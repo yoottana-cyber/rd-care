@@ -1,5 +1,6 @@
 import {readXlsxRows} from './xlsx-reader.js';
 import {downloadStudentExampleXlsx} from './template-xlsx.js';
+import {readCsvFile} from './csv-encoding.js';
 
 const HEADER='classroom,roll_no,student_no,full_name,username,password';
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -51,7 +52,7 @@ export function prepareRows(raw,rooms){
 }
 const chunks=(items,size)=>Array.from({length:Math.ceil(items.length/size)},(_,i)=>items.slice(i*size,(i+1)*size));
 export function createUnifiedImport({api,rooms,onSuccess}){
- let rows=[],preview=[],filename='',busy=false,stopped=false,completed=0,phase='';
+ let rows=[],preview=[],filename='',busy=false,stopped=false,completed=0,phase='',detectedEncoding='';
  function showPreview(container){
   const place=container.querySelector('#unifiedPreview');if(!place)return;
   const errors=preview.filter(x=>x.status==='error').length;
@@ -68,7 +69,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
  }
  async function preflight(container){
   if(busy)return;
-  busy=true;rows=[];preview=[];completed=0;
+  busy=true;rows=[];preview=[];completed=0;detectedEncoding='';
   const button=container.querySelector('#unifiedPreviewButton');
   if(button)button.disabled=true;
   try{
@@ -77,17 +78,24 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    if(file?.size){
     if(file.size>8_000_000)throw Error('ไฟล์ใหญ่เกิน 8 MB กรุณาแบ่งเป็นหลายไฟล์');
     if(/\.xlsx$/i.test(file.name))raw=await readXlsxRows(file);
-    else if(/\.csv$/i.test(file.name))raw=csvRows(await file.text());
+    else if(/\.csv$/i.test(file.name)){
+     const result=await readCsvFile(file,String(data.get('encoding')||'auto'));
+     raw=csvRows(result.text);detectedEncoding=result.encodingLabel;
+    }
     else throw Error('รองรับไฟล์ .xlsx หรือ .csv เท่านั้น');
     filename=file.name;
-   }else{raw=csvRows(String(data.get('csv')||''));filename='ข้อความ CSV';}
+   }else{
+    const pasted=String(data.get('csv')||'');
+    if(pasted.includes('\ufffd'))throw Error('ข้อความที่วางมีอักขระภาษาไทยเสียหาย (�) กรุณาเลือกไฟล์ CSV ต้นฉบับหรือ Excel .xlsx แทน');
+    raw=csvRows(pasted);filename='ข้อความ CSV';
+   }
    const prepared=prepareRows(raw,typeof rooms==='function'?rooms():rooms);
    rows=prepared.map(x=>x.values);
    preview=prepared.map(x=>({source_row:x.values.source_row,room:x.values.classroom,roll_no:x.values.roll_no,
     student_no:x.values.student_no,full_name:x.values.full_name,username:x.values.username,status:x.status,message:x.message}));
    let checked=0;
    if(prepared.some(x=>x.message)){
-    phase='พบข้อมูลผิดพลาดภายในไฟล์ กรุณาแก้ไขก่อนนำเข้า';
+    phase=(detectedEncoding?'ตรวจพบรหัสอักขระ '+detectedEncoding+' • ':'')+'พบข้อมูลผิดพลาดภายในไฟล์ กรุณาแก้ไขก่อนนำเข้า';
    }else{
     phase='กำลังตรวจสอบข้อมูลในฐานข้อมูล...';showPreview(container);
     const groups=chunks(rows,100);
@@ -100,8 +108,8 @@ export function createUnifiedImport({api,rooms,onSuccess}){
      checked+=group.length;
      phase='ตรวจแล้ว '+checked+' / '+rows.length+' คน';showPreview(container);
     }
-    phase=preview.some(x=>x.status==='error')?'พบรายการที่ต้องแก้ไข ไม่สามารถเริ่มบันทึกได้':
-     'ตรวจสอบครบทั้งไฟล์แล้ว พร้อมนำเข้า '+rows.length+' คน';
+    phase=(detectedEncoding?'ตรวจพบรหัสอักขระ '+detectedEncoding+' • ':'')+(preview.some(x=>x.status==='error')?'พบรายการที่ต้องแก้ไข ไม่สามารถเริ่มบันทึกได้':
+     'ตรวจสอบครบทั้งไฟล์แล้ว พร้อมนำเข้า '+rows.length+' คน');
    }
   }catch(e){rows=[];preview=[];phase=e.message;}
   finally{busy=false;if(button?.isConnected)button.disabled=false;showPreview(container)}
@@ -140,9 +148,15 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    <p class="row" style="flex-wrap:wrap"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV (.csv)</a></p>
    <form id="unifiedForm" class="stack">
      <div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".xlsx,.csv,text/csv"></div>
+     <div class="field"><label>รหัสภาษาไทยของไฟล์ CSV</label><select name="encoding">
+      <option value="auto">ตรวจจับอัตโนมัติ (แนะนำ)</option>
+      <option value="utf-8">UTF-8 (CSV UTF-8)</option>
+      <option value="windows-874">Windows-874 / TIS-620 (CSV จาก Excel รุ่นเก่า)</option>
+     </select></div>
      <div class="field"><label>หรือวาง CSV ตามรูปแบบไฟล์ตัวอย่าง</label>
       <textarea name="csv" rows="3" placeholder="classroom,roll_no,student_no,full_name,username,password"></textarea></div>
      <p class="muted">ระบุห้องเรียนตรงกับที่มีในระบบ เช่น ม.1/1 และ ม.2/3 • รหัสนักเรียนและ Username ที่มี 0 นำหน้า ให้ตั้งคอลัมน์ Excel เป็น Text</p>
+     <p class="muted">ไฟล์ CSV ที่บันทึกจาก Excel บางเครื่องใช้รหัสภาษาไทย Windows-874/TIS-620 ระบบจะอ่านให้อัตโนมัติ หากชื่อกลายเป็น � ให้ใช้ไฟล์ต้นฉบับหรือบันทึกใหม่เป็น CSV UTF-8</p>
      <p class="warn">Password ขั้นต่ำ 4 ตัวตามที่ตั้งค่าไว้ แต่ควรใช้รหัสผ่านยาวและไม่ซ้ำ ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน และโปรดเก็บไฟล์รหัสผ่านเป็นความลับ</p>
      <button class="button full" id="unifiedPreviewButton" type="submit">ตรวจสอบทั้งไฟล์ก่อนนำเข้า</button>
    </form>
