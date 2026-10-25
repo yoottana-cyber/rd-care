@@ -18,7 +18,7 @@ classroom,roll_no,student_no,full_name,username,password
 - username: ชื่อบัญชีที่กำหนดเอง 3–40 ตัว ภาษาอังกฤษ ตัวเลข `.`, `_`, `-`; ไม่ซ้ำกับบัญชีที่มีอยู่
 - password: รหัสผ่าน 4–128 ตัว ควรใช้รหัสยาวและไม่ซ้ำ ห้ามใช้เลขประจำตัวประชาชน 13 หลัก
 
-ไฟล์ CSV ตัวอย่างอยู่ที่ `web/templates/student-all-rooms-import.csv`; นอกจากนี้มีไฟล์ Excel ตัวอย่างพร้อมแผ่นงาน Rooms/Instructions ให้ดาวน์โหลดจากบทสนทนา
+ไฟล์ CSV ตัวอย่างอยู่ที่ `web/templates/student-all-rooms-import.csv`; ปุ่ม **ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx)** ในหน้า Admin จะสร้างไฟล์มาตรฐานด้วยฟอนต์ **Tahoma** พร้อมแผ่นงาน Students, Instructions และ Rooms โดยค่าในเซลล์ `Students!A2:A4` คือ `ม.1/1`, `ม.2/3`, `ม.3/2` ตามลำดับ (ใช้ **มอ ม้า** ไม่ใช่อักษรที่หน้าตาคล้ายกัน)
 
 ## ขั้นตอน
 

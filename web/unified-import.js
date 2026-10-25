@@ -1,4 +1,5 @@
 import {readXlsxRows} from './xlsx-reader.js';
+import {downloadStudentExampleXlsx} from './template-xlsx.js';
 
 const HEADER='classroom,roll_no,student_no,full_name,username,password';
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -136,7 +137,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   if(!container)return;
   container.innerHTML=`<section class="card stack"><h3>นำเข้านักเรียนและบัญชีจากทุกห้องในไฟล์เดียว</h3>
    <p class="muted">ไฟล์มาตรฐาน 6 คอลัมน์: classroom,roll_no,student_no,full_name,username,password • ไม่ต้องเลือกห้องเรียน • รองรับรายชื่อจำนวนมาก โดยระบบแบ่งชุดนำเข้าอัตโนมัติ</p>
-   <p><a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดไฟล์ตัวอย่าง CSV 6 คอลัมน์</a></p>
+   <p class="row" style="flex-wrap:wrap"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV (.csv)</a></p>
    <form id="unifiedForm" class="stack">
      <div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".xlsx,.csv,text/csv"></div>
      <div class="field"><label>หรือวาง CSV ตามรูปแบบไฟล์ตัวอย่าง</label>
@@ -152,6 +153,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    <p class="muted">ระบบแบ่งการบันทึกเป็นชุดละ 10 คนเพื่อความเสถียร แต่ละชุดบันทึกแบบครบหรือไม่บันทึกเลย หากเกิดข้อผิดพลาดระหว่างทาง รายการที่สำเร็จแล้วจะไม่ถูกย้อนกลับทั้งไฟล์</p>
    <p class="warn">ใช้เฉพาะข้อมูลจำลองในฐาน Dev ก่อนผ่านการทบทวน PDPA และขั้นตอนเปิดระบบจริง</p>
   </section>`;
+  container.querySelector('#downloadUnifiedExcel').addEventListener('click',downloadStudentExampleXlsx);
   container.querySelector('#unifiedForm').addEventListener('submit',e=>{e.preventDefault();preflight(container)});
   container.querySelector('#unifiedCommit').addEventListener('click',()=>commit(container));
   container.querySelector('#unifiedCancel').addEventListener('click',()=>{stopped=true;phase='กำลังหยุดหลังจบชุดที่ทำอยู่...';showPreview(container)});
