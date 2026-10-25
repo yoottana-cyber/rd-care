@@ -30,9 +30,12 @@
 .login-wrap .login-brand::before{top:-160px;left:-70px}
 .login-wrap .login-brand::after{bottom:-188px;right:-70px;width:260px;height:260px}
 .login-wrap .login-crest{
- display:block;width:91px;height:91px;max-width:100%;object-fit:contain;
- margin:0 auto 10px;
- filter:drop-shadow(0 8px 12px rgba(0,40,24,.21));
+ display:block;width:138px;height:auto;max-width:min(52%,180px);object-fit:contain;
+ box-sizing:content-box;padding:10px 15px;margin:0 auto 14px;
+ background:#ffffff;border:1px solid rgba(255,255,255,.88);
+ border-radius:23px;
+ box-shadow:0 9px 24px rgba(0,48,29,.19),inset 0 0 0 1px rgba(11,127,72,.06);
+ image-rendering:-webkit-optimize-contrast;
 }
 .login-wrap .login-brand h1{
  color:#fff;font-size:clamp(19px,3vw,23px);font-weight:850;
@@ -152,7 +155,7 @@
  .login-wrap{padding:14px 11px 18px;min-height:100dvh}
  .login-wrap .login-card,.login-wrap .portal-card.login-card{border-radius:21px}
  .login-wrap .login-brand{padding:17px 18px 19px}
- .login-wrap .login-crest{width:77px;height:77px;margin-bottom:7px}
+ .login-wrap .login-crest{width:112px;height:auto;max-width:48%;padding:8px 10px;margin-bottom:10px;border-radius:18px}
  .login-wrap .login-brand h1{font-size:20px}
  .login-wrap .login-content{padding:17px 17px 15px}
  .login-wrap .login-role-tabs button{font-size:11px}
