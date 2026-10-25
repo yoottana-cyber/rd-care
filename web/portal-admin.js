@@ -30,7 +30,8 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
      <div class="field"><label>เลือกห้องเรียน</label><select id="portalAdminRoom">${roomOpts}</select></div>
      <form id="portalCreateStudent" class="stack">
       <div class="field"><label>นักเรียนจำลอง</label><select required name="student_id">${studentOpts}</select></div>
-      <div class="field"><label>Username (เลขประจำตัวนักเรียน)</label><input id="selectedStudentNumber" value="${esc(students[0]?.student_no||'')}" readonly></div>
+      <div class="field"><label>Username (ค่าเริ่มต้นคือเลขประจำตัวนักเรียน)</label><input id="selectedStudentNumber" name="username" maxlength="40" required value="${esc(students[0]?.student_no||'')}" autocomplete="off"></div>
+      <div class="field"><label>รหัสผ่านเริ่มต้น (ไม่บังคับ: เว้นว่างเพื่อให้ระบบสุ่ม)</label><input name="password" type="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="อย่างน้อย 4 ตัวอักษร"></div>
       <button type="submit" class="button full" ${students.length?'':'disabled'}>สร้างบัญชีนักเรียน</button>
      </form></section>
     <section class="card stack"><h3>สร้างบัญชีผู้ปกครอง</h3>
@@ -81,8 +82,8 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
   });
   $('#portalCreateStudent')?.addEventListener('submit',e=>safeRun(async()=>{
    e.preventDefault();const f=new FormData(e.currentTarget),button=e.currentTarget.querySelector('button');button.disabled=true;
-   try{const r=await api('/api/admin/portal/accounts',{method:'POST',body:{role:'student',student_id:Number(f.get('student_id'))}});
-    toast('สร้างบัญชีนักเรียนแล้ว');await load({username:r.username,temporary_password:r.temporary_password});
+   try{const r=await api('/api/admin/portal/accounts',{method:'POST',body:{role:'student',student_id:Number(f.get('student_id')),username:String(f.get('username')).trim(),...(f.get('password')?{password:String(f.get('password'))}:{})}});
+    toast('สร้างบัญชีนักเรียนแล้ว');await load(r.temporary_password?{username:r.username,temporary_password:r.temporary_password}:null);
    }finally{if(button.isConnected)button.disabled=false}
   }));
   $('#portalBulkCreate')?.addEventListener('click',()=>safeRun(async()=>{
