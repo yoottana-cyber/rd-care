@@ -270,12 +270,12 @@ function renderAdminStudents(){
     <button class="button full" type="submit">ตรวจสอบข้อมูลก่อนนำเข้า</button>
    </form>
    ${adminImportState.preview && adminImportState.roomId===adminStudentState.roomId?
-    `<div class="summary"><strong>ผลตรวจสอบ ${esc(adminImportState.filename)}:</strong> ${adminImportState.preview.valid} รายการพร้อมนำเข้า / ${adminImportState.preview.errors} รายการมีปัญหา</div>
+    `<div class="summary"><strong>${adminImportState.preview.ok?'ผลการนำเข้า':'ผลตรวจสอบ'} ${esc(adminImportState.filename)}:</strong> ${adminImportState.preview.valid} รายการ${adminImportState.preview.ok?'นำเข้าสำเร็จ':'พร้อมนำเข้า'} / ${adminImportState.preview.errors} รายการมีปัญหา</div>
      <div class="table-wrap"><table class="table"><thead><tr><th>แถว</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ–สกุล</th><th>สถานะ/ข้อผิดพลาด</th></tr></thead>
      <tbody>${adminImportState.preview.items.map(item=>`<tr><td>${item.source_row}</td><td>${esc(item.student.roll_no)}</td>
       <td>${esc(item.student.student_no)}</td><td>${esc(item.student.full_name)}</td>
-      <td class="${item.status==='ready'?'':'import-error'}">${item.status==='ready'?'พร้อมนำเข้า':esc(item.message)}</td></tr>`).join('')}</tbody></table></div>
-     <button type="button" id="adminConfirmImport" class="button full" ${adminImportState.preview.ready?'':'disabled'}>ยืนยันนำเข้า ${adminImportState.preview.items.length} คน</button>
+      <td class="${item.status==='error'?'import-error':item.status==='imported'?'import-success':''}">${item.status==='ready'?'พร้อมนำเข้า':esc(item.message)}</td></tr>`).join('')}</tbody></table></div>
+     ${adminImportState.preview.ok?'':`<button type="button" id="adminConfirmImport" class="button full" ${adminImportState.preview.ready?'':'disabled'}>ยืนยันนำเข้า ${adminImportState.preview.items.length} คน</button>`}
      ${adminImportState.preview.ready?'':'<p class="warn">พบข้อมูลไม่ถูกต้องหรือซ้ำ ระบบจะยังไม่บันทึกจนกว่าทุกแถวจะผ่านการตรวจสอบ</p>'}`:'<div class="muted">กรุณาตรวจสอบข้อมูลก่อนกดยืนยัน ไม่มีการเขียนข้อมูลลง D1 ระหว่างตรวจสอบ</div>'}
    <div class="warn">ใช้เฉพาะข้อมูลจำลองในระยะทดสอบ ห้ามนำเข้ารายชื่อนักเรียนจริงก่อนทบทวนสิทธิ์และ PDPA</div>
  </section>`);
@@ -364,7 +364,7 @@ function renderAdminStudents(){
   const button=$('#adminConfirmImport');button.disabled=true;
   try{
    const result=await api('/api/admin/import-students',{method:'POST',body:{classroom_id:adminImportState.roomId,students:adminImportState.students}});
-   adminImportState.preview=null;adminImportState.students=[];
+   adminImportState.preview=result;adminImportState.students=[];
    referenceCache.clear();toast(`นำเข้าสำเร็จ ${result.imported} คน`);await loadAdminStudents();
   }finally{if(button.isConnected)button.disabled=false}
  }));
