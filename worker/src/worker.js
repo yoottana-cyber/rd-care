@@ -178,9 +178,23 @@ async function writeAttendance(req,env,user){
       VALUES(?,?,?,'pending_review') ON CONFLICT(student_id,timetable_id,school_date) DO UPDATE SET
       state=CASE WHEN attendance_alerts.state='resolved' THEN 'pending_review' ELSE attendance_alerts.state END`)
      .bind(e.student_id,slot.id,date));
+    // Record an internal review request for the class advisor, not a Push send.
+    stmts.push(env.DB.prepare(`INSERT INTO notification_outbox(alert_id,event_type,audience,state)
+      SELECT id,'attendance_review_requested','advisor','pending'
+      FROM attendance_alerts
+      WHERE student_id=? AND timetable_id=? AND school_date=? AND state='pending_review'
+      ON CONFLICT(alert_id,event_type,audience) DO UPDATE SET
+      state=CASE WHEN notification_outbox.state='cancelled' THEN 'pending' ELSE notification_outbox.state END,
+      updated_at=CURRENT_TIMESTAMP`).bind(e.student_id,slot.id,date));
    }else{
     stmts.push(env.DB.prepare(`UPDATE attendance_alerts SET state='resolved',reviewed_by=? ,reviewed_at=CURRENT_TIMESTAMP
       WHERE student_id=? AND timetable_id=? AND school_date=? AND state!='resolved'`).bind(user.id,e.student_id,slot.id,date));
+    // If the student is actually present/late/on leave, cancel pending events.
+    // Delivered events remain in the audit trail for future retraction handling.
+    stmts.push(env.DB.prepare(`UPDATE notification_outbox SET state='cancelled',updated_at=CURRENT_TIMESTAMP
+      WHERE state='pending' AND alert_id IN (
+      SELECT id FROM attendance_alerts
+      WHERE student_id=? AND timetable_id=? AND school_date=?)`).bind(e.student_id,slot.id,date));
    }
   }
  }
@@ -257,9 +271,26 @@ async function reviewAlert(req,env,user,id){
    .bind(record.student_id,record.timetable_id,record.school_date).first();
   if(att?.status!=='absent')throw error(409,'สถานะการเช็กชื่อเปลี่ยนไปแล้ว');
  }
- await env.DB.prepare(`UPDATE attendance_alerts SET state=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?`).bind(b.state,user.id,id).run();
- await log(env.DB,user.id,'attendance_reviewed','attendance_alerts',id);
- return json({ok:true,notification:'Push ยังไม่เปิดใช้งานในต้นแบบ ไม่มีการส่งถึงผู้ปกครอง'});
+ const stmts=[
+  env.DB.prepare(`UPDATE attendance_alerts SET state=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP
+    WHERE id=? AND state='pending_review'`).bind(b.state,user.id,id)
+ ];
+ if(b.state==='confirmed'){
+  // A guardian-facing event can only be queued after advisor confirmation.
+  stmts.push(env.DB.prepare(`INSERT INTO notification_outbox(alert_id,event_type,audience,state)
+    SELECT id,'absence_confirmed','guardian','pending' FROM attendance_alerts
+    WHERE id=? AND state='confirmed'
+    ON CONFLICT(alert_id,event_type,audience) DO UPDATE SET
+    state=CASE WHEN notification_outbox.state='cancelled' THEN 'pending' ELSE notification_outbox.state END,
+    updated_at=CURRENT_TIMESTAMP`).bind(id));
+ }else{
+  stmts.push(env.DB.prepare(`UPDATE notification_outbox SET state='cancelled',updated_at=CURRENT_TIMESTAMP
+    WHERE alert_id=? AND state='pending'`).bind(id));
+ }
+ stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+   .bind(user.id,'attendance_reviewed','attendance_alerts',String(id)));
+ await env.DB.batch(stmts);
+ return json({ok:true,notification:'บันทึกเหตุการณ์ลงคิวภายในแล้ว แต่ยังไม่ได้ส่ง Push หรือข้อความถึงผู้ปกครอง'});
 }
 async function dashboard(req,env,user){
  const date=new URL(req.url).searchParams.get('date')||bangkokToday();requireDate(date);

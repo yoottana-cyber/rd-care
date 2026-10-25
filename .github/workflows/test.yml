@@ -31,3 +31,5 @@ jobs:
           assert c.execute('SELECT count(*) FROM students').fetchone()[0] == 15
           print('D1/SQLite structure and dummy data verified')
           PY
+      - name: Notification outbox schema and lifecycle
+        run: python3 -m unittest discover -s tests -p 'notification_*_test.py' -v
