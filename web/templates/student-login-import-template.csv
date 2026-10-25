@@ -1,4 +1,4 @@
 ﻿roll_no,student_no,full_name,username,password
-1,DEMO9001,นักเรียนทดสอบ หนึ่ง,student-demo01,Demo#1234
-2,DEMO9002,นักเรียนทดสอบ สอง,student-demo02,Demo#5678
-3,DEMO9003,นักเรียนทดสอบ สาม,student-demo03,Demo#9012
+1,STU9001,นักเรียนตัวอย่าง หนึ่ง,student001,Student#1234
+2,STU9002,นักเรียนตัวอย่าง สอง,student002,Student#5678
+3,STU9003,นักเรียนตัวอย่าง สาม,student003,Student#9012
