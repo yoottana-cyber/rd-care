@@ -1,11 +1,13 @@
 import {API_BASE_URL} from './config.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
+import {readXlsxRows} from './xlsx-reader.js';
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
+const adminImportState={roomId:null,students:[],preview:null,filename:''};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
@@ -247,15 +249,25 @@ function renderAdminStudents(){
      </form>`:'<div class="empty">เลือกปุ่ม “แก้ไข” ด้านบน</div>'}
    </section>
   </div>
-  <section class="card stack"><h3>นำเข้ารายชื่อนักเรียน CSV</h3><p class="muted">ส่งออกจาก Excel เป็น CSV UTF-8 หรือวางข้อความ CSV รูปแบบ roll_no,student_no,full_name (สูงสุด 60 คน/ครั้ง)</p>
-   <form id="adminImportCsv" class="stack"><div class="field"><label>ไฟล์ CSV (ถ้ามี)</label><input name="file" type="file" accept=".csv,text/csv"></div>
-    <div class="field"><label>หรือวางข้อมูล CSV</label><textarea name="csv" placeholder="roll_no,student_no,full_name&#10;1,DEMO0001,นักเรียนตัวอย่าง"></textarea></div>
-    <button class="button full">นำเข้าห้องที่เลือก</button></form>
+  <section class="card stack"><h3>นำเข้ารายชื่อนักเรียน Excel / CSV</h3>
+   <p class="muted">รองรับ .xlsx (แผ่นงานแรก) และ CSV UTF-8 • ครั้งละ 1–60 คน • ห้ามนำเข้าข้อมูลนักเรียนจริงในฐานทดลอง</p>
+   <form id="adminImportCsv" class="stack"><div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+    <div class="field"><label>หรือวางข้อความ CSV</label><textarea name="csv" placeholder="roll_no,student_no,full_name&#10;1,DEMO0101,นักเรียนตัวอย่าง"></textarea></div>
+    <p class="muted">ลำดับคอลัมน์: roll_no,student_no,full_name • หากรหัสนักเรียนขึ้นต้นด้วย 0 ให้ตั้งคอลัมน์เป็นข้อความ (Text) ใน Excel ก่อนบันทึก</p>
+    <button class="button full" type="submit">ตรวจสอบข้อมูลก่อนนำเข้า</button>
+   </form>
+   ${adminImportState.preview && adminImportState.roomId===adminStudentState.roomId?
+    `<div class="summary"><strong>ผลตรวจสอบ ${esc(adminImportState.filename)}:</strong> ${adminImportState.preview.valid} รายการพร้อมนำเข้า / ${adminImportState.preview.errors} รายการมีปัญหา</div>
+     <div class="table-wrap"><table class="table"><thead><tr><th>แถว</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ–สกุล</th><th>สถานะ/ข้อผิดพลาด</th></tr></thead>
+     <tbody>${adminImportState.preview.items.map(item=>`<tr><td>${item.source_row}</td><td>${esc(item.student.roll_no)}</td>
+      <td>${esc(item.student.student_no)}</td><td>${esc(item.student.full_name)}</td>
+      <td class="${item.status==='ready'?'':'import-error'}">${item.status==='ready'?'พร้อมนำเข้า':esc(item.message)}</td></tr>`).join('')}</tbody></table></div>
+     <button type="button" id="adminConfirmImport" class="button full" ${adminImportState.preview.ready?'':'disabled'}>ยืนยันนำเข้า ${adminImportState.preview.items.length} คน</button>
+     ${adminImportState.preview.ready?'':'<p class="warn">พบข้อมูลไม่ถูกต้องหรือซ้ำ ระบบจะยังไม่บันทึกจนกว่าทุกแถวจะผ่านการตรวจสอบ</p>'}`:'<div class="muted">กรุณาตรวจสอบข้อมูลก่อนกดยืนยัน ไม่มีการเขียนข้อมูลลง D1 ระหว่างตรวจสอบ</div>'}
    <div class="warn">ใช้เฉพาะข้อมูลจำลองในระยะทดสอบ ห้ามนำเข้ารายชื่อนักเรียนจริงก่อนทบทวนสิทธิ์และ PDPA</div>
-  </section>
  </section>`);
  $('#adminStudentRoom').addEventListener('change',e=>safeRun(async()=>{
-  adminStudentState.roomId=Number(e.target.value);adminStudentState.editId=null;await loadAdminStudents();
+  adminStudentState.roomId=Number(e.target.value);adminStudentState.editId=null;adminImportState.preview=null;adminImportState.students=[];await loadAdminStudents();
  }));
  $('#adminStudentSearch').addEventListener('input',e=>{
   const q=e.target.value.trim().toLocaleLowerCase();
@@ -286,15 +298,39 @@ function renderAdminStudents(){
  $('#adminImportCsv').addEventListener('submit',e=>safeRun(async()=>{
   e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
   try{
-   const f=new FormData(form),file=f.get('file');
-   const csv=(file&&file.size?await file.text():String(f.get('csv')||'')).replace(/^\uFEFF/,'').trim();
-   const rows=parseCsv(csv);
-   if(rows[0]?.map(x=>x.trim().toLowerCase()).join(',')==='roll_no,student_no,full_name')rows.shift();
-   if(!rows.length||rows.length>60)throw Error('CSV ต้องมีนักเรียน 1–60 คน');
-   const students=rows.map(r=>({roll_no:Number(r[0]),student_no:r[1].trim(),full_name:r[2].trim()}));
-   await api('/api/admin/import-students',{method:'POST',body:{classroom_id:adminStudentState.roomId,students}});
-   referenceCache.clear();toast(`นำเข้าสำเร็จ ${students.length} คน`);await loadAdminStudents();
+   const data=new FormData(form),file=data.get('file');
+   let rows,filename;
+   if(file&&file.size){
+    if(file.size>3_000_000)throw Error('ไฟล์ใหญ่เกิน 3 MB');
+    if(/\.xlsx$/i.test(file.name)){
+     rows=await readXlsxRows(file);
+    }else if(/\.csv$/i.test(file.name)){
+     rows=parseCsv((await file.text()).replace(/^\uFEFF/,'').trim());
+    }else throw Error('กรุณาใช้ไฟล์ .xlsx หรือ .csv');
+    filename=file.name;
+   }else{
+    rows=parseCsv(String(data.get('csv')||'').replace(/^\uFEFF/,'').trim());
+    filename='ข้อความ CSV';
+   }
+   if(rows[0]?.slice(0,3).map(x=>String(x??'').trim().toLowerCase()).join(',')==='roll_no,student_no,full_name')rows.shift();
+   if(rows.length<1||rows.length>60)throw Error('นำเข้าได้ครั้งละ 1–60 คน (ไม่รวมบรรทัดหัวตาราง)');
+   const students=rows.map((r,i)=>({roll_no:Number(r[0]),student_no:String(r[1]??'').trim(),full_name:String(r[2]??'').trim(),source_row:i+2}));
+   const roomId=adminStudentState.roomId;
+   const plan=await api('/api/admin/import-students/preview',{method:'POST',body:{classroom_id:roomId,students}});
+   if(adminStudentState.roomId!==roomId||state.tab!=='adminStudents')return;
+   adminImportState.roomId=roomId;adminImportState.students=students;adminImportState.preview=plan;adminImportState.filename=filename;
+   renderAdminStudents();
   }finally{button.disabled=false}
+ }));
+ $('#adminConfirmImport')?.addEventListener('click',()=>safeRun(async()=>{
+  if(!adminImportState.preview?.ready||adminImportState.roomId!==adminStudentState.roomId)return;
+  if(!confirm(`ยืนยันเพิ่มนักเรียนจำลอง ${adminImportState.students.length} คนเข้าห้องที่เลือก?\nระบบจะนำเข้าแบบทั้งหมดหรือไม่บันทึกเลย`))return;
+  const button=$('#adminConfirmImport');button.disabled=true;
+  try{
+   const result=await api('/api/admin/import-students',{method:'POST',body:{classroom_id:adminImportState.roomId,students:adminImportState.students}});
+   adminImportState.preview=null;adminImportState.students=[];
+   referenceCache.clear();toast(`นำเข้าสำเร็จ ${result.imported} คน`);await loadAdminStudents();
+  }finally{if(button.isConnected)button.disabled=false}
  }));
 }
 
