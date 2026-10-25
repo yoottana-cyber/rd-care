@@ -66,8 +66,13 @@ function loginPage(){
 }
 function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian')); }
 function renderStudentLate(){
- $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card stack">
- <div class="login-head"><div class="brand-icon">RD</div><h1>แจ้งมาสายด้วยตนเอง</h1><p>ต้องใช้รหัสยืนยันที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p></div>
+ $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card">
+ <header class="login-brand">
+  <img class="login-crest" src="./media/ratsada-crest.svg" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
+  <h1>แจ้งมาสายด้วยตนเอง</h1>
+  <p class="brand-subtitle">ต้องใช้รหัสยืนยันที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p>
+ </header>
+ <div class="login-content">
  <form class="stack" id="studentLateForm">
   <div class="field"><label for="studentNumber">รหัสประจำตัวนักเรียน</label><input id="studentNumber" name="student_no" maxlength="40" required autocomplete="off" placeholder="เช่น 000123"></div>
   <div class="field"><label for="studentLateCode">รหัสยืนยันจากครูเวร</label><input id="studentLateCode" name="code" pattern="[a-fA-F0-9]{24}" maxlength="24" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="รหัส 24 ตัวอักษร"></div>
@@ -77,6 +82,7 @@ function renderStudentLate(){
  <p id="lateSelfFeedback" class="muted" aria-live="polite">ระบบบันทึกเวลาเข้าถึงเซิร์ฟเวอร์อัตโนมัติ เมื่อครูเวรยืนยันจึงนับเป็นรายการมาสายที่ตรวจสอบแล้ว</p>
  <button type="button" class="button secondary full" id="backToStaffLogin">กลับหน้าเข้าสู่ระบบครู</button>
  <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
+ </div><footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
  bindThemeButtons();
  $('#backToStaffLogin').addEventListener('click',renderLogin);
