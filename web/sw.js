@@ -1,4 +1,4 @@
-const CACHE='rd-care-shell-v8';
+const CACHE='rd-care-shell-v9';
 const ASSETS=['./','./index.html','./app.css','./app.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
