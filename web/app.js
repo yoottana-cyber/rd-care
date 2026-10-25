@@ -389,6 +389,17 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
  })()}
  </section></div>`);
  advisorImporter.render($('#advisorImportHolder'));
+ const accountForm=$('#addUser'),accountRole=accountForm?.querySelector('select[name="role"]');
+ const accountPassword=accountForm?.querySelector('input[name="password"]');
+ const syncPasswordMinimum=()=>{
+  const min=accountRole.value==='teacher'?4:12;
+  accountPassword.minLength=min;
+  accountPassword.closest('.field')?.querySelector('label')?.replaceChildren(
+   document.createTextNode('รหัสผ่านชั่วคราว (อย่างน้อย '+min+' ตัว)')
+  );
+ };
+ accountRole?.addEventListener('change',syncPasswordMinimum);
+ if(accountRole&&accountPassword)syncPasswordMinimum();
  $('[data-edit-user]').forEach(btn=>btn.addEventListener('click',()=>{
   adminEditUserId=Number(btn.dataset.editUser);renderAdmin();
  }));
