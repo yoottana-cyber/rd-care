@@ -1,0 +1,31 @@
+name: Check RD Care Starter
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check worker/src/core.js
+          node --check worker/src/worker.js
+          node --check web/app.js
+          node --check web/sw.js
+      - name: Unit tests
+        run: node --test tests/*.test.mjs
+      - name: Test schema + sample data
+        run: |
+          python3 - <<'PY'
+          import sqlite3
+          c=sqlite3.connect(':memory:')
+          with open('worker/migrations/0001_initial.sql',encoding='utf-8') as f: c.executescript(f.read())
+          with open('worker/demo_seed.sql',encoding='utf-8') as f: c.executescript(f.read())
+          assert c.execute('SELECT count(*) FROM classrooms').fetchone()[0] == 48
+          assert c.execute('SELECT count(*) FROM students').fetchone()[0] == 15
+          print('D1/SQLite structure and dummy data verified')
+          PY

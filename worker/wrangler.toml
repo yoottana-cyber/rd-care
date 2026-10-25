@@ -1,0 +1,12 @@
+name = "rd-care-api-dev"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+ALLOWED_ORIGINS = "http://localhost:5500,https://school.example.ac.th"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rd-care-dev"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"

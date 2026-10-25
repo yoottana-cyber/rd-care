@@ -1,0 +1,157 @@
+import {API_BASE_URL} from './config.js';
+const $=(selector)=>document.querySelector(selector);
+const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],behaviors:[],behaviorTotal:0};
+const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
+const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
+let toastTimer;
+function dateToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+function timeNow(){return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}
+function toast(message,bad=false){const el=$('#toast');el.textContent=message;el.className='toast show'+(bad?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.className='toast',4200);}
+async function api(path,{method='GET',body,auth=true}={}){
+ if(API_BASE_URL.includes('REPLACE-WITH'))throw Error('กรุณาตั้งค่า API_BASE_URL ใน web/config.js ก่อน');
+ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),12000);
+ try{
+  const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){if(response.status===401&&auth){state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
+  return data;
+ }catch(e){if(e.name==='AbortError')throw Error('การเชื่อมต่อล่าช้า กรุณาลองใหม่');throw e}
+ finally{clearTimeout(timer)}
+}
+function safeRun(job){Promise.resolve().then(job).catch(e=>toast(e.message,true));}
+function loginPage(){
+ return `<div class="login-wrap"><section class="card login-card">
+ <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน</p></div>
+ <form id="loginForm"><div class="field"><label for="username">ชื่อผู้ใช้งาน</label><input id="username" name="username" required autocomplete="username" placeholder="เช่น teacher01"></div>
+ <div class="field"><label for="password">รหัสผ่าน</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
+ <button class="button full" type="submit">เข้าสู่ระบบ</button></form>
+ <p class="muted" style="text-align:center">รุ่นทดลอง • ยังไม่เปิดใช้งานการแจ้งเตือนผู้ปกครอง</p></section></div>`;
+}
+function renderLogin(){ $('#app').innerHTML=loginPage();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}})); }
+async function boot(){
+ const [me,rooms]=await Promise.all([api('/api/auth/me'),api('/api/classrooms')]);state.user=me.user;state.rooms=rooms.items;
+ if(!state.rooms.some(r=>r.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
+ await showTab('dashboard');
+}
+function roleName(){return roles[state.user?.role]||state.user?.role;}
+function chrome(content){
+ const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['admin','ตั้งค่าระบบ','⚙']]:[])];
+ return `<main class="shell"><header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
+ <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button id="logout" class="button ghost" type="button">ออก</button></div></header>
+ <nav class="nav" aria-label="เมนูหลัก">${navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('')}</nav>
+ ${content}<footer class="foot">RD Care v0.1 • ทดลองกับข้อมูลจำลองก่อนใช้งานจริง • ไม่เปิด Push ผู้ปกครองในรุ่นนี้</footer></main>`;
+}
+function mount(content){$('#app').innerHTML=chrome(content);$$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));$('#logout').addEventListener('click',()=>safeRun(logout));}
+function $$(sel){return [...document.querySelectorAll(sel)]}
+async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
+function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
+function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
+function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
+async function showTab(tab){state.tab=tab;
+ if(tab==='dashboard')return loadDashboard();
+ if(tab==='attendance')return loadAttendance();
+ if(tab==='late')return loadLate();
+ if(tab==='behavior')return loadBehavior();
+ if(tab==='alerts')return loadAlerts();
+ if(tab==='admin')return loadAdmin();
+}
+async function loadDashboard(){state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));renderDashboard();}
+function renderDashboard(){const s=state.stats||{};mount(`<section class="stack"><div><h2>ภาพรวมการดูแลนักเรียน</h2><p class="muted">สถิติจากข้อมูลที่บันทึกแล้ว • ${esc(state.date)}</p></div>
+ <div class="card">${filters()}</div><div class="grid four">${[['ห้องเรียน',s.rooms],['นักเรียน',s.students],['รายการเช็กชื่อประจำวัน',s.daily],['รายการเช็กชื่อรายคาบ',s.period]].map(([name,n])=>`<div class="card stats"><small>${name}</small><strong>${Number(n||0).toLocaleString('th-TH')}</strong></div>`).join('')}</div>
+ <div class="grid three">${[['พบขาดรายคาบ',s.absent_period],['รอตรวจสอบ',s.alerts],['รายการมาสาย',s.late]].map(([name,n])=>`<div class="card stats"><small>${name}</small><strong>${Number(n||0).toLocaleString('th-TH')}</strong></div>`).join('')}</div>
+ <div class="warn">การขาดรายคาบหมายถึง “ไม่พบการเข้าชั้นเรียน” ยังไม่ใช่ข้อสรุปว่านักเรียนหนีเรียน ต้องให้ครูที่ปรึกษาตรวจสอบก่อน</div></section>`);
+ bindFilters(loadDashboard);
+}
+async function loadAttendance(){
+ if(!state.roomId){mount(`<div class="card empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>`);return}
+ const students=await api(`/api/students?classroom_id=${state.roomId}`);state.students=students.items;
+ const slots=await api(`/api/timetable?date=${state.date}&classroom_id=${state.roomId}`);state.slots=slots.items;
+ if(!state.slots.some(s=>s.id===state.slotId))state.slotId=state.slots[0]?.id||null;
+ let entries=[];
+ if(state.kind==='daily'||state.slotId){const q=`?kind=${state.kind}&classroom_id=${state.roomId}&date=${state.date}`+(state.kind==='period'?`&timetable_id=${state.slotId}`:'');entries=(await api('/api/attendance'+q)).items;}
+ state.savedCount=entries.length;
+ state.statuses=Object.fromEntries(state.students.map(s=>[s.id,'present']));
+ for(const a of entries)state.statuses[a.student_id]=a.status;
+ renderAttendance();
+}
+function statusCounts(){return Object.fromEntries(['present','absent','late','leave'].map(s=>[s,Object.values(state.statuses).filter(x=>x===s).length]));}
+function statusSummary(){const c=statusCounts();return `มา ${c.present} • ขาด ${c.absent} • สาย ${c.late} • ลา ${c.leave}`;}
+function renderAttendance(){
+ const slotOptions=state.slots.map(s=>`<option value="${s.id}" ${s.id===state.slotId?'selected':''}>คาบ ${s.period} • ${esc(s.subject)} (${esc(s.teacher_name)})</option>`).join('');
+ const students=state.students.map(s=>`<div class="student" data-id="${s.id}"><div><div class="student-name">${s.roll_no}. ${esc(s.full_name)}</div><div class="student-sub">รหัส ${esc(s.student_no)}</div></div><div class="pills">${Object.keys(names).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${names[status]}</button>`).join('')}</div></div>`).join('');
+ mount(`<section class="stack"><div><h2>เช็กชื่อนักเรียน</h2><p class="muted">แตะเฉพาะนักเรียนที่ขาด สาย หรือลา แล้วกดบันทึกทั้งห้อง</p></div><div class="card stack">${filters()}
+  <div class="row"><button class="button ${state.kind==='daily'?'':'secondary'}" data-kind="daily">ประจำวัน</button><button class="button ${state.kind==='period'?'':'secondary'}" data-kind="period">รายคาบ</button></div>
+  ${state.kind==='period'?`<div class="field"><label>เลือกคาบเรียนตามตาราง</label><select id="slot">${slotOptions||'<option value="">ยังไม่กำหนดตารางสอนวันนี้</option>'}</select></div>`:''}
+ </div><div class="card stack"><div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
+ ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การกดบันทึกใหม่จะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคนเพื่อช่วยเช็กชื่อเร็วขึ้น ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
+ <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
+ <button id="saveAttendance" class="button full" ${!state.students.length||state.kind==='period'&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
+ bindFilters(loadAttendance);
+ $$('[data-kind]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{state.kind=btn.dataset.kind;await loadAttendance()})));
+ $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));
+ $$('[data-student]').forEach(btn=>btn.addEventListener('click',()=>{state.statuses[Number(btn.dataset.student)]=btn.dataset.status;updateAttendanceControls()}));
+ $('#markAll')?.addEventListener('click',()=>{for(const s of state.students)state.statuses[s.id]='present';updateAttendanceControls()});
+ $('#saveAttendance')?.addEventListener('click',()=>safeRun(saveAttendance));
+}
+function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();}
+async function saveAttendance(){
+ if(!state.students.length)return;
+ const button=$('#saveAttendance');button.disabled=true;
+ try{const result=await api('/api/attendance',{method:'POST',body:{kind:state.kind,date:state.date,classroom_id:state.roomId,timetable_id:state.slotId,entries:state.students.map(s=>({student_id:s.id,status:state.statuses[s.id]}))}});toast(`บันทึกสำเร็จ ${result.saved} คน`);await loadAttendance();}
+ finally{button.disabled=false}
+}
+async function loadLate(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}const [a,b]=await Promise.all([api(`/api/students?classroom_id=${state.roomId}`),api(`/api/late?classroom_id=${state.roomId}&date=${state.date}`)]);state.students=a.items;state.lates=b.items;renderLate();}
+function studentOptions(){return state.students.map(s=>`<option value="${s.id}">${s.roll_no}. ${esc(s.full_name)}</option>`).join('');}
+function renderLate(){mount(`<div class="stack"><div><h2>บันทึกนักเรียนมาสาย</h2><p class="muted">ช่วงทดลอง: ครูบันทึกแทนนักเรียน • ระบบลงทะเบียนด้วยตนเองจะพัฒนาในระยะต่อไป</p></div>
+ <div class="card stack">${filters()}<form id="lateForm" class="stack"><div class="grid two"><div class="field"><label>นักเรียน</label><select name="student_id" required>${studentOptions()}</select></div><div class="field"><label>เวลามาถึง</label><input name="arrived_at" type="time" value="${timeNow()}" required></div></div>
+ <div class="field"><label>สาเหตุ (ไม่บังคับ)</label><textarea name="reason" maxlength="300" placeholder="ระบุเหตุผลตามที่ได้รับแจ้ง"></textarea></div><button class="button full" ${!state.students.length?'disabled':''}>บันทึกมาสาย</button></form></div>
+ <div class="card"><h3>รายการมาสายวันที่ ${esc(state.date)}</h3>${state.lates.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สถานะ</th></tr></thead><tbody>${state.lates.map(l=>`<tr><td>${esc(l.full_name)}</td><td>${esc(l.arrived_at)}</td><td>${l.state==='verified'?'ยืนยันแล้ว':'รอตรวจสอบ'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีรายการมาสาย</div>'}</div></div>`);
+ bindFilters(loadLate);
+ $('#lateForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api('/api/late',{method:'POST',body:{student_id:Number(f.get('student_id')),arrived_at:f.get('arrived_at'),reason:f.get('reason'),date:state.date}});toast('บันทึกมาสายสำเร็จ');await loadLate()}));
+}
+async function loadBehavior(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}const a=await api(`/api/students?classroom_id=${state.roomId}`);state.students=a.items;state.studentId=state.students.some(s=>s.id===state.studentId)?state.studentId:state.students[0]?.id||null;
+ if(state.studentId){const b=await api('/api/behavior?student_id='+state.studentId);state.behaviors=b.items;state.behaviorTotal=b.total;}else {state.behaviors=[];state.behaviorTotal=0}renderBehavior();}
+function renderBehavior(){mount(`<div class="stack"><div><h2>คะแนนพฤติกรรมนักเรียน</h2><p class="muted">บันทึกแบบเพิ่ม/ลดคะแนน พร้อมผู้บันทึกและประวัติย้อนหลัง</p></div>
+ <div class="card stack">${filters({date:false})}<form id="behaviorForm" class="stack"><div class="field"><label>นักเรียน</label><select id="behaviorStudent" name="student_id">${state.students.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${s.roll_no}. ${esc(s.full_name)}</option>`).join('')}</select></div>
+ <div class="field"><label>คะแนน (+ เพิ่ม / - ตัด)</label><input name="points" type="number" required min="-50" max="50" value="-5"></div><div class="field"><label>เหตุผล</label><textarea name="reason" maxlength="300" required placeholder="ระบุเหตุการณ์ที่บันทึก"></textarea></div><button class="button full" ${!state.students.length?'disabled':''}>บันทึกคะแนนพฤติกรรม</button></form></div>
+ <div class="card"><div class="row between"><h3>ประวัติคะแนนนักเรียน</h3><span class="tag">ยอดรวม ${Number(state.behaviorTotal)} คะแนน</span></div>${state.behaviors.length?`<div class="table-wrap"><table class="table"><thead><tr><th>คะแนน</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลา</th></tr></thead><tbody>${state.behaviors.map(b=>`<tr><td>${b.points>0?'+':''}${b.points}</td><td>${esc(b.reason)}</td><td>${esc(b.teacher_name)}</td><td>${esc(b.created_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีประวัติ</div>'}</div></div>`);
+ bindFilters(loadBehavior);
+ $('#behaviorStudent')?.addEventListener('change',e=>safeRun(async()=>{state.studentId=Number(e.target.value);await loadBehavior()}));
+ $('#behaviorForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api('/api/behavior',{method:'POST',body:{student_id:Number(f.get('student_id')),points:Number(f.get('points')),reason:f.get('reason')}});toast('บันทึกคะแนนสำเร็จ');await loadBehavior()}));
+}
+async function loadAlerts(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}try{const data=await api('/api/alerts?classroom_id='+state.roomId);state.alerts=data.items;renderAlerts()}catch(e){mount(`<div class="card"><h2>งานตรวจสอบ</h2><p class="warn">${esc(e.message)}</p><p class="muted">หน้านี้ให้ครูที่ปรึกษาและผู้ดูแลระบบเข้าถึงได้</p></div>`)} }
+function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false})}
+ <div class="warn">รุ่นนี้ยังไม่ส่ง Push ถึงผู้ปกครอง แม้จะกดยืนยันแล้วก็ตาม</div>
+ ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
+ <div class="row"><button class="button secondary" data-review="${a.id}" data-state="resolved">มีเหตุ/บันทึกผิด</button><button class="button" data-review="${a.id}" data-state="confirmed">ยืนยันไม่เข้าชั้นเรียน</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการรอตรวจสอบ</div>'}</div></div>`);
+ bindFilters(loadAlerts);
+ $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (รุ่นทดลองไม่มีการแจ้งผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
+}
+async function loadAdmin(){if(state.user.role!=='admin')return;const data=await api('/api/admin/users');state.users=data.items;renderAdmin();}
+function teacherOptions(){return state.users.filter(u=>u.role==='teacher'&&u.active).map(u=>`<option value="${u.id}">${esc(u.display_name)} (${esc(u.username)})</option>`).join('');}
+function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข้อมูลระบบ</h2><p class="muted">สำหรับผู้ดูแลระบบเท่านั้น • ใช้ข้อมูลจำลองในช่วงทดลอง</p></div>
+ <div class="grid two"><section class="card stack"><h3>เพิ่มบัญชีครู/บุคลากร</h3><form id="addUser" class="stack"><div class="field"><label>ชื่อเข้าสู่ระบบ (ภาษาอังกฤษ/ตัวเลข)</label><input name="username" required minlength="3" pattern="[A-Za-z0-9._-]+"></div><div class="field"><label>ชื่อที่แสดง</label><input name="display_name" required maxlength="100"></div><div class="field"><label>รหัสผ่านชั่วคราว (อย่างน้อย 12 ตัว)</label><input name="password" type="password" required minlength="12"></div><div class="field"><label>บทบาท</label><select name="role"><option value="teacher">ครู</option><option value="staff">งานกิจการนักเรียน</option></select></div><button class="button full">สร้างบัญชี</button></form></section>
+ <section class="card stack"><h3>กำหนดครูที่ปรึกษา</h3><form id="assignAdvisor" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูที่ปรึกษา</label><select name="teacher_user_id">${teacherOptions()}</select></div><button class="button full" ${!teacherOptions()?'disabled':''}>บันทึกครูที่ปรึกษา</button></form></section>
+ <section class="card stack"><h3>เพิ่มตารางสอนรายคาบ</h3><form id="addSlot" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูผู้สอน</label><select name="teacher_user_id">${teacherOptions()}</select></div>
+ <div class="grid two"><div class="field"><label>วันในสัปดาห์</label><select name="day_of_week">${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}</select></div><div class="field"><label>คาบ</label><input type="number" name="period" min="1" max="12" value="1" required></div></div><div class="field"><label>ชื่อวิชา</label><input name="subject" placeholder="วิทยาการคำนวณ" required maxlength="120"></div><button class="button full" ${!teacherOptions()?'disabled':''}>เพิ่มคาบเรียน</button></form></section>
+ <section class="card stack"><h3>นำเข้านักเรียน (CSV)</h3><form id="importStudents" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ข้อความ CSV (ไม่เกิน 60 คนต่อครั้ง)</label><textarea name="csv" required placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง" rows="7"></textarea></div><p class="muted">ก่อนทดลองด้วยข้อมูลจริง ต้องกำหนดสิทธิ์/ฐานกฎหมายและแจ้งผู้เกี่ยวข้องตามนโยบายโรงเรียน</p><button class="button full">นำเข้ารายชื่อ</button></form></section></div>
+ <section class="card"><h3>บัญชีผู้ใช้ (${state.users.length})</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th></tr></thead><tbody>${state.users.map(u=>`<tr><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td><td>${esc(roles[u.role])}</td></tr>`).join('')}</tbody></table></div></section></div>`);
+ const formApi=(id,path,makeBody,after=loadAdmin)=>{$('#'+id).addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api(path,{method:'POST',body:makeBody(f)});toast('บันทึกสำเร็จ');await after()}));};
+ formApi('addUser','/api/admin/users',f=>({username:f.get('username'),display_name:f.get('display_name'),password:f.get('password'),role:f.get('role')}));
+ formApi('assignAdvisor','/api/admin/advisor',f=>({classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id'))}));
+ formApi('addSlot','/api/admin/timetable',f=>({classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id')),day_of_week:Number(f.get('day_of_week')),period:Number(f.get('period')),subject:f.get('subject')}));
+ formApi('importStudents','/api/admin/import-students',f=>{
+  const records=parseCsv(String(f.get('csv')||'').trim());
+  if(records[0]?.join(',').toLowerCase()==='roll_no,student_no,full_name')records.shift();
+  return {classroom_id:Number(f.get('classroom_id')),students:records.map(r=>({roll_no:Number(r[0]),student_no:r[1],full_name:r[2]}))};
+ });
+}
+function parseCsv(csv){const rows=[];let row=[],col='',quoted=false;
+ for(let i=0;i<csv.length;i++){const ch=csv[i];if(ch==='"'){if(quoted&&csv[i+1]==='"'){col+='"';i++}else quoted=!quoted;}else if(ch===','&&!quoted){row.push(col);col=''}else if((ch==='\r'||ch==='\n')&&!quoted){if(ch==='\r'&&csv[i+1]==='\n')i++;row.push(col);if(row.some(x=>x.trim()))rows.push(row);row=[];col=''}else col+=ch;}
+ if(quoted)throw Error('ไฟล์ CSV มีเครื่องหมายคำพูดไม่ครบ');row.push(col);if(row.some(x=>x.trim()))rows.push(row);if(rows.some(r=>r.length!==3))throw Error('CSV ต้องมี 3 คอลัมน์: roll_no,student_no,full_name');return rows;
+}
+async function start(){if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});if(!state.token){renderLogin();return}try{await boot()}catch{state.token='';sessionStorage.removeItem('rd_token');renderLogin()}}
+window.addEventListener('online',()=>toast('เชื่อมต่ออินเทอร์เน็ตแล้ว'));
+window.addEventListener('offline',()=>toast('ออฟไลน์: ระบบจะไม่บันทึกข้อมูลจนกว่าจะเชื่อมต่อ',true));
+start();

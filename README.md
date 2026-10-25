@@ -1,0 +1,67 @@
+# RD Care — Cloudflare D1 + Workers + PWA
+
+ระบบต้นแบบสำหรับ **โรงเรียนรัษฎา** รองรับโครงสร้าง 48 ห้องเรียน (ม.1–ม.3 ระดับละ 9 ห้อง, ม.4–ม.6 ระดับละ 7 ห้อง) และเตรียมขยายถึงนักเรียนประมาณ 1,800 คน
+
+> **สถานะ:** Starter/MVP สำหรับทดสอบกับ **ข้อมูลจำลอง** เท่านั้น ยังไม่ใช่ระบบพร้อมนำข้อมูลส่วนบุคคลของนักเรียนจริงเข้าประมวลผลหรือเปิดให้ผู้ปกครองใช้งาน
+
+## มีแล้วในเวอร์ชันนี้
+
+- ลงชื่อเข้าใช้งานพร้อมสิทธิ์ `admin`, `staff`, `teacher` (hash รหัสผ่าน PBKDF2 และ session token)
+- จัดห้องเรียน 48 ห้องในข้อมูลจำลอง นำเข้านักเรียนแบบ CSV ทางหน้า Admin
+- เช็กชื่อประจำวัน/รายคาบ เป็นชุดพร้อมกันทั้งห้อง โดยแบ่งสิทธิ์ครูตามที่ปรึกษาและตารางสอน
+- บันทึกมาสายโดยครู, เพิ่ม/ลดคะแนนพฤติกรรม, รายงานภาพรวม
+- รายการไม่เข้าคาบที่รอครูที่ปรึกษาตรวจสอบ **ยังไม่ส่ง Push**
+- PWA ติดตั้งผ่าน HTTPS บน Android/iPhone (ความสามารถต่างกันตามเบราว์เซอร์)
+
+## โครงสร้างโปรเจกต์
+
+```text
+rd-care/
+├── .github/workflows/test.yml   # ตรวจสอบโค้ดอัตโนมัติทุกครั้งที่แก้
+├── docs/INSTALL.md              # วิธีติดตั้งและเปิดใช้งาน
+├── docs/ROADMAP.md              # สิ่งที่ยังต้องพัฒนา
+├── tests/                       # ทดสอบฟังก์ชันสำคัญ
+├── web/                         # คัดลอกเฉพาะโฟลเดอร์นี้ขึ้น cPanel: public_html/rd-care/
+│   ├── index.html
+│   ├── app.js, app.css, config.js
+│   ├── sw.js, manifest.webmanifest
+│   └── icons/
+└── worker/                      # Cloudflare Worker API + D1; ไม่อัปโหลดขึ้น cPanel
+    ├── src/
+    ├── migrations/
+    ├── demo_seed.sql
+    ├── package.json
+    └── wrangler.toml
+```
+
+## ติดตั้ง
+
+อ่าน [docs/INSTALL.md](docs/INSTALL.md) ทีละขั้นตอนโดยเริ่มทดสอบ D1 แบบ **local** ก่อน แล้วจึงสร้าง D1 แบบ **remote**
+
+## เก็บบน GitHub (แนะนำ Private)
+
+1. สร้าง Repository ชื่อ `rd-care` ใต้บัญชี `yoottana-cyber` โดยตั้งเป็น **Private**; อย่าเลือกเพิ่ม README เพราะโฟลเดอร์นี้มีไฟล์แล้ว
+2. ดาวน์โหลด ZIP นี้ แตกไฟล์เข้าโฟลเดอร์ `rd-care`
+3. บนเครื่อง Windows เปิด PowerShell ในโฟลเดอร์และรัน:
+
+```powershell
+git init
+git branch -M main
+git add .
+git commit -m "Initial RD Care D1/PWA starter"
+git remote add origin https://github.com/yoottana-cyber/rd-care.git
+git push -u origin main
+```
+
+4. เพิ่มการอนุญาตให้ GitHub connector ของ ChatGPT เข้าถึง Repo ใหม่ หาก GitHub App ตั้งค่าให้เข้าถึงเฉพาะ Repository ที่เลือก
+5. หลังจากนั้นสามารถใช้ ChatGPT ให้ช่วยตรวจโค้ด สร้าง branch/PR และแก้ไขไฟล์ใน Repo ที่เชื่อมต่อได้
+
+**ห้าม commit** `.dev.vars`, `.env`, API tokens, secret, ไฟล์ credentials, SQL ที่มีรหัสผ่าน หรือรายชื่อนักเรียน/ผู้ปกครองจริง
+
+## ความปลอดภัยและขอบเขต
+
+- เปิดใช้ HTTPS ทั้งหน้าเว็บและ API เสมอ
+- ระบบส่ง Token ด้วย Authorization header และเก็บไว้ใน `sessionStorage` (หมดอายุ 8 ชม.)
+- เริ่มต้นด้วยข้อมูลจำลองก่อนเท่านั้น ผู้ปกครองยังไม่ได้มีบัญชีและ **ยังไม่มี Web Push จริง**
+- ก่อนเปิดใช้งานจริง: เพิ่มนโยบายข้อมูลส่วนบุคคล สิทธิ์ผู้ปกครอง การสำรองข้อมูล การดูแลเหตุผิดปกติ ระบบยืนยันตัวตน/อุปกรณ์ และทดสอบพร้อมกันทั้ง 48 ห้อง
+- cPanel ใช้เผยแพร่เฉพาะหน้า PWA; **D1 ไม่ใช่ MySQL ใน Hosting** และ Worker/API ไม่รันบน PHP Hosting

@@ -1,0 +1,18 @@
+const CACHE='rd-care-shell-v1';
+const ASSETS=['./','./index.html','./app.css','./app.js','./config.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+self.addEventListener('install',e=>{
+ e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
+});
+self.addEventListener('activate',e=>{
+ e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+});
+self.addEventListener('fetch',e=>{
+ const url=new URL(e.request.url);
+ if(e.request.method!=='GET'||url.origin!==self.location.origin)return;
+ if(url.pathname.endsWith('/config.js')){e.respondWith(fetch(e.request,{cache:'no-store'}).catch(()=>caches.match(e.request)));return;}
+ if(e.request.mode==='navigate'){
+  e.respondWith(fetch(e.request).catch(()=>caches.match('./index.html')));return;
+ }
+ e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request)));
+});
+// ยังไม่เปิดรับ Push ในรุ่นทดสอบ เพราะต้องมีระบบผูกอุปกรณ์/ยินยอมก่อน

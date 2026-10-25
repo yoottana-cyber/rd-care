@@ -1,0 +1,14 @@
+{
+  "name": "rd-care-d1-worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply rd-care-dev --local",
+    "migrate:remote": "wrangler d1 migrations apply rd-care-dev --remote",
+    "seed:local": "wrangler d1 execute rd-care-dev --local --file=demo_seed.sql"
+  },
+  "devDependencies": {"wrangler": "^4.0.0"}
+}
