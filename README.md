@@ -45,6 +45,12 @@ Cloudflare Pages จะเผยแพร่หน้าเว็บทดลอ
 
 อ่าน [docs/INSTALL.md](docs/INSTALL.md) ทีละขั้นตอนโดยเริ่มทดสอบ D1 แบบ **local** ก่อน แล้วจึงสร้าง D1 แบบ **remote**
 
+## Deploy Worker Dev ผ่าน GitHub Actions
+
+อ่าน [docs/DEPLOY-DEV.md](docs/DEPLOY-DEV.md) สำหรับวิธีตั้งค่า `CLOUDFLARE_API_TOKEN` และ `CLOUDFLARE_ACCOUNT_ID` เป็น GitHub Secrets หนึ่งครั้ง จากนั้น GitHub Actions จะ Apply D1 migrations และ Deploy Worker Dev โดยอัตโนมัติเมื่อมีการเปลี่ยน `worker/**` บน `main`.
+
+**Cloudflare Pages ของเว็บทดลองกับ Worker Deploy เป็นคนละกระบวนการ** และยังไม่อัปโหลด Hosting โรงเรียน
+
 ## เก็บบน GitHub (แนะนำ Private)
 
 1. สร้าง Repository ชื่อ `rd-care` ใต้บัญชี `yoottana-cyber` โดยตั้งเป็น **Private**; อย่าเลือกเพิ่ม README เพราะโฟลเดอร์นี้มีไฟล์แล้ว

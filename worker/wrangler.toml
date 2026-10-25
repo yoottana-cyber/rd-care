@@ -8,5 +8,5 @@ ALLOWED_ORIGINS = "http://localhost:5500,https://school.example.ac.th"
 [[d1_databases]]
 binding = "DB"
 database_name = "rd-care-dev"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "161c2fb5-cd80-42bd-bbab-28b5d61df3e0"
 migrations_dir = "migrations"
