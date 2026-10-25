@@ -1,4 +1,5 @@
 import {API_BASE_URL} from './config.js';
+import {bindThemeButtons} from './theme.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -24,7 +25,9 @@ export function createPortalUi({root,onStaffLogin}){
  function frame(inner){
   root.innerHTML=`<div class="login-wrap portal-wrap"><section class="card portal-card stack">
     <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>พื้นที่นักเรียนและผู้ปกครอง • ข้อมูลทดลอง</p></div>
-    ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div></section></div>`;
+    ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div>
+    <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div></section></div>`;
+  bindThemeButtons();
  }
  function showLogin(role=state.role){
   state.role=role;requestVersion++;
