@@ -80,7 +80,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
     else throw Error('รองรับไฟล์ .xlsx หรือ .csv เท่านั้น');
     filename=file.name;
    }else{raw=csvRows(String(data.get('csv')||''));filename='ข้อความ CSV';}
-   const prepared=prepareRows(raw,rooms);
+   const prepared=prepareRows(raw,typeof rooms==='function'?rooms():rooms);
    rows=prepared.map(x=>x.values);
    preview=prepared.map(x=>({source_row:x.values.source_row,room:x.values.classroom,roll_no:x.values.roll_no,
     student_no:x.values.student_no,full_name:x.values.full_name,username:x.values.username,status:x.status,message:x.message}));
