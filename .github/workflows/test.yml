@@ -40,3 +40,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'notification_*_test.py' -v
       - name: School-year room transfer plan schema
         run: python3 -m unittest discover -s tests -p 'transfer_*_test.py' -v
+      - name: Historical student enrollment invariants
+        run: python3 -m unittest discover -s tests -p 'enrollment_*_test.py' -v
