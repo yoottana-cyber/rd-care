@@ -57,8 +57,8 @@ export function createPortalUi({root,onStaffLogin}){
   frame(`<h2>ตั้งรหัสผ่านส่วนตัว</h2><p class="warn">บัญชีนี้ยังใช้รหัสผ่านชั่วคราว กรุณาเปลี่ยนก่อนดูข้อมูล</p>
    <form id="portalChangeForm" class="stack">
     <div class="field"><label>รหัสผ่านชั่วคราว / รหัสผ่านปัจจุบัน</label><input type="password" name="current_password" autocomplete="current-password" required></div>
-    <div class="field"><label>รหัสผ่านใหม่ (อย่างน้อย 12 ตัวอักษร)</label><input type="password" name="new_password" minlength="12" maxlength="128" autocomplete="new-password" required></div>
-    <div class="field"><label>ยืนยันรหัสผ่านใหม่</label><input type="password" name="confirm" minlength="12" autocomplete="new-password" required></div>
+    <div class="field"><label>รหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)</label><input type="password" name="new_password" minlength="4" maxlength="128" autocomplete="new-password" required></div>
+    <div class="field"><label>ยืนยันรหัสผ่านใหม่</label><input type="password" name="confirm" minlength="4" autocomplete="new-password" required></div>
     <button type="submit" class="button full">เปลี่ยนรหัสผ่าน</button></form>
    <button type="button" class="button secondary full" id="portalLogout">ออกจากระบบ</button>`);
   select('#portalLogout').addEventListener('click',logout);
