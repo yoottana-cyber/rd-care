@@ -14,6 +14,7 @@ jobs:
         run: |
           node --check worker/src/core.js
           node --check worker/src/password.js
+          node --check worker/src/admin-validation.js
           node --check worker/src/worker.js
           node --check web/app.js
           node --check web/run-safely.js

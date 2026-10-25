@@ -5,6 +5,8 @@ const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
+const adminStudentState={roomId:null,items:[],editId:null};
+let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
@@ -39,7 +41,7 @@ async function boot(){
 }
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
- const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['admin','ตั้งค่าระบบ','⚙']]:[])];
+ const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['adminStudents','นักเรียน','♙'],['admin','ครูและระบบ','⚙']]:[])];
  return `<main class="shell"><header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
  <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button id="logout" class="button ghost" type="button">ออก</button></div></header>
  <nav class="nav" aria-label="เมนูหลัก">${navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('')}</nav>
@@ -58,6 +60,7 @@ async function showTab(tab){state.tab=tab;
  if(tab==='behavior')return loadBehavior();
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
+ if(tab==='adminStudents')return loadAdminStudents();
 }
 async function loadDashboard(){state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));renderDashboard();}
 function renderDashboard(){const s=state.stats||{};mount(`<section class="stack"><div><h2>ภาพรวมการดูแลนักเรียน</h2><p class="muted">สถิติจากข้อมูลที่บันทึกแล้ว • ${esc(state.date)}</p></div>
@@ -151,7 +154,31 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
  <section class="card stack"><h3>เพิ่มตารางสอนรายคาบ</h3><form id="addSlot" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูผู้สอน</label><select name="teacher_user_id">${teacherOptions()}</select></div>
  <div class="grid two"><div class="field"><label>วันในสัปดาห์</label><select name="day_of_week">${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}</select></div><div class="field"><label>คาบ</label><input type="number" name="period" min="1" max="12" value="1" required></div></div><div class="field"><label>ชื่อวิชา</label><input name="subject" placeholder="วิทยาการคำนวณ" required maxlength="120"></div><button class="button full" ${!teacherOptions()?'disabled':''}>เพิ่มคาบเรียน</button></form></section>
  <section class="card stack"><h3>นำเข้านักเรียน (CSV)</h3><form id="importStudents" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ข้อความ CSV (ไม่เกิน 60 คนต่อครั้ง)</label><textarea name="csv" required placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง" rows="7"></textarea></div><p class="muted">ก่อนทดลองด้วยข้อมูลจริง ต้องกำหนดสิทธิ์/ฐานกฎหมายและแจ้งผู้เกี่ยวข้องตามนโยบายโรงเรียน</p><button class="button full">นำเข้ารายชื่อ</button></form></section></div>
- <section class="card"><h3>บัญชีผู้ใช้ (${state.users.length})</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th></tr></thead><tbody>${state.users.map(u=>`<tr><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td><td>${esc(roles[u.role])}</td></tr>`).join('')}</tbody></table></div></section></div>`);
+ <section class="card stack"><h3>ครูและบุคลากร (${state.users.length} บัญชี)</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+ <tbody>${state.users.map(u=>`<tr><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td><td>${esc(roles[u.role])}</td><td>${u.active?'ใช้งาน':'พักบัญชี'}</td><td>${u.role==='teacher'||u.role==='staff'?`<button type="button" class="button secondary" data-edit-user="${u.id}">แก้ไข</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>
+ ${(()=>{
+  const person=state.users.find(u=>u.id===adminEditUserId&&(u.role==='teacher'||u.role==='staff'));
+  return person?`<form id="adminPersonnelEdit" class="stack"><h3>แก้ไข ${esc(person.username)}</h3>
+   <div class="grid two"><div class="field"><label>ชื่อที่แสดง</label><input name="display_name" value="${esc(person.display_name)}" required maxlength="100"></div>
+   <div class="field"><label>สถานะบัญชี</label><select name="active"><option value="1" ${person.active?'selected':''}>ใช้งาน</option><option value="0" ${person.active?'':'selected'}>ระงับการใช้งาน</option></select></div></div>
+   <p class="muted">การระงับบัญชีจะยกเลิกเซสชันที่ใช้งานอยู่ของครูหรือบุคลากรคนนั้นทันที แต่ไม่ลบประวัติ</p>
+   <button class="button" type="submit">บันทึกข้อมูลบุคลากร</button></form>`:'<p class="muted">กด “แก้ไข” เพื่อปรับชื่อหรือสถานะครู/บุคลากร</p>';
+ })()}
+ </section></div>`);
+ $$('[data-edit-user]').forEach(btn=>btn.addEventListener('click',()=>{
+  adminEditUserId=Number(btn.dataset.editUser);renderAdmin();
+ }));
+ $('#adminPersonnelEdit')?.addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const form=e.currentTarget,person=state.users.find(u=>u.id===adminEditUserId);
+  if(!person)return;
+  const f=new FormData(form),active=Number(f.get('active'));
+  if(!active&&!confirm(`ระงับบัญชีของ ${person.display_name} และออกจากระบบทุกอุปกรณ์?`))return;
+  const button=form.querySelector('button');button.disabled=true;
+  try{
+   await api('/api/admin/users/'+person.id,{method:'POST',body:{display_name:String(f.get('display_name')).trim(),active}});
+   adminEditUserId=null;toast('บันทึกข้อมูลบุคลากรแล้ว');await loadAdmin();
+  }finally{button.disabled=false}
+ }));
  const formApi=(id,path,makeBody,after=loadAdmin)=>{$('#'+id).addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api(path,{method:'POST',body:makeBody(f)});toast('บันทึกสำเร็จ');await after()}));};
  formApi('addUser','/api/admin/users',f=>({username:f.get('username'),display_name:f.get('display_name'),password:f.get('password'),role:f.get('role')}));
  formApi('assignAdvisor','/api/admin/advisor',f=>({classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id'))}));
@@ -162,6 +189,115 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
   return {classroom_id:Number(f.get('classroom_id')),students:records.map(r=>({roll_no:Number(r[0]),student_no:r[1],full_name:r[2]}))};
  },async()=>{referenceCache.clear();await loadAdmin()});
 }
+
+async function loadAdminStudents(){
+ if(state.user?.role!=='admin')return;
+ if(!state.rooms.some(r=>r.id===adminStudentState.roomId))
+  adminStudentState.roomId=state.rooms[0]?.id||null;
+ if(!adminStudentState.roomId){mount('<div class="empty">ยังไม่มีห้องเรียน</div>');return}
+ const roomId=adminStudentState.roomId;
+ try{
+  const data=await api('/api/admin/students?classroom_id='+roomId);
+  if(state.tab!=='adminStudents'||adminStudentState.roomId!==roomId)return;
+  adminStudentState.items=data.items;
+  if(!data.items.some(s=>s.id===adminStudentState.editId))adminStudentState.editId=null;
+  renderAdminStudents();
+ }catch(e){
+  if(!state.user)return;
+  mount(`<section class="card stack"><h2>จัดการนักเรียน</h2><div class="warn">API จัดการนักเรียนยังไม่พร้อมใน Worker ที่เผยแพร่อยู่ (ต้อง Deploy Worker เวอร์ชันใหม่ก่อน)</div><p class="muted">${esc(e.message)}</p></section>`);
+ }
+}
+function studentPayload(form){
+ return {classroom_id:Number(form.get('classroom_id')),roll_no:Number(form.get('roll_no')),
+  student_no:String(form.get('student_no')||'').trim(),full_name:String(form.get('full_name')||'').trim(),
+  active:Number(form.get('active')??1)};
+}
+function renderAdminStudents(){
+ const items=adminStudentState.items;
+ const edit=items.find(s=>s.id===adminStudentState.editId);
+ const rooms=(chosen)=>state.rooms.map(r=>`<option value="${r.id}" ${r.id===chosen?'selected':''}>${esc(r.label)}</option>`).join('');
+ const activeCount=items.filter(s=>s.active).length;
+ const rows=items.map(s=>`<tr data-admin-student-row><td>${s.roll_no}</td><td><strong>${esc(s.full_name)}</strong><div class="muted">${esc(s.student_no)}</div></td>
+   <td><span class="tag">${s.active?'ใช้งาน':'พักข้อมูล'}</span></td>
+   <td><button type="button" class="button secondary" data-edit-student="${s.id}">แก้ไข</button>
+   <button type="button" class="button ${s.active?'ghost':'secondary'}" data-toggle-student="${s.id}">${s.active?'พักข้อมูล':'เปิดใช้งาน'}</button></td></tr>`).join('');
+ mount(`<section class="stack">
+  <div><h2>จัดการข้อมูลนักเรียน</h2><p class="muted">ข้อมูลจำลอง • เพิ่ม แก้ไข เปลี่ยนห้อง และพักข้อมูลโดยไม่ลบประวัติ</p></div>
+  <div class="card stack"><div class="row between"><div class="field smallbox"><label for="adminStudentRoom">ห้องเรียน</label><select id="adminStudentRoom">${rooms(adminStudentState.roomId)}</select></div>
+   <div><strong>${activeCount} คน</strong><p class="muted">พักข้อมูล ${items.length-activeCount} คน</p></div></div>
+   <div class="field"><label for="adminStudentSearch">ค้นหารายชื่อหรือรหัสนักเรียน</label><input id="adminStudentSearch" placeholder="พิมพ์ชื่อหรือรหัสนักเรียน" type="search"></div>
+   <div class="table-wrap"><table class="table"><thead><tr><th>เลขที่</th><th>ชื่อ–สกุล / รหัสนักเรียน</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>${rows||'<tr><td colspan="4">ยังไม่มีนักเรียนในห้องนี้</td></tr>'}</tbody></table></div>
+  </div>
+  <div class="grid two">
+   <section class="card stack"><h3>เพิ่มนักเรียน</h3><form class="stack" id="adminAddStudent">
+    <div class="field"><label>ห้องเรียน</label><select name="classroom_id">${rooms(adminStudentState.roomId)}</select></div>
+    <div class="field"><label>เลขประจำตัวนักเรียน</label><input name="student_no" required maxlength="40" placeholder="DEMO001"></div>
+    <div class="field"><label>ชื่อ–สกุล</label><input name="full_name" required maxlength="120" placeholder="นักเรียนตัวอย่าง"></div>
+    <div class="field"><label>เลขที่</label><input type="number" name="roll_no" min="1" max="100" required></div>
+    <input type="hidden" name="active" value="1"><button class="button full" type="submit">เพิ่มนักเรียน</button>
+   </form></section>
+   <section class="card stack"><h3>${edit?'แก้ไขข้อมูลนักเรียน':'เลือกนักเรียนจากตารางเพื่อแก้ไข'}</h3>
+    ${edit?`<form id="adminEditStudent" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${rooms(edit.classroom_id)}</select></div>
+     <div class="field"><label>รหัสนักเรียน</label><input name="student_no" required maxlength="40" value="${esc(edit.student_no)}"></div>
+     <div class="field"><label>ชื่อ–สกุล</label><input name="full_name" required maxlength="120" value="${esc(edit.full_name)}"></div>
+     <div class="field"><label>เลขที่</label><input type="number" name="roll_no" min="1" max="100" required value="${edit.roll_no}"></div>
+     <div class="field"><label>สถานะ</label><select name="active"><option value="1" ${edit.active?'selected':''}>ใช้งาน</option><option value="0" ${edit.active?'':'selected'}>พักข้อมูล</option></select></div>
+     <button type="submit" class="button full">บันทึกการเปลี่ยนแปลง</button>
+     <p class="muted">หากมีประวัติการเช็กชื่อหรือพฤติกรรมแล้ว ระบบจะป้องกันการย้ายห้องเพื่อรักษาความถูกต้องของประวัติ</p>
+     </form>`:'<div class="empty">เลือกปุ่ม “แก้ไข” ด้านบน</div>'}
+   </section>
+  </div>
+  <section class="card stack"><h3>นำเข้ารายชื่อนักเรียน CSV</h3><p class="muted">ส่งออกจาก Excel เป็น CSV UTF-8 หรือวางข้อความ CSV รูปแบบ roll_no,student_no,full_name (สูงสุด 60 คน/ครั้ง)</p>
+   <form id="adminImportCsv" class="stack"><div class="field"><label>ไฟล์ CSV (ถ้ามี)</label><input name="file" type="file" accept=".csv,text/csv"></div>
+    <div class="field"><label>หรือวางข้อมูล CSV</label><textarea name="csv" placeholder="roll_no,student_no,full_name&#10;1,DEMO0001,นักเรียนตัวอย่าง"></textarea></div>
+    <button class="button full">นำเข้าห้องที่เลือก</button></form>
+   <div class="warn">ใช้เฉพาะข้อมูลจำลองในระยะทดสอบ ห้ามนำเข้ารายชื่อนักเรียนจริงก่อนทบทวนสิทธิ์และ PDPA</div>
+  </section>
+ </section>`);
+ $('#adminStudentRoom').addEventListener('change',e=>safeRun(async()=>{
+  adminStudentState.roomId=Number(e.target.value);adminStudentState.editId=null;await loadAdminStudents();
+ }));
+ $('#adminStudentSearch').addEventListener('input',e=>{
+  const q=e.target.value.trim().toLocaleLowerCase();
+  for(const row of document.querySelectorAll('[data-admin-student-row]'))row.hidden=!row.textContent.toLocaleLowerCase().includes(q);
+ });
+ document.querySelectorAll('[data-edit-student]').forEach(btn=>btn.addEventListener('click',()=>{
+  adminStudentState.editId=Number(btn.dataset.editStudent);renderAdminStudents();
+ }));
+ document.querySelectorAll('[data-toggle-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
+  const st=adminStudentState.items.find(s=>s.id===Number(btn.dataset.toggleStudent));
+  if(!st)return;
+  if(!confirm(st.active?`พักข้อมูล ${st.full_name} โดยไม่ลบประวัติ?`:`เปิดใช้งาน ${st.full_name}?`))return;
+  await api('/api/admin/students/'+st.id,{method:'POST',body:{...st,active:st.active?0:1}});
+  referenceCache.clear();toast('ปรับสถานะนักเรียนแล้ว');await loadAdminStudents();
+ })));
+ $('#adminAddStudent').addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
+  try{await api('/api/admin/students',{method:'POST',body:studentPayload(new FormData(form))});
+    referenceCache.clear();toast('เพิ่มนักเรียนสำเร็จ');await loadAdminStudents();
+  }finally{button.disabled=false}
+ }));
+ $('#adminEditStudent')?.addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const id=adminStudentState.editId,form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
+  try{await api('/api/admin/students/'+id,{method:'POST',body:studentPayload(new FormData(form))});
+    adminStudentState.editId=null;referenceCache.clear();toast('บันทึกข้อมูลนักเรียนแล้ว');await loadAdminStudents();
+  }finally{button.disabled=false}
+ }));
+ $('#adminImportCsv').addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
+  try{
+   const f=new FormData(form),file=f.get('file');
+   const csv=(file&&file.size?await file.text():String(f.get('csv')||'')).replace(/^\uFEFF/,'').trim();
+   const rows=parseCsv(csv);
+   if(rows[0]?.map(x=>x.trim().toLowerCase()).join(',')==='roll_no,student_no,full_name')rows.shift();
+   if(!rows.length||rows.length>60)throw Error('CSV ต้องมีนักเรียน 1–60 คน');
+   const students=rows.map(r=>({roll_no:Number(r[0]),student_no:r[1].trim(),full_name:r[2].trim()}));
+   await api('/api/admin/import-students',{method:'POST',body:{classroom_id:adminStudentState.roomId,students}});
+   referenceCache.clear();toast(`นำเข้าสำเร็จ ${students.length} คน`);await loadAdminStudents();
+  }finally{button.disabled=false}
+ }));
+}
+
 function parseCsv(csv){const rows=[];let row=[],col='',quoted=false;
  for(let i=0;i<csv.length;i++){const ch=csv[i];if(ch==='"'){if(quoted&&csv[i+1]==='"'){col+='"';i++}else quoted=!quoted;}else if(ch===','&&!quoted){row.push(col);col=''}else if((ch==='\r'||ch==='\n')&&!quoted){if(ch==='\r'&&csv[i+1]==='\n')i++;row.push(col);if(row.some(x=>x.trim()))rows.push(row);row=[];col=''}else col+=ch;}
  if(quoted)throw Error('ไฟล์ CSV มีเครื่องหมายคำพูดไม่ครบ');row.push(col);if(row.some(x=>x.trim()))rows.push(row);if(rows.some(r=>r.length!==3))throw Error('CSV ต้องมี 3 คอลัมน์: roll_no,student_no,full_name');return rows;
