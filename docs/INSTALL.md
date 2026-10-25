@@ -77,6 +77,32 @@ npx wrangler deploy
 
 ตั้งรหัสลับแบบสุ่ม 32+ ตัวอักษรผ่าน `wrangler secret put` (Wrangler จะถามให้กรอกเอง) จากนั้นสร้าง Admin ด้วยคำสั่งตัวอย่างหัวข้อ C แต่เปลี่ยน URL ให้เป็น HTTPS ของ Worker ที่ deploy แล้ว **หลังตั้งค่าเสร็จ ลบ SETUP_TOKEN ด้วย `npx wrangler secret delete SETUP_TOKEN`** เพื่อลดความเสี่ยง
 
+## E.1 ปัญหา Login รุ่นแรก: PBKDF2 บน Cloudflare Workers
+
+RD Care รุ่นแรกใช้ PBKDF2-SHA256 210,000 รอบ แต่ workerd จำกัดการเรียก PBKDF2 สูงสุด 100,000 รอบ
+จึงแก้โค้ดต้นแบบให้ใช้ 100,000 รอบ (สำหรับข้อมูลจำลองเท่านั้น) โดยคงรหัสผ่านแบบ salted hash
+
+**สำคัญ:** ผู้ที่เคยสร้างบัญชีด้วยเวอร์ชันเดิมจะต้องตั้ง Hash ใหม่ เนื่องจาก 210,000 และ 100,000 รอบให้ผลลัพธ์ต่างกัน
+
+หลังอัปเดต GitHub แล้วให้ Deploy Worker จากโฟลเดอร์ worker:
+
+```powershell
+npm.cmd install
+npx.cmd wrangler deploy
+```
+
+กลับไปโฟลเดอร์รากโปรเจกต์แล้วรันสคริปต์รีเซ็ต Admin รุ่นทดลอง:
+
+```powershell
+.\scripts\reset-demo-admin-password.ps1
+```
+
+ตรวจสอบก่อนว่าค่า D1 binding ใน worker/wrangler.toml เป็นฐาน **rd-care-dev** ที่ต้องการ
+สคริปต์ถามรหัสผ่านในเครื่อง ไม่แสดงรหัสผ่านและไม่บันทึกรหัสผ่านจริงลง GitHub
+แล้วเปลี่ยนเฉพาะ Salt/Hash ของบัญชี admin ที่มีอยู่แล้วผ่าน D1 remote
+
+ก่อนเปิดใช้งานจริงกับข้อมูลนักเรียน ต้องทบทวน Authentication ใหม่: ปรับไปใช้บริการยืนยันตัวตนมาตรฐานที่รองรับ MFA, การจำกัดอัตราคำขอและ password hashing ที่แข็งแรงกว่า
+
 ## F. อัปโหลด PWA ไป cPanel / DirectAdmin
 
 1. เปลี่ยน `web/config.js` ให้เป็น URL Worker จริง **ใช้ HTTPS** เช่น:
