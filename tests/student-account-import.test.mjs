@@ -38,20 +38,18 @@ test('batch planning limits work to 10 per click for Worker CPU budget',()=>{
  assert.equal(planStudentPortalAccounts(students,[],10).ready.length,10);
 });
 
-test('student portal creation rejects a username different from registered student number',async()=>{
- let queried=0;
+test('student portal account may use a custom valid username',async()=>{
  const fake={DB:{prepare(sql){
-  queried++;
-  if(sql.includes('FROM students WHERE id=? AND active=1'))return {bind(){return {async first(){return {id:5,student_no:'001234',full_name:'Demo Student'}}}}};
-  throw Error('Unexpected query: '+sql);
+  if(sql.includes('FROM students WHERE id=? AND active=1'))
+   return {bind(){return {async first(){return {id:5,student_no:'001234',full_name:'Demo Student'}}}}};
+  throw Error('unexpected database query before hashing: '+sql);
  }}};
  const req=new Request('https://rdcare.test/api/admin/portal/accounts',{
   method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify({role:'student',student_id:5,username:'fake-username'})
+  body:JSON.stringify({role:'student',student_id:5,username:'student-custom',password:'no'})
  });
  await assert.rejects(
   portalAdminRoutes(req,fake,{id:1,role:'admin'},'/api/admin/portal/accounts'),
-  e=>e.code===400&&e.message.includes('เลขประจำตัวนักเรียน')
+  e=>e.code===400&&e.message.includes('4–128')
  );
- assert.equal(queried,1);
 });
