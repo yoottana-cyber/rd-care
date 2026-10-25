@@ -383,7 +383,7 @@ async function adminRoutes(req,env,user,path){
   await log(env.DB,user.id,'student_created','students',res.meta.last_row_id);
   return json({ok:true,id:res.meta.last_row_id},201);
  }
- const studentEdit=new RegExp('^/api/admin/students/([0-9]+)
+ const studentEdit=new RegExp('^/api/admin/students/([0-9]+)$').exec(path);
  if(req.method==='POST'&&studentEdit){
   const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
   try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
@@ -410,7 +410,7 @@ async function adminRoutes(req,env,user,path){
   ]);
   return json({ok:true,id});
  }
- const userEdit=new RegExp('^/api/admin/users/([0-9]+)
+ const userEdit=new RegExp('^/api/admin/users/([0-9]+)$').exec(path);
  if(req.method==='POST'&&userEdit){
   const id=positiveInt(userEdit[1]),b=await payload(req);
   const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
