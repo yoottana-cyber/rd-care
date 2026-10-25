@@ -1,4 +1,5 @@
 import {API_BASE_URL} from './config.js';
+import {runSafely} from './run-safely.js';
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],behaviors:[],behaviorTotal:0};
