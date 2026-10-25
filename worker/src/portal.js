@@ -104,7 +104,7 @@ async function records(req,env,a){
   )`).bind(id,a.role,a.student_id||0,a.role,a.id).first();
  if(!linked)fail(403,'ไม่มีสิทธิ์ดูข้อมูลนักเรียนคนนี้');
  // Every child query is bound to the authorized student id: never expose class rosters.
- const [daily,period,late,behavior]=await env.DB.batch([
+ const [daily,period,late,behavior,total]=await env.DB.batch([
   env.DB.prepare(`SELECT school_date,status FROM attendance_daily
    WHERE student_id=? AND school_date BETWEEN ? AND ? ORDER BY school_date DESC LIMIT 90`).bind(id,from,to),
   env.DB.prepare(`SELECT p.school_date,p.status,t.period,t.subject FROM attendance_period p
