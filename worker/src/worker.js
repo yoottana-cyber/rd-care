@@ -2,6 +2,7 @@ import { STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateA
 import { passwordHash } from './password.js';
 import { validateStudentInput, validatePersonnelInput } from './admin-validation.js';
 import { planStudentImport } from './student-import.js';
+import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } from './late-self.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -246,6 +247,107 @@ async function listLate(req,env,user){
  WHERE h.classroom_id=? AND l.school_date=? AND h.start_date<=l.school_date
  AND (h.end_date IS NULL OR h.end_date>l.school_date) ORDER BY l.arrived_at DESC`).bind(roomId,date).all();
  return json({items:results});
+}
+// An authenticated staff member issues a short-lived credential to one
+// student. It is shown once, never logged or stored in plaintext.
+async function issueLateSelfCode(req,env,user){
+ if(!isStaff(user))throw error(403,'เฉพาะครูเวรหรือผู้ดูแลระบบ');
+ const b=await payload(req),studentId=positiveInt(b.student_id),date=bangkokToday();
+ if(!studentId)throw error(400,'กรุณาเลือกนักเรียน');
+ const student=await env.DB.prepare(`SELECT s.id FROM students s
+  JOIN student_enrollments h ON h.student_id=s.id AND h.end_date IS NULL
+  WHERE s.id=? AND s.active=1`).bind(studentId).first();
+ if(!student)throw error(404,'ไม่พบนักเรียนที่ใช้งานอยู่');
+ const prior=await env.DB.prepare(`SELECT
+  (SELECT COUNT(*) FROM late_self_requests WHERE student_id=? AND school_date=?)
+ +(SELECT COUNT(*) FROM late_records WHERE student_id=? AND school_date=?) AS total`)
+  .bind(studentId,date,studentId,date).first();
+ if(prior?.total>0)throw error(409,'นักเรียนมีรายการแจ้งมาสายวันนี้แล้ว');
+ const code=randomHex(12),expires=now()+600;
+ await env.DB.batch([
+  env.DB.prepare(`INSERT INTO late_self_passcodes(student_id,school_date,code_hash,expires_at,issued_by)
+    VALUES(?,?,?,?,?)
+    ON CONFLICT(student_id,school_date) DO UPDATE SET
+    code_hash=excluded.code_hash,expires_at=excluded.expires_at,
+    issued_by=excluded.issued_by,consumed_at=NULL`)
+   .bind(studentId,date,await digest(code),expires,user.id),
+  env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+   .bind(user.id,'late_self_code_issued','students',String(studentId))
+ ]);
+ return json({ok:true,code,expires_in:600,message:'แจ้งรหัสนี้ให้นักเรียนโดยตรง มีอายุ 10 นาทีและใช้ได้ครั้งเดียว'},201);
+}
+// Public submission: no bearer token, no student names or identity enumeration.
+// A student code never creates or changes an approved attendance record.
+async function submitLateSelf(req,env){
+ let b;
+ try{b=validateLateSelfReport(await payload(req))}catch(e){throw error(400,e.message)}
+ const date=bangkokToday(),ts=now(),codeHash=await digest(b.code);
+ const pass=await env.DB.prepare(`SELECT p.id,p.student_id FROM late_self_passcodes p
+  JOIN students s ON s.id=p.student_id
+  JOIN student_enrollments h ON h.student_id=s.id AND h.end_date IS NULL
+  WHERE p.code_hash=? AND p.school_date=? AND p.expires_at>?
+   AND p.consumed_at IS NULL AND s.student_no=? AND s.active=1`)
+  .bind(codeHash,date,ts,b.student_no).first();
+ if(!pass)throw error(400,'รหัสนักเรียนหรือรหัสยืนยันไม่ถูกต้อง หรือรหัสหมดอายุ');
+ const results=await env.DB.batch([
+  env.DB.prepare(`INSERT INTO late_self_requests(student_id,school_date,arrived_at,reason)
+   SELECT p.student_id,p.school_date,?,? FROM late_self_passcodes p
+   WHERE p.id=? AND p.code_hash=? AND p.consumed_at IS NULL AND p.expires_at>?
+   AND NOT EXISTS(SELECT 1 FROM late_records l WHERE l.student_id=p.student_id AND l.school_date=p.school_date)`)
+   .bind(bangkokArrivalTime(),b.reason,pass.id,codeHash,ts),
+  env.DB.prepare(`UPDATE late_self_passcodes SET consumed_at=? WHERE id=? AND code_hash=? AND consumed_at IS NULL AND expires_at>?`)
+   .bind(ts,pass.id,codeHash,ts)
+ ]);
+ if(results[0].meta.changes!==1||results[1].meta.changes!==1)
+  throw error(409,'รหัสนี้ถูกใช้แล้ว หรือมีการลงทะเบียนมาสายวันนี้แล้ว');
+ return json({ok:true,state:'pending',message:'ส่งคำขอมาสายสำเร็จ รอครูเวรตรวจสอบก่อนบันทึกผล'},201);
+}
+async function listLateSelf(req,env,user){
+ if(!isStaff(user))throw error(403,'เฉพาะครูเวรหรือผู้ดูแลระบบ');
+ const q=new URL(req.url).searchParams,roomId=positiveInt(q.get('classroom_id'));
+ const date=q.get('date')||bangkokToday();requireDate(date);
+ if(!roomId)throw error(400,'กรุณาเลือกห้องเรียน');
+ const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(roomId).first();
+ if(!room)throw error(404,'ไม่พบห้องเรียน');
+ const {results}=await env.DB.prepare(`SELECT r.id,r.school_date,r.arrived_at,r.reason,r.state,
+   s.full_name,s.student_no,h.roll_no
+   FROM late_self_requests r JOIN students s ON s.id=r.student_id
+   JOIN student_enrollments h ON h.student_id=s.id
+   WHERE h.classroom_id=? AND r.school_date=?
+    AND h.start_date<=r.school_date AND (h.end_date IS NULL OR h.end_date>r.school_date)
+   ORDER BY CASE WHEN r.state='pending' THEN 0 ELSE 1 END,r.id DESC LIMIT 100`)
+  .bind(roomId,date).all();
+ return json({items:results});
+}
+async function reviewLateSelf(req,env,user,id){
+ if(!isStaff(user))throw error(403,'เฉพาะครูเวรหรือผู้ดูแลระบบ');
+ let state;
+ try{state=validateLateReviewState((await payload(req)).state)}catch(e){throw error(400,e.message)}
+ const item=await env.DB.prepare('SELECT id,state,student_id,school_date FROM late_self_requests WHERE id=?').bind(id).first();
+ if(!item)throw error(404,'ไม่พบคำขอ');
+ if(item.state!=='pending')throw error(409,'คำขอนี้ถูกตรวจสอบแล้ว');
+ if(state==='verified'){
+  const duplicate=await env.DB.prepare('SELECT id FROM late_records WHERE student_id=? AND school_date=?')
+   .bind(item.student_id,item.school_date).first();
+  if(duplicate)throw error(409,'มีบันทึกมาสายที่ยืนยันแล้วในวันนี้');
+  const results=await env.DB.batch([
+   env.DB.prepare(`INSERT INTO late_records(student_id,school_date,arrived_at,reason,state,recorded_by,reviewed_by)
+     SELECT student_id,school_date,arrived_at,reason,'verified',?,? FROM late_self_requests
+     WHERE id=? AND state='pending'`).bind(user.id,user.id,id),
+   env.DB.prepare(`UPDATE late_self_requests SET state='verified',verified_by=?,reviewed_at=CURRENT_TIMESTAMP
+     WHERE id=? AND state='pending'`).bind(user.id,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_late_verified','late_self_requests',String(id))
+  ]);
+  if(results[0].meta.changes!==1||results[1].meta.changes!==1)
+   throw error(409,'คำขอนี้ถูกตรวจสอบแล้ว');
+ }else{
+  const change=await env.DB.prepare(`UPDATE late_self_requests SET state='rejected',verified_by=?,reviewed_at=CURRENT_TIMESTAMP
+   WHERE id=? AND state='pending'`).bind(user.id,id).run();
+  if(change.meta.changes!==1)throw error(409,'คำขอนี้ถูกตรวจสอบแล้ว');
+  await log(env.DB,user.id,'student_late_rejected','late_self_requests',id);
+ }
+ return json({ok:true,state,message:state==='verified'?'ยืนยันมาสายและบันทึกแล้ว':'ปฏิเสธคำขอแล้ว'});
 }
 async function addBehavior(req,env,user){
  const b=await payload(req),stId=positiveInt(b.student_id);
@@ -567,6 +669,7 @@ async function route(req,env){
  if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
  if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
  if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ if(req.method==='POST'&&path==='/api/student/late/report')return submitLateSelf(req,env);
  const user=await currentUser(req,env);
  if(req.method==='POST'&&path==='/api/auth/logout'){
   await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
@@ -579,6 +682,10 @@ async function route(req,env){
  if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
  if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
  if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='POST'&&path==='/api/late/self/code')return issueLateSelfCode(req,env,user);
+ if(req.method==='GET'&&path==='/api/late/self/requests')return listLateSelf(req,env,user);
+ const lateReview=/^\/api\/late\/self\/requests\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&lateReview)return reviewLateSelf(req,env,user,Number(lateReview[1]));
  if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
  if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
  if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
