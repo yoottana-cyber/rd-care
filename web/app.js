@@ -111,14 +111,15 @@ async function boot(){
 }
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
- const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['adminStudents','นักเรียน','♙'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','♧'],['admin','ครูและระบบ','⚙']]:[])];
+ const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อ','✅'],['late','มาสาย','⏰'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${state.tab===id?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
- <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>RD Care</h1><p>Smart Student Care • ระบบดูแลช่วยเหลือนักเรียน</p></div></div>
- <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออก</button></div></header>
+ <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>ระบบการดูแลและช่วยเหลือนักเรียน</h1><p>RD Care • โรงเรียนรัษฎา</p></div></div>
+ <div class="user"><span class="rd-date-chip" aria-label="วันที่ปัจจุบัน">📅 ${esc(displayDate)}</span><span class="rd-user-avatar" aria-hidden="true">${esc((state.user.display_name||'ค').trim().charAt(0))}</span><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออกจากระบบ</button></div></header>
  <div class="rd-layout" id="rdLayout">
- <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><span>เมนูหลัก</span><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
+ <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><div class="rd-side-brand"><img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="38" height="38" decoding="async"><span><strong>RD CARE</strong><small>RATSADA SCHOOL</small></span></div><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><p class="rd-nav-caption">เมนูหลัก</p><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
  <div class="rd-workspace">
  ${state.user?.role==='admin'?`<section class="rd-global-search" aria-label="ค้นหานักเรียนทั้งโรงเรียน">
   <label for="rdGlobalSearch">🔎 ค้นหานักเรียนทั้งโรงเรียน</label>
@@ -218,19 +219,26 @@ function renderDashboard(){
   ['รายการมาสาย',s.late,'⏰','stat-indigo']
  ];
  const actions=[
-  ['attendance','✓','เช็กชื่อ','บันทึกการมาเรียน','quick-purple'],
-  ['late','◷','มาสาย','ตรวจสอบรายการมาสาย','quick-teal'],
-  ['behavior','★','พฤติกรรม','บันทึกและตรวจสอบ','quick-orange'],
-  ['alerts','!','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
-  ...(state.user?.role==='admin'?[['adminStudents','♙','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue']]:[])
+  ['attendance','✅','เช็กชื่อ','บันทึกการมาเรียน','quick-purple'],
+  ['late','⏰','มาสาย','ตรวจสอบรายการมาสาย','quick-teal'],
+  ['behavior','⭐','พฤติกรรม','บันทึกและตรวจสอบ','quick-orange'],
+  ['alerts','🔔','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
+  ...(state.user?.role==='admin'?[['adminStudents','🎓','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue']]:[])
  ];
  mount(`<section class="stack">
   <div class="dashboard-hero">
-   <div><span class="hero-chip">✦ RD Care • Smart Student Care</span>
-    <h2>ภาพรวมการดูแลนักเรียน</h2>
-    <p>ติดตามการมาเรียนและรายการรอตรวจสอบ • วันที่ ${esc(state.date)}</p></div>
+   <div class="rd-hero-greeting"><span class="rd-hero-avatar" aria-hidden="true">👤</span>
+    <div><span class="hero-chip">✦ RD Care • Smart Student Care</span>
+     <h2>ยินดีต้อนรับ ${esc(state.user.display_name)}</h2>
+     <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(state.date)}</p></div></div>
    <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
   </div>
+  <h3 class="dashboard-section-title">🌈 แอปพลิเคชัน (Smart Apps)</h3>
+  <div class="card smart-apps-card"><div class="grid quick-actions">${actions.map(([tab,icon,title,desc,tone])=>
+   `<button type="button" class="quick-action ${tone}" data-quick-tab="${tab}" title="${desc}" aria-label="${title}: ${desc}">
+     <span class="quick-symbol" aria-hidden="true">${icon}</span>
+     <span class="quick-text"><strong>${title}</strong><small>${desc}</small></span>
+    </button>`).join('')}</div></div>
   <div class="card">${filters()}</div>
   <h3 class="dashboard-section-title">📊 สถิติภาพรวม</h3>
   <div class="grid four">${metrics.slice(0,4).map(([name,value,icon,tone])=>
@@ -239,12 +247,6 @@ function renderDashboard(){
    `<div class="card stats ${tone}"><span class="stat-icon" aria-hidden="true">${icon}</span><small>${name}</small><strong>${count(value)}</strong></div>`).join('')}</div>
   <h3 class="dashboard-section-title">📈 กราฟการมาเรียน</h3>
   ${renderAttendanceCharts(s)}
-  <h3 class="dashboard-section-title">⚡ ทางลัดการทำงาน</h3>
-  <div class="grid quick-actions">${actions.map(([tab,icon,title,desc,tone])=>
-   `<button type="button" class="quick-action ${tone}" data-quick-tab="${tab}">
-     <span class="quick-symbol" aria-hidden="true">${icon}</span>
-     <span class="quick-text"><strong>${title}</strong><small>${desc}</small></span>
-    </button>`).join('')}</div>
   <div class="warn">การขาดรายคาบหมายถึง “ไม่พบการเข้าชั้นเรียน” ยังไม่ใช่ข้อสรุปว่านักเรียนหนีเรียน ต้องให้ครูที่ปรึกษาตรวจสอบก่อน</div>
  </section>`);
  bindFilters(loadDashboard);
