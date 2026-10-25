@@ -238,6 +238,13 @@ p{line-height:1.65}
 [data-theme="dark"] .table th{background:#2b493e!important;color:#d8f1e4;border-color:#395a4c}
 [data-theme="dark"] .rd-date-chip{color:#c8d5e1;background:#27374d;border-color:#3b4f67}
 
+@media(min-width:781px) and (max-width:1150px){
+ .rd-shell .rd-date-chip{display:none}
+ .rd-shell>.top .brand p{display:none}
+ .rd-shell .user>div{display:none}
+ .rd-shell>.top{padding:10px 14px}
+ .rd-shell>.top .brand h1{font-size:13px}
+}
 @media(max-width:780px){
  .rd-shell{display:block;min-height:100dvh;max-width:none;padding:0 0 94px}
  .rd-shell>.top{
@@ -259,9 +266,10 @@ p{line-height:1.65}
  .rd-shell #logout{padding:7px 9px;min-height:32px}
  .rd-shell .nav{
   background:#fff;border-top:1px solid #dce5ed;box-shadow:0 -8px 24px #1c394019;
-  padding:9px 5px max(10px,env(safe-area-inset-bottom));gap:3px
+  padding:9px 5px max(10px,env(safe-area-inset-bottom));gap:3px;
+  justify-content:flex-start;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin
  }
- .rd-shell .nav button{font-size:10px;border:0;padding:9px 3px}
+ .rd-shell .nav button{font-size:10px;border:0;padding:9px 7px;flex:0 0 auto;min-width:66px;white-space:nowrap}
  .dashboard-hero{padding:18px 16px;gap:10px;min-height:116px}
  .rd-hero-avatar{width:49px;height:49px;font-size:22px}
  .dashboard-hero h2{font-size:16px}
