@@ -16,6 +16,7 @@ jobs:
           node --check worker/src/password.js
           node --check worker/src/worker.js
           node --check web/app.js
+          node --check web/run-safely.js
           node --check web/sw.js
       - name: Unit tests
         run: node --test tests/*.test.mjs
