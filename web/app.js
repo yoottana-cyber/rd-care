@@ -37,22 +37,42 @@ async function api(path,{method='GET',body,auth=true}={}){
 }
 function safeRun(job){return runSafely(job,e=>toast(e?.message||String(e),true));}
 function loginPage(){
- return `<div class="login-wrap"><section class="card login-card">
- <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน</p></div>
- <form id="loginForm"><div class="field"><label for="username">ชื่อผู้ใช้งาน</label><input id="username" name="username" required autocomplete="username" placeholder="เช่น teacher01"></div>
- <div class="field"><label for="password">รหัสผ่าน</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
- <button class="button full" type="submit">เข้าสู่ระบบ</button></form>
- <div class="grid two" style="margin-top:12px">
- <button id="portalStudentLogin" type="button" class="button secondary full">นักเรียนเข้าสู่ระบบ</button>
- <button id="portalGuardianLogin" type="button" class="button secondary full">ผู้ปกครองเข้าสู่ระบบ</button></div>
- <button id="studentLateEntry" type="button" class="button secondary full" style="margin-top:12px">นักเรียนแจ้งมาสาย</button>
- <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
- <p class="muted" style="text-align:center">ยังไม่เปิดใช้งานการแจ้งเตือนผู้ปกครองอัตโนมัติ</p></section></div>`;
+ return `<div class="login-wrap"><section class="card login-card" aria-label="เข้าสู่ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา">
+ <header class="login-brand">
+  <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
+  <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
+  <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
+  <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
+ </header>
+ <div class="login-content">
+  <div class="login-role-tabs" role="group" aria-label="ประเภทผู้เข้าใช้งาน">
+   <button type="button" class="active" id="staffLoginTab" aria-pressed="true">ครู / ผู้ดูแลระบบ</button>
+   <button type="button" id="portalStudentLogin" aria-pressed="false">นักเรียน / ผู้ปกครอง</button>
+  </div>
+  <form id="loginForm">
+   <div class="field"><label for="username">ชื่อผู้ใช้งาน (Username)</label><input id="username" name="username" required autocomplete="username" maxlength="40" placeholder="กรอกชื่อผู้ใช้งาน"></div>
+   <div class="field"><label for="password">รหัสผ่าน (Password)</label><input id="password" name="password" type="password" required autocomplete="current-password" placeholder="กรอกรหัสผ่าน"></div>
+   <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
+  </form>
+  <div class="login-links">
+   <button id="portalGuardianLogin" type="button" class="button secondary">เข้าสู่ระบบผู้ปกครอง</button>
+   <button id="studentLateEntry" type="button" class="button secondary">นักเรียนแจ้งมาสาย</button>
+  </div>
+  <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
+  <p class="login-message">ระบบยังไม่ส่งการแจ้งเตือน Push ถึงผู้ปกครองโดยอัตโนมัติ</p>
+ </div>
+ <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
+ </section></div>`;
 }
 function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian')); }
 function renderStudentLate(){
- $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card stack">
- <div class="login-head"><div class="brand-icon">RD</div><h1>แจ้งมาสายด้วยตนเอง</h1><p>ต้องใช้รหัสยืนยันที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p></div>
+ $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card">
+ <header class="login-brand">
+  <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
+  <h1>แจ้งมาสายด้วยตนเอง</h1>
+  <p class="brand-subtitle">ต้องใช้รหัสยืนยันที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p>
+ </header>
+ <div class="login-content">
  <form class="stack" id="studentLateForm">
   <div class="field"><label for="studentNumber">รหัสประจำตัวนักเรียน</label><input id="studentNumber" name="student_no" maxlength="40" required autocomplete="off" placeholder="เช่น 000123"></div>
   <div class="field"><label for="studentLateCode">รหัสยืนยันจากครูเวร</label><input id="studentLateCode" name="code" pattern="[a-fA-F0-9]{24}" maxlength="24" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="รหัส 24 ตัวอักษร"></div>
@@ -62,6 +82,7 @@ function renderStudentLate(){
  <p id="lateSelfFeedback" class="muted" aria-live="polite">ระบบบันทึกเวลาเข้าถึงเซิร์ฟเวอร์อัตโนมัติ เมื่อครูเวรยืนยันจึงนับเป็นรายการมาสายที่ตรวจสอบแล้ว</p>
  <button type="button" class="button secondary full" id="backToStaffLogin">กลับหน้าเข้าสู่ระบบครู</button>
  <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
+ </div><footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
  bindThemeButtons();
  $('#backToStaffLogin').addEventListener('click',renderLogin);
