@@ -48,7 +48,7 @@ test('existing username cannot be hijacked and no room advisor silently overwrit
  assert.match(planAdvisorImport([row()],roomMap,teacher).items[0].message,/เว้น Password ว่าง/);
  assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','')],roomMap,[{...teacher[0],display_name:'ครูคนอื่น'}]).items[0].message,/ชื่อไม่ตรง/);
 });
-test('rejects duplicate rooms and usernames, short staff passwords, and national ID passwords',()=>{
+test('rejects duplicate rooms, short teacher passwords, and national ID passwords',()=>{
  const roomDup=planAdvisorImport([row(),row()],roomMap);
  assert.equal(roomDup.ready,false);
  assert.match(roomDup.items[1].message,/ซ้ำ/);
