@@ -4,6 +4,8 @@ import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
+import {initTheme,bindThemeButtons,themeButtonLabel} from './theme.js';
+initTheme();
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
@@ -41,9 +43,10 @@ function loginPage(){
  <button id="portalStudentLogin" type="button" class="button secondary full">นักเรียนเข้าสู่ระบบ</button>
  <button id="portalGuardianLogin" type="button" class="button secondary full">ผู้ปกครองเข้าสู่ระบบ</button></div>
  <button id="studentLateEntry" type="button" class="button secondary full" style="margin-top:12px">นักเรียนแจ้งมาสาย</button>
+ <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
  <p class="muted" style="text-align:center">รุ่นทดลอง • ยังไม่เปิดใช้งานการแจ้งเตือนผู้ปกครอง</p></section></div>`;
 }
-function renderLogin(){ $('#app').innerHTML=loginPage();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian')); }
+function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian')); }
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card stack">
  <div class="login-head"><div class="brand-icon">RD</div><h1>แจ้งมาสายด้วยตนเอง</h1><p>ระบบทดลอง • ต้องใช้รหัสชั่วคราวที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p></div>
@@ -77,11 +80,11 @@ function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['adminStudents','นักเรียน','♙'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','♧'],['admin','ครูและระบบ','⚙']]:[])];
  return `<main class="shell"><header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
- <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button id="logout" class="button ghost" type="button">ออก</button></div></header>
+ <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออก</button></div></header>
  <nav class="nav" aria-label="เมนูหลัก">${navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('')}</nav>
  ${content}<footer class="foot">RD Care v0.1 • ทดลองกับข้อมูลจำลองก่อนใช้งานจริง • ไม่เปิด Push ผู้ปกครองในรุ่นนี้</footer></main>`;
 }
-function mount(content){$('#app').innerHTML=chrome(content);$$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));$('#logout').addEventListener('click',()=>safeRun(logout));}
+function mount(content){$('#app').innerHTML=chrome(content);bindThemeButtons();$$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));$('#logout').addEventListener('click',()=>safeRun(logout));}
 function $$(sel){return [...document.querySelectorAll(sel)]}
 async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
 function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
@@ -98,12 +101,57 @@ async function showTab(tab){state.tab=tab;
  if(tab==='adminStudents')return loadAdminStudents();
  if(tab==='portalAccounts')return createPortalAdmin({api,mount,toast,rooms:state.rooms,safeRun}).load();
 }
-async function loadDashboard(){state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));renderDashboard();}
-function renderDashboard(){const s=state.stats||{};mount(`<section class="stack"><div><h2>ภาพรวมการดูแลนักเรียน</h2><p class="muted">สถิติจากข้อมูลที่บันทึกแล้ว • ${esc(state.date)}</p></div>
- <div class="card">${filters()}</div><div class="grid four">${[['ห้องเรียน',s.rooms],['นักเรียน',s.students],['รายการเช็กชื่อประจำวัน',s.daily],['รายการเช็กชื่อรายคาบ',s.period]].map(([name,n])=>`<div class="card stats"><small>${name}</small><strong>${Number(n||0).toLocaleString('th-TH')}</strong></div>`).join('')}</div>
- <div class="grid three">${[['พบขาดรายคาบ',s.absent_period],['รอตรวจสอบ',s.alerts],['รายการมาสาย',s.late]].map(([name,n])=>`<div class="card stats"><small>${name}</small><strong>${Number(n||0).toLocaleString('th-TH')}</strong></div>`).join('')}</div>
- <div class="warn">การขาดรายคาบหมายถึง “ไม่พบการเข้าชั้นเรียน” ยังไม่ใช่ข้อสรุปว่านักเรียนหนีเรียน ต้องให้ครูที่ปรึกษาตรวจสอบก่อน</div></section>`);
+async function loadDashboard(){
+ state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));
+ renderDashboard();
+}
+function renderDashboard(){
+ const s=state.stats||{};
+ const count=n=>Number(n||0).toLocaleString('th-TH');
+ const metrics=[
+  ['ห้องเรียน',s.rooms,'🏫','stat-violet'],
+  ['นักเรียน',s.students,'🎓','stat-cyan'],
+  ['เช็กชื่อประจำวัน',s.daily,'📝','stat-blue'],
+  ['เช็กชื่อรายคาบ',s.period,'📚','stat-green'],
+  ['พบขาดรายคาบ',s.absent_period,'🔎','stat-rose'],
+  ['รอตรวจสอบ',s.alerts,'📌','stat-amber'],
+  ['รายการมาสาย',s.late,'⏰','stat-indigo']
+ ];
+ const actions=[
+  ['attendance','✓','เช็กชื่อ','บันทึกการมาเรียน','quick-purple'],
+  ['late','◷','มาสาย','ตรวจสอบรายการมาสาย','quick-teal'],
+  ['behavior','★','พฤติกรรม','บันทึกและตรวจสอบ','quick-orange'],
+  ['alerts','!','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
+  ...(state.user?.role==='admin'?[['adminStudents','♙','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue']]:[])
+ ];
+ mount(\`<section class="stack">
+  <div class="dashboard-hero">
+   <div><span class="hero-chip">✦ RD Care • Smart Student Care</span>
+    <h2>ภาพรวมการดูแลนักเรียน</h2>
+    <p>ติดตามการมาเรียนและรายการรอตรวจสอบ • วันที่ \${esc(state.date)}</p></div>
+   <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
+  </div>
+  <div class="card">\${filters()}</div>
+  <h3 class="dashboard-section-title">📊 สถิติภาพรวม</h3>
+  <div class="grid four">\${metrics.slice(0,4).map(([name,value,icon,tone])=>
+   \`<div class="card stats \${tone}"><span class="stat-icon" aria-hidden="true">\${icon}</span><small>\${name}</small><strong>\${count(value)}</strong></div>\`).join('')}</div>
+  <div class="grid three">\${metrics.slice(4).map(([name,value,icon,tone])=>
+   \`<div class="card stats \${tone}"><span class="stat-icon" aria-hidden="true">\${icon}</span><small>\${name}</small><strong>\${count(value)}</strong></div>\`).join('')}</div>
+  <h3 class="dashboard-section-title">⚡ ทางลัดการทำงาน</h3>
+  <div class="grid quick-actions">\${actions.map(([tab,icon,title,desc,tone])=>
+   \`<button type="button" class="quick-action \${tone}" data-quick-tab="\${tab}">
+     <span class="quick-symbol" aria-hidden="true">\${icon}</span>
+     <span class="quick-text"><strong>\${title}</strong><small>\${desc}</small></span>
+    </button>\`).join('')}</div>
+  <div class="warn">การขาดรายคาบหมายถึง “ไม่พบการเข้าชั้นเรียน” ยังไม่ใช่ข้อสรุปว่านักเรียนหนีเรียน ต้องให้ครูที่ปรึกษาตรวจสอบก่อน</div>
+ </section>\`);
  bindFilters(loadDashboard);
+ $('#refreshDashboard')?.addEventListener('click',()=>safeRun(async()=>{
+  const button=$('#refreshDashboard');button.disabled=true;
+  try{state.date=dateToday();await loadDashboard();toast('อัปเดตข้อมูลล่าสุดแล้ว')}
+  finally{if(button.isConnected)button.disabled=false}
+ }));
+ $$('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
 }
 async function loadAttendance(){
  if(!state.roomId){mount(`<div class="card empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>`);return}
