@@ -154,7 +154,31 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
  <section class="card stack"><h3>เพิ่มตารางสอนรายคาบ</h3><form id="addSlot" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูผู้สอน</label><select name="teacher_user_id">${teacherOptions()}</select></div>
  <div class="grid two"><div class="field"><label>วันในสัปดาห์</label><select name="day_of_week">${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}</select></div><div class="field"><label>คาบ</label><input type="number" name="period" min="1" max="12" value="1" required></div></div><div class="field"><label>ชื่อวิชา</label><input name="subject" placeholder="วิทยาการคำนวณ" required maxlength="120"></div><button class="button full" ${!teacherOptions()?'disabled':''}>เพิ่มคาบเรียน</button></form></section>
  <section class="card stack"><h3>นำเข้านักเรียน (CSV)</h3><form id="importStudents" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ข้อความ CSV (ไม่เกิน 60 คนต่อครั้ง)</label><textarea name="csv" required placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง" rows="7"></textarea></div><p class="muted">ก่อนทดลองด้วยข้อมูลจริง ต้องกำหนดสิทธิ์/ฐานกฎหมายและแจ้งผู้เกี่ยวข้องตามนโยบายโรงเรียน</p><button class="button full">นำเข้ารายชื่อ</button></form></section></div>
- <section class="card"><h3>บัญชีผู้ใช้ (${state.users.length})</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th></tr></thead><tbody>${state.users.map(u=>`<tr><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td><td>${esc(roles[u.role])}</td></tr>`).join('')}</tbody></table></div></section></div>`);
+ <section class="card stack"><h3>ครูและบุคลากร (${state.users.length} บัญชี)</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+ <tbody>${state.users.map(u=>`<tr><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td><td>${esc(roles[u.role])}</td><td>${u.active?'ใช้งาน':'พักบัญชี'}</td><td>${u.role==='teacher'||u.role==='staff'?`<button type="button" class="button secondary" data-edit-user="${u.id}">แก้ไข</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>
+ ${(()=>{
+  const person=state.users.find(u=>u.id===adminEditUserId&&(u.role==='teacher'||u.role==='staff'));
+  return person?`<form id="adminPersonnelEdit" class="stack"><h3>แก้ไข ${esc(person.username)}</h3>
+   <div class="grid two"><div class="field"><label>ชื่อที่แสดง</label><input name="display_name" value="${esc(person.display_name)}" required maxlength="100"></div>
+   <div class="field"><label>สถานะบัญชี</label><select name="active"><option value="1" ${person.active?'selected':''}>ใช้งาน</option><option value="0" ${person.active?'':'selected'}>ระงับการใช้งาน</option></select></div></div>
+   <p class="muted">การระงับบัญชีจะยกเลิกเซสชันที่ใช้งานอยู่ของครูหรือบุคลากรคนนั้นทันที แต่ไม่ลบประวัติ</p>
+   <button class="button" type="submit">บันทึกข้อมูลบุคลากร</button></form>`:'<p class="muted">กด “แก้ไข” เพื่อปรับชื่อหรือสถานะครู/บุคลากร</p>';
+ })()}
+ </section></div>`);
+ $$('[data-edit-user]').forEach(btn=>btn.addEventListener('click',()=>{
+  adminEditUserId=Number(btn.dataset.editUser);renderAdmin();
+ }));
+ $('#adminPersonnelEdit')?.addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const form=e.currentTarget,person=state.users.find(u=>u.id===adminEditUserId);
+  if(!person)return;
+  const f=new FormData(form),active=Number(f.get('active'));
+  if(!active&&!confirm(`ระงับบัญชีของ ${person.display_name} และออกจากระบบทุกอุปกรณ์?`))return;
+  const button=form.querySelector('button');button.disabled=true;
+  try{
+   await api('/api/admin/users/'+person.id,{method:'POST',body:{display_name:String(f.get('display_name')).trim(),active}});
+   adminEditUserId=null;toast('บันทึกข้อมูลบุคลากรแล้ว');await loadAdmin();
+  }finally{button.disabled=false}
+ }));
  const formApi=(id,path,makeBody,after=loadAdmin)=>{$('#'+id).addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api(path,{method:'POST',body:makeBody(f)});toast('บันทึกสำเร็จ');await after()}));};
  formApi('addUser','/api/admin/users',f=>({username:f.get('username'),display_name:f.get('display_name'),password:f.get('password'),role:f.get('role')}));
  formApi('assignAdvisor','/api/admin/advisor',f=>({classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id'))}));
