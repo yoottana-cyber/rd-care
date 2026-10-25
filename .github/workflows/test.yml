@@ -17,11 +17,14 @@ jobs:
           node --check worker/src/admin-validation.js
           node --check worker/src/student-import.js
           node --check worker/src/late-self.js
+          node --check worker/src/portal.js
           node --check worker/src/worker.js
           node --check web/app.js
           node --check web/run-safely.js
           node --check web/request-cache.js
           node --check web/xlsx-reader.js
+          node --check web/portal-ui.js
+          node --check web/portal-admin.js
           node --check web/sw.js
           node --check 'functions/api/[[path]].js'
       - name: Unit tests
@@ -45,3 +48,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'enrollment_*_test.py' -v
       - name: Late self-report SQL lifecycle
         run: python3 -m unittest discover -s tests -p 'late_self_test.py' -v
+      - name: Portal isolation and guardian relationships
+        run: python3 -m unittest discover -s tests -p 'portal_privacy_test.py' -v

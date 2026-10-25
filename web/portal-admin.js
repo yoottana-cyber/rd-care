@@ -1,0 +1,107 @@
+// Staff portal provisioning is admin-only and never stores one-time credentials.
+const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
+ let roomId=rooms?.[0]?.id||null,accounts=[],links=[],students=[];
+ const $=s=>document.querySelector(s);
+ async function load(notice=null){
+  if(!rooms?.some(r=>r.id===roomId))roomId=rooms?.[0]?.id||null;
+  const data=await Promise.all([
+   api('/api/admin/portal/accounts'),api('/api/admin/portal/links'),
+   roomId?api('/api/admin/students?classroom_id='+roomId):Promise.resolve({items:[]})
+  ]);
+  accounts=data[0].items;links=data[1].items;students=data[2].items.filter(s=>s.active);
+  render(notice);
+ }
+ function render(notice){
+  const roomOpts=rooms.map(r=>`<option value="${r.id}" ${r.id===roomId?'selected':''}>${esc(r.label)}</option>`).join('');
+  const studentOpts=students.map(s=>`<option value="${s.id}">${s.roll_no}. ${esc(s.full_name)} (${esc(s.student_no)})</option>`).join('');
+  const guardians=accounts.filter(a=>a.role==='guardian'&&a.active);
+  const guardianOpts=guardians.map(a=>`<option value="${a.id}">${esc(a.display_name)} (${esc(a.username)})</option>`).join('');
+  mount(`<section class="stack"><div><h2>บัญชีนักเรียนและผู้ปกครอง</h2><p class="muted">Admin ออกบัญชีทดลอง แยกสิทธิ์จากครูและผู้ดูแล • ไม่ใช้ข้อมูลส่วนบุคคลจริง</p></div>
+   ${notice?`<section class="card stack"><h3>ข้อมูลรับบัญชี (แสดงครั้งเดียว)</h3><div class="warn">เก็บรหัสชั่วคราวอย่างปลอดภัย แจ้งเจ้าของบัญชีหลังยืนยันตัวตนเท่านั้น ห้ามส่งในกลุ่มสาธารณะหรือเผยแพร่ภาพหน้าจอ</div>
+    <div class="field"><label>Username</label><input readonly value="${esc(notice.username)}"></div>
+    <div class="field"><label>รหัสผ่านชั่วคราว</label><input readonly value="${esc(notice.temporary_password)}"></div>
+    <p class="muted">รหัสชั่วคราวไม่สามารถดูย้อนหลังได้ หากสูญหายให้รีเซ็ตรหัสผ่านใหม่จากปุ่มด้านล่าง</p></section>`:''}
+   <div class="grid two">
+    <section class="card stack"><h3>สร้างบัญชีนักเรียน</h3>
+     <div class="field"><label>เลือกห้องเรียน</label><select id="portalAdminRoom">${roomOpts}</select></div>
+     <form id="portalCreateStudent" class="stack">
+      <div class="field"><label>นักเรียนจำลอง</label><select required name="student_id">${studentOpts}</select></div>
+      <div class="field"><label>Username ใหม่</label><input name="username" required minlength="3" maxlength="40" placeholder="เช่น stu-demo01" autocomplete="off"></div>
+      <button type="submit" class="button full" ${students.length?'':'disabled'}>สร้างบัญชีนักเรียน</button>
+     </form></section>
+    <section class="card stack"><h3>สร้างบัญชีผู้ปกครอง</h3>
+     <form id="portalCreateGuardian" class="stack">
+      <div class="field"><label>ชื่อผู้ปกครองตัวอย่าง</label><input name="display_name" required maxlength="100" placeholder="ผู้ปกครองทดสอบ"></div>
+      <div class="field"><label>Username ใหม่</label><input name="username" required minlength="3" maxlength="40" placeholder="เช่น guardian-demo01"></div>
+      <button class="button full" type="submit">สร้างบัญชีผู้ปกครอง</button>
+     </form></section></div>
+   <section class="card stack"><h3>ผูกผู้ปกครองกับนักเรียน</h3>
+    <div class="warn">ต้องตรวจสอบตัวตนและหลักฐานความสัมพันธ์จริงก่อนผูกสิทธิ์เมื่อใช้งานจริง ห้ามอนุญาตจากคำกล่าวอ้างเพียงอย่างเดียว</div>
+    <form id="portalLink" class="stack"><div class="grid two">
+     <div class="field"><label>บัญชีผู้ปกครอง</label><select name="guardian_account_id" required>${guardianOpts}</select></div>
+     <div class="field"><label>นักเรียนในห้องที่เลือก</label><select name="student_id" required>${studentOpts}</select></div></div>
+     <label><input name="verified" type="checkbox" required> ยืนยันว่าได้ตรวจสอบตัวตนและความสัมพันธ์ก่อนผูกบัญชี</label>
+     <button type="submit" class="button full" ${guardians.length&&students.length?'':'disabled'}>ผูกบัญชีผู้ปกครองกับนักเรียน</button></form>
+   </section>
+   <section class="card stack"><h3>บัญชีที่ออกแล้ว (${accounts.length})</h3>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Username / ชื่อ</th><th>ประเภท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+     <tbody>${accounts.map(a=>`<tr><td><strong>${esc(a.username)}</strong><div class="muted">${esc(a.display_name)}</div></td>
+      <td>${a.role==='student'?'นักเรียน':'ผู้ปกครอง'}</td><td>${a.active?'ใช้งาน':'ระงับ'} ${a.must_change_password?'• ต้องเปลี่ยนรหัส':''}</td>
+      <td><button type="button" class="button secondary" data-reset-portal="${a.id}">รีเซ็ต</button>
+       <button type="button" class="button ghost" data-status-portal="${a.id}" data-active="${a.active?0:1}">${a.active?'ระงับ':'เปิดใช้'}</button></td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีบัญชี</td></tr>'}</tbody></table></div>
+   </section>
+   <section class="card stack"><h3>ผู้ปกครองที่ผูกกับนักเรียน (${links.length})</h3>
+    <div class="table-wrap"><table class="table"><thead><tr><th>ผู้ปกครอง</th><th>นักเรียน</th><th>จัดการ</th></tr></thead>
+     <tbody>${links.map(l=>`<tr><td>${esc(l.guardian_name)}</td><td>${esc(l.full_name)} <span class="muted">${esc(l.student_no)}</span></td>
+      <td><button type="button" class="button ghost" data-unlink-guardian="${l.guardian_account_id}" data-unlink-student="${l.student_id}">เพิกถอนสิทธิ์</button></td></tr>`).join('')||'<tr><td colspan="3">ยังไม่มีการผูกบัญชี</td></tr>'}</tbody></table></div></section>
+  </section>`);
+  $('#portalAdminRoom')?.addEventListener('change',e=>safeRun(async()=>{roomId=Number(e.target.value);await load()}));
+  $('#portalCreateStudent')?.addEventListener('submit',e=>safeRun(async()=>{
+   e.preventDefault();const f=new FormData(e.currentTarget),button=e.currentTarget.querySelector('button');button.disabled=true;
+   try{const r=await api('/api/admin/portal/accounts',{method:'POST',body:{role:'student',student_id:Number(f.get('student_id')),username:String(f.get('username'))}});
+    toast('สร้างบัญชีนักเรียนแล้ว');await load({username:r.username,temporary_password:r.temporary_password});
+   }finally{if(button.isConnected)button.disabled=false}
+  }));
+  $('#portalCreateGuardian')?.addEventListener('submit',e=>safeRun(async()=>{
+   e.preventDefault();const f=new FormData(e.currentTarget),button=e.currentTarget.querySelector('button');button.disabled=true;
+   try{const r=await api('/api/admin/portal/accounts',{method:'POST',body:{role:'guardian',display_name:String(f.get('display_name')),username:String(f.get('username'))}});
+    toast('สร้างบัญชีผู้ปกครองแล้ว');await load({username:r.username,temporary_password:r.temporary_password});
+   }finally{if(button.isConnected)button.disabled=false}
+  }));
+  $('#portalLink')?.addEventListener('submit',e=>safeRun(async()=>{
+   e.preventDefault();const f=new FormData(e.currentTarget),button=e.currentTarget.querySelector('button');
+   if(f.get('verified')!=='on')throw Error('ต้องยืนยันการตรวจสอบตัวตนก่อน');
+   if(!confirm('ตรวจสอบความสัมพันธ์เรียบร้อย และยืนยันให้ผู้ปกครองดูข้อมูลนักเรียนคนนี้?'))return;
+   button.disabled=true;
+   try{await api('/api/admin/portal/links',{method:'POST',body:{
+    guardian_account_id:Number(f.get('guardian_account_id')),student_id:Number(f.get('student_id')),identity_verified:true}});
+    toast('ผูกสิทธิ์สำเร็จ');await load();
+   }finally{if(button.isConnected)button.disabled=false}
+  }));
+  document.querySelectorAll('[data-reset-portal]').forEach(b=>b.addEventListener('click',()=>safeRun(async()=>{
+   if(!confirm('รีเซ็ตรหัสผ่านบัญชีนี้และให้ออกจากระบบทุกอุปกรณ์?'))return;
+   b.disabled=true;
+   try{const id=Number(b.dataset.resetPortal);
+    const account=accounts.find(a=>a.id===id);
+    const r=await api('/api/admin/portal/accounts/'+id+'/reset',{method:'POST',body:{}});
+    toast('รีเซ็ตรหัสผ่านสำเร็จ');await load({username:account.username,temporary_password:r.temporary_password});
+   }finally{if(b.isConnected)b.disabled=false}
+  })));
+  document.querySelectorAll('[data-status-portal]').forEach(b=>b.addEventListener('click',()=>safeRun(async()=>{
+   if(!confirm('ยืนยันการเปลี่ยนสถานะบัญชี? เซสชันเดิมจะถูกยกเลิก'))return;
+   b.disabled=true;
+   try{await api('/api/admin/portal/accounts/'+b.dataset.statusPortal+'/status',{
+    method:'POST',body:{active:Number(b.dataset.active)}});toast('ปรับสถานะแล้ว');await load();
+   }finally{if(b.isConnected)b.disabled=false}
+  })));
+  document.querySelectorAll('[data-unlink-guardian]').forEach(b=>b.addEventListener('click',()=>safeRun(async()=>{
+   if(!confirm('เพิกถอนสิทธิ์ผู้ปกครองในการดูข้อมูลนักเรียนคนนี้?'))return;
+   b.disabled=true;
+   try{await api('/api/admin/portal/links/'+b.dataset.unlinkGuardian+'/'+b.dataset.unlinkStudent+'/revoke',
+     {method:'POST',body:{}});toast('เพิกถอนสิทธิ์แล้ว');await load();
+   }finally{if(b.isConnected)b.disabled=false}
+  })));
+ }
+ return {load};
+}

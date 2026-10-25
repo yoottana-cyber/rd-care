@@ -46,6 +46,10 @@ Cloudflare Pages จะเผยแพร่หน้าเว็บทดลอ
 
 อ่าน [docs/INSTALL.md](docs/INSTALL.md) ทีละขั้นตอนโดยเริ่มทดสอบ D1 แบบ **local** ก่อน แล้วจึงสร้าง D1 แบบ **remote**
 
+## นักเรียนและผู้ปกครองเข้าสู่ระบบ
+
+หน้า Login ของ RD Care มีทางเข้า **นักเรียน** และ **ผู้ปกครอง** พร้อมบัญชีแยกจากครู/ผู้บริหาร ผู้ดูแลสร้างบัญชีและผูกเด็กที่มีสิทธิ์ให้ผู้ปกครองก่อน โดยต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าครั้งแรก อ่านวิธีใช้งานและข้อจำกัดได้ที่ [docs/STUDENT-GUARDIAN-PORTAL.md](docs/STUDENT-GUARDIAN-PORTAL.md). ใช้เฉพาะข้อมูลจำลองระหว่างพัฒนา
+
 ## Deploy Worker Dev ผ่าน GitHub Actions
 
 อ่าน [docs/DEPLOY-DEV.md](docs/DEPLOY-DEV.md) สำหรับวิธีตั้งค่า `CLOUDFLARE_API_TOKEN` และ `CLOUDFLARE_ACCOUNT_ID` เป็น GitHub Secrets หนึ่งครั้ง จากนั้น GitHub Actions จะ Apply D1 migrations และ Deploy Worker Dev โดยอัตโนมัติเมื่อมีการเปลี่ยน `worker/**` บน `main`.
