@@ -3,6 +3,7 @@ import { passwordHash } from './password.js';
 import { validateStudentInput, validatePersonnelInput } from './admin-validation.js';
 import { planStudentImport } from './student-import.js';
 import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } from './late-self.js';
+import {portalRoutes,portalAdminRoutes} from './portal.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -442,6 +443,7 @@ async function dashboard(req,env,user){
 }
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
+ if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/users'){
   const {results}=await env.DB.prepare("SELECT id,username,display_name,role,active FROM users ORDER BY display_name").all();
   return json({items:results});
@@ -669,6 +671,7 @@ async function route(req,env){
  if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
  if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
  if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ if(path.startsWith('/api/portal/'))return portalRoutes(req,env,path);
  if(req.method==='POST'&&path==='/api/student/late/report')return submitLateSelf(req,env);
  const user=await currentUser(req,env);
  if(req.method==='POST'&&path==='/api/auth/logout'){
