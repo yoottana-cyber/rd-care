@@ -61,14 +61,14 @@ export function buildExampleXlsx(kind='students'){
  const isAdvisor=kind==='advisors';
  const students=isAdvisor?[
   ['classroom','full_name','username','password'],
-  ['ม.1/1','ครูตัวอย่าง หนึ่ง','teacher_demo01','DemoTeacher#1234'],
-  ['ม.2/3','ครูตัวอย่าง สอง','teacher_demo02','DemoTeacher#5678'],
-  ['ม.3/2','ครูตัวอย่าง สาม','teacher_demo03','DemoTeacher#9012']
+  ['ม.1/1','ครูตัวอย่าง หนึ่ง','teacher001','Teacher#1234'],
+  ['ม.2/3','ครูตัวอย่าง สอง','teacher002','Teacher#5678'],
+  ['ม.3/2','ครูตัวอย่าง สาม','teacher003','Teacher#9012']
  ]:[
   ['classroom','roll_no','student_no','full_name','username','password'],
-  ['ม.1/1',1,'DEMO9001','นักเรียนตัวอย่าง หนึ่ง','demo-stu01','Demo#1234'],
-  ['ม.2/3',2,'DEMO9002','นักเรียนตัวอย่าง สอง','demo-stu02','Demo#5678'],
-  ['ม.3/2',3,'DEMO9003','นักเรียนตัวอย่าง สาม','demo-stu03','Demo#9012']
+  ['ม.1/1',1,'STU9001','นักเรียนตัวอย่าง หนึ่ง','student001','Student#1234'],
+  ['ม.2/3',2,'STU9002','นักเรียนตัวอย่าง สอง','student002','Student#5678'],
+  ['ม.3/2',3,'STU9003','นักเรียนตัวอย่าง สาม','student003','Student#9012']
  ];
  const instructions=isAdvisor?[
   ['RD Care — ตัวอย่างนำเข้าครูที่ปรึกษาทุกห้องในไฟล์เดียว','คำอธิบาย'],
