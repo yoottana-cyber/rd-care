@@ -10,10 +10,8 @@ const verifyWebp=path=>{
  assert.equal(bytes.readUInt32LE(4)+8,bytes.length);
  return bytes;
 };
-test('school photo and official Ratsada crest bundled locally as valid WebP assets',()=>{
- const photo=verifyWebp('web/media/ratsada-campus.webp');
+test('official Ratsada school crest remains valid and available locally',()=>{
  const logo=verifyWebp('web/media/ratsada-crest.webp');
- assert.ok(photo.byteLength>2000);
  assert.ok(logo.byteLength>2000);
 });
 test('staff login uses Ratsada school full name, official crest, role tabs and developer credit',()=>{
@@ -43,7 +41,8 @@ test('student guardian login shares school design and retains separate token-sco
 test('login style is scoped, mobile responsive and does not change the dashboard palette',()=>{
  const css=read('web/login.css');
  assert.match(css,/\.login-wrap\{/);
- assert.match(css,/url\('\.\/media\/ratsada-campus\.webp'\)/);
+ assert.doesNotMatch(css,/ratsada-campus|url\(/);
+ assert.match(css,/linear-gradient\(145deg,#f9fdfb/);
  assert.match(css,/\.login-role-tabs/);
  assert.match(css,/\[data-theme="dark"\] \.login-wrap/);
  assert.match(css,/@media\(max-width:570px\)/);
@@ -54,9 +53,10 @@ test('login style is scoped, mobile responsive and does not change the dashboard
 });
 test('new login assets are precached for PWA and remain self-hosted',()=>{
  const sw=read('web/sw.js');
- for(const name of ['login.css','ratsada-campus.webp','ratsada-crest.webp'])
+ for(const name of ['login.css','ratsada-crest.webp'])
   assert.ok(sw.includes(name),name);
- assert.match(sw,/rd-care-shell-v23/);
+ assert.doesNotMatch(sw,/ratsada-campus\.webp/);
+ assert.match(sw,/rd-care-shell-v24/);
  const index=read('web/index.html');
  assert.match(index,/img-src 'self' data:/);
  const manifest=JSON.parse(read('web/manifest.webmanifest'));
