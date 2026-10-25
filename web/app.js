@@ -8,6 +8,13 @@ import {createPortalAdmin} from './portal-admin.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
 import {initTheme,bindThemeButtons} from './theme.js';
 initTheme();
+// Always show the emblem; retain the bundled small crest for offline/error fallback.
+document.addEventListener('error',event=>{
+ const img=event.target;
+ if(!(img instanceof HTMLImageElement)||!img.classList.contains('rd-school-crest')||img.dataset.crestFallback)return;
+ img.dataset.crestFallback='1';
+ img.src='./media/ratsada-crest.webp';
+},true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
@@ -40,7 +47,7 @@ function loginPage(){
  return `<div class="login-wrap"><section class="card login-card" aria-label="เข้าสู่ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา">
  <header class="login-brand">
   <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
-  <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="138" height="128" decoding="async" fetchpriority="high">
+  <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
   <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
   <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
  </header>
@@ -68,7 +75,7 @@ function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#l
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card">
  <header class="login-brand">
-  <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="138" height="128" decoding="async" fetchpriority="high">
+  <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
   <h1>แจ้งมาสายด้วยตนเอง</h1>
   <p class="brand-subtitle">ต้องใช้รหัสยืนยันที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p>
  </header>
@@ -108,7 +115,7 @@ function chrome(content){
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${state.tab===id?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
- <header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • ระบบดูแลช่วยเหลือนักเรียน</p></div></div>
+ <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>RD Care</h1><p>Smart Student Care • ระบบดูแลช่วยเหลือนักเรียน</p></div></div>
  <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออก</button></div></header>
  <div class="rd-layout" id="rdLayout">
  <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><span>เมนูหลัก</span><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
