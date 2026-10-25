@@ -1,5 +1,6 @@
 import { STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername, httpErrorStatus } from './core.js';
 import { passwordHash } from './password.js';
+import { validateStudentInput, validatePersonnelInput } from './admin-validation.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -363,6 +364,67 @@ async function adminRoutes(req,env,user,path){
   stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)').bind(user.id,'students_imported','classrooms',roomId));
   await env.DB.batch(stmts);
   return json({ok:true,imported:b.students.length},201);
+ }
+ if(req.method==='GET'&&path==='/api/admin/students'){
+  const roomId=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
+  if(!roomId)throw error(400,'กรุณาเลือกห้องเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(roomId).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  const {results}=await env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,full_name,active FROM students WHERE classroom_id=? ORDER BY active DESC,roll_no,id').bind(roomId).all();
+  return json({items:results});
+ }
+ if(req.method==='POST'&&path==='/api/admin/students'){
+  const b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  const res=await env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,?,?,?)')
+   .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active).run();
+  await log(env.DB,user.id,'student_created','students',res.meta.last_row_id);
+  return json({ok:true,id:res.meta.last_row_id},201);
+ }
+ const studentEdit=/^\\/api\\/admin\\/students\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=/^\\/api\\/admin\\/users\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
  }
  throw error(404,'ไม่พบ API');
 }
