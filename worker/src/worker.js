@@ -428,7 +428,7 @@ async function dashboard(req,env,user){
  const scope=isStaff(user)?{query:'',args:[]}:await env.DB.prepare(`SELECT id FROM classrooms WHERE advisor_user_id=? OR id IN
  (SELECT classroom_id FROM timetable WHERE teacher_user_id=? AND active=1)`).bind(user.id,user.id).all();
  const ids=isStaff(user)?null:scope.results.map(x=>x.id);
- if(ids?.length===0)return json({rooms:0,students:0,daily:0,period:0,absent_period:0,alerts:0,late:0});
+ if(ids?.length===0)return json({rooms:0,students:0,daily:0,period:0,absent_period:0,alerts:0,late:0,daily_statuses:{present:0,absent:0,late:0,leave:0},daily_trend:[]});
  const filter=ids?` AND c.id IN (${ids.map(()=>'?').join(',')})`:'';
  const a=ids||[];
  const results=await env.DB.batch([
@@ -438,10 +438,28 @@ async function dashboard(req,env,user){
   env.DB.prepare('SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=?'+filter).bind(date,...a),
   env.DB.prepare("SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=? AND p.status='absent'"+filter).bind(date,...a),
   env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN student_enrollments h ON h.student_id=al.student_id AND h.start_date<=al.school_date AND (h.end_date IS NULL OR h.end_date>al.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE al.school_date=? AND al.state='pending_review'"+filter).bind(date,...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN student_enrollments h ON h.student_id=l.student_id AND h.start_date<=l.school_date AND (h.end_date IS NULL OR h.end_date>l.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE l.school_date=?'+filter).bind(date,...a)
+  env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN student_enrollments h ON h.student_id=l.student_id AND h.start_date<=l.school_date AND (h.end_date IS NULL OR h.end_date>l.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE l.school_date=?'+filter).bind(date,...a),
+  env.DB.prepare("SELECT d.school_date day,d.status,COUNT(*) total FROM attendance_daily d"+
+    " JOIN student_enrollments h ON h.student_id=d.student_id AND h.start_date<=d.school_date"+
+    " AND (h.end_date IS NULL OR h.end_date>d.school_date)"+
+    " JOIN classrooms c ON c.id=h.classroom_id WHERE d.school_date BETWEEN date(?,'-6 days') AND ?"+
+    filter+" GROUP BY d.school_date,d.status ORDER BY d.school_date").bind(date,date,...a)
  ]);
- const values=results.map(r=>r.results[0]?.total||0);
- return json(Object.fromEntries(['rooms','students','daily','period','absent_period','alerts','late'].map((n,i)=>[n,values[i]])));
+ const values=results.slice(0,7).map(r=>r.results[0]?.total||0);
+ const dateUTC=new Date(date+'T12:00:00Z').getTime();
+ const daily_trend=Array.from({length:7},(_,i)=>({
+  date:new Date(dateUTC-(6-i)*86400000).toISOString().slice(0,10),
+  present:0,absent:0,late:0,leave:0
+ }));
+ const byDate=new Map(daily_trend.map(row=>[row.date,row]));
+ for(const row of results[7]?.results||[]){
+  const destination=byDate.get(row.day);
+  if(destination&&['present','absent','late','leave'].includes(row.status))
+   destination[row.status]=Number(row.total)||0;
+ }
+ const {present,absent,late,leave}=daily_trend[6];
+ return json({...Object.fromEntries(['rooms','students','daily','period','absent_period','alerts','late'].map((n,i)=>[n,values[i]])),
+  daily_statuses:{present,absent,late,leave},daily_trend});
 }
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
