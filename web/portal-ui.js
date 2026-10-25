@@ -22,8 +22,21 @@ export function createPortalUi({root,onStaffLogin}){
   }
   return data;
  }
- function frame(inner){
-  root.innerHTML=`<div class="login-wrap portal-wrap"><section class="card portal-card stack">
+ function frame(inner,login=false){
+  root.innerHTML=login?`<div class="login-wrap portal-wrap"><section class="card login-card portal-login-card">
+    <header class="login-brand">
+      <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
+      <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
+      <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
+      <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
+    </header>
+    <div class="login-content">
+    ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div>
+    <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
+    </div>
+    <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
+    </section></div>`
+    :`<div class="login-wrap portal-wrap"><section class="card portal-card stack">
     <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>พื้นที่นักเรียนและผู้ปกครอง</p></div>
     ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div>
     <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div></section></div>`;
@@ -32,7 +45,10 @@ export function createPortalUi({root,onStaffLogin}){
  function showLogin(role=state.role){
   state.role=role;requestVersion++;
   state.account=null;state.children=[];state.records=null;
-  frame(`<h2>เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
+  frame(`<div class="login-role-tabs" role="group" aria-label="ประเภทผู้เข้าใช้งาน">
+    <button type="button" class="active" aria-pressed="true">นักเรียน / ผู้ปกครอง</button>
+    <button type="button" id="portalBackTop" aria-pressed="false">ครู / ผู้ดูแลระบบ</button></div>
+    <h2 class="login-heading">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
    <div class="row portal-role-choice">
     <button type="button" class="button ${role==='student'?'':'secondary'}" data-role="student">นักเรียน</button>
     <button type="button" class="button ${role==='guardian'?'':'secondary'}" data-role="guardian">ผู้ปกครอง</button></div>
@@ -41,7 +57,8 @@ export function createPortalUi({root,onStaffLogin}){
     <div class="field"><label>รหัสผ่าน</label><input name="password" type="password" required autocomplete="current-password"></div>
     <button type="submit" class="button full">เข้าสู่ระบบ</button></form>
    <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
-   <button type="button" id="portalBack" class="button secondary full">กลับหน้าเข้าสู่ระบบครู</button>`);
+   <button type="button" id="portalBack" class="button secondary full">กลับหน้าเข้าสู่ระบบครู</button>`,true);
+  select('#portalBackTop').addEventListener('click',onStaffLogin);
   select('#portalBack').addEventListener('click',onStaffLogin);
   root.querySelectorAll('[data-role]').forEach(b=>b.addEventListener('click',()=>showLogin(b.dataset.role)));
   select('#portalLoginForm').addEventListener('submit',async e=>{
@@ -57,13 +74,13 @@ export function createPortalUi({root,onStaffLogin}){
   });
  }
  function showPasswordChange(){
-  frame(`<h2>ตั้งรหัสผ่านส่วนตัว</h2><p class="warn">บัญชีนี้ยังใช้รหัสผ่านชั่วคราว กรุณาเปลี่ยนก่อนดูข้อมูล</p>
+  frame(`<h2 class="login-heading">ตั้งรหัสผ่านส่วนตัว</h2><p class="warn">บัญชีนี้ยังใช้รหัสผ่านชั่วคราว กรุณาเปลี่ยนก่อนดูข้อมูล</p>
    <form id="portalChangeForm" class="stack">
     <div class="field"><label>รหัสผ่านชั่วคราว / รหัสผ่านปัจจุบัน</label><input type="password" name="current_password" autocomplete="current-password" required></div>
     <div class="field"><label>รหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)</label><input type="password" name="new_password" minlength="4" maxlength="128" autocomplete="new-password" required></div>
     <div class="field"><label>ยืนยันรหัสผ่านใหม่</label><input type="password" name="confirm" minlength="4" autocomplete="new-password" required></div>
     <button type="submit" class="button full">เปลี่ยนรหัสผ่าน</button></form>
-   <button type="button" class="button secondary full" id="portalLogout">ออกจากระบบ</button>`);
+   <button type="button" class="button secondary full" id="portalLogout">ออกจากระบบ</button>`,true);
   select('#portalLogout').addEventListener('click',logout);
   select('#portalChangeForm').addEventListener('submit',async e=>{
    e.preventDefault();const form=e.currentTarget,f=new FormData(form);
