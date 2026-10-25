@@ -1,4 +1,5 @@
 import { STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername } from './core.js';
+import { passwordHash } from './password.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -6,10 +7,6 @@ const hex = (bytes) => [...new Uint8Array(bytes)].map(x=>x.toString(16).padStart
 const randomHex = (count) => hex(crypto.getRandomValues(new Uint8Array(count)));
 const digest = async (str) => hex(await crypto.subtle.digest('SHA-256',encoder.encode(str)));
 
-async function passwordHash(password,salt){
- const key=await crypto.subtle.importKey('raw',encoder.encode(password),'PBKDF2',false,['deriveBits']);
- return hex(await crypto.subtle.deriveBits({name:'PBKDF2',salt:encoder.encode(salt),iterations:210000,hash:'SHA-256'},key,256));
-}
 function equalHash(a,b){
  if(typeof a!=='string'||typeof b!=='string'||a.length!==b.length)return false;
  let mismatch=0;
