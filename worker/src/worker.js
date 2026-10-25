@@ -378,6 +378,41 @@ async function adminRoutes(req,env,user,path){
   await env.DB.batch(stmts); // atomic; any late duplicate rolls back all rows
   return json({ok:true,imported:plan.items.length,items:plan.items.map(x=>({...x,status:'imported',message:'นำเข้าสำเร็จ'}))},201);
  }
+ if(req.method==='GET'&&path==='/api/admin/transfer-plans'){
+  const studentId=positiveInt(new URL(req.url).searchParams.get('student_id'));
+  if(!studentId)throw error(400,'กรุณาเลือกนักเรียน');
+  const student=await env.DB.prepare('SELECT id FROM students WHERE id=?').bind(studentId).first();
+  if(!student)throw error(404,'ไม่พบนักเรียน');
+  const {results}=await env.DB.prepare(`SELECT p.id,p.school_year,p.term,p.state,p.to_classroom_id,p.from_classroom_id,
+   source.label AS from_room,dest.label AS to_room
+   FROM student_transfer_plans p
+   JOIN classrooms source ON source.id=p.from_classroom_id
+   JOIN classrooms dest ON dest.id=p.to_classroom_id
+   WHERE p.student_id=? ORDER BY p.school_year DESC,p.term DESC`).bind(studentId).all();
+  return json({items:results});
+ }
+ if(req.method==='POST'&&path==='/api/admin/transfer-plans'){
+  const b=await payload(req),studentId=positiveInt(b.student_id),dest=positiveInt(b.to_classroom_id);
+  const year=Number(b.school_year),term=Number(b.term),state=b.state||'planned';
+  if(!studentId||!dest||!Number.isSafeInteger(year)||year<2500||year>2700||
+   ![1,2].includes(term)||!['planned','cancelled'].includes(state))
+   throw error(400,'ข้อมูลแผนย้ายห้องไม่ถูกต้อง');
+  const student=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=? AND active=1').bind(studentId).first();
+  const target=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(dest).first();
+  if(!student||!target)throw error(404,'ไม่พบนักเรียนหรือห้องปลายทาง');
+  if(student.classroom_id===dest)throw error(400,'ห้องปลายทางต้องไม่ใช่ห้องเรียนปัจจุบัน');
+  await env.DB.batch([
+   env.DB.prepare(`INSERT INTO student_transfer_plans(student_id,from_classroom_id,to_classroom_id,school_year,term,state,created_by)
+    VALUES(?,?,?,?,?,?,?)
+    ON CONFLICT(student_id,school_year,term) DO UPDATE SET
+      from_classroom_id=excluded.from_classroom_id,to_classroom_id=excluded.to_classroom_id,
+      state=excluded.state,created_by=excluded.created_by,updated_at=CURRENT_TIMESTAMP`)
+    .bind(studentId,student.classroom_id,dest,year,term,state,user.id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_transfer_plan_saved','students',String(studentId))
+  ]);
+  return json({ok:true,message:'บันทึกแผนย้ายห้องแล้ว ยังไม่เปลี่ยนห้องเรียนปัจจุบัน'});
+ }
  if(req.method==='GET'&&path==='/api/admin/students'){
   const roomId=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
   if(!roomId)throw error(400,'กรุณาเลือกห้องเรียน');
