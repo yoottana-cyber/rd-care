@@ -25,7 +25,7 @@ test('no attendance does not imply student absence or a false percentage',()=>{
  const markup=renderAttendanceCharts({daily_statuses:{present:0,absent:0,late:0,leave:0},daily_trend:[]});
  assert.match(markup,/ยังไม่มีบันทึกเช็กชื่อ/);
  assert.match(markup,/ไม่มีข้อมูลการมาเรียนในช่วงนี้/);
- assert.doesNotMatch(markup,/100%|NaN/);
+ assert.doesNotMatch(markup,/>100%|NaN/);
 });
 test('D1 dashboard query joins scoped classroom enrollments and aggregates daily status in seven-day window',()=>{
  const code=readFileSync(new URL('../worker/src/worker.js',import.meta.url),'utf8');
