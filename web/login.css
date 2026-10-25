@@ -3,7 +3,7 @@
 .login-wrap{
  position:relative;isolation:isolate;min-height:100dvh;
  display:grid;place-items:center;padding:36px 18px 30px;
- background:#dcf2e7 url('./media/ratsada-campus.svg') center center/cover no-repeat fixed;
+ background:#dcf2e7 url('./media/ratsada-campus.webp') center center/cover no-repeat fixed;
 }
 .login-wrap::before{
  content:"";position:absolute;inset:0;z-index:-1;
@@ -124,7 +124,7 @@
 .login-wrap .login-content .ok{color:#19633e;background:#eaf9f0;border-color:#c6ebd4}
 .login-wrap .login-content .warn{color:#7f5421;background:#fff8eb}
 [data-theme="dark"] .login-wrap{
- background:#143d2b url('./media/ratsada-campus.svg') center/cover no-repeat fixed;
+ background:#143d2b url('./media/ratsada-campus.webp') center/cover no-repeat fixed;
 }
 [data-theme="dark"] .login-wrap::before{
  background:linear-gradient(120deg,rgba(0,28,18,.57),rgba(2,56,35,.44),rgba(2,30,22,.63));
