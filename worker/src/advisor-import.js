@@ -26,9 +26,9 @@ function validate(raw,rooms,accounts){
    else if(pwd!=='')message='บัญชีครูมีอยู่แล้ว ให้เว้น Password ว่างเพื่อผูกห้อง โดยไม่เปลี่ยนรหัสผ่านเดิม';
    else mode='link';
   }else{
-   if(typeof pwd!=='string'||pwd.length<12||pwd.length>128||/[\u0000-\u001f\u007f]/.test(pwd))
-    message='ครูใหม่ต้องกำหนด Password 12–128 ตัวอักษร';
-   else if(/^\d{13}$/.test(pwd))message='ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน';
+   if(typeof pwd==='string'&&/^\d{13}$/.test(pwd))message='ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน';
+   else if(!validateUserPassword(pwd,'teacher'))
+    message='ครูใหม่ต้องกำหนด Password 4–128 ตัวอักษร';
    else mode='create';
   }
  }
