@@ -4,7 +4,11 @@
 
 เปิดเว็บทดลอง Cloudflare Pages → **นักเรียน** → เลือกห้องเรียน → ส่วน **นำเข้ารายชื่อนักเรียน Excel / CSV**
 
-รองรับ `.xlsx` (Sheet 1 หรือไฟล์ที่มี `xl/worksheets/sheet1.xml`) และ `.csv` แบบ UTF-8 สูงสุด 60 คนต่อครั้ง ไฟล์ `.xlsx` ไม่เกิน 3MB
+รองรับ `.xlsx` (Sheet 1 หรือไฟล์ที่มี `xl/worksheets/sheet1.xml`) และ `.csv` แบบ UTF-8 ไฟล์ `.xlsx` ไม่เกิน 3MB
+
+รองรับ 3 คอลัมน์ `roll_no,student_no,full_name` สำหรับนำเข้ารายชื่อได้ครั้งละ 60 คน และ 5 คอลัมน์ `roll_no,student_no,full_name,username,password` สำหรับสร้างนักเรียนและบัญชีพร้อมกันครั้งละไม่เกิน 10 คน Username และ Password ตั้งเองได้ โดย Password ขั้นต่ำ 4 ตัว (ควรใช้รหัสที่ยาวกว่านั้น) ระบบไม่แสดง Password ในผล Preview และจัดเก็บเฉพาะรหัสผ่านที่ผ่านการ Hash
+
+ไฟล์ตัวอย่าง CSV: `web/templates/student-login-import-template.csv` (ข้อมูลสมมติเท่านั้น)
 
 | roll_no | student_no | full_name |
 |---|---|---|
