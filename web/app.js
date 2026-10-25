@@ -5,6 +5,8 @@ const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
+const adminStudentState={roomId:null,items:[],editId:null};
+let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
@@ -39,7 +41,7 @@ async function boot(){
 }
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
- const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['admin','ตั้งค่าระบบ','⚙']]:[])];
+ const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['adminStudents','นักเรียน','♙'],['admin','ครูและระบบ','⚙']]:[])];
  return `<main class="shell"><header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
  <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button id="logout" class="button ghost" type="button">ออก</button></div></header>
  <nav class="nav" aria-label="เมนูหลัก">${navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('')}</nav>
@@ -58,6 +60,7 @@ async function showTab(tab){state.tab=tab;
  if(tab==='behavior')return loadBehavior();
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
+ if(tab==='adminStudents')return loadAdminStudents();
 }
 async function loadDashboard(){state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));renderDashboard();}
 function renderDashboard(){const s=state.stats||{};mount(`<section class="stack"><div><h2>ภาพรวมการดูแลนักเรียน</h2><p class="muted">สถิติจากข้อมูลที่บันทึกแล้ว • ${esc(state.date)}</p></div>
