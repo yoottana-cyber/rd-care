@@ -4,6 +4,7 @@ import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
+import {renderAttendanceCharts} from './dashboard-charts.js';
 import {initTheme,bindThemeButtons} from './theme.js';
 initTheme();
 const $=(selector)=>document.querySelector(selector);
@@ -205,6 +206,8 @@ function renderDashboard(){
    `<div class="card stats ${tone}"><span class="stat-icon" aria-hidden="true">${icon}</span><small>${name}</small><strong>${count(value)}</strong></div>`).join('')}</div>
   <div class="grid three">${metrics.slice(4).map(([name,value,icon,tone])=>
    `<div class="card stats ${tone}"><span class="stat-icon" aria-hidden="true">${icon}</span><small>${name}</small><strong>${count(value)}</strong></div>`).join('')}</div>
+  <h3 class="dashboard-section-title">📈 กราฟการมาเรียน</h3>
+  ${renderAttendanceCharts(s)}
   <h3 class="dashboard-section-title">⚡ ทางลัดการทำงาน</h3>
   <div class="grid quick-actions">${actions.map(([tab,icon,title,desc,tone])=>
    `<button type="button" class="quick-action ${tone}" data-quick-tab="${tab}">

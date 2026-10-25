@@ -1,5 +1,5 @@
-const CACHE='rd-care-shell-v18';
-const ASSETS=['./','./index.html','./app.css','./theme.css','./reference-ui.css','./theme.js','./app.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='rd-care-shell-v19';
+const ASSETS=['./','./index.html','./app.css','./theme.css','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
