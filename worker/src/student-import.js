@@ -1,9 +1,12 @@
 import { validateStudentInput } from './admin-validation.js';
+import {validUsername} from './core.js';
 // Prepare an atomic import plan. Every issue is returned with its source-row
 // number, and the whole import is blocked until all rows pass validation.
-export function planStudentImport(students,roomId,existing=[]){
+export function planStudentImport(students,roomId,existing=[],existingAccounts=[]){
  if(!Array.isArray(students)||students.length===0||students.length>60)throw Error('นำเข้าได้ครั้งละ 1–60 คน');
- const ids=new Set(),rolls=new Set();
+ const ids=new Set(),rolls=new Set(),loginNames=new Set();
+ const usedAccountNames=new Set(existingAccounts.map(a=>String(a.username).toLowerCase()));
+ let credentials=0;
  const occupiedIds=new Map(existing.map(s=>[String(s.student_no).toLowerCase(),s]));
  const occupiedRolls=new Map(existing.filter(s=>s.classroom_id===roomId).map(s=>[s.roll_no,s]));
  const items=students.map((raw,index)=>{
