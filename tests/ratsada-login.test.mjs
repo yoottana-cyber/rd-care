@@ -3,21 +3,16 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
-const b64=path=>{
- const xml=read(path);
- assert.match(xml,/<svg/);
- assert.match(xml,/data:image\/webp;base64,/);
- const match=xml.match(/base64,([^"]+)"/);
- assert.ok(match);
- const bytes=Buffer.from(match[1],'base64');
+const verifyWebp=path=>{
+ const bytes=readFileSync(new URL('../'+path,import.meta.url));
  assert.equal(bytes.toString('ascii',0,4),'RIFF');
  assert.equal(bytes.toString('ascii',8,12),'WEBP');
  assert.equal(bytes.readUInt32LE(4)+8,bytes.length);
  return bytes;
 };
-test('school photo and official Ratsada crest bundled locally as valid WebP-based SVG assets',()=>{
- const photo=b64('web/media/ratsada-campus.svg');
- const logo=b64('web/media/ratsada-crest.svg');
+test('school photo and official Ratsada crest bundled locally as valid WebP assets',()=>{
+ const photo=verifyWebp('web/media/ratsada-campus.webp');
+ const logo=verifyWebp('web/media/ratsada-crest.webp');
  assert.ok(photo.byteLength>2000);
  assert.ok(logo.byteLength>2000);
 });
@@ -59,7 +54,7 @@ test('login style is scoped, mobile responsive and does not change the dashboard
 });
 test('new login assets are precached for PWA and remain self-hosted',()=>{
  const sw=read('web/sw.js');
- for(const name of ['login.css','ratsada-campus.svg','ratsada-crest.svg'])
+ for(const name of ['login.css','ratsada-campus.webp','ratsada-crest.webp'])
   assert.ok(sw.includes(name),name);
  assert.match(sw,/rd-care-shell-v23/);
  const index=read('web/index.html');
