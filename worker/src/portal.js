@@ -21,8 +21,8 @@ async function bodyJson(req){
  catch{fail(400,'รูปแบบ JSON ไม่ถูกต้อง')}
 }
 function securePassword(value){
- if(typeof value!=='string'||value.length<12||value.length>128||/[\u0000-\u001f\u007f]/.test(value))
-  fail(400,'รหัสผ่านใหม่ต้องมีความยาว 12–128 ตัวอักษร');
+ if(typeof value!=='string'||value.length<4||value.length>128||/[\u0000-\u001f\u007f]/.test(value))
+  fail(400,'รหัสผ่านใหม่ต้องมีความยาว 4–128 ตัวอักษร');
  return value;
 }
 function checkedRole(role){if(!['student','guardian'].includes(role))fail(400,'ประเภทบัญชีไม่ถูกต้อง');return role}
