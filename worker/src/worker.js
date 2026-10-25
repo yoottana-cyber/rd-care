@@ -1,4 +1,4 @@
-import { STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername } from './core.js';
+import { STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername, httpErrorStatus } from './core.js';
 import { passwordHash } from './password.js';
 
 const encoder = new TextEncoder();
@@ -381,7 +381,7 @@ export default {
   let response;
   try{response=await route(req,env);}
   catch(e){
-   const code=e.code||(/UNIQUE constraint failed/.test(e.message||'')?409:500);
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
    if(code===500)console.error('RD Care API:',e);
    response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
   }
