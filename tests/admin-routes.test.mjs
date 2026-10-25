@@ -6,6 +6,8 @@ function contextFor(role) {
  const user={id:1,username:'demo',display_name:'Demo',role,active:1};
  return { DB:{prepare(sql) {
    if(sql.includes('FROM sessions s'))return {bind(){return {async first(){return user}}}};
+   if(sql.includes('SELECT id,classroom_id FROM students'))return {bind(){return {async first(){return null}}}};
+   if(sql.includes('SELECT id,role FROM users'))return {bind(){return {async first(){return null}}}};
    throw new Error('unexpected database access: '+sql);
  }}};
 }
@@ -33,4 +35,20 @@ test('invalid admin student input returns 400 before D1 write',async()=>{
   body:JSON.stringify({classroom_id:1,roll_no:0,student_no:'D',full_name:'Demo'})
  }),contextFor('admin'));
  assert.equal(response.status,400);
+});
+
+test('student and teacher edit URLs reach the intended admin handler',async()=>{
+ const admin=contextFor('admin');
+ const studentResponse=await worker.fetch(new Request('https://test.local/api/admin/students/999',{
+  method:'POST',headers:{'content-type':'application/json',...bearer},
+  body:JSON.stringify({classroom_id:1,roll_no:1,student_no:'DEMO1',full_name:'Demo'})
+ }),admin);
+ assert.equal(studentResponse.status,404);
+ assert.equal((await studentResponse.json()).error,'ไม่พบนักเรียน');
+ const personnelResponse=await worker.fetch(new Request('https://test.local/api/admin/users/999',{
+  method:'POST',headers:{'content-type':'application/json',...bearer},
+  body:JSON.stringify({display_name:'Demo',active:0})
+ }),admin);
+ assert.equal(personnelResponse.status,404);
+ assert.equal((await personnelResponse.json()).error,'ไม่พบบัญชี');
 });
