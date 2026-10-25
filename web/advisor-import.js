@@ -23,7 +23,7 @@ export function prepareAdvisorRows(raw,rooms){
   else if(item.classroom.includes('\ufffd')||item.full_name.includes('\ufffd'))message='อักขระไทยเสียหาย กรุณาใช้ CSV UTF-8 หรือ Excel .xlsx';
   else if(!item.full_name||item.full_name.length>100)message='ชื่อ–สกุลครูต้องยาวไม่เกิน 100 ตัว';
   else if(!/^[a-z0-9._-]{3,40}$/i.test(item.username))message='Username ไม่ถูกต้อง';
-  else if(item.password&&item.password.length<12)message='รหัสผ่านครูใหม่ต้องมีอย่างน้อย 12 ตัว';
+  else if(item.password&&item.password.length<4)message='รหัสผ่านครูใหม่ต้องมีอย่างน้อย 4 ตัว';
   else if(item.password.length>128)message='รหัสผ่านยาวเกิน 128 ตัว';
   else if(/^\d{13}$/.test(item.password))message='ห้ามใช้เลขบัตรประชาชนเป็นรหัสผ่าน';
   else if(byRoom.has(item.classroom))message='ห้องซ้ำในไฟล์';
