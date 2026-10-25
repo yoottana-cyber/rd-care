@@ -9,6 +9,8 @@ self.addEventListener('activate',e=>{
 self.addEventListener('fetch',e=>{
  const url=new URL(e.request.url);
  if(e.request.method!=='GET'||url.origin!==self.location.origin)return;
+ // API responses contain private school data: always bypass the PWA cache.
+ if(url.pathname.startsWith('/api/'))return;
  if(url.pathname.endsWith('/config.js')){e.respondWith(fetch(e.request,{cache:'no-store'}).catch(()=>caches.match(e.request)));return;}
  if(e.request.mode==='navigate'){
   e.respondWith(fetch(e.request).catch(()=>caches.match('./index.html')));return;
