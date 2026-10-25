@@ -20,7 +20,7 @@ test('staff login uses Ratsada school full name, official crest, role tabs and d
  const app=read('web/app.js');
  const region=app.slice(app.indexOf('function loginPage(){'),app.indexOf('function renderLogin(){'));
  assert.match(region,/ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา/);
- assert.match(region,/src="\.\/media\/ratsada-crest\.svg"/);
+ assert.match(region,/src="\.\/media\/ratsada-crest\.webp"/);
  assert.match(region,/พัฒนาโดย ครูยุทธนา บุญจันทร์/);
  for(const id of ['loginForm','username','password','portalStudentLogin','portalGuardianLogin','studentLateEntry'])
   assert.ok(region.includes(id),id);
@@ -43,7 +43,7 @@ test('student guardian login shares school design and retains separate token-sco
 test('login style is scoped, mobile responsive and does not change the dashboard palette',()=>{
  const css=read('web/login.css');
  assert.match(css,/\.login-wrap\{/);
- assert.match(css,/url\('\.\/media\/ratsada-campus\.svg'\)/);
+ assert.match(css,/url\('\.\/media\/ratsada-campus\.webp'\)/);
  assert.match(css,/\.login-role-tabs/);
  assert.match(css,/\[data-theme="dark"\] \.login-wrap/);
  assert.match(css,/@media\(max-width:570px\)/);
