@@ -4,7 +4,7 @@ import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
-import {initTheme,bindThemeButtons,themeButtonLabel} from './theme.js';
+import {initTheme,bindThemeButtons} from './theme.js';
 initTheme();
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -124,27 +124,27 @@ function renderDashboard(){
   ['alerts','!','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
   ...(state.user?.role==='admin'?[['adminStudents','♙','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue']]:[])
  ];
- mount(\`<section class="stack">
+ mount(`<section class="stack">
   <div class="dashboard-hero">
    <div><span class="hero-chip">✦ RD Care • Smart Student Care</span>
     <h2>ภาพรวมการดูแลนักเรียน</h2>
-    <p>ติดตามการมาเรียนและรายการรอตรวจสอบ • วันที่ \${esc(state.date)}</p></div>
+    <p>ติดตามการมาเรียนและรายการรอตรวจสอบ • วันที่ ${esc(state.date)}</p></div>
    <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
   </div>
-  <div class="card">\${filters()}</div>
+  <div class="card">${filters()}</div>
   <h3 class="dashboard-section-title">📊 สถิติภาพรวม</h3>
-  <div class="grid four">\${metrics.slice(0,4).map(([name,value,icon,tone])=>
-   \`<div class="card stats \${tone}"><span class="stat-icon" aria-hidden="true">\${icon}</span><small>\${name}</small><strong>\${count(value)}</strong></div>\`).join('')}</div>
-  <div class="grid three">\${metrics.slice(4).map(([name,value,icon,tone])=>
-   \`<div class="card stats \${tone}"><span class="stat-icon" aria-hidden="true">\${icon}</span><small>\${name}</small><strong>\${count(value)}</strong></div>\`).join('')}</div>
+  <div class="grid four">${metrics.slice(0,4).map(([name,value,icon,tone])=>
+   `<div class="card stats ${tone}"><span class="stat-icon" aria-hidden="true">${icon}</span><small>${name}</small><strong>${count(value)}</strong></div>`).join('')}</div>
+  <div class="grid three">${metrics.slice(4).map(([name,value,icon,tone])=>
+   `<div class="card stats ${tone}"><span class="stat-icon" aria-hidden="true">${icon}</span><small>${name}</small><strong>${count(value)}</strong></div>`).join('')}</div>
   <h3 class="dashboard-section-title">⚡ ทางลัดการทำงาน</h3>
-  <div class="grid quick-actions">\${actions.map(([tab,icon,title,desc,tone])=>
-   \`<button type="button" class="quick-action \${tone}" data-quick-tab="\${tab}">
-     <span class="quick-symbol" aria-hidden="true">\${icon}</span>
-     <span class="quick-text"><strong>\${title}</strong><small>\${desc}</small></span>
-    </button>\`).join('')}</div>
+  <div class="grid quick-actions">${actions.map(([tab,icon,title,desc,tone])=>
+   `<button type="button" class="quick-action ${tone}" data-quick-tab="${tab}">
+     <span class="quick-symbol" aria-hidden="true">${icon}</span>
+     <span class="quick-text"><strong>${title}</strong><small>${desc}</small></span>
+    </button>`).join('')}</div>
   <div class="warn">การขาดรายคาบหมายถึง “ไม่พบการเข้าชั้นเรียน” ยังไม่ใช่ข้อสรุปว่านักเรียนหนีเรียน ต้องให้ครูที่ปรึกษาตรวจสอบก่อน</div>
- </section>\`);
+ </section>`);
  bindFilters(loadDashboard);
  $('#refreshDashboard')?.addEventListener('click',()=>safeRun(async()=>{
   const button=$('#refreshDashboard');button.disabled=true;
