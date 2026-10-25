@@ -169,10 +169,10 @@ export async function portalAdminRoutes(req,env,actor,path){
    if(!studentId)fail(400,'กรุณาเลือกนักเรียน');
    const st=await env.DB.prepare('SELECT id,student_no,full_name FROM students WHERE id=? AND active=1').bind(studentId).first();
    if(!st)fail(404,'ไม่พบนักเรียนที่ใช้งานอยู่');
-   username=studentUsername(st);
-   // Reject supplied username that differs from the authoritative student number.
-   if(b.username!==undefined&&String(b.username).trim().toLowerCase()!==username)
-    fail(400,'Username นักเรียนต้องตรงกับเลขประจำตัวนักเรียนเท่านั้น');
+   // Student number remains the default; Admin may choose another login ID.
+   username=b.username===undefined||!String(b.username).trim()
+     ?studentUsername(st):String(b.username).trim().toLowerCase();
+   if(!validUsername(username))fail(400,'Username ต้องมี 3–40 ตัวอักษร ภาษาอังกฤษ ตัวเลข จุด หรือขีด');
    displayName=st.full_name;
   }else{
    username=typeof b.username==='string'?b.username.trim().toLowerCase():'';
@@ -181,12 +181,16 @@ export async function portalAdminRoutes(req,env,actor,path){
    if(!displayName||displayName.length>100||/[\u0000-\u001f\u007f]/.test(displayName))
     fail(400,'กรุณากรอกชื่อผู้ปกครองไม่เกิน 100 ตัวอักษร');
   }
-  const password=randomHex(16),salt=randomHex(16),hash=await passwordHash(password,salt);
+  const chosen=b.password!==undefined;
+  const password=chosen?String(b.password):randomHex(16);
+  if(password.length<4||password.length>128)
+   fail(400,'รหัสผ่านต้องมีความยาว 4–128 ตัวอักษร');
+  const salt=randomHex(16),hash=await passwordHash(password,salt);
   const result=await env.DB.prepare(`INSERT INTO portal_accounts
    (username,display_name,role,student_id,password_salt,password_hash,created_by)
    VALUES(?,?,?,?,?,?,?)`).bind(username,displayName,role,studentId,salt,hash,actor.id).run();
   await audit(env.DB,actor.id,'portal_account_created',result.meta.last_row_id);
-  return reply({ok:true,id:result.meta.last_row_id,username,role,temporary_password:password,
+  return reply({ok:true,id:result.meta.last_row_id,username,role,temporary_password:chosen?null:password,
     message:'รหัสผ่านชั่วคราวแสดงเพียงครั้งเดียว โปรดแจ้งเจ้าของบัญชีที่ยืนยันตัวตนแล้วเป็นการส่วนตัว'},201);
  }
  if(req.method==='POST'&&path==='/api/admin/portal/links'){
