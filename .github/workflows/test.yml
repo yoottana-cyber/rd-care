@@ -26,6 +26,7 @@ jobs:
           node --check web/request-cache.js
           node --check web/xlsx-reader.js
           node --check web/unified-import.js
+          node --check web/csv-encoding.js
           node --check web/portal-ui.js
           node --check web/portal-admin.js
           node --check web/portal-batch.js
