@@ -2,6 +2,8 @@ import {API_BASE_URL} from './config.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {readXlsxRows} from './xlsx-reader.js';
+import {createPortalUi} from './portal-ui.js';
+import {createPortalAdmin} from './portal-admin.js';
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
@@ -13,6 +15,7 @@ let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
+const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>renderLogin()});
 function dateToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function timeNow(){return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}
 function toast(message,bad=false){const el=$('#toast');el.textContent=message;el.className='toast show'+(bad?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.className='toast',4200);}
@@ -33,10 +36,14 @@ function loginPage(){
  <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน</p></div>
  <form id="loginForm"><div class="field"><label for="username">ชื่อผู้ใช้งาน</label><input id="username" name="username" required autocomplete="username" placeholder="เช่น teacher01"></div>
  <div class="field"><label for="password">รหัสผ่าน</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
- <button class="button full" type="submit">เข้าสู่ระบบ</button></form><button id="studentLateEntry" type="button" class="button secondary full" style="margin-top:12px">นักเรียนแจ้งมาสาย</button>
+ <button class="button full" type="submit">เข้าสู่ระบบ</button></form>
+ <div class="grid two" style="margin-top:12px">
+ <button id="portalStudentLogin" type="button" class="button secondary full">นักเรียนเข้าสู่ระบบ</button>
+ <button id="portalGuardianLogin" type="button" class="button secondary full">ผู้ปกครองเข้าสู่ระบบ</button></div>
+ <button id="studentLateEntry" type="button" class="button secondary full" style="margin-top:12px">นักเรียนแจ้งมาสาย</button>
  <p class="muted" style="text-align:center">รุ่นทดลอง • ยังไม่เปิดใช้งานการแจ้งเตือนผู้ปกครอง</p></section></div>`;
 }
-function renderLogin(){ $('#app').innerHTML=loginPage();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate); }
+function renderLogin(){ $('#app').innerHTML=loginPage();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian')); }
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card stack">
  <div class="login-head"><div class="brand-icon">RD</div><h1>แจ้งมาสายด้วยตนเอง</h1><p>ระบบทดลอง • ต้องใช้รหัสชั่วคราวที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p></div>
@@ -68,7 +75,7 @@ async function boot(){
 }
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
- const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['adminStudents','นักเรียน','♙'],['admin','ครูและระบบ','⚙']]:[])];
+ const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['adminStudents','นักเรียน','♙'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','♧'],['admin','ครูและระบบ','⚙']]:[])];
  return `<main class="shell"><header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
  <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button id="logout" class="button ghost" type="button">ออก</button></div></header>
  <nav class="nav" aria-label="เมนูหลัก">${navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('')}</nav>
@@ -88,6 +95,7 @@ async function showTab(tab){state.tab=tab;
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
  if(tab==='adminStudents')return loadAdminStudents();
+ if(tab==='portalAccounts')return createPortalAdmin({api,mount,toast,rooms:state.rooms,safeRun}).load();
 }
 async function loadDashboard(){state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));renderDashboard();}
 function renderDashboard(){const s=state.stats||{};mount(`<section class="stack"><div><h2>ภาพรวมการดูแลนักเรียน</h2><p class="muted">สถิติจากข้อมูลที่บันทึกแล้ว • ${esc(state.date)}</p></div>
@@ -489,7 +497,7 @@ function parseCsv(csv){const rows=[];let row=[],col='',quoted=false;
  for(let i=0;i<csv.length;i++){const ch=csv[i];if(ch==='"'){if(quoted&&csv[i+1]==='"'){col+='"';i++}else quoted=!quoted;}else if(ch===','&&!quoted){row.push(col);col=''}else if((ch==='\r'||ch==='\n')&&!quoted){if(ch==='\r'&&csv[i+1]==='\n')i++;row.push(col);if(row.some(x=>x.trim()))rows.push(row);row=[];col=''}else col+=ch;}
  if(quoted)throw Error('ไฟล์ CSV มีเครื่องหมายคำพูดไม่ครบ');row.push(col);if(row.some(x=>x.trim()))rows.push(row);if(rows.some(r=>r.length!==3))throw Error('CSV ต้องมี 3 คอลัมน์: roll_no,student_no,full_name');return rows;
 }
-async function start(){if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});if(!state.token){renderLogin();return}try{await boot()}catch{state.token='';sessionStorage.removeItem('rd_token');renderLogin()}}
+async function start(){if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});if(portalUi.hasSession()){await portalUi.resume();return}if(!state.token){renderLogin();return}try{await boot()}catch{state.token='';sessionStorage.removeItem('rd_token');renderLogin()}}
 window.addEventListener('online',()=>toast('เชื่อมต่ออินเทอร์เน็ตแล้ว'));
 window.addEventListener('offline',()=>toast('ออฟไลน์: ระบบจะไม่บันทึกข้อมูลจนกว่าจะเชื่อมต่อ',true));
 start();
