@@ -43,3 +43,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'transfer_*_test.py' -v
       - name: Historical student enrollment invariants
         run: python3 -m unittest discover -s tests -p 'enrollment_*_test.py' -v
+      - name: Late self-report SQL lifecycle
+        run: python3 -m unittest discover -s tests -p 'late_self_test.py' -v
