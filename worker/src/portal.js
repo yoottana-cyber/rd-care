@@ -122,7 +122,7 @@ async function records(req,env,a){
  ]);
  const rows=behavior.results||[];
  return reply({student:linked,from,to,daily:daily.results||[],period:period.results||[],
-  late:late.results||[],behavior:rows,behavior_total:rows.reduce((n,x)=>n+x.points,0),
+  late:late.results||[],behavior:rows,behavior_total:total.results?.[0]?.total||0,
   note:'คะแนนรวมเฉพาะรายการในช่วงวันที่เลือก'});
 }
 export async function portalRoutes(req,env,path){
