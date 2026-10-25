@@ -6,6 +6,7 @@ import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } fro
 import {portalRoutes,portalAdminRoutes} from './portal.js';
 import {searchStudents} from './student-search.js';
 import {advisorImportEndpoint} from './advisor-import.js';
+import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint} from './unified-roster.js';
 
 const encoder = new TextEncoder();
