@@ -1,5 +1,6 @@
 import {validUsername} from './core.js';
 import {passwordHash} from './password.js';
+import {validateUserPassword} from './user-password-policy.js';
 
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{
