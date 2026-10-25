@@ -1,3 +1,4 @@
+import {API_BASE_URL} from './config.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -6,12 +7,13 @@ const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'n
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
 export function createPortalUi({root,onStaffLogin}){
  const state={token:sessionStorage.getItem('rd_portal_token')||'',account:null,role:'student',children:[],studentId:null,records:null,from:minusDays(today(),29),to:today()};
+ let requestVersion=0;
  const select=s=>root.querySelector(s);
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
  async function call(path,{method='GET',body,auth=true}={}){
   const headers={'content-type':'application/json'};
   if(auth&&state.token)headers.authorization='Bearer '+state.token;
-  const response=await fetch(path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
+  const response=await fetch(API_BASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json().catch(()=>({}));
   if(!response.ok){
    if(response.status===401&&auth){state.token='';sessionStorage.removeItem('rd_portal_token');}
@@ -25,7 +27,7 @@ export function createPortalUi({root,onStaffLogin}){
     ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div></section></div>`;
  }
  function showLogin(role=state.role){
-  state.role=role;
+  state.role=role;requestVersion++;
   state.account=null;state.children=[];state.records=null;
   frame(`<h2>เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
    <div class="row portal-role-choice">
@@ -73,24 +75,36 @@ export function createPortalUi({root,onStaffLogin}){
   });
  }
  async function logout(){
+  requestVersion++;
   try{if(state.token)await call('/api/portal/auth/logout',{method:'POST',body:{}})}catch{}
   state.token='';state.account=null;state.records=null;state.children=[];
   sessionStorage.removeItem('rd_portal_token');showLogin();
  }
  async function showDashboard(){
   try{
-   const data=await call('/api/portal/children');state.children=data.items;
+   const session=state.token;
+   const data=await call('/api/portal/children');
+   if(session!==state.token||!state.account)return;
+   state.children=data.items;
    if(!state.children.some(s=>s.id===state.studentId))state.studentId=state.children[0]?.id||null;
    if(state.studentId)await loadRecords();else renderDashboard();
   }catch(error){if(!state.token){showLogin(state.role);return}frame('<p class="warn">ไม่สามารถโหลดข้อมูลที่ได้รับสิทธิ์</p><button class="button secondary full" id="portalRetry">ลองอีกครั้ง</button>');message(error.message,true);select('#portalRetry').addEventListener('click',showDashboard)}
  }
  async function loadRecords(){
-  if(!state.studentId){state.records=null;renderDashboard();return}
+  const studentId=state.studentId,from=state.from,to=state.to;
+  const version=++requestVersion;
+  state.records=null;
+  if(!studentId){renderDashboard();return}
   try{
-   state.records=await call('/api/portal/records?student_id='+state.studentId+
-    '&from='+encodeURIComponent(state.from)+'&to='+encodeURIComponent(state.to));
-   renderDashboard();
-  }catch(error){if(!state.token){showLogin(state.role);return}message(error.message,true)}
+   const records=await call('/api/portal/records?student_id='+studentId+
+    '&from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));
+   if(version!==requestVersion||studentId!==state.studentId||from!==state.from||to!==state.to)return;
+   state.records=records;renderDashboard();
+  }catch(error){
+   if(version!==requestVersion)return;
+   if(!state.token){showLogin(state.role);return}
+   renderDashboard();message(error.message,true);
+  }
  }
  const empty='<p class="empty">ไม่พบรายการในช่วงวันที่เลือก</p>';
  function renderDashboard(){
