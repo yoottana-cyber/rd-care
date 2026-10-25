@@ -22,6 +22,7 @@ jobs:
           node --check worker/src/student-username.js
           node --check worker/src/student-search.js
           node --check worker/src/advisor-import.js
+          node --check worker/src/user-password-policy.js
           node --check worker/src/worker.js
           node --check web/app.js
           node --check web/theme.js

@@ -6,6 +6,7 @@ import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } fro
 import {portalRoutes,portalAdminRoutes} from './portal.js';
 import {searchStudents} from './student-search.js';
 import {advisorImportEndpoint} from './advisor-import.js';
+import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint} from './unified-roster.js';
 
 const encoder = new TextEncoder();
@@ -475,7 +476,8 @@ async function adminRoutes(req,env,user,path){
  }
  if(req.method==='POST'&&path==='/api/admin/users'){
   const b=await payload(req),username=String(b.username||'').trim().toLowerCase(), pass=String(b.password||'');
-  if(!validUsername(username)||pass.length<12||pass.length>128||!['teacher','staff','admin'].includes(b.role))throw error(400,'ชื่อผู้ใช้หรือรหัสผ่าน (12–128 ตัว) ไม่ถูกต้อง');
+  if(!validUsername(username)||!['teacher','staff','admin'].includes(b.role)||!validateUserPassword(pass,b.role))
+   throw error(400,'ชื่อผู้ใช้ไม่ถูกต้อง หรือรหัสผ่านต้องมี '+userPasswordMinimum(b.role)+'–128 ตัว และไม่ใช้เลขประจำตัวประชาชน');
   const salt=randomHex(16),hash=await passwordHash(pass,salt);
   const res=await env.DB.prepare('INSERT INTO users(username,display_name,role,password_salt,password_hash) VALUES(?,?,?,?,?)')
    .bind(username,requiredText(b.display_name,100),b.role,salt,hash).run();
