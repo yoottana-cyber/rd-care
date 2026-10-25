@@ -116,7 +116,9 @@ async function records(req,env,a){
     ORDER BY school_date DESC LIMIT 90`).bind(id,from,to),
   env.DB.prepare(`SELECT substr(created_at,1,10) AS record_date,points,reason FROM behavior_records
     WHERE student_id=? AND substr(created_at,1,10) BETWEEN ? AND ?
-    ORDER BY id DESC LIMIT 100`).bind(id,from,to)
+    ORDER BY id DESC LIMIT 100`).bind(id,from,to),
+  env.DB.prepare(`SELECT COALESCE(SUM(points),0) AS total FROM behavior_records
+    WHERE student_id=? AND substr(created_at,1,10) BETWEEN ? AND ?`).bind(id,from,to)
  ]);
  const rows=behavior.results||[];
  return reply({student:linked,from,to,daily:daily.results||[],period:period.results||[],
