@@ -376,7 +376,7 @@ async function adminRoutes(req,env,user,path){
   stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
    .bind(user.id,'students_imported','classrooms',String(roomId)));
   await env.DB.batch(stmts); // atomic; any late duplicate rolls back all rows
-  return json({ok:true,imported:plan.items.length,items:plan.items.map(x=>({...x,status:'imported',message:'นำเข้าสำเร็จ'}))},201);
+  return json({ok:true,ready:true,valid:plan.items.length,errors:0,imported:plan.items.length,items:plan.items.map(x=>({...x,status:'imported',message:'นำเข้าสำเร็จ'}))},201);
  }
  if(req.method==='GET'&&path==='/api/admin/transfer-plans'){
   const studentId=positiveInt(new URL(req.url).searchParams.get('student_id'));
