@@ -29,7 +29,7 @@ test('four character initial password is accepted, three characters rejected',()
  assert.equal(planStudentImport([row(1,{password:'1234'})],1,[],[]).ready,true);
  const bad=planStudentImport([row(1,{password:'123'})],1,[],[]);
  assert.equal(bad.ready,false);
- assert.match(bad.items[0].message,/4–128/);
+ assert.match(bad.items[0].message,/อย่างน้อย 4 ตัว/);
 });
 test('duplicate custom username in a file or existing accounts is blocked',()=>{
  const plan=planStudentImport([row(1),row(2,{username:'student0001'})],1,[],[]);
