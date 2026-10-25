@@ -1,0 +1,165 @@
+/* School identity login: Ratsada green/white, genuine school aerial photo and emblem. */
+/* Scoped selectors intentionally leave the attendance/admin dashboard untouched. */
+.login-wrap{
+ position:relative;isolation:isolate;min-height:100dvh;
+ display:grid;place-items:center;padding:36px 18px 30px;
+ background:#dcf2e7 url('./media/ratsada-campus.webp') center center/cover no-repeat fixed;
+}
+.login-wrap::before{
+ content:"";position:absolute;inset:0;z-index:-1;
+ background:linear-gradient(120deg,rgba(5,56,36,.38),rgba(10,97,58,.24) 45%,rgba(13,65,46,.4)),
+  linear-gradient(0deg,rgba(2,35,27,.35),transparent 55%);
+}
+.login-wrap::after{
+ content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;
+ background:radial-gradient(circle at 50% 47%,rgba(255,255,255,.18),transparent 62%);
+}
+.login-card,.portal-card.login-card{
+ width:min(476px,100%);max-width:100%;padding:0;
+ background:#fff;color:#153c2b;border:1px solid rgba(246,255,247,.76);
+ border-radius:26px;overflow:hidden;box-shadow:0 25px 75px rgba(3,39,28,.29),0 3px 12px rgba(3,39,28,.09);
+}
+.login-wrap .login-brand{
+ text-align:center;position:relative;overflow:hidden;
+ padding:25px 29px 27px;
+ background:linear-gradient(138deg,#117e4a,#10a267 60%,#29bf7d);
+ color:#fff;
+}
+.login-wrap .login-brand::before,
+.login-wrap .login-brand::after{
+ content:"";position:absolute;pointer-events:none;border-radius:50%;
+ border:1px solid rgba(255,255,255,.15);width:220px;height:220px;
+}
+.login-wrap .login-brand::before{top:-160px;left:-70px}
+.login-wrap .login-brand::after{bottom:-188px;right:-70px;width:260px;height:260px}
+.login-wrap .login-crest{
+ display:block;width:91px;height:91px;max-width:100%;object-fit:contain;
+ margin:0 auto 10px;
+ filter:drop-shadow(0 8px 12px rgba(0,40,24,.21));
+}
+.login-wrap .login-brand h1{
+ color:#fff;font-size:clamp(19px,3vw,23px);font-weight:850;
+ letter-spacing:-.15px;line-height:1.5;margin:0;max-width:370px;margin-inline:auto;
+}
+.login-wrap .login-brand .brand-subtitle{
+ color:#e9fff3;margin:6px 0 0;font-size:13px;font-weight:600;line-height:1.6;opacity:.96;
+}
+.login-wrap .login-brand .brand-code{
+ display:inline-flex;align-items:center;gap:6px;justify-content:center;
+ padding:5px 12px;margin:0 0 11px;border:1px solid rgba(255,255,255,.28);
+ background:rgba(255,255,255,.14);border-radius:999px;
+ font-weight:750;letter-spacing:.9px;font-size:11px;
+}
+.login-wrap .login-content{padding:23px 29px 21px}
+.login-wrap .login-content form{display:flex;flex-direction:column;gap:14px}
+.login-wrap .login-content .field{gap:7px}
+.login-wrap .login-content .field label{
+ font-size:13px;font-weight:750;color:#23503b;
+}
+.login-wrap .login-content .field input{
+ width:100%;border:1px solid #d5e5dc;border-radius:12px;
+ background:#fafffc;color:#163c29;padding:13px 14px;
+ min-height:47px;font-size:14px;
+}
+.login-wrap .login-content .field input:focus{
+ border-color:#159b64;outline:3px solid rgba(41,177,110,.19);
+}
+.login-wrap .login-content .field input::placeholder{color:#81988a}
+.login-wrap .login-content .button{
+ border-radius:12px;min-height:45px;font-size:13px;
+ background:linear-gradient(115deg,#087e4a,#09a366);border:1px solid #098b54;
+ box-shadow:0 5px 14px rgba(7,118,67,.18);color:#fff;
+}
+.login-wrap .login-content .button:hover:not(:disabled){filter:brightness(1.075)}
+.login-wrap .login-content .button.secondary,
+.login-wrap .login-content .button.ghost{
+ background:#f1f9f4;color:#177345;border:1px solid #d5e9dc;box-shadow:none;
+}
+.login-wrap .login-content .button.secondary:hover,
+.login-wrap .login-content .button.ghost:hover{background:#e4f5e9}
+.login-wrap .login-role-tabs{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ background:#eff6f1;border:1px solid #dceae0;border-radius:13px;
+ padding:4px;gap:4px;margin-bottom:19px;
+}
+.login-wrap .login-role-tabs button{
+ font:inherit;font-size:12px;min-height:41px;font-weight:750;
+ color:#467059;cursor:pointer;border:0;border-radius:10px;
+ background:transparent;padding:8px 9px;box-shadow:none;
+}
+.login-wrap .login-role-tabs button:hover{background:#ddf0e4}
+.login-wrap .login-role-tabs button.active,
+.login-wrap .login-role-tabs button[aria-selected="true"]{
+ color:#fff;background:linear-gradient(115deg,#07874e,#12a66a);
+ box-shadow:0 5px 12px rgba(14,127,73,.18);
+}
+.login-wrap .login-role-tabs button:focus-visible,
+.login-wrap .login-content button:focus-visible,
+.login-wrap .theme-switch:focus-visible{
+ outline:3px solid #e1b34e;outline-offset:2px;
+}
+.login-wrap .login-heading{color:#135638;font-size:16px;font-weight:850;margin:0 0 14px;text-align:center}
+.login-wrap .login-links{display:flex;flex-wrap:wrap;gap:9px;margin-top:13px;align-items:center}
+.login-wrap .login-links>*{flex:1 1 150px}
+.login-wrap .login-divider{
+ display:flex;align-items:center;gap:10px;color:#809787;
+ font-size:11px;margin:17px 0 10px;text-align:center;
+}
+.login-wrap .login-divider::before,.login-wrap .login-divider::after{
+ content:"";flex:1;border-top:1px solid #e5eee8;
+}
+.login-wrap .login-credit{
+ border-top:1px solid #e3efe7;background:#f7fbf8;
+ padding:15px 24px;color:#587261;font-size:12px;
+ line-height:1.5;text-align:center;font-weight:650;
+}
+.login-wrap .login-content>.muted,.login-wrap .login-content .muted{
+ color:#688575;line-height:1.6;
+}
+.login-wrap .login-content .theme-switch-login{margin-top:12px}
+.login-wrap .login-content .theme-switch{font-size:12px;min-height:36px}
+.login-wrap .login-message{display:block;text-align:center;font-size:11px;color:#6f8879;margin-top:8px}
+.login-wrap .portal-role-choice{display:grid;grid-template-columns:1fr 1fr;gap:7px;justify-content:stretch}
+.login-wrap .portal-role-choice button{width:100%}
+.login-wrap .login-content .ok{color:#19633e;background:#eaf9f0;border-color:#c6ebd4}
+.login-wrap .login-content .warn{color:#7f5421;background:#fff8eb}
+[data-theme="dark"] .login-wrap{
+ background:#143d2b url('./media/ratsada-campus.webp') center/cover no-repeat fixed;
+}
+[data-theme="dark"] .login-wrap::before{
+ background:linear-gradient(120deg,rgba(0,28,18,.57),rgba(2,56,35,.44),rgba(2,30,22,.63));
+}
+[data-theme="dark"] .login-wrap .login-card,
+[data-theme="dark"] .login-wrap .portal-card.login-card{background:#172a20;color:#e9fbee;border-color:#365345}
+[data-theme="dark"] .login-wrap .login-content{background:#172a20}
+[data-theme="dark"] .login-wrap .login-content .field label,
+[data-theme="dark"] .login-wrap .login-heading{color:#d5f7e3}
+[data-theme="dark"] .login-wrap .login-content .field input{
+ color:#f2fff7;background:#1f392b;border-color:#486452;
+}
+[data-theme="dark"] .login-wrap .login-content .field input::placeholder{color:#a9c0af}
+[data-theme="dark"] .login-wrap .login-role-tabs{background:#20392c;border-color:#395746}
+[data-theme="dark"] .login-wrap .login-role-tabs button{color:#bdddc6}
+[data-theme="dark"] .login-wrap .login-role-tabs button.active,
+[data-theme="dark"] .login-wrap .login-role-tabs button[aria-selected="true"]{color:#fff}
+[data-theme="dark"] .login-wrap .login-credit{background:#1e3327;border-color:#315441;color:#d0e8d8}
+[data-theme="dark"] .login-wrap .login-content .muted{color:#bad3c2}
+[data-theme="dark"] .login-wrap .login-content .button.secondary,
+[data-theme="dark"] .login-wrap .login-content .button.ghost{
+ background:#234b35;color:#d5fce4;border-color:#3f6e50;
+}
+[data-theme="dark"] .login-wrap .login-content .button.secondary:hover,
+[data-theme="dark"] .login-wrap .login-content .button.ghost:hover{background:#2c5a3e}
+@media(max-width:570px){
+ .login-wrap{padding:14px 11px 18px;min-height:100dvh;background-attachment:scroll}
+ .login-wrap .login-card,.login-wrap .portal-card.login-card{border-radius:21px}
+ .login-wrap .login-brand{padding:17px 18px 19px}
+ .login-wrap .login-crest{width:77px;height:77px;margin-bottom:7px}
+ .login-wrap .login-brand h1{font-size:20px}
+ .login-wrap .login-content{padding:17px 17px 15px}
+ .login-wrap .login-role-tabs button{font-size:11px}
+ .login-wrap .login-credit{padding:12px 11px}
+}
+@media(prefers-reduced-motion:reduce){
+ .login-wrap .login-role-tabs button,.login-wrap .login-content button{transition:none!important}
+}
