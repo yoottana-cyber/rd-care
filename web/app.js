@@ -365,17 +365,20 @@ function renderAdminStudents(){
        <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(h.start_date)}</td><td>${esc(h.end_date||'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
    </section>`:''}
   <section class="card stack"><h3>นำเข้ารายชื่อนักเรียน Excel / CSV</h3>
-   <p class="muted">รองรับ .xlsx (แผ่นงานแรก) และ CSV UTF-8 • ครั้งละ 1–60 คน • ห้ามนำเข้าข้อมูลนักเรียนจริงในฐานทดลอง</p>
+   <p class="muted">รองรับ .xlsx และ CSV UTF-8 • 3 คอลัมน์สำหรับรายชื่ออย่างเดียว (สูงสุด 60 คน) หรือ 5 คอลัมน์รวม Username/Password เพื่อสร้างบัญชีทันที (สูงสุด 10 คน)</p>
+   <p><a href="./templates/student-login-import-template.csv" download>ดาวน์โหลดไฟล์ตัวอย่าง CSV สำหรับนำเข้าพร้อมบัญชี</a></p>
    <form id="adminImportCsv" class="stack"><div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
-    <div class="field"><label>หรือวางข้อความ CSV</label><textarea name="csv" placeholder="roll_no,student_no,full_name&#10;1,DEMO0101,นักเรียนตัวอย่าง"></textarea></div>
-    <p class="muted">ลำดับคอลัมน์: roll_no,student_no,full_name • หากรหัสนักเรียนขึ้นต้นด้วย 0 ให้ตั้งคอลัมน์เป็นข้อความ (Text) ใน Excel ก่อนบันทึก</p>
+    <div class="field"><label>หรือวางข้อความ CSV</label><textarea name="csv" placeholder="roll_no,student_no,full_name,username,password&#10;1,DEMO0101,นักเรียนตัวอย่าง,demo0101,Demo#1234"></textarea></div>
+    <p class="muted">คอลัมน์: roll_no,student_no,full_name,username,password (หรือ 3 คอลัมน์แรกแบบเดิม) • Username ตั้งเองได้ • Password อย่างน้อย 4 ตัว • หากรหัสขึ้นต้น 0 ให้ตั้งคอลัมน์ Excel เป็น Text</p>
+    <p class="warn">รหัสผ่าน 4 ตัวมีความเสี่ยง ควรใช้รหัสที่ยาวและไม่ซ้ำกัน ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน และต้องเก็บไฟล์บัญชีที่มีรหัสผ่านให้ปลอดภัย</p>
     <button class="button full" type="submit">ตรวจสอบข้อมูลก่อนนำเข้า</button>
    </form>
    ${adminImportState.preview && adminImportState.roomId===adminStudentState.roomId?
     `<div class="summary"><strong>${adminImportState.preview.ok?'ผลการนำเข้า':'ผลตรวจสอบ'} ${esc(adminImportState.filename)}:</strong> ${adminImportState.preview.valid} รายการ${adminImportState.preview.ok?'นำเข้าสำเร็จ':'พร้อมนำเข้า'} / ${adminImportState.preview.errors} รายการมีปัญหา</div>
-     <div class="table-wrap"><table class="table"><thead><tr><th>แถว</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ–สกุล</th><th>สถานะ/ข้อผิดพลาด</th></tr></thead>
+     <div class="table-wrap"><table class="table"><thead><tr><th>แถว</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ–สกุล</th><th>Username / บัญชี</th><th>สถานะ/ข้อผิดพลาด</th></tr></thead>
      <tbody>${adminImportState.preview.items.map(item=>`<tr><td>${item.source_row}</td><td>${esc(item.student.roll_no)}</td>
       <td>${esc(item.student.student_no)}</td><td>${esc(item.student.full_name)}</td>
+      <td>${item.create_account?esc(item.login_username)+' (สร้างบัญชี)':'ไม่สร้างบัญชี'}</td>
       <td class="${item.status==='error'?'import-error':item.status==='imported'?'import-success':''}">${item.status==='ready'?'พร้อมนำเข้า':esc(item.message)}</td></tr>`).join('')}</tbody></table></div>
      ${adminImportState.preview.ok?'':`<button type="button" id="adminConfirmImport" class="button full" ${adminImportState.preview.ready?'':'disabled'}>ยืนยันนำเข้า ${adminImportState.preview.items.length} คน</button>`}
      ${adminImportState.preview.ready?'':'<p class="warn">พบข้อมูลไม่ถูกต้องหรือซ้ำ ระบบจะยังไม่บันทึกจนกว่าทุกแถวจะผ่านการตรวจสอบ</p>'}`:'<div class="muted">กรุณาตรวจสอบข้อมูลก่อนกดยืนยัน ไม่มีการเขียนข้อมูลลง D1 ระหว่างตรวจสอบ</div>'}
