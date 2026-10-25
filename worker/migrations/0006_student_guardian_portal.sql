@@ -35,3 +35,9 @@ CREATE TABLE guardian_student_links (
  PRIMARY KEY (guardian_account_id,student_id)
 );
 CREATE INDEX idx_guardian_student_links_student ON guardian_student_links(student_id);
+-- Defense in depth for accidental privilege grants made outside the UI.
+CREATE TRIGGER guardian_link_role_guard BEFORE INSERT ON guardian_student_links
+WHEN (SELECT role FROM portal_accounts WHERE id=NEW.guardian_account_id)!='guardian'
+BEGIN
+ SELECT RAISE(ABORT,'guardian_account_required');
+END;
