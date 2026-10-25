@@ -58,7 +58,9 @@ function renderStudentLate(){
  </form>
  <p id="lateSelfFeedback" class="muted" aria-live="polite">ระบบบันทึกเวลาเข้าถึงเซิร์ฟเวอร์อัตโนมัติ เมื่อครูเวรยืนยันจึงนับเป็นรายการมาสายที่ตรวจสอบแล้ว</p>
  <button type="button" class="button secondary full" id="backToStaffLogin">กลับหน้าเข้าสู่ระบบครู</button>
+ <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
  </section></div>`;
+ bindThemeButtons();
  $('#backToStaffLogin').addEventListener('click',renderLogin);
  $('#studentLateForm').addEventListener('submit',e=>safeRun(async()=>{
   e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');
