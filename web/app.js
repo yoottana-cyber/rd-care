@@ -4,7 +4,7 @@ import {createRequestCache} from './request-cache.js';
 import {readXlsxRows} from './xlsx-reader.js';
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],behaviors:[],behaviorTotal:0};
+const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
 const adminImportState={roomId:null,students:[],preview:null,filename:''};
@@ -33,10 +33,34 @@ function loginPage(){
  <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน</p></div>
  <form id="loginForm"><div class="field"><label for="username">ชื่อผู้ใช้งาน</label><input id="username" name="username" required autocomplete="username" placeholder="เช่น teacher01"></div>
  <div class="field"><label for="password">รหัสผ่าน</label><input id="password" name="password" type="password" required autocomplete="current-password"></div>
- <button class="button full" type="submit">เข้าสู่ระบบ</button></form>
+ <button class="button full" type="submit">เข้าสู่ระบบ</button></form><button id="studentLateEntry" type="button" class="button secondary full" style="margin-top:12px">นักเรียนแจ้งมาสาย</button>
  <p class="muted" style="text-align:center">รุ่นทดลอง • ยังไม่เปิดใช้งานการแจ้งเตือนผู้ปกครอง</p></section></div>`;
 }
-function renderLogin(){ $('#app').innerHTML=loginPage();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}})); }
+function renderLogin(){ $('#app').innerHTML=loginPage();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate); }
+function renderStudentLate(){
+ $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card stack">
+ <div class="login-head"><div class="brand-icon">RD</div><h1>แจ้งมาสายด้วยตนเอง</h1><p>ระบบทดลอง • ต้องใช้รหัสชั่วคราวที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p></div>
+ <form class="stack" id="studentLateForm">
+  <div class="field"><label for="studentNumber">รหัสประจำตัวนักเรียน</label><input id="studentNumber" name="student_no" maxlength="40" required autocomplete="off" placeholder="เช่น DEMO1001"></div>
+  <div class="field"><label for="studentLateCode">รหัสยืนยันจากครูเวร</label><input id="studentLateCode" name="code" pattern="[a-fA-F0-9]{24}" maxlength="24" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="รหัส 24 ตัวอักษร"></div>
+  <div class="field"><label for="studentLateReason">สาเหตุ (ไม่บังคับ)</label><textarea id="studentLateReason" name="reason" maxlength="300" placeholder="ระบุเหตุผลตามที่ต้องการแจ้ง"></textarea></div>
+  <button type="submit" class="button full">ส่งคำขอให้ครูเวรตรวจสอบ</button>
+ </form>
+ <p id="lateSelfFeedback" class="muted" aria-live="polite">ระบบบันทึกเวลาเข้าถึงเซิร์ฟเวอร์อัตโนมัติ เมื่อครูเวรยืนยันจึงนับเป็นรายการมาสายที่ตรวจสอบแล้ว</p>
+ <button type="button" class="button secondary full" id="backToStaffLogin">กลับหน้าเข้าสู่ระบบครู</button>
+ </section></div>`;
+ $('#backToStaffLogin').addEventListener('click',renderLogin);
+ $('#studentLateForm').addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');
+  const body=Object.fromEntries(new FormData(form));
+  button.disabled=true;
+  try{
+   const result=await api('/api/student/late/report',{method:'POST',body,auth:false});
+   form.reset();form.hidden=true;$('#lateSelfFeedback').textContent=result.message;
+   toast('ส่งคำขอมาสายแล้ว รอครูเวรตรวจสอบ');
+  }finally{if(button.isConnected)button.disabled=false}
+ }));
+}
 async function boot(){
  const [me,rooms]=await Promise.all([api('/api/auth/me'),api('/api/classrooms')]);state.user=me.user;state.rooms=rooms.items;
  if(!state.rooms.some(r=>r.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
@@ -122,14 +146,78 @@ async function saveAttendance(){
  try{const result=await api('/api/attendance',{method:'POST',body:{kind:state.kind,date:state.date,classroom_id:state.roomId,timetable_id:state.slotId,entries:state.students.map(s=>({student_id:s.id,status:state.statuses[s.id]}))}});toast(`บันทึกสำเร็จ ${result.saved} คน`);await loadAttendance();}
  finally{button.disabled=false}
 }
-async function loadLate(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}const [a,b]=await Promise.all([api(`/api/students?classroom_id=${state.roomId}`),api(`/api/late?classroom_id=${state.roomId}&date=${state.date}`)]);state.students=a.items;state.lates=b.items;renderLate();}
+async function loadLate(){
+ if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}
+ const room=state.roomId,date=state.date;
+ const staff=state.user?.role==='staff'||state.user?.role==='admin';
+ const [a,b,self]=await Promise.all([
+   api(`/api/students?classroom_id=${room}&date=${date}`),
+   api(`/api/late?classroom_id=${room}&date=${date}`),
+   staff?api(`/api/late/self/requests?classroom_id=${room}&date=${date}`):Promise.resolve({items:[]})
+ ]);
+ if(state.tab!=='late'||state.roomId!==room||state.date!==date)return;
+ state.students=a.items;state.lates=b.items;state.selfLates=self.items;
+ renderLate();
+}
 function studentOptions(){return state.students.map(s=>`<option value="${s.id}">${s.roll_no}. ${esc(s.full_name)}</option>`).join('');}
-function renderLate(){mount(`<div class="stack"><div><h2>บันทึกนักเรียนมาสาย</h2><p class="muted">ช่วงทดลอง: ครูบันทึกแทนนักเรียน • ระบบลงทะเบียนด้วยตนเองจะพัฒนาในระยะต่อไป</p></div>
- <div class="card stack">${filters()}<form id="lateForm" class="stack"><div class="grid two"><div class="field"><label>นักเรียน</label><select name="student_id" required>${studentOptions()}</select></div><div class="field"><label>เวลามาถึง</label><input name="arrived_at" type="time" value="${timeNow()}" required></div></div>
- <div class="field"><label>สาเหตุ (ไม่บังคับ)</label><textarea name="reason" maxlength="300" placeholder="ระบุเหตุผลตามที่ได้รับแจ้ง"></textarea></div><button class="button full" ${!state.students.length?'disabled':''}>บันทึกมาสาย</button></form></div>
- <div class="card"><h3>รายการมาสายวันที่ ${esc(state.date)}</h3>${state.lates.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สถานะ</th></tr></thead><tbody>${state.lates.map(l=>`<tr><td>${esc(l.full_name)}</td><td>${esc(l.arrived_at)}</td><td>${l.state==='verified'?'ยืนยันแล้ว':'รอตรวจสอบ'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีรายการมาสาย</div>'}</div></div>`);
+function renderLate(){
+ const staff=state.user?.role==='staff'||state.user?.role==='admin';
+ const requests=state.selfLates||[];
+ const pending=requests.filter(r=>r.state==='pending');
+ mount(`<div class="stack"><div><h2>ระบบบันทึกนักเรียนมาสาย</h2><p class="muted">บันทึกเวลาและตรวจสอบคำขอจากนักเรียน • นักเรียนต้องใช้รหัสครั้งเดียวจากครูเวร</p></div>
+ <div class="card stack">${filters()}<form id="lateForm" class="stack">
+ <div class="grid two"><div class="field"><label>นักเรียน</label><select name="student_id" required>${studentOptions()}</select></div>
+ <div class="field"><label>เวลามาถึง</label><input name="arrived_at" type="time" value="${timeNow()}" required></div></div>
+ <div class="field"><label>สาเหตุ (ไม่บังคับ)</label><textarea name="reason" maxlength="300" placeholder="ระบุเหตุผลตามที่ได้รับแจ้ง"></textarea></div>
+ <button class="button full" ${!state.students.length?'disabled':''}>บันทึกมาสายโดยครู</button></form></div>
+ ${staff?`<section class="card stack"><h3>ออกรหัสให้นักเรียนแจ้งมาสาย</h3>
+  <p class="muted">ครูเวรออกให้เป็นรายคน รหัสมีอายุ 10 นาที ใช้ได้ครั้งเดียว และต้องแจ้งให้นักเรียนโดยตรงเท่านั้น</p>
+  <form id="lateIssueCode" class="stack"><div class="field"><label>นักเรียน</label><select name="student_id" required>${studentOptions()}</select></div>
+  <button class="button secondary full" type="submit" ${!state.students.length||state.date!==dateToday()?'disabled':''}>สร้างรหัสยืนยันชั่วคราว</button></form>
+  ${state.date!==dateToday()?'<p class="warn">การออกรหัสทำได้เฉพาะวันที่ปัจจุบัน กรุณาเปลี่ยนวันที่ก่อน</p>':''}
+  <div id="lateIssuedCode" aria-live="polite" class="summary" hidden></div>
+  <p class="muted">นักเรียนเปิดหน้าเว็บ RD Care ก่อนเข้าสู่ระบบ → “นักเรียนแจ้งมาสาย” กรอกรหัสนักเรียนและรหัสยืนยัน</p>
+ </section>
+ <section class="card stack"><h3>รายการแจ้งมาสายรอตรวจสอบ (${pending.length})</h3>
+  ${requests.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สาเหตุ</th><th>สถานะ</th><th>การตรวจสอบ</th></tr></thead>
+  <tbody>${requests.map(r=>`<tr><td>${esc(r.roll_no)}. ${esc(r.full_name)}<div class="muted">${esc(r.student_no)}</div></td>
+   <td>${esc(r.arrived_at)}</td><td>${esc(r.reason||'ไม่ระบุ')}</td>
+   <td>${r.state==='pending'?'รอตรวจสอบ':r.state==='verified'?'ยืนยันแล้ว':'ไม่อนุมัติ'}</td>
+   <td>${r.state==='pending'?`<button class="button secondary" type="button" data-review-self="${r.id}" data-result="verified">ยืนยัน</button>
+    <button class="button ghost" type="button" data-review-self="${r.id}" data-result="rejected">ปฏิเสธ</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีคำขอจากนักเรียนในห้องนี้</div>'}
+ </section>`:''}
+ <div class="card"><h3>รายการมาสายวันที่ ${esc(state.date)}</h3>${state.lates.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สถานะ</th></tr></thead><tbody>${state.lates.map(l=>`<tr><td>${esc(l.full_name)}</td><td>${esc(l.arrived_at)}</td><td>${l.state==='verified'?'ยืนยันแล้ว':l.state==='rejected'?'ไม่อนุมัติ':'รอตรวจสอบ'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีรายการมาสายที่บันทึกแล้ว</div>'}</div></div>`);
  bindFilters(loadLate);
- $('#lateForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api('/api/late',{method:'POST',body:{student_id:Number(f.get('student_id')),arrived_at:f.get('arrived_at'),reason:f.get('reason'),date:state.date}});toast('บันทึกมาสายสำเร็จ');await loadLate()}));
+ $('#lateForm').addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const form=e.currentTarget,f=new FormData(form),button=form.querySelector('button');
+  button.disabled=true;
+  try{
+   await api('/api/late',{method:'POST',body:{student_id:Number(f.get('student_id')),arrived_at:f.get('arrived_at'),reason:f.get('reason'),date:state.date}});
+   toast('บันทึกมาสายสำเร็จ');await loadLate();
+  }finally{if(button.isConnected)button.disabled=false}
+ }));
+ $('#lateIssueCode')?.addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');
+  button.disabled=true;
+  try{
+   const id=Number(new FormData(form).get('student_id'));
+   const response=await api('/api/late/self/code',{method:'POST',body:{student_id:id}});
+   const box=$('#lateIssuedCode');
+   if(box){box.hidden=false;box.textContent='รหัสยืนยันชั่วคราว: '+response.code+' (หมดอายุใน 10 นาที) แจ้งให้นักเรียนโดยตรง ห้ามส่งลงกลุ่มสาธารณะ';}
+  }finally{if(button.isConnected)button.disabled=false}
+ }));
+ $$('[data-review-self]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+  const id=Number(button.dataset.reviewSelf),result=button.dataset.result;
+  const request=requests.find(r=>r.id===id);
+  if(!request)return;
+  if(!confirm((result==='verified'?'ยืนยัน':'ปฏิเสธ')+'การแจ้งมาสายของ '+request.full_name+'?'))return;
+  button.disabled=true;
+  try{
+   await api('/api/late/self/requests/'+id+'/review',{method:'POST',body:{state:result}});
+   toast(result==='verified'?'ตรวจสอบและบันทึกมาสายแล้ว':'ปฏิเสธคำขอแล้ว');
+   await loadLate();
+  }finally{if(button.isConnected)button.disabled=false}
+ })));
 }
 async function loadBehavior(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}const a=await api(`/api/students?classroom_id=${state.roomId}`);state.students=a.items;state.studentId=state.students.some(s=>s.id===state.studentId)?state.studentId:state.students[0]?.id||null;
  if(state.studentId){const b=await api('/api/behavior?student_id='+state.studentId);state.behaviors=b.items;state.behaviorTotal=b.total;}else {state.behaviors=[];state.behaviorTotal=0}renderBehavior();}
