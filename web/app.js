@@ -8,7 +8,7 @@ const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboa
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
 const adminImportState={roomId:null,students:[],preview:null,filename:''};
-const adminTransferState={studentId:null,items:[]};
+const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
@@ -77,7 +77,7 @@ async function loadAttendance(){
  const roomId=state.roomId,date=state.date;
  // Independent lookups run in parallel; repeat switches use a short memory-only cache.
  const [students,slots]=await Promise.all([
-  referenceCache.get('students:'+roomId,()=>api(`/api/students?classroom_id=${roomId}`)),
+  referenceCache.get('students:'+roomId+':'+date,()=>api(`/api/students?classroom_id=${roomId}&date=${date}`)),
   referenceCache.get('timetable:'+roomId+':'+date,()=>api(`/api/timetable?date=${date}&classroom_id=${roomId}`))
  ]);
  if(state.tab!=='attendance'||state.roomId!==roomId||state.date!==date)return;
@@ -240,13 +240,13 @@ function renderAdminStudents(){
     <input type="hidden" name="active" value="1"><button class="button full" type="submit">เพิ่มนักเรียน</button>
    </form></section>
    <section class="card stack"><h3>${edit?'แก้ไขข้อมูลนักเรียน':'เลือกนักเรียนจากตารางเพื่อแก้ไข'}</h3>
-    ${edit?`<form id="adminEditStudent" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${rooms(edit.classroom_id)}</select></div>
+    ${edit?`<form id="adminEditStudent" class="stack"><div class="field"><label>ห้องเรียนปัจจุบัน</label><select name="classroom_id" disabled>${rooms(edit.classroom_id)}</select><input name="classroom_id" type="hidden" value="${edit.classroom_id}"></div>
      <div class="field"><label>รหัสนักเรียน</label><input name="student_no" required maxlength="40" value="${esc(edit.student_no)}"></div>
      <div class="field"><label>ชื่อ–สกุล</label><input name="full_name" required maxlength="120" value="${esc(edit.full_name)}"></div>
      <div class="field"><label>เลขที่</label><input type="number" name="roll_no" min="1" max="100" required value="${edit.roll_no}"></div>
      <div class="field"><label>สถานะ</label><select name="active"><option value="1" ${edit.active?'selected':''}>ใช้งาน</option><option value="0" ${edit.active?'':'selected'}>พักข้อมูล</option></select></div>
      <button type="submit" class="button full">บันทึกการเปลี่ยนแปลง</button>
-     <p class="muted">หากมีประวัติการเช็กชื่อหรือพฤติกรรมแล้ว ระบบจะป้องกันการย้ายห้องเพื่อรักษาความถูกต้องของประวัติ</p>
+     <p class="muted">หากต้องการย้ายห้อง ให้ใช้ส่วน “แผนย้ายห้อง” ด้านล่างเท่านั้น เพื่อรักษาประวัติการเช็กชื่อย้อนหลัง</p>
      </form>`:'<div class="empty">เลือกปุ่ม “แก้ไข” ด้านบน</div>'}
    </section>
   </div>
@@ -258,9 +258,15 @@ function renderAdminStudents(){
      <div class="field"><label>ห้องเรียนปลายทาง</label><select name="to_classroom_id">${state.rooms.filter(r=>r.id!==edit.classroom_id).map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div>
      <button class="button secondary" type="submit">บันทึกแผนย้ายห้อง</button></form>
     ${adminTransferState.studentId===edit.id&&adminTransferState.items.length?
-     `<div class="table-wrap"><table class="table"><thead><tr><th>ปีการศึกษา/เทอม</th><th>ห้องเดิม → ห้องแผน</th><th>สถานะ</th></tr></thead>
-       <tbody>${adminTransferState.items.map(p=>`<tr><td>${p.school_year}/${p.term}</td><td>${esc(p.from_room)} → ${esc(p.to_room)}</td><td>${p.state==='planned'?'วางแผน':'ยกเลิก'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีแผนย้ายห้องที่บันทึกไว้</p>'}
-    <div class="warn">การย้ายห้องจริงยังถูกป้องกันสำหรับนักเรียนที่มีประวัติ เพื่อรอระบบบันทึกประวัติการสังกัดห้องย้อนหลัง</div>
+     `<div class="table-wrap"><table class="table"><thead><tr><th>ปีการศึกษา/เทอม</th><th>ห้องเดิม → ห้องแผน</th><th>สถานะ</th><th>ยืนยัน</th></tr></thead>
+       <tbody>${adminTransferState.items.map(p=>`<tr><td>${p.school_year}/${p.term}</td><td>${esc(p.from_room)} → ${esc(p.to_room)}</td><td>${p.state==='planned'?'รอยืนยัน':p.state==='applied'?'ย้ายแล้ว':'ยกเลิก'}</td>
+        <td>${p.state==='planned'&&p.from_classroom_id===edit.classroom_id?
+         `<button type="button" class="button secondary" data-execute-transfer="${p.id}" data-target="${esc(p.to_room)}">ย้ายวันนี้</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีแผนย้ายห้องที่บันทึกไว้</p>'}
+    <div class="warn">การย้ายห้องจริงมีผลตั้งแต่วันที่ยืนยันวันนี้ หากวันนี้มีข้อมูลเช็กชื่อหรือมาสาย ระบบจะปฏิเสธการย้าย กรุณาดำเนินการก่อนเริ่มเช็กชื่อ และใช้เฉพาะข้อมูลจำลอง</div>
+    <h3>ประวัติการสังกัดห้อง</h3>
+    ${adminTransferState.studentId===edit.id&&adminTransferState.history.length?
+      `<div class="table-wrap"><table class="table"><thead><tr><th>ห้องเรียน</th><th>เลขที่</th><th>เริ่มวันที่</th><th>สิ้นสุดก่อนวันที่</th></tr></thead>
+       <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(h.start_date)}</td><td>${esc(h.end_date||'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
    </section>`:''}
   <section class="card stack"><h3>นำเข้ารายชื่อนักเรียน Excel / CSV</h3>
    <p class="muted">รองรับ .xlsx (แผ่นงานแรก) และ CSV UTF-8 • ครั้งละ 1–60 คน • ห้ามนำเข้าข้อมูลนักเรียนจริงในฐานทดลอง</p>
@@ -288,12 +294,15 @@ function renderAdminStudents(){
  });
  document.querySelectorAll('[data-edit-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
   const id=Number(btn.dataset.editStudent);
-  adminStudentState.editId=id;adminTransferState.studentId=id;adminTransferState.items=[];
+  adminStudentState.editId=id;adminTransferState.studentId=id;adminTransferState.items=[];adminTransferState.history=[];
   try{
-   const result=await api('/api/admin/transfer-plans?student_id='+id);
+   const [plans,history]=await Promise.all([
+     api('/api/admin/transfer-plans?student_id='+id),
+     api('/api/admin/enrollments?student_id='+id)
+   ]);
    if(adminStudentState.editId!==id||state.tab!=='adminStudents')return;
-   adminTransferState.items=result.items;
-  }catch(error){toast('โหลดแผนย้ายห้องไม่สำเร็จ: '+error.message,true)}
+   adminTransferState.items=plans.items;adminTransferState.history=history.items;
+  }catch(error){toast('โหลดข้อมูลการย้ายห้องไม่สำเร็จ: '+error.message,true)}
   renderAdminStudents();
  })));
  document.querySelectorAll('[data-toggle-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
@@ -330,6 +339,24 @@ function renderAdminStudents(){
    toast('บันทึกแผนย้ายห้องแล้ว (ยังไม่ย้ายจริง)');renderAdminStudents();
   }finally{if(button.isConnected)button.disabled=false}
  }));
+ document.querySelectorAll('[data-execute-transfer]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
+  const planId=Number(btn.dataset.executeTransfer),editId=adminStudentState.editId;
+  const current=adminStudentState.items.find(s=>s.id===editId);
+  if(!current)return;
+  const yes=confirm(`ยืนยันย้าย ${current.full_name} ไปห้อง ${btn.dataset.target} มีผลตั้งแต่วันนี้ใช่หรือไม่?\\nหลังย้าย ข้อมูลเช็กชื่อก่อนวันนี้จะยังอยู่ห้องเดิม`);
+  if(!yes)return;
+  btn.disabled=true;
+  try{
+   const result=await api('/api/admin/transfer-plans/'+planId+'/execute',{method:'POST',body:{}});
+   referenceCache.clear();adminStudentState.editId=null;
+   adminTransferState.items=[];adminTransferState.history=[];
+   const plan=adminTransferState.studentId===editId?
+       adminStudentState.items.find(s=>s.id===editId):null;
+   adminTransferState.studentId=null;
+   toast('ย้ายห้องสำเร็จ เลขที่ใหม่ '+result.roll_no+' (มีผล '+result.effective_date+')');
+   await loadAdminStudents();
+  }finally{if(btn.isConnected)btn.disabled=false}
+ })));
  $('#adminImportCsv').addEventListener('submit',e=>safeRun(async()=>{
   e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
   try{

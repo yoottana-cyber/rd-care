@@ -19,6 +19,8 @@ test('admin student routes reject anonymous requests without querying D1',async(
 test('admin student list and edits reject teacher role',async()=>{
  for(const [method,path,body] of [
   ['GET','/api/admin/students?classroom_id=1',undefined],
+  ['GET','/api/admin/enrollments?student_id=1',undefined],
+  ['POST','/api/admin/transfer-plans/1/execute','{}'],
   ['POST','/api/admin/students',JSON.stringify({classroom_id:1,roll_no:1,student_no:'DEMO1',full_name:'Sample'})],
   ['POST','/api/admin/students/1',JSON.stringify({classroom_id:1,roll_no:1,student_no:'DEMO1',full_name:'Sample'})],
   ['POST','/api/admin/users/1',JSON.stringify({display_name:'Teacher',active:0})]

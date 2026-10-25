@@ -107,9 +107,13 @@ async function classrooms(env,user){
  return json({items:results});
 }
 async function getStudents(req,env,user){
- const roomId=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
+ const q=new URL(req.url).searchParams,roomId=positiveInt(q.get('classroom_id'));
+ const date=q.get('date')||bangkokToday();requireDate(date);
  await assertRoom(env,user,roomId);
- const {results}=await env.DB.prepare('SELECT id,student_no,roll_no,full_name FROM students WHERE classroom_id=? AND active=1 ORDER BY roll_no').bind(roomId).all();
+ const {results}=await env.DB.prepare(`SELECT s.id,s.student_no,h.roll_no,s.full_name FROM students s
+ JOIN student_enrollments h ON h.student_id=s.id
+ WHERE h.classroom_id=? AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)
+ AND s.active=1 ORDER BY h.roll_no`).bind(roomId,date,date).all();
  return json({items:results});
 }
 async function getTimetable(req,env,user){
@@ -136,14 +140,21 @@ async function getAttendance(req,env,user){
  const kind=q.get('kind');const date=q.get('date')||bangkokToday();
  requireDate(date);await assertRoom(env,user,roomId);
  if(kind==='daily'){
-  const {results}=await env.DB.prepare(`SELECT a.student_id,a.status FROM attendance_daily a JOIN students s ON s.id=a.student_id WHERE s.classroom_id=? AND a.school_date=?`).bind(roomId,date).all();
+  const {results}=await env.DB.prepare(`SELECT a.student_id,a.status FROM attendance_daily a
+ JOIN student_enrollments h ON h.student_id=a.student_id
+ WHERE h.classroom_id=? AND a.school_date=? AND h.start_date<=a.school_date
+ AND (h.end_date IS NULL OR h.end_date>a.school_date)`).bind(roomId,date).all();
   return json({items:results});
  }
  if(kind==='period'){
   const timetableId=positiveInt(q.get('timetable_id'));
   const slot=await env.DB.prepare('SELECT id,classroom_id FROM timetable WHERE id=? AND active=1').bind(timetableId).first();
   if(!slot||slot.classroom_id!==roomId)throw error(400,'คาบเรียนไม่สัมพันธ์กับห้อง');
-  const {results}=await env.DB.prepare('SELECT student_id,status FROM attendance_period WHERE timetable_id=? AND school_date=?').bind(timetableId,date).all();
+  const {results}=await env.DB.prepare(`SELECT p.student_id,p.status FROM attendance_period p
+ JOIN student_enrollments h ON h.student_id=p.student_id
+ WHERE p.timetable_id=? AND p.school_date=? AND h.classroom_id=?
+ AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date)`)
+ .bind(timetableId,date,roomId).all();
   return json({items:results});
  }
  throw error(400,'ประเภทการเช็กชื่อไม่ถูกต้อง');
@@ -154,7 +165,10 @@ async function writeAttendance(req,env,user){
  requireWriteDate(date);
  if(!['daily','period'].includes(kind))throw error(400,'กรุณาเลือกประเภทการเช็กชื่อ');
  await assertRoom(env,user,roomId,kind==='daily'?'daily':'view');
- const {results:students}=await env.DB.prepare('SELECT id FROM students WHERE classroom_id=? AND active=1 ORDER BY roll_no').bind(roomId).all();
+ const {results:students}=await env.DB.prepare(`SELECT s.id FROM students s
+ JOIN student_enrollments h ON h.student_id=s.id
+ WHERE h.classroom_id=? AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)
+ AND s.active=1 ORDER BY h.roll_no`).bind(roomId,date,date).all();
  if(!students.length)throw error(400,'ห้องเรียนยังไม่มีนักเรียน');
  const ids=new Set(students.map(x=>x.id));
  if(!validateEntries(b.entries,ids))throw error(400,'รายการต้องมีนักเรียนทุกคนในห้อง สถานะถูกต้อง และไม่ซ้ำกัน');
@@ -207,8 +221,13 @@ async function writeAttendance(req,env,user){
 }
 async function addLate(req,env,user){
  const b=await payload(req),stId=positiveInt(b.student_id);
- const st=await studentAccess(env,user,stId);
  const date=b.date||bangkokToday(); requireWriteDate(date);
+ const st=await env.DB.prepare(`SELECT s.id,h.classroom_id FROM students s
+  JOIN student_enrollments h ON h.student_id=s.id
+  WHERE s.id=? AND s.active=1 AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)`)
+  .bind(stId,date,date).first();
+ if(!st)throw error(404,'ไม่พบนักเรียนที่สังกัดห้องในวันที่เลือก');
+ await assertRoom(env,user,st.classroom_id);
  const arrivedAt=String(b.arrived_at||'');
  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(arrivedAt))throw error(400,'เวลาไม่ถูกต้อง');
  const state=isStaff(user)?'verified':'pending';
@@ -221,8 +240,11 @@ async function listLate(req,env,user){
  const q=new URL(req.url).searchParams,roomId=positiveInt(q.get('classroom_id'));
  await assertRoom(env,user,roomId);
  const date=q.get('date')||bangkokToday();requireDate(date);
- const {results}=await env.DB.prepare(`SELECT l.id,s.roll_no,s.full_name,l.arrived_at,l.reason,l.state FROM late_records l JOIN students s ON s.id=l.student_id
- WHERE s.classroom_id=? AND l.school_date=? ORDER BY l.arrived_at DESC`).bind(roomId,date).all();
+ const {results}=await env.DB.prepare(`SELECT l.id,h.roll_no,s.full_name,l.arrived_at,l.reason,l.state FROM late_records l
+ JOIN students s ON s.id=l.student_id
+ JOIN student_enrollments h ON h.student_id=l.student_id
+ WHERE h.classroom_id=? AND l.school_date=? AND h.start_date<=l.school_date
+ AND (h.end_date IS NULL OR h.end_date>l.school_date) ORDER BY l.arrived_at DESC`).bind(roomId,date).all();
  return json({items:results});
 }
 async function addBehavior(req,env,user){
@@ -251,16 +273,18 @@ async function listAlerts(req,env,user){
   const room=await env.DB.prepare('SELECT advisor_user_id FROM classrooms WHERE id=?').bind(roomId).first();
   if(room?.advisor_user_id!==user.id)throw error(403,'เฉพาะครูที่ปรึกษาของห้องนี้เท่านั้น');
  }
- const {results}=await env.DB.prepare(`SELECT a.id,a.school_date,a.state,s.roll_no,s.full_name,t.period,t.subject
+ const {results}=await env.DB.prepare(`SELECT a.id,a.school_date,a.state,h.roll_no,s.full_name,t.period,t.subject
   FROM attendance_alerts a JOIN students s ON s.id=a.student_id JOIN timetable t ON t.id=a.timetable_id
-  WHERE s.classroom_id=? AND a.state='pending_review' ORDER BY a.school_date DESC,t.period DESC LIMIT 50`).bind(roomId).all();
+  JOIN student_enrollments h ON h.student_id=s.id AND h.classroom_id=t.classroom_id
+  WHERE t.classroom_id=? AND h.start_date<=a.school_date AND (h.end_date IS NULL OR h.end_date>a.school_date)
+  AND a.state='pending_review' ORDER BY a.school_date DESC,t.period DESC LIMIT 50`).bind(roomId).all();
  return json({items:results});
 }
 async function reviewAlert(req,env,user,id){
  const b=await payload(req);
  if(!['confirmed','resolved'].includes(b.state))throw error(400,'สถานะไม่ถูกต้อง');
- const record=await env.DB.prepare(`SELECT a.id,a.student_id,a.school_date,a.timetable_id,a.state,s.classroom_id
- FROM attendance_alerts a JOIN students s ON s.id=a.student_id WHERE a.id=?`).bind(id).first();
+ const record=await env.DB.prepare(`SELECT a.id,a.student_id,a.school_date,a.timetable_id,a.state,t.classroom_id
+ FROM attendance_alerts a JOIN timetable t ON t.id=a.timetable_id WHERE a.id=?`).bind(id).first();
  if(!record)throw error(404,'ไม่พบรายการ');
  await assertRoom(env,user,record.classroom_id);
  if(!isStaff(user)){
@@ -304,12 +328,12 @@ async function dashboard(req,env,user){
  const a=ids||[];
  const results=await env.DB.batch([
   env.DB.prepare('SELECT COUNT(*) total FROM classrooms c WHERE 1=1'+filter).bind(...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM students s JOIN classrooms c ON c.id=s.classroom_id WHERE s.active=1'+filter).bind(...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM attendance_daily d JOIN students s ON s.id=d.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE d.school_date=?'+filter).bind(date,...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM attendance_period p JOIN students s ON s.id=p.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE p.school_date=?'+filter).bind(date,...a),
-  env.DB.prepare("SELECT COUNT(*) total FROM attendance_period p JOIN students s ON s.id=p.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE p.school_date=? AND p.status='absent'"+filter).bind(date,...a),
-  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN students s ON s.id=al.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE al.school_date=? AND al.state='pending_review'"+filter).bind(date,...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN students s ON s.id=l.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE l.school_date=?'+filter).bind(date,...a)
+  env.DB.prepare('SELECT COUNT(*) total FROM students s JOIN student_enrollments h ON h.student_id=s.id JOIN classrooms c ON c.id=h.classroom_id WHERE s.active=1 AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)'+filter).bind(date,date,...a),
+  env.DB.prepare('SELECT COUNT(*) total FROM attendance_daily d JOIN student_enrollments h ON h.student_id=d.student_id AND h.start_date<=d.school_date AND (h.end_date IS NULL OR h.end_date>d.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE d.school_date=?'+filter).bind(date,...a),
+  env.DB.prepare('SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=?'+filter).bind(date,...a),
+  env.DB.prepare("SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=? AND p.status='absent'"+filter).bind(date,...a),
+  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN student_enrollments h ON h.student_id=al.student_id AND h.start_date<=al.school_date AND (h.end_date IS NULL OR h.end_date>al.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE al.school_date=? AND al.state='pending_review'"+filter).bind(date,...a),
+  env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN student_enrollments h ON h.student_id=l.student_id AND h.start_date<=l.school_date AND (h.end_date IS NULL OR h.end_date>l.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE l.school_date=?'+filter).bind(date,...a)
  ]);
  const values=results.map(r=>r.results[0]?.total||0);
  return json(Object.fromEntries(['rooms','students','daily','period','absent_period','alerts','late'].map((n,i)=>[n,values[i]])));
@@ -373,6 +397,11 @@ async function adminRoutes(req,env,user,path){
   const stmts=plan.items.map(({student})=>env.DB.prepare(
    'INSERT INTO students(student_no,classroom_id,roll_no,full_name) VALUES(?,?,?,?)'
    ).bind(student.student_no,roomId,student.roll_no,student.full_name));
+  for(const {student} of plan.items){
+   stmts.push(env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
+    SELECT id,?,?,?,? FROM students WHERE student_no=?`)
+     .bind(roomId,student.roll_no,bangkokToday(),user.id,student.student_no));
+  }
   stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
    .bind(user.id,'students_imported','classrooms',String(roomId)));
   await env.DB.batch(stmts); // atomic; any late duplicate rolls back all rows
@@ -383,9 +412,11 @@ async function adminRoutes(req,env,user,path){
   if(!studentId)throw error(400,'กรุณาเลือกนักเรียน');
   const student=await env.DB.prepare('SELECT id FROM students WHERE id=?').bind(studentId).first();
   if(!student)throw error(404,'ไม่พบนักเรียน');
-  const {results}=await env.DB.prepare(`SELECT p.id,p.school_year,p.term,p.state,p.to_classroom_id,p.from_classroom_id,
+  const {results}=await env.DB.prepare(`SELECT p.id,p.school_year,p.term,CASE WHEN application.id IS NOT NULL THEN 'applied' ELSE p.state END AS state,
+   application.effective_date,p.to_classroom_id,p.from_classroom_id,
    source.label AS from_room,dest.label AS to_room
    FROM student_transfer_plans p
+   LEFT JOIN student_transfer_applications application ON application.plan_id=p.id
    JOIN classrooms source ON source.id=p.from_classroom_id
    JOIN classrooms dest ON dest.id=p.to_classroom_id
    WHERE p.student_id=? ORDER BY p.school_year DESC,p.term DESC`).bind(studentId).all();
@@ -401,6 +432,10 @@ async function adminRoutes(req,env,user,path){
   const target=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(dest).first();
   if(!student||!target)throw error(404,'ไม่พบนักเรียนหรือห้องปลายทาง');
   if(student.classroom_id===dest)throw error(400,'ห้องปลายทางต้องไม่ใช่ห้องเรียนปัจจุบัน');
+  const applied=await env.DB.prepare(`SELECT a.id FROM student_transfer_applications a
+   JOIN student_transfer_plans p ON p.id=a.plan_id WHERE p.student_id=? AND p.school_year=? AND p.term=?`)
+   .bind(studentId,year,term).first();
+  if(applied)throw error(409,'แผนนี้ถูกดำเนินการแล้ว ไม่สามารถแก้ไขย้อนหลัง');
   await env.DB.batch([
    env.DB.prepare(`INSERT INTO student_transfer_plans(student_id,from_classroom_id,to_classroom_id,school_year,term,state,created_by)
     VALUES(?,?,?,?,?,?,?)
@@ -412,6 +447,56 @@ async function adminRoutes(req,env,user,path){
     .bind(user.id,'student_transfer_plan_saved','students',String(studentId))
   ]);
   return json({ok:true,message:'บันทึกแผนย้ายห้องแล้ว ยังไม่เปลี่ยนห้องเรียนปัจจุบัน'});
+ }
+ if(req.method==='GET'&&path==='/api/admin/enrollments'){
+  const studentId=positiveInt(new URL(req.url).searchParams.get('student_id'));
+  if(!studentId)throw error(400,'กรุณาเลือกนักเรียน');
+  const {results}=await env.DB.prepare(`SELECT h.classroom_id,c.label AS classroom_label,h.roll_no,h.start_date,h.end_date
+   FROM student_enrollments h JOIN classrooms c ON c.id=h.classroom_id
+   WHERE h.student_id=? ORDER BY h.start_date DESC`).bind(studentId).all();
+  return json({items:results});
+ }
+ const transferExecute=/^\/api\/admin\/transfer-plans\/(\d+)\/execute$/.exec(path);
+ if(req.method==='POST'&&transferExecute){
+  const planId=positiveInt(transferExecute[1]);
+  const plan=await env.DB.prepare(`SELECT p.*,s.classroom_id AS current_room,s.roll_no AS current_roll,s.active
+   FROM student_transfer_plans p JOIN students s ON s.id=p.student_id WHERE p.id=?`).bind(planId).first();
+  if(!plan)throw error(404,'ไม่พบแผนย้ายห้อง');
+  if(plan.state!=='planned'||!plan.active)throw error(409,'แผนถูกยกเลิกหรือนักเรียนไม่ได้ใช้งาน');
+  if(plan.current_room!==plan.from_classroom_id)throw error(409,'ห้องปัจจุบันไม่ตรงกับแผน กรุณาจัดทำแผนใหม่');
+  const already=await env.DB.prepare('SELECT id FROM student_transfer_applications WHERE plan_id=?').bind(planId).first();
+  if(already)throw error(409,'ดำเนินการตามแผนนี้แล้ว');
+  const today=bangkokToday();
+  const active=await env.DB.prepare(`SELECT id,start_date FROM student_enrollments
+   WHERE student_id=? AND classroom_id=? AND end_date IS NULL`).bind(plan.student_id,plan.current_room).first();
+  if(!active||active.start_date>=today)throw error(409,'ไม่สามารถย้ายห้องซ้ำในวันเดียวกัน หรือข้อมูลการสังกัดห้องไม่ถูกต้อง');
+  const hasToday=await env.DB.prepare(`SELECT
+    (SELECT COUNT(*) FROM attendance_daily WHERE student_id=? AND school_date=?)
+   +(SELECT COUNT(*) FROM attendance_period WHERE student_id=? AND school_date=?)
+   +(SELECT COUNT(*) FROM late_records WHERE student_id=? AND school_date=?)
+   +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=? AND school_date=?) AS total`)
+   .bind(plan.student_id,today,plan.student_id,today,plan.student_id,today,plan.student_id,today).first();
+  if(hasToday.total>0)throw error(409,'มีการเช็กชื่อหรือบันทึกมาสายในวันนี้แล้ว ให้ดำเนินการย้ายก่อนเริ่มเช็กชื่อในวันใหม่');
+  const occupied=await env.DB.prepare(`SELECT roll_no FROM student_enrollments
+   WHERE classroom_id=? AND end_date IS NULL`).bind(plan.to_classroom_id).all();
+  const used=new Set(occupied.results.map(x=>x.roll_no));
+  let roll=1;
+  while(used.has(roll)&&roll<=100)roll++;
+  if(roll>100)throw error(409,'ห้องปลายทางมีเลขที่เต็ม 100 คน');
+  await env.DB.batch([
+   env.DB.prepare(`UPDATE student_enrollments SET end_date=? WHERE id=? AND end_date IS NULL`).bind(today,active.id),
+   env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
+    VALUES(?,?,?,?,?)`).bind(plan.student_id,plan.to_classroom_id,roll,today,user.id),
+   env.DB.prepare(`UPDATE students SET classroom_id=?,roll_no=? WHERE id=? AND classroom_id=?`)
+    .bind(plan.to_classroom_id,roll,plan.student_id,plan.from_classroom_id),
+   env.DB.prepare(`INSERT INTO student_transfer_applications
+    (plan_id,student_id,from_classroom_id,to_classroom_id,old_roll_no,new_roll_no,effective_date,executed_by)
+    VALUES(?,?,?,?,?,?,?,?)`)
+    .bind(planId,plan.student_id,plan.from_classroom_id,plan.to_classroom_id,plan.current_roll,roll,today,user.id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_transferred','students',String(plan.student_id))
+  ]);
+  return json({ok:true,effective_date:today,roll_no:roll,message:'ย้ายห้องสำเร็จ ประวัติการสังกัดห้องเดิมยังคงอยู่'});
  }
  if(req.method==='GET'&&path==='/api/admin/students'){
   const roomId=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
@@ -426,10 +511,18 @@ async function adminRoutes(req,env,user,path){
   try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
   const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
   if(!room)throw error(404,'ไม่พบห้องเรียน');
-  const res=await env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,?,?,?)')
-   .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active).run();
-  await log(env.DB,user.id,'student_created','students',res.meta.last_row_id);
-  return json({ok:true,id:res.meta.last_row_id},201);
+  // Student, enrollment and audit must be one transaction, not separate writes.
+  const [insert]=await env.DB.batch([
+   env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,?,?,?)')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active),
+   env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
+     SELECT id,?,?,?,? FROM students WHERE student_no=?`)
+    .bind(student.classroom_id,student.roll_no,bangkokToday(),user.id,student.student_no),
+   env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
+      SELECT ?,'student_created','students',CAST(id AS TEXT) FROM students WHERE student_no=?`)
+    .bind(user.id,student.student_no)
+  ]);
+  return json({ok:true,id:insert.meta.last_row_id},201);
  }
  const studentEdit = /^\/api\/admin\/students\/(\d+)$/.exec(path);
  if(req.method==='POST'&&studentEdit){
@@ -439,19 +532,13 @@ async function adminRoutes(req,env,user,path){
   if(!old)throw error(404,'ไม่พบนักเรียน');
   const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
   if(!room)throw error(404,'ไม่พบห้องเรียน');
-  if(old.classroom_id!==student.classroom_id){
-   const history=await env.DB.prepare(`SELECT
-      (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
-     +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
-     +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
-     +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
-     +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
-     .bind(id,id,id,id,id).first();
-   if(history.total>0)throw error(409,'มีประวัติการเช็กชื่อหรือพฤติกรรมแล้ว ไม่สามารถย้ายห้องจนกว่าจะรองรับประวัติการย้ายห้อง');
-  }
+  if(old.classroom_id!==student.classroom_id)
+   throw error(409,'กรุณาใช้แผนย้ายห้องและปุ่มยืนยันย้ายห้อง เพื่อรักษาประวัติการเช็กชื่อ');
   await env.DB.batch([
    env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
     .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('UPDATE student_enrollments SET roll_no=? WHERE student_id=? AND end_date IS NULL')
+    .bind(student.roll_no,id),
    env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
     .bind(user.id,'student_updated','students',String(id))
   ]);
