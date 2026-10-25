@@ -13,7 +13,7 @@ test('new students, transfers and archive require valid classroom, roll and stat
   {...sample,classroom_id:0},{...sample,roll_no:0},{...sample,roll_no:101},
   {...sample,full_name:''},{...sample,student_no:''},
   {...sample,active:'0'},{...sample,full_name:'x'.repeat(121)},
-  {...sample,student_no:'x'.repeat(41)},{...sample,student_no:'x\n'}
+  {...sample,student_no:'x'.repeat(41)},{...sample,student_no:'x\ny'}
  ]) assert.throws(()=>validateStudentInput(invalid));
  assert.equal(validateStudentInput({...sample,active:false}).active,0);
 });
