@@ -9,8 +9,7 @@ const teacher={id:2,username:'teacher',role:'teacher',active:1};
 test('portal login refuses missing/invalid role without DB reads',async()=>{
  for(const role of ['',null,'admin','teacher','parent']){
   const req=new Request(url+'/api/portal/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({role,username:'demo',password:'x'})});
-  const response=await portalRoutes(req,{DB:{prepare(){throw Error('unexpected SQL query')}}},'/api/portal/auth/login');
-  assert.equal(response.status,400);
+  await assert.rejects(portalRoutes(req,{DB:{prepare(){throw Error('unexpected SQL query')}}},'/api/portal/auth/login'),e=>e.code===400);
  }
 });
 test('anonymous cannot see portal children, attendance or account',async()=>{
