@@ -57,14 +57,29 @@ function sheet(rows,widths,freeze=true){
   '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+frozen+
   '<cols>'+columns+'</cols><sheetData>'+data+'</sheetData></worksheet>';
 }
-export function buildExampleXlsx(){
- const students=[
+export function buildExampleXlsx(kind='students'){
+ const isAdvisor=kind==='advisors';
+ const students=isAdvisor?[
+  ['classroom','full_name','username','password'],
+  ['ม.1/1','ครูตัวอย่าง หนึ่ง','teacher_demo01','DemoTeacher#1234'],
+  ['ม.2/3','ครูตัวอย่าง สอง','teacher_demo02','DemoTeacher#5678'],
+  ['ม.3/2','ครูตัวอย่าง สาม','teacher_demo03','DemoTeacher#9012']
+ ]:[
   ['classroom','roll_no','student_no','full_name','username','password'],
   ['ม.1/1',1,'DEMO9001','นักเรียนทดสอบ หนึ่ง','demo-stu01','Demo#1234'],
   ['ม.2/3',2,'DEMO9002','นักเรียนทดสอบ สอง','demo-stu02','Demo#5678'],
   ['ม.3/2',3,'DEMO9003','นักเรียนทดสอบ สาม','demo-stu03','Demo#9012']
  ];
- const instructions=[
+ const instructions=isAdvisor?[
+  ['RD Care — ตัวอย่างนำเข้าครูที่ปรึกษาทุกห้องในไฟล์เดียว','คำอธิบาย'],
+  ['Advisors','4 คอลัมน์ในแถวแรก classroom,full_name,username,password'],
+  ['classroom','ห้องเรียนตามรายการที่ตั้งค่าใน RD Care เช่น ม.1/1'],
+  ['full_name','ชื่อ–สกุลครู (ตรงกับบัญชีเดิมเมื่อผูกบัญชีครูที่มีอยู่แล้ว)'],
+  ['username','กำหนดเอง 3–40 ตัว อังกฤษ ตัวเลข จุด ขีด'],
+  ['password','ครูใหม่ 12–128 ตัว / ครูมีบัญชีแล้วให้เว้นว่าง'],
+  ['การนำเข้า','ระบบตรวจซ้ำทั้งไฟล์ก่อนสร้างบัญชีหรือผูกห้อง'],
+  ['ความปลอดภัย','ห้ามนำข้อมูลจริงหรือรหัสผ่านจริงมาใส่ในไฟล์ทดสอบ']
+ ]:[
   ['RD Care — ตัวอย่างนำเข้านักเรียนทุกห้องในไฟล์เดียว','คำอธิบาย / แนวทาง'],
   ['Students','ต้องมีหัวตาราง 6 คอลัมน์ในแถวแรก และไม่เพิ่มแถวเหนือหัวตาราง'],
   ['classroom','ห้องเรียน เช่น ม.1/1 ม.2/3 ม.3/2 (อักษร ม. มอ ม้า)'],
@@ -92,7 +107,7 @@ export function buildExampleXlsx(){
   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
  const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-  '<sheets><sheet name="Students" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="Rooms" sheetId="3" r:id="rId3"/></sheets></workbook>';
+  '<sheets><sheet name="'+(isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="Rooms" sheetId="3" r:id="rId3"/></sheets></workbook>';
  const bookRelations='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
   [1,2,3].map(n=>'<Relationship Id="rId'+n+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+n+'.xml"/>').join('')+
@@ -111,7 +126,7 @@ export function buildExampleXlsx(){
   '[Content_Types].xml':types,'_rels/.rels':relations,
   'xl/workbook.xml':workbook,'xl/_rels/workbook.xml.rels':bookRelations,
   'xl/styles.xml':styles,
-  'xl/worksheets/sheet1.xml':sheet(students,[17,14,22,35,22,20]),
+  'xl/worksheets/sheet1.xml':sheet(students,isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
   'xl/worksheets/sheet2.xml':sheet(instructions,[49,83]),
   'xl/worksheets/sheet3.xml':sheet(rooms,[32])
  });
@@ -121,6 +136,16 @@ export function downloadStudentExampleXlsx(){
  const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
  const link=document.createElement('a');
  link.href=url;link.download='RD_Care_Student_Import_All_Rooms_Thai_Font_Fixed.xlsx';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+
+export function buildAdvisorExampleXlsx(){return buildExampleXlsx('advisors')}
+export function downloadAdvisorExampleXlsx(){
+ const bytes=buildAdvisorExampleXlsx();
+ const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
+ const link=document.createElement('a');
+ link.href=url;link.download='RD_Care_Advisor_Import_All_Rooms.xlsx';
  document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
