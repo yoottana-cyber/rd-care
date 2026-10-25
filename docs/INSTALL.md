@@ -103,7 +103,11 @@ npx.cmd wrangler deploy
 
 ก่อนเปิดใช้งานจริงกับข้อมูลนักเรียน ต้องทบทวน Authentication ใหม่: ปรับไปใช้บริการยืนยันตัวตนมาตรฐานที่รองรับ MFA, การจำกัดอัตราคำขอและ password hashing ที่แข็งแรงกว่า
 
-## F. อัปโหลด PWA ไป cPanel / DirectAdmin
+## F. เว็บทดลองระหว่างพัฒนา (ยังไม่ใช้ Hosting โรงเรียน)
+
+ใช้ [PAGES-PREVIEW.md](PAGES-PREVIEW.md) เพื่อเผยแพร่หน้าเว็บอัตโนมัติบน Cloudflare Pages เหมือนระบบลาออนไลน์เดิม โดยผูก Service Binding ไปยัง Worker ที่ทดสอบผ่านแล้ว และใช้ข้อมูลจำลองเท่านั้น
+
+## F.1 เมื่อพร้อมเปิดจริงจึงอัปโหลด PWA ไป cPanel / DirectAdmin
 
 1. เปลี่ยน `web/config.js` ให้เป็น URL Worker จริง **ใช้ HTTPS** เช่น:
 
