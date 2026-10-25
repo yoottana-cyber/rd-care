@@ -9,7 +9,7 @@ const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>'
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
-const unifiedImport=createUnifiedImport({api,rooms:state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
+const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
 const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
@@ -369,7 +369,7 @@ function renderAdminStudents(){
 `);
  unifiedImport.render($('#unifiedImportHolder'));
  $('#adminStudentRoom').addEventListener('change',e=>safeRun(async()=>{
-  adminStudentState.roomId=Number(e.target.value);adminStudentState.editId=null;adminImportState.preview=null;adminImportState.students=[];await loadAdminStudents();
+  adminStudentState.roomId=Number(e.target.value);adminStudentState.editId=null;await loadAdminStudents();
  }));
  $('#adminStudentSearch').addEventListener('input',e=>{
   const q=e.target.value.trim().toLocaleLowerCase();
