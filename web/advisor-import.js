@@ -129,7 +129,7 @@ export function createAdvisorImport({api,rooms,onSuccess}){
  function render(container){
   if(!container)return;
   container.innerHTML='<section class="card stack"><h3>📥 นำเข้าครูที่ปรึกษาหลายห้องในไฟล์เดียว (Excel / CSV)</h3>'+
-   '<p class="muted">ใช้ 4 คอลัมน์: <code>classroom,full_name,username,password</code> • Admin เท่านั้น • ข้อมูลจำลอง Dev</p>'+
+   '<p class="muted">ใช้ 4 คอลัมน์: <code>classroom,full_name,username,password</code> • เฉพาะผู้ดูแลระบบ • นำเข้าครูที่ปรึกษาหลายห้องในไฟล์เดียว</p>'+
    '<div class="row" style="flex-wrap:wrap;gap:12px"><button id="advisorTemplateExcel" type="button" class="button secondary">ดาวน์โหลด Excel ตัวอย่าง (.xlsx)</button>'+
    '<a href="./templates/advisor-all-rooms-import.csv" download>ดาวน์โหลด CSV ตัวอย่าง</a></div>'+
    '<form id="advisorImportForm" class="stack"><div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label>'+
