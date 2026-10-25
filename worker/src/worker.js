@@ -515,10 +515,21 @@ async function adminRoutes(req,env,user,path){
     SELECT id,?,?,?,? FROM students WHERE student_no=?`)
      .bind(roomId,student.roll_no,bangkokToday(),user.id,student.student_no));
   }
+  // Hash each supplied initial password before one atomic D1 batch.
+  for(let i=0;i<plan.items.length;i++){
+   const row=plan.items[i],raw=b.students[i];
+   if(!row.create_account)continue;
+   const salt=randomHex(16);
+   const hash=await passwordHash(raw.password,salt);
+   stmts.push(env.DB.prepare(`INSERT INTO portal_accounts
+    (username,display_name,role,student_id,password_salt,password_hash,created_by)
+    SELECT ?,full_name,'student',id,?,?,? FROM students WHERE student_no=?`)
+    .bind(row.login_username,salt,hash,user.id,row.student.student_no));
+  }
   stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
    .bind(user.id,'students_imported','classrooms',String(roomId)));
   await env.DB.batch(stmts); // atomic; any late duplicate rolls back all rows
-  return json({ok:true,ready:true,valid:plan.items.length,errors:0,imported:plan.items.length,items:plan.items.map(x=>({...x,status:'imported',message:'นำเข้าสำเร็จ'}))},201);
+  return json({ok:true,ready:true,valid:plan.items.length,errors:0,imported:plan.items.length,accounts:plan.accounts,items:plan.items.map(x=>({...x,status:'imported',message:'นำเข้าสำเร็จ'}))},201);
  }
  if(req.method==='GET'&&path==='/api/admin/transfer-plans'){
   const studentId=positiveInt(new URL(req.url).searchParams.get('student_id'));
