@@ -20,7 +20,7 @@ async function api(path,{method='GET',body,auth=true}={}){
  }catch(e){if(e.name==='AbortError')throw Error('การเชื่อมต่อล่าช้า กรุณาลองใหม่');throw e}
  finally{clearTimeout(timer)}
 }
-function safeRun(job){Promise.resolve().then(job).catch(e=>toast(e.message,true));}
+function safeRun(job){return runSafely(job,e=>toast(e?.message||String(e),true));}
 function loginPage(){
  return `<div class="login-wrap"><section class="card login-card">
  <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน</p></div>
