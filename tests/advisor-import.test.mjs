@@ -21,6 +21,13 @@ test('four-column advisor import supports multiple rooms and Thai UTF-8 names',(
  assert.equal(items.every(x=>x.status==='ready'),true);
  assert.equal(items[1].values.classroom,'ม.2/3');
 });
+test('Excel rows without a trailing password cell can link an existing teacher account',()=>{
+ const parsed=prepareAdvisorRows([['classroom','full_name','username','password'],['ม.1/1','ครูตัวอย่าง หนึ่ง','teacher_demo01']],
+  [{label:'ม.1/1'}]);
+ assert.equal(parsed.length,1);
+ assert.equal(parsed[0].values.password,'');
+ assert.equal(parsed[0].status,'ready');
+});
 test('valid advisor batch never echoes passwords',()=>{
  const plan=planAdvisorImport([row()],roomMap);
  assert.equal(plan.ready,true);
