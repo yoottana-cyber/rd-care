@@ -2,7 +2,7 @@
 
 ## รุ่นเริ่มต้น (MVP)
 - [x] 48 ห้องเรียนแบบจำลอง
-- [x] PWA บน Shared Hosting
+- [x] PWA รุ่นทดลองบน Cloudflare Pages (ยังไม่ใช่ Hosting โรงเรียน)
 - [x] Cloudflare Workers + D1, migrations
 - [x] Login (admin/staff/teacher), สิทธิ์ห้องเรียน/ครูรายคาบ
 - [x] เช็กชื่อประจำวัน, เช็กชื่อรายคาบ, บันทึกเป็นชุด
@@ -18,7 +18,8 @@
 ## เว็บทดลองบน Cloudflare Pages
 - [x] เตรียม Pages Functions proxy, Service Binding และ Git-linked preview documentation
 - [ ] ผู้ดูแลสร้าง Pages project/ตั้งค่า Service Binding และตรวจสอบ URL จริง
-- [ ] ตรวจสอบการ Login และการทำงานบนมือถือจริงผ่าน Pages preview
+- [x] ตรวจสอบการ Login บน Pages preview ด้วยบัญชี Admin จำลอง
+- [ ] ทดสอบบนมือถือจริงผ่าน Pages preview
 - [ ] หลังพัฒนาครบค่อยย้าย PWA ไป Hosting โรงเรียน
 
 ## จัดการนักเรียนและบุคลากร (ข้อมูลจำลอง)
