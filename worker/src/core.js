@@ -34,3 +34,11 @@ export function cleanText(text,max=120) {
 export function validUsername(value) {
   return typeof value==='string' && /^[a-z0-9._-]{3,40}$/i.test(value);
 }
+
+// Exception codes from Web Crypto DOMException (e.g. 9=NotSupportedError)
+// are NOT HTTP response statuses. Using them in new Response({status})
+// throws again and leaves the request as Cloudflare 1101.
+export function httpErrorStatus(error) {
+  const status = error?.code;
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validDate,weekday,validateEntries,cleanText,validUsername} from '../worker/src/core.js';
+import {validDate,weekday,validateEntries,cleanText,validUsername,httpErrorStatus} from '../worker/src/core.js';
 test('dates valid including leap year',()=>{
  assert.equal(validDate('2026-02-30'),false);
  assert.equal(validDate('2028-02-29'),true);
@@ -17,4 +17,14 @@ test('input checks',()=>{
  assert.equal(validUsername('teacher.01'),true);
  assert.equal(validUsername('a'),false);
  assert.equal(cleanText(' test ',5),'test');
+});
+
+test('WebCrypto exceptions never become invalid HTTP statuses',()=>{
+ assert.equal(httpErrorStatus({code:9,message:'NotSupportedError'}),500);
+ assert.equal(httpErrorStatus({code:15}),500);
+ assert.equal(httpErrorStatus({code:'401'}),500);
+ assert.equal(httpErrorStatus({code:401}),401);
+ assert.equal(httpErrorStatus({code:409}),409);
+ assert.equal(httpErrorStatus({code:600}),500);
+ assert.equal(httpErrorStatus(new Error('unknown')),500);
 });
