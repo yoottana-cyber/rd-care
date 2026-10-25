@@ -221,8 +221,13 @@ async function writeAttendance(req,env,user){
 }
 async function addLate(req,env,user){
  const b=await payload(req),stId=positiveInt(b.student_id);
- const st=await studentAccess(env,user,stId);
  const date=b.date||bangkokToday(); requireWriteDate(date);
+ const st=await env.DB.prepare(`SELECT s.id,h.classroom_id FROM students s
+  JOIN student_enrollments h ON h.student_id=s.id
+  WHERE s.id=? AND s.active=1 AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)`)
+  .bind(stId,date,date).first();
+ if(!st)throw error(404,'ไม่พบนักเรียนที่สังกัดห้องในวันที่เลือก');
+ await assertRoom(env,user,st.classroom_id);
  const arrivedAt=String(b.arrived_at||'');
  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(arrivedAt))throw error(400,'เวลาไม่ถูกต้อง');
  const state=isStaff(user)?'verified':'pending';
