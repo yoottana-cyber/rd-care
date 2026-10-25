@@ -1,0 +1,84 @@
+/* Original RD Care navigation inspired by the StudentPro reference structure. */
+.rd-layout{min-width:0}
+.rd-workspace{min-width:0}
+.rd-sidebar{display:none}
+.rd-global-search{
+ position:relative;z-index:7;margin-bottom:19px;
+ background:var(--rd-surface);border:1px solid var(--rd-line);
+ border-radius:18px;padding:14px 17px;box-shadow:var(--rd-shadow)
+}
+.rd-global-search label{display:block;color:var(--rd-ink);font-weight:800;font-size:13px;margin-bottom:9px}
+.rd-global-search input{
+ width:100%;min-height:44px;padding:11px 13px;border-radius:12px;
+ background:var(--rd-surface);color:var(--rd-ink);
+ border:1px solid var(--rd-line);outline-offset:2px;font:inherit
+}
+.rd-global-search input:focus{outline:3px solid #c9c6ff;border-color:#7065e8}
+.rd-global-search .muted{display:block;margin-top:8px;line-height:1.4}
+.rd-search-results{
+ position:absolute;top:calc(100% - 5px);left:12px;right:12px;
+ z-index:25;background:var(--rd-surface);border:1px solid var(--rd-line);
+ box-shadow:0 21px 40px rgba(22,36,83,.17);
+ border-radius:13px;padding:6px;max-height:min(340px,48dvh);overflow:auto
+}
+.rd-search-results[hidden]{display:none!important}
+.rd-search-result{
+ width:100%;padding:12px 13px;text-align:left;display:flex;flex-direction:column;gap:3px;
+ background:transparent;color:var(--rd-ink);border:0;border-radius:9px;font:inherit;cursor:pointer
+}
+.rd-search-result:hover,.rd-search-result:focus-visible{background:#edf0ff}
+.rd-search-result-name{font-weight:800}
+.rd-search-result .muted{font-size:12px;margin:0}
+@media(min-width:781px){
+ .rd-shell{max-width:1520px}
+ .rd-layout{
+  display:grid;grid-template-columns:238px minmax(0,1fr);
+  gap:22px;align-items:start;transition:grid-template-columns .2s
+ }
+ .rd-layout.sidebar-collapsed{grid-template-columns:72px minmax(0,1fr)}
+ .rd-sidebar{
+  display:flex;flex-direction:column;position:sticky;top:18px;
+  max-height:calc(100dvh - 35px);overflow-y:auto;
+  border-radius:19px;padding:13px 11px;
+  background:var(--rd-surface);border:1px solid var(--rd-line);box-shadow:var(--rd-shadow)
+ }
+ .rd-sidebar-title{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:4px 7px 11px;color:var(--rd-ink);font-size:13px;font-weight:850;
+ }
+ .rd-sidebar-title button{font-size:20px;width:37px;height:37px;padding:0}
+ .rd-sidebar-nav{display:flex;flex-direction:column;gap:6px}
+ .rd-sidebar-link{
+  border:1px solid transparent;background:transparent;color:var(--rd-ink);
+  display:flex;gap:10px;align-items:center;text-align:left;
+  padding:11px 9px;border-radius:11px;font-weight:750;font:inherit;
+  cursor:pointer;min-height:44px;transition:background .15s,border-color .15s;
+ }
+ .rd-sidebar-link:hover,.rd-sidebar-link:focus-visible{background:#eef0ff;border-color:#d9defe}
+ .rd-sidebar-link.active{background:#ebeaff;border-color:#c9c9fa;color:#4634b3;font-weight:850}
+ .rd-sidebar-symbol{
+  display:inline-grid;place-items:center;width:30px;height:30px;flex-shrink:0;
+  border-radius:10px;font-size:20px;background:#eff2ff;color:#5141b7
+ }
+ .rd-sidebar-label{font-size:13px;line-height:1.35;min-width:0;overflow-wrap:anywhere}
+ .rd-workspace>.nav{display:none}
+ .sidebar-collapsed .rd-sidebar-title>span,.sidebar-collapsed .rd-sidebar-label{display:none}
+ .sidebar-collapsed .rd-sidebar-title{justify-content:center;padding:3px 0 13px}
+ .sidebar-collapsed .rd-sidebar-link{justify-content:center;padding:8px 4px}
+}
+@media(max-width:780px){
+ .rd-layout{display:block}
+ .rd-sidebar{display:none}
+ .rd-workspace>.nav{display:flex}
+ .rd-global-search{padding:12px 13px;margin-bottom:15px}
+ .rd-search-results{max-height:min(300px,42dvh)}
+}
+[data-theme="dark"] .rd-search-result:hover,
+[data-theme="dark"] .rd-search-result:focus-visible{background:#33416c}
+[data-theme="dark"] .rd-sidebar-link.active{background:#35365f;border-color:#5b548a;color:#f2edff}
+[data-theme="dark"] .rd-sidebar-link:hover,
+[data-theme="dark"] .rd-sidebar-link:focus-visible{background:#29385a;border-color:#4c537e}
+[data-theme="dark"] .rd-sidebar-symbol{background:#343964;color:#ded4ff}
+@media(prefers-reduced-motion:reduce){
+ .rd-layout,.rd-sidebar-link{transition:none}
+}

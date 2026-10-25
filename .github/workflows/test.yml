@@ -20,6 +20,7 @@ jobs:
           node --check worker/src/late-self.js
           node --check worker/src/portal.js
           node --check worker/src/student-username.js
+          node --check worker/src/student-search.js
           node --check worker/src/worker.js
           node --check web/app.js
           node --check web/theme.js

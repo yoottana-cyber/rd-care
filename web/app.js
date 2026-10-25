@@ -81,12 +81,78 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const navs=[['dashboard','ภาพรวม','▦'],['attendance','เช็กชื่อ','✓'],['late','มาสาย','◷'],['behavior','พฤติกรรม','★'],['alerts','ตรวจสอบขาด','!'],...(state.user?.role==='admin'?[['adminStudents','นักเรียน','♙'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','♧'],['admin','ครูและระบบ','⚙']]:[])];
- return `<main class="shell"><header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
+ const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${state.tab===id?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
+ const bottom=navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
+ return `<main class="shell rd-shell">
+ <header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
  <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออก</button></div></header>
- <nav class="nav" aria-label="เมนูหลัก">${navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('')}</nav>
- ${content}<footer class="foot">RD Care v0.1 • ทดลองกับข้อมูลจำลองก่อนใช้งานจริง • ไม่เปิด Push ผู้ปกครองในรุ่นนี้</footer></main>`;
+ <div class="rd-layout" id="rdLayout">
+ <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><span>เมนูหลัก</span><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
+ <div class="rd-workspace">
+ ${state.user?.role==='admin'?`<section class="rd-global-search" aria-label="ค้นหานักเรียนทั้งโรงเรียน">
+  <label for="rdGlobalSearch">🔎 ค้นหานักเรียนทั้งโรงเรียน</label>
+  <input id="rdGlobalSearch" type="search" autocomplete="off" maxlength="60" placeholder="ค้นหาชื่อ รหัสนักเรียน หรือห้อง (อย่างน้อย 2 ตัว)">
+  <div id="rdSearchFeedback" class="muted" role="status" aria-live="polite">ค้นหาข้อมูลจำลองจากห้องเรียนทั้งหมด เฉพาะผู้ดูแลระบบ</div>
+  <div id="rdSearchResults" class="rd-search-results" role="list" hidden></div>
+ </section>`:''}
+ <nav class="nav" aria-label="เมนูหลักบนมือถือ">${bottom}</nav>
+ ${content}
+ </div>
+ </div><footer class="foot">RD Care v0.1 • ทดลองกับข้อมูลจำลองก่อนใช้งานจริง • ไม่เปิด Push ผู้ปกครองในรุ่นนี้</footer></main>`;
 }
-function mount(content){$('#app').innerHTML=chrome(content);bindThemeButtons();$$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));$('#logout').addEventListener('click',()=>safeRun(logout));}
+function mount(content){
+ $('#app').innerHTML=chrome(content);
+ bindThemeButtons();
+ $$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));
+ $('#logout').addEventListener('click',()=>safeRun(logout));
+ const layout=$('#rdLayout');
+ try{if(sessionStorage.getItem('rd_sidebar_collapsed')==='1')layout?.classList.add('sidebar-collapsed')}catch{}
+ $('#sidebarToggle')?.addEventListener('click',()=>{
+  layout.classList.toggle('sidebar-collapsed');
+  const closed=layout.classList.contains('sidebar-collapsed');
+  $('#sidebarToggle').setAttribute('aria-label',closed?'ขยายเมนูด้านข้าง':'ย่อเมนูด้านข้าง');
+  try{sessionStorage.setItem('rd_sidebar_collapsed',closed?'1':'0')}catch{}
+ });
+ bindGlobalStudentSearch();
+}
+function bindGlobalStudentSearch(){
+ const input=$('#rdGlobalSearch'),results=$('#rdSearchResults'),feedback=$('#rdSearchFeedback');
+ if(!input||!results||!feedback)return;
+ let timer=null,seq=0;
+ input.addEventListener('input',()=>{
+  clearTimeout(timer);const current=++seq,q=input.value.trim();
+  results.hidden=true;results.replaceChildren();
+  if(q.length<2){feedback.textContent='พิมพ์อย่างน้อย 2 ตัวอักษรเพื่อค้นหาทั้งโรงเรียน';return}
+  feedback.textContent='กำลังค้นหา...';
+  timer=setTimeout(async()=>{
+   try{
+    const response=await api('/api/admin/student-search?q='+encodeURIComponent(q));
+    if(current!==seq||!input.isConnected||state.user?.role!=='admin')return;
+    results.innerHTML=response.items.map(s=>`<button class="rd-search-result" type="button" role="listitem"
+       data-search-student="${Number(s.id)}" data-search-room="${Number(s.classroom_id)}">
+      <span class="rd-search-result-name">${esc(s.full_name)}</span>
+      <span class="muted">${esc(s.student_no)} • ${esc(s.classroom_label)} • เลขที่ ${Number(s.roll_no)}${s.active?'':' • พักข้อมูล'}</span>
+     </button>`).join('');
+    results.hidden=response.items.length===0;
+    feedback.textContent=response.items.length?'พบ ${response.items.length} รายการ (แสดงสูงสุด 20 รายการ)':'ไม่พบรายชื่อที่ตรงกับคำค้น';
+   }catch(e){
+    if(current!==seq||!input.isConnected)return;
+    feedback.textContent=e.message;results.hidden=true;
+   }
+  },270);
+ });
+ results.addEventListener('click',e=>{
+  const button=e.target.closest('[data-search-student]');
+  if(!button||!results.contains(button))return;
+  seq++;clearTimeout(timer);
+  adminStudentState.roomId=Number(button.dataset.searchRoom);
+  adminStudentState.editId=Number(button.dataset.searchStudent);
+  safeRun(async()=>{
+   await showTab('adminStudents');
+   $('#adminEditStudent')?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+ });
+}
 function $$(sel){return [...document.querySelectorAll(sel)]}
 async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
 function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
