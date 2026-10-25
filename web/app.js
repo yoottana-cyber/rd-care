@@ -40,7 +40,7 @@ function loginPage(){
  return `<div class="login-wrap"><section class="card login-card" aria-label="เข้าสู่ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา">
  <header class="login-brand">
   <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
-  <img class="login-crest" src="./media/ratsada-crest.svg" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
+  <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
   <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
   <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
  </header>
@@ -68,7 +68,7 @@ function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#l
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card">
  <header class="login-brand">
-  <img class="login-crest" src="./media/ratsada-crest.svg" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
+  <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="91" height="91" decoding="async">
   <h1>แจ้งมาสายด้วยตนเอง</h1>
   <p class="brand-subtitle">ต้องใช้รหัสยืนยันที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p>
  </header>
