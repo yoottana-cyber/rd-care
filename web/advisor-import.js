@@ -137,7 +137,7 @@ export function createAdvisorImport({api,rooms,onSuccess}){
    '<div class="field"><label>รหัสภาษาไทย CSV</label><select name="encoding"><option value="auto">ตรวจจับอัตโนมัติ</option>'+
    '<option value="utf-8">UTF-8</option><option value="windows-874">Windows-874 / TIS-620</option></select></div>'+
    '<div class="field"><label>หรือวางข้อมูล CSV</label><textarea name="csv" rows="4" placeholder="classroom,full_name,username,password"></textarea></div>'+
-   '<p class="muted">ครูใหม่: กรอก Password อย่างน้อย 12 ตัว • ครูที่มีบัญชีแล้ว: ชื่อและ Username ต้องตรงกับระบบและเว้น Password ว่าง • ไม่เปลี่ยนรหัสผ่านครูเดิม</p>'+
+   '<p class="muted">ครูใหม่: กรอก Password อย่างน้อย 4 ตัว (แนะนำให้ยาวและไม่ซ้ำ) • ครูที่มีบัญชีแล้ว: ชื่อและ Username ต้องตรงกับระบบและเว้น Password ว่าง • ไม่เปลี่ยนรหัสผ่านครูเดิม</p>'+
    '<div class="warn">ห้องที่มีครูที่ปรึกษาอยู่แล้วจะถูกปฏิเสธ ไม่เขียนทับการมอบหมายเดิม • หนึ่งห้องต่อหนึ่งครูที่ปรึกษา • หนึ่ง Username ต่อไฟล์</div>'+
    '<button class="button full" type="submit">ตรวจสอบทั้งไฟล์ก่อนนำเข้า</button></form>'+
    '<div id="advisorImportStatus" role="status" aria-live="polite" class="muted"></div>'+
