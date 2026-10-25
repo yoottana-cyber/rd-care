@@ -18,7 +18,7 @@ export async function searchStudents(req,env,user){
   JOIN classrooms c ON c.id=s.classroom_id
   WHERE instr(lower(s.student_no),?)>0 OR instr(lower(s.full_name),?)>0
      OR instr(lower(c.label),?)>0
-  ORDER BY s.active DESC,c.grade,c.room_no,s.roll_no,s.id LIMIT 20`
+  ORDER BY s.active DESC,c.grade,c.room,s.roll_no,s.id LIMIT 20`
  ).bind(q,q,q).all();
  return respond({items:rows.results});
 }
