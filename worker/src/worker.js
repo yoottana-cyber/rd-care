@@ -5,6 +5,7 @@ import { planStudentImport } from './student-import.js';
 import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } from './late-self.js';
 import {portalRoutes,portalAdminRoutes} from './portal.js';
 import {searchStudents} from './student-search.js';
+import {advisorImportEndpoint} from './advisor-import.js';
 import {unifiedRosterEndpoint} from './unified-roster.js';
 
 const encoder = new TextEncoder();
@@ -464,6 +465,7 @@ async function dashboard(req,env,user){
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
+ if(path==='/api/admin/advisors/preview'||path==='/api/admin/advisors/commit')return advisorImportEndpoint(req,env,user,path);
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
  if(path==='/api/admin/unified-import/preview'||path==='/api/admin/unified-import/commit')
   return unifiedRosterEndpoint(req,env,user,path);
