@@ -26,7 +26,7 @@ export function createPortalUi({root,onStaffLogin}){
   root.innerHTML=login?`<div class="login-wrap portal-wrap"><section class="card login-card portal-login-card">
     <header class="login-brand">
       <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
-      <img class="login-crest" src="./media/ratsada-crest.webp" alt="ตราโรงเรียนรัษฎา" width="138" height="128" decoding="async" fetchpriority="high">
+      <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
       <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
       <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
     </header>
@@ -37,7 +37,7 @@ export function createPortalUi({root,onStaffLogin}){
     <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
     </section></div>`
     :`<div class="login-wrap portal-wrap"><section class="card portal-card stack">
-    <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>พื้นที่นักเรียนและผู้ปกครอง</p></div>
+    <div class="login-head"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><h1>RD Care</h1><p>พื้นที่นักเรียนและผู้ปกครอง</p></div>
     ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div>
     <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div></section></div>`;
   bindThemeButtons();
