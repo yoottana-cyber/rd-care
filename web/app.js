@@ -347,9 +347,10 @@ function renderAdminStudents(){
     rows=parseCsv(String(data.get('csv')||'').replace(/^\uFEFF/,'').trim());
     filename='ข้อความ CSV';
    }
-   if(rows[0]?.slice(0,3).map(x=>String(x??'').trim().toLowerCase()).join(',')==='roll_no,student_no,full_name')rows.shift();
+   const header=rows[0]?.slice(0,3).map(x=>String(x??'').trim().toLowerCase()).join(',')==='roll_no,student_no,full_name';
+   if(header)rows.shift();
    if(rows.length<1||rows.length>60)throw Error('นำเข้าได้ครั้งละ 1–60 คน (ไม่รวมบรรทัดหัวตาราง)');
-   const students=rows.map((r,i)=>({roll_no:Number(r[0]),student_no:String(r[1]??'').trim(),full_name:String(r[2]??'').trim(),source_row:i+2}));
+   const students=rows.map((r,i)=>({roll_no:Number(r[0]),student_no:String(r[1]??'').trim(),full_name:String(r[2]??'').trim(),source_row:r.source_row||(i+1+(header?1:0))}));
    const roomId=adminStudentState.roomId;
    const plan=await api('/api/admin/import-students/preview',{method:'POST',body:{classroom_id:roomId,students}});
    if(adminStudentState.roomId!==roomId||state.tab!=='adminStudents')return;
