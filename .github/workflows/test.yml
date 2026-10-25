@@ -16,6 +16,7 @@ jobs:
           node --check worker/src/password.js
           node --check worker/src/admin-validation.js
           node --check worker/src/student-import.js
+          node --check worker/src/unified-roster.js
           node --check worker/src/late-self.js
           node --check worker/src/portal.js
           node --check worker/src/student-username.js
@@ -24,6 +25,7 @@ jobs:
           node --check web/run-safely.js
           node --check web/request-cache.js
           node --check web/xlsx-reader.js
+          node --check web/unified-import.js
           node --check web/portal-ui.js
           node --check web/portal-admin.js
           node --check web/portal-batch.js

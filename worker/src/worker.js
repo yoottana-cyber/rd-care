@@ -4,6 +4,7 @@ import { validateStudentInput, validatePersonnelInput } from './admin-validation
 import { planStudentImport } from './student-import.js';
 import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } from './late-self.js';
 import {portalRoutes,portalAdminRoutes} from './portal.js';
+import {unifiedRosterEndpoint} from './unified-roster.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -444,6 +445,8 @@ async function dashboard(req,env,user){
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
+ if(path==='/api/admin/unified-import/preview'||path==='/api/admin/unified-import/commit')
+  return unifiedRosterEndpoint(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/users'){
   const {results}=await env.DB.prepare("SELECT id,username,display_name,role,active FROM users ORDER BY display_name").all();
   return json({items:results});

@@ -1,7 +1,7 @@
 // Minimal first-worksheet .xlsx reader, using browser DOMParser + native
 // DecompressionStream('deflate-raw'). No third-party code or external CDN.
 // Accepts only bounded Office Open XML ZIP archives, not legacy .xls.
-const MAX_FILE=3_000_000, MAX_ENTRY=6_000_000;
+const MAX_FILE=8_000_000, MAX_ENTRY=20_000_000;
 const utf8=new TextDecoder();
 function u16(view,i){return view.getUint16(i,true)}
 function u32(view,i){return view.getUint32(i,true)}
@@ -61,7 +61,7 @@ export async function readXlsxRows(file){
  const xml=parseXml(sheet);
  const rows=[];
  for(const r of xml.getElementsByTagName('row')){
-  if(rows.length>=1500)throw Error('กรุณาแบ่ง Excel เป็นไฟล์เล็กลง (สูงสุด 1,500 แถว)');
+  if(rows.length>=12000)throw Error('Excel มีมากกว่า 12,000 แถว กรุณาแบ่งเป็นหลายไฟล์');
   const row=[];
   for(const cell of r.getElementsByTagName('c')){
    const ref=cell.getAttribute('r')||'';
