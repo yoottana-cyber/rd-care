@@ -8,6 +8,7 @@ const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboa
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
 const adminImportState={roomId:null,students:[],preview:null,filename:''};
+const adminTransferState={studentId:null,items:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
@@ -249,6 +250,18 @@ function renderAdminStudents(){
      </form>`:'<div class="empty">เลือกปุ่ม “แก้ไข” ด้านบน</div>'}
    </section>
   </div>
+  ${edit?`<section class="card stack"><h3>วางแผนย้ายห้องตามปีการศึกษา</h3>
+    <p class="muted">บันทึกเป็นแผนก่อนเปิดภาคเรียน ไม่เปลี่ยนห้องปัจจุบันและไม่แก้ข้อมูลเช็กชื่อย้อนหลัง</p>
+    <form id="adminTransferForm" class="stack"><div class="grid two">
+     <div class="field"><label>ปีการศึกษา (พ.ศ.)</label><input name="school_year" type="number" min="2500" max="2700" value="${new Date().getUTCFullYear()+543}" required></div>
+     <div class="field"><label>ภาคเรียน</label><select name="term"><option value="1">1</option><option value="2">2</option></select></div></div>
+     <div class="field"><label>ห้องเรียนปลายทาง</label><select name="to_classroom_id">${state.rooms.filter(r=>r.id!==edit.classroom_id).map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div>
+     <button class="button secondary" type="submit">บันทึกแผนย้ายห้อง</button></form>
+    ${adminTransferState.studentId===edit.id&&adminTransferState.items.length?
+     `<div class="table-wrap"><table class="table"><thead><tr><th>ปีการศึกษา/เทอม</th><th>ห้องเดิม → ห้องแผน</th><th>สถานะ</th></tr></thead>
+       <tbody>${adminTransferState.items.map(p=>`<tr><td>${p.school_year}/${p.term}</td><td>${esc(p.from_room)} → ${esc(p.to_room)}</td><td>${p.state==='planned'?'วางแผน':'ยกเลิก'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีแผนย้ายห้องที่บันทึกไว้</p>'}
+    <div class="warn">การย้ายห้องจริงยังถูกป้องกันสำหรับนักเรียนที่มีประวัติ เพื่อรอระบบบันทึกประวัติการสังกัดห้องย้อนหลัง</div>
+   </section>`:''}
   <section class="card stack"><h3>นำเข้ารายชื่อนักเรียน Excel / CSV</h3>
    <p class="muted">รองรับ .xlsx (แผ่นงานแรก) และ CSV UTF-8 • ครั้งละ 1–60 คน • ห้ามนำเข้าข้อมูลนักเรียนจริงในฐานทดลอง</p>
    <form id="adminImportCsv" class="stack"><div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
@@ -273,9 +286,16 @@ function renderAdminStudents(){
   const q=e.target.value.trim().toLocaleLowerCase();
   for(const row of document.querySelectorAll('[data-admin-student-row]'))row.hidden=!row.textContent.toLocaleLowerCase().includes(q);
  });
- document.querySelectorAll('[data-edit-student]').forEach(btn=>btn.addEventListener('click',()=>{
-  adminStudentState.editId=Number(btn.dataset.editStudent);renderAdminStudents();
- }));
+ document.querySelectorAll('[data-edit-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
+  const id=Number(btn.dataset.editStudent);
+  adminStudentState.editId=id;adminTransferState.studentId=id;adminTransferState.items=[];
+  try{
+   const result=await api('/api/admin/transfer-plans?student_id='+id);
+   if(adminStudentState.editId!==id||state.tab!=='adminStudents')return;
+   adminTransferState.items=result.items;
+  }catch(error){toast('โหลดแผนย้ายห้องไม่สำเร็จ: '+error.message,true)}
+  renderAdminStudents();
+ })));
  document.querySelectorAll('[data-toggle-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
   const st=adminStudentState.items.find(s=>s.id===Number(btn.dataset.toggleStudent));
   if(!st)return;
@@ -294,6 +314,21 @@ function renderAdminStudents(){
   try{await api('/api/admin/students/'+id,{method:'POST',body:studentPayload(new FormData(form))});
     adminStudentState.editId=null;referenceCache.clear();toast('บันทึกข้อมูลนักเรียนแล้ว');await loadAdminStudents();
   }finally{button.disabled=false}
+ }));
+ $('#adminTransferForm')?.addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();
+  const studentId=adminStudentState.editId,form=e.currentTarget,button=form.querySelector('button');
+  const data=new FormData(form);
+  if(!confirm('บันทึกแผนย้ายห้องสำหรับภาคเรียนที่เลือก? ยังไม่เปลี่ยนห้องเรียนจริง'))return;
+  button.disabled=true;
+  try{
+   await api('/api/admin/transfer-plans',{method:'POST',body:{
+    student_id:studentId,school_year:Number(data.get('school_year')),
+    term:Number(data.get('term')),to_classroom_id:Number(data.get('to_classroom_id'))}});
+   const plans=await api('/api/admin/transfer-plans?student_id='+studentId);
+   adminTransferState.studentId=studentId;adminTransferState.items=plans.items;
+   toast('บันทึกแผนย้ายห้องแล้ว (ยังไม่ย้ายจริง)');renderAdminStudents();
+  }finally{if(button.isConnected)button.disabled=false}
  }));
  $('#adminImportCsv').addEventListener('submit',e=>safeRun(async()=>{
   e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
