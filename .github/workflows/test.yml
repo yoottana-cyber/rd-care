@@ -19,6 +19,7 @@ jobs:
           node --check web/run-safely.js
           node --check web/request-cache.js
           node --check web/sw.js
+          node --check 'functions/api/[[path]].js'
       - name: Unit tests
         run: node --test tests/*.test.mjs
       - name: Test schema + sample data
