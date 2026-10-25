@@ -27,6 +27,8 @@ export function planStudentImport(students,roomId,existing=[],existingAccounts=[
     if(!validUsername(login_username))message ||= 'Username ใช้ภาษาอังกฤษ ตัวเลข จุด หรือขีด 3–40 ตัว';
     if(typeof raw.password!=='string'||raw.password.length<4||raw.password.length>128)
      message ||= 'Password ต้องมีอย่างน้อย 4 ตัว และไม่เกิน 128 ตัว';
+    else if(/^\d{13}$/.test(raw.password))
+     message ||= 'ห้ามใช้เลขประจำตัวประชาชน 13 หลักเป็นรหัสผ่าน';
     if(loginNames.has(login_username))message ||= 'Username ซ้ำในไฟล์';
     else if(usedAccountNames.has(login_username))message ||= 'Username มีบัญชีอยู่แล้ว';
     loginNames.add(login_username);
