@@ -24,7 +24,7 @@ export function createPortalUi({root,onStaffLogin}){
  }
  function frame(inner){
   root.innerHTML=`<div class="login-wrap portal-wrap"><section class="card portal-card stack">
-    <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>พื้นที่นักเรียนและผู้ปกครอง • ข้อมูลทดลอง</p></div>
+    <div class="login-head"><div class="brand-icon">RD</div><h1>RD Care</h1><p>พื้นที่นักเรียนและผู้ปกครอง</p></div>
     ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div>
     <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div></section></div>`;
   bindThemeButtons();
@@ -128,7 +128,7 @@ export function createPortalUi({root,onStaffLogin}){
     <h3>ประวัติมาสาย</h3>${table(r.late,[['school_date','วันที่'],['arrived_at','เวลา'],['state','สถานะ']],row=>row.state==='verified'?'ยืนยันแล้ว':'รอตรวจสอบ')}
     <h3>คะแนนพฤติกรรม</h3><p class="muted">รวมเฉพาะช่วงวันที่เลือก: ${r.behavior_total} คะแนน</p>
     ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}`:''}
-   <p class="muted">ข้อมูลทดลอง • ไม่มีการส่ง Push ถึงผู้ปกครองในรุ่นนี้</p>`);
+   <p class="muted">ยังไม่เปิดใช้งานการแจ้งเตือน Push ถึงผู้ปกครอง</p>`);
   select('#portalLogout').addEventListener('click',logout);
   select('#portalStudent')?.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()});
   select('#portalSearch')?.addEventListener('click',()=>{
