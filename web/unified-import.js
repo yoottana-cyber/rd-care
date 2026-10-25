@@ -36,6 +36,8 @@ export function prepareRows(raw,rooms){
   const key=values.student_no.toLowerCase(),uname=values.username.toLowerCase();
   const rollkey=values.classroom+':'+values.roll_no;
   if(r.length!==6)message='คอลัมน์ไม่ครบ 6 ช่อง';
+  else if(values.classroom.includes('\ufffd')||values.full_name.includes('\ufffd'))
+   message='ข้อความภาษาไทยเสียหาย (�) กรุณาใช้ CSV ต้นฉบับ หรือบันทึกใหม่เป็น CSV UTF-8 / Excel .xlsx';
   else if(!labels.has(values.classroom))message='ไม่พบห้องเรียน '+values.classroom;
   else if(!Number.isInteger(values.roll_no)||values.roll_no<1||values.roll_no>100)message='เลขที่ต้องอยู่ในช่วง 1–100';
   else if(!values.student_no||values.student_no.length>40)message='รหัสนักเรียนไม่ถูกต้อง';
