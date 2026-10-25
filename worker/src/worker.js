@@ -107,9 +107,13 @@ async function classrooms(env,user){
  return json({items:results});
 }
 async function getStudents(req,env,user){
- const roomId=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
+ const q=new URL(req.url).searchParams,roomId=positiveInt(q.get('classroom_id'));
+ const date=q.get('date')||bangkokToday();requireDate(date);
  await assertRoom(env,user,roomId);
- const {results}=await env.DB.prepare('SELECT id,student_no,roll_no,full_name FROM students WHERE classroom_id=? AND active=1 ORDER BY roll_no').bind(roomId).all();
+ const {results}=await env.DB.prepare(`SELECT s.id,s.student_no,h.roll_no,s.full_name FROM students s
+ JOIN student_enrollments h ON h.student_id=s.id
+ WHERE h.classroom_id=? AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)
+ AND s.active=1 ORDER BY h.roll_no`).bind(roomId,date,date).all();
  return json({items:results});
 }
 async function getTimetable(req,env,user){
@@ -136,14 +140,21 @@ async function getAttendance(req,env,user){
  const kind=q.get('kind');const date=q.get('date')||bangkokToday();
  requireDate(date);await assertRoom(env,user,roomId);
  if(kind==='daily'){
-  const {results}=await env.DB.prepare(`SELECT a.student_id,a.status FROM attendance_daily a JOIN students s ON s.id=a.student_id WHERE s.classroom_id=? AND a.school_date=?`).bind(roomId,date).all();
+  const {results}=await env.DB.prepare(`SELECT a.student_id,a.status FROM attendance_daily a
+ JOIN student_enrollments h ON h.student_id=a.student_id
+ WHERE h.classroom_id=? AND a.school_date=? AND h.start_date<=a.school_date
+ AND (h.end_date IS NULL OR h.end_date>a.school_date)`).bind(roomId,date).all();
   return json({items:results});
  }
  if(kind==='period'){
   const timetableId=positiveInt(q.get('timetable_id'));
   const slot=await env.DB.prepare('SELECT id,classroom_id FROM timetable WHERE id=? AND active=1').bind(timetableId).first();
   if(!slot||slot.classroom_id!==roomId)throw error(400,'คาบเรียนไม่สัมพันธ์กับห้อง');
-  const {results}=await env.DB.prepare('SELECT student_id,status FROM attendance_period WHERE timetable_id=? AND school_date=?').bind(timetableId,date).all();
+  const {results}=await env.DB.prepare(`SELECT p.student_id,p.status FROM attendance_period p
+ JOIN student_enrollments h ON h.student_id=p.student_id
+ WHERE p.timetable_id=? AND p.school_date=? AND h.classroom_id=?
+ AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date)`)
+ .bind(timetableId,date,roomId).all();
   return json({items:results});
  }
  throw error(400,'ประเภทการเช็กชื่อไม่ถูกต้อง');
@@ -154,7 +165,10 @@ async function writeAttendance(req,env,user){
  requireWriteDate(date);
  if(!['daily','period'].includes(kind))throw error(400,'กรุณาเลือกประเภทการเช็กชื่อ');
  await assertRoom(env,user,roomId,kind==='daily'?'daily':'view');
- const {results:students}=await env.DB.prepare('SELECT id FROM students WHERE classroom_id=? AND active=1 ORDER BY roll_no').bind(roomId).all();
+ const {results:students}=await env.DB.prepare(`SELECT s.id FROM students s
+ JOIN student_enrollments h ON h.student_id=s.id
+ WHERE h.classroom_id=? AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)
+ AND s.active=1 ORDER BY h.roll_no`).bind(roomId,date,date).all();
  if(!students.length)throw error(400,'ห้องเรียนยังไม่มีนักเรียน');
  const ids=new Set(students.map(x=>x.id));
  if(!validateEntries(b.entries,ids))throw error(400,'รายการต้องมีนักเรียนทุกคนในห้อง สถานะถูกต้อง และไม่ซ้ำกัน');
@@ -221,8 +235,11 @@ async function listLate(req,env,user){
  const q=new URL(req.url).searchParams,roomId=positiveInt(q.get('classroom_id'));
  await assertRoom(env,user,roomId);
  const date=q.get('date')||bangkokToday();requireDate(date);
- const {results}=await env.DB.prepare(`SELECT l.id,s.roll_no,s.full_name,l.arrived_at,l.reason,l.state FROM late_records l JOIN students s ON s.id=l.student_id
- WHERE s.classroom_id=? AND l.school_date=? ORDER BY l.arrived_at DESC`).bind(roomId,date).all();
+ const {results}=await env.DB.prepare(`SELECT l.id,h.roll_no,s.full_name,l.arrived_at,l.reason,l.state FROM late_records l
+ JOIN students s ON s.id=l.student_id
+ JOIN student_enrollments h ON h.student_id=l.student_id
+ WHERE h.classroom_id=? AND l.school_date=? AND h.start_date<=l.school_date
+ AND (h.end_date IS NULL OR h.end_date>l.school_date) ORDER BY l.arrived_at DESC`).bind(roomId,date).all();
  return json({items:results});
 }
 async function addBehavior(req,env,user){
@@ -251,16 +268,18 @@ async function listAlerts(req,env,user){
   const room=await env.DB.prepare('SELECT advisor_user_id FROM classrooms WHERE id=?').bind(roomId).first();
   if(room?.advisor_user_id!==user.id)throw error(403,'เฉพาะครูที่ปรึกษาของห้องนี้เท่านั้น');
  }
- const {results}=await env.DB.prepare(`SELECT a.id,a.school_date,a.state,s.roll_no,s.full_name,t.period,t.subject
+ const {results}=await env.DB.prepare(`SELECT a.id,a.school_date,a.state,h.roll_no,s.full_name,t.period,t.subject
   FROM attendance_alerts a JOIN students s ON s.id=a.student_id JOIN timetable t ON t.id=a.timetable_id
-  WHERE s.classroom_id=? AND a.state='pending_review' ORDER BY a.school_date DESC,t.period DESC LIMIT 50`).bind(roomId).all();
+  JOIN student_enrollments h ON h.student_id=s.id AND h.classroom_id=t.classroom_id
+  WHERE t.classroom_id=? AND h.start_date<=a.school_date AND (h.end_date IS NULL OR h.end_date>a.school_date)
+  AND a.state='pending_review' ORDER BY a.school_date DESC,t.period DESC LIMIT 50`).bind(roomId).all();
  return json({items:results});
 }
 async function reviewAlert(req,env,user,id){
  const b=await payload(req);
  if(!['confirmed','resolved'].includes(b.state))throw error(400,'สถานะไม่ถูกต้อง');
- const record=await env.DB.prepare(`SELECT a.id,a.student_id,a.school_date,a.timetable_id,a.state,s.classroom_id
- FROM attendance_alerts a JOIN students s ON s.id=a.student_id WHERE a.id=?`).bind(id).first();
+ const record=await env.DB.prepare(`SELECT a.id,a.student_id,a.school_date,a.timetable_id,a.state,t.classroom_id
+ FROM attendance_alerts a JOIN timetable t ON t.id=a.timetable_id WHERE a.id=?`).bind(id).first();
  if(!record)throw error(404,'ไม่พบรายการ');
  await assertRoom(env,user,record.classroom_id);
  if(!isStaff(user)){
@@ -304,12 +323,12 @@ async function dashboard(req,env,user){
  const a=ids||[];
  const results=await env.DB.batch([
   env.DB.prepare('SELECT COUNT(*) total FROM classrooms c WHERE 1=1'+filter).bind(...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM students s JOIN classrooms c ON c.id=s.classroom_id WHERE s.active=1'+filter).bind(...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM attendance_daily d JOIN students s ON s.id=d.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE d.school_date=?'+filter).bind(date,...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM attendance_period p JOIN students s ON s.id=p.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE p.school_date=?'+filter).bind(date,...a),
-  env.DB.prepare("SELECT COUNT(*) total FROM attendance_period p JOIN students s ON s.id=p.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE p.school_date=? AND p.status='absent'"+filter).bind(date,...a),
-  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN students s ON s.id=al.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE al.school_date=? AND al.state='pending_review'"+filter).bind(date,...a),
-  env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN students s ON s.id=l.student_id JOIN classrooms c ON c.id=s.classroom_id WHERE l.school_date=?'+filter).bind(date,...a)
+  env.DB.prepare('SELECT COUNT(*) total FROM students s JOIN student_enrollments h ON h.student_id=s.id JOIN classrooms c ON c.id=h.classroom_id WHERE s.active=1 AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)'+filter).bind(date,date,...a),
+  env.DB.prepare('SELECT COUNT(*) total FROM attendance_daily d JOIN student_enrollments h ON h.student_id=d.student_id AND h.start_date<=d.school_date AND (h.end_date IS NULL OR h.end_date>d.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE d.school_date=?'+filter).bind(date,...a),
+  env.DB.prepare('SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=?'+filter).bind(date,...a),
+  env.DB.prepare("SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=? AND p.status='absent'"+filter).bind(date,...a),
+  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN student_enrollments h ON h.student_id=al.student_id AND h.start_date<=al.school_date AND (h.end_date IS NULL OR h.end_date>al.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE al.school_date=? AND al.state='pending_review'"+filter).bind(date,...a),
+  env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN student_enrollments h ON h.student_id=l.student_id AND h.start_date<=l.school_date AND (h.end_date IS NULL OR h.end_date>l.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE l.school_date=?'+filter).bind(date,...a)
  ]);
  const values=results.map(r=>r.results[0]?.total||0);
  return json(Object.fromEntries(['rooms','students','daily','period','absent_period','alerts','late'].map((n,i)=>[n,values[i]])));
