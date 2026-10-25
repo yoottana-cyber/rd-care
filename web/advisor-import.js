@@ -18,7 +18,7 @@ export function prepareAdvisorRows(raw,rooms){
   const item={classroom:classroom.trim(),full_name:full_name.trim(),username:user.trim().toLowerCase(),
    password,source_row:Number(cells.source_row)||index+2};
   let message='';
-  if(cells.length!==4)message='ต้องมี 4 คอลัมน์';
+  if(cells.length<3||cells.length>4)message='ต้องมี 4 คอลัมน์ (Password อาจเว้นว่างสำหรับครูเดิม)';
   else if(!labels.has(item.classroom))message='ไม่พบห้องเรียน '+item.classroom;
   else if(item.classroom.includes('\ufffd')||item.full_name.includes('\ufffd'))message='อักขระไทยเสียหาย กรุณาใช้ CSV UTF-8 หรือ Excel .xlsx';
   else if(!item.full_name||item.full_name.length>100)message='ชื่อ–สกุลครูต้องยาวไม่เกิน 100 ตัว';
