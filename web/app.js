@@ -259,12 +259,12 @@ function renderAdminStudents(){
  }));
  $('#adminStudentSearch').addEventListener('input',e=>{
   const q=e.target.value.trim().toLocaleLowerCase();
-  for(const row of $('[data-admin-student-row]'))row.hidden=!row.textContent.toLocaleLowerCase().includes(q);
+  for(const row of document.querySelectorAll('[data-admin-student-row]'))row.hidden=!row.textContent.toLocaleLowerCase().includes(q);
  });
- $('[data-edit-student]').forEach(btn=>btn.addEventListener('click',()=>{
+ document.querySelectorAll('[data-edit-student]').forEach(btn=>btn.addEventListener('click',()=>{
   adminStudentState.editId=Number(btn.dataset.editStudent);renderAdminStudents();
  }));
- $('[data-toggle-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
+ document.querySelectorAll('[data-toggle-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
   const st=adminStudentState.items.find(s=>s.id===Number(btn.dataset.toggleStudent));
   if(!st)return;
   if(!confirm(st.active?`พักข้อมูล ${st.full_name} โดยไม่ลบประวัติ?`:`เปิดใช้งาน ${st.full_name}?`))return;
