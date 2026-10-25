@@ -35,6 +35,12 @@ rd-care/
     └── wrangler.toml
 ```
 
+## ทดลองดูหน้าเว็บเหมือนระบบลาออนไลน์เดิม (Cloudflare Pages + GitHub)
+
+**เริ่มที่ [docs/PAGES-PREVIEW.md](docs/PAGES-PREVIEW.md)** เพื่อเชื่อม GitHub `yoottana-cyber/rd-care` กับ Cloudflare Pages หนึ่งครั้ง โดยตั้ง Build output เป็น `web` และ Service Binding `RD_CARE_API` ไปยัง Worker `rd-care-api-dev`.
+
+Cloudflare Pages จะเผยแพร่หน้าเว็บทดลองผ่าน `*.pages.dev` อัตโนมัติเมื่อ Merge เข้า `main` (พร้อม Preview URL ของ PR ตามการตั้งค่า). **ไม่ใช่ Hosting โรงเรียน** และ Backend Worker/D1 จะไม่ Deploy โดยอัตโนมัติจากการ Merge.
+
 ## ติดตั้ง
 
 อ่าน [docs/INSTALL.md](docs/INSTALL.md) ทีละขั้นตอนโดยเริ่มทดสอบ D1 แบบ **local** ก่อน แล้วจึงสร้าง D1 แบบ **remote**
