@@ -47,14 +47,14 @@ function loginPage(){
  <button id="portalGuardianLogin" type="button" class="button secondary full">ผู้ปกครองเข้าสู่ระบบ</button></div>
  <button id="studentLateEntry" type="button" class="button secondary full" style="margin-top:12px">นักเรียนแจ้งมาสาย</button>
  <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
- <p class="muted" style="text-align:center">รุ่นทดลอง • ยังไม่เปิดใช้งานการแจ้งเตือนผู้ปกครอง</p></section></div>`;
+ <p class="muted" style="text-align:center">ยังไม่เปิดใช้งานการแจ้งเตือนผู้ปกครองอัตโนมัติ</p></section></div>`;
 }
 function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian')); }
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card stack">
- <div class="login-head"><div class="brand-icon">RD</div><h1>แจ้งมาสายด้วยตนเอง</h1><p>ระบบทดลอง • ต้องใช้รหัสชั่วคราวที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p></div>
+ <div class="login-head"><div class="brand-icon">RD</div><h1>แจ้งมาสายด้วยตนเอง</h1><p>ต้องใช้รหัสยืนยันที่ครูเวรออกให้สำหรับนักเรียนแต่ละคน</p></div>
  <form class="stack" id="studentLateForm">
-  <div class="field"><label for="studentNumber">รหัสประจำตัวนักเรียน</label><input id="studentNumber" name="student_no" maxlength="40" required autocomplete="off" placeholder="เช่น DEMO1001"></div>
+  <div class="field"><label for="studentNumber">รหัสประจำตัวนักเรียน</label><input id="studentNumber" name="student_no" maxlength="40" required autocomplete="off" placeholder="เช่น 000123"></div>
   <div class="field"><label for="studentLateCode">รหัสยืนยันจากครูเวร</label><input id="studentLateCode" name="code" pattern="[a-fA-F0-9]{24}" maxlength="24" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="รหัส 24 ตัวอักษร"></div>
   <div class="field"><label for="studentLateReason">สาเหตุ (ไม่บังคับ)</label><textarea id="studentLateReason" name="reason" maxlength="300" placeholder="ระบุเหตุผลตามที่ต้องการแจ้ง"></textarea></div>
   <button type="submit" class="button full">ส่งคำขอให้ครูเวรตรวจสอบ</button>
@@ -87,7 +87,7 @@ function chrome(content){
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${state.tab===id?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
- <header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • รุ่นทดสอบ D1</p></div></div>
+ <header class="top"><div class="brand"><div class="brand-icon">RD</div><div><h1>RD Care</h1><p>Smart Student Care • ระบบดูแลช่วยเหลือนักเรียน</p></div></div>
  <div class="user"><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออก</button></div></header>
  <div class="rd-layout" id="rdLayout">
  <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><span>เมนูหลัก</span><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
@@ -95,13 +95,13 @@ function chrome(content){
  ${state.user?.role==='admin'?`<section class="rd-global-search" aria-label="ค้นหานักเรียนทั้งโรงเรียน">
   <label for="rdGlobalSearch">🔎 ค้นหานักเรียนทั้งโรงเรียน</label>
   <input id="rdGlobalSearch" type="search" autocomplete="off" maxlength="60" placeholder="ค้นหาชื่อ รหัสนักเรียน หรือห้อง (อย่างน้อย 2 ตัว)">
-  <div id="rdSearchFeedback" class="muted" role="status" aria-live="polite">ค้นหาข้อมูลจำลองจากห้องเรียนทั้งหมด เฉพาะผู้ดูแลระบบ</div>
+  <div id="rdSearchFeedback" class="muted" role="status" aria-live="polite">ค้นหารายชื่อนักเรียนทุกห้องเรียน • เฉพาะผู้ดูแลระบบ</div>
   <div id="rdSearchResults" class="rd-search-results" role="list" hidden></div>
  </section>`:''}
  <nav class="nav" aria-label="เมนูหลักบนมือถือ">${bottom}</nav>
  ${content}
  </div>
- </div><footer class="foot">RD Care v0.1 • ทดลองกับข้อมูลจำลองก่อนใช้งานจริง • ไม่เปิด Push ผู้ปกครองในรุ่นนี้</footer></main>`;
+ </div><footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • ยังไม่เปิดใช้งาน Push ผู้ปกครอง</footer></main>`;
 }
 function mount(content){
  $('#app').innerHTML=chrome(content);
@@ -362,20 +362,20 @@ function renderBehavior(){mount(`<div class="stack"><div><h2>คะแนนพ�
 }
 async function loadAlerts(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}try{const data=await api('/api/alerts?classroom_id='+state.roomId);state.alerts=data.items;renderAlerts()}catch(e){mount(`<div class="card"><h2>งานตรวจสอบ</h2><p class="warn">${esc(e.message)}</p><p class="muted">หน้านี้ให้ครูที่ปรึกษาและผู้ดูแลระบบเข้าถึงได้</p></div>`)} }
 function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false})}
- <div class="warn">รุ่นนี้ยังไม่ส่ง Push ถึงผู้ปกครอง แม้จะกดยืนยันแล้วก็ตาม</div>
+ <div class="warn">การยืนยันรายการนี้ยังไม่ส่งการแจ้งเตือน Push ถึงผู้ปกครอง</div>
  ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-review="${a.id}" data-state="resolved">มีเหตุ/บันทึกผิด</button><button class="button" data-review="${a.id}" data-state="confirmed">ยืนยันไม่เข้าชั้นเรียน</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการรอตรวจสอบ</div>'}</div></div>`);
  bindFilters(loadAlerts);
- $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (รุ่นทดลองไม่มีการแจ้งผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
+ $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (ระบบยังไม่ส่งการแจ้งเตือนผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
 }
 async function loadAdmin(){if(state.user.role!=='admin')return;const data=await api('/api/admin/users');state.users=data.items;renderAdmin();}
 function teacherOptions(){return state.users.filter(u=>u.role==='teacher'&&u.active).map(u=>`<option value="${u.id}">${esc(u.display_name)} (${esc(u.username)})</option>`).join('');}
-function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข้อมูลระบบ</h2><p class="muted">สำหรับผู้ดูแลระบบเท่านั้น • ใช้ข้อมูลจำลองในช่วงทดลอง</p></div>
+function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข้อมูลระบบ</h2><p class="muted">สำหรับผู้ดูแลระบบ • จัดการบัญชี ห้องเรียน และข้อมูลการใช้งาน</p></div>
  <div class="grid two"><section class="card stack"><h3>เพิ่มบัญชีครู/บุคลากร</h3><form id="addUser" class="stack"><div class="field"><label>ชื่อเข้าสู่ระบบ (ภาษาอังกฤษ/ตัวเลข)</label><input name="username" required minlength="3" pattern="[A-Za-z0-9._-]+"></div><div class="field"><label>ชื่อที่แสดง</label><input name="display_name" required maxlength="100"></div><div class="field"><label>รหัสผ่านชั่วคราว (ครูอย่างน้อย 4 ตัว)</label><input name="password" type="password" required minlength="4"></div><div class="field"><label>บทบาท</label><select name="role"><option value="teacher">ครู</option><option value="staff">งานกิจการนักเรียน</option></select></div><button class="button full">สร้างบัญชี</button></form></section>
  <section class="card stack"><h3>กำหนดครูที่ปรึกษา</h3><form id="assignAdvisor" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูที่ปรึกษา</label><select name="teacher_user_id">${teacherOptions()}</select></div><button class="button full" ${!teacherOptions()?'disabled':''}>บันทึกครูที่ปรึกษา</button></form></section>
  <section class="card stack"><h3>เพิ่มตารางสอนรายคาบ</h3><form id="addSlot" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูผู้สอน</label><select name="teacher_user_id">${teacherOptions()}</select></div>
  <div class="grid two"><div class="field"><label>วันในสัปดาห์</label><select name="day_of_week">${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}</select></div><div class="field"><label>คาบ</label><input type="number" name="period" min="1" max="12" value="1" required></div></div><div class="field"><label>ชื่อวิชา</label><input name="subject" placeholder="วิทยาการคำนวณ" required maxlength="120"></div><button class="button full" ${!teacherOptions()?'disabled':''}>เพิ่มคาบเรียน</button></form></section>
- <section class="card stack"><h3>นำเข้านักเรียน (CSV)</h3><form id="importStudents" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ข้อความ CSV (ไม่เกิน 60 คนต่อครั้ง)</label><textarea name="csv" required placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง" rows="7"></textarea></div><p class="muted">ก่อนทดลองด้วยข้อมูลจริง ต้องกำหนดสิทธิ์/ฐานกฎหมายและแจ้งผู้เกี่ยวข้องตามนโยบายโรงเรียน</p><button class="button full">นำเข้ารายชื่อ</button></form></section></div>
+ <section class="card stack"><h3>นำเข้านักเรียน (CSV)</h3><form id="importStudents" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ข้อความ CSV (ไม่เกิน 60 คนต่อครั้ง)</label><textarea name="csv" required placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง" rows="7"></textarea></div><p class="muted">ก่อนนำเข้าข้อมูล โปรดตรวจสอบสิทธิ์และการคุ้มครองข้อมูลส่วนบุคคลตามนโยบายโรงเรียน</p><button class="button full">นำเข้ารายชื่อ</button></form></section></div>
  <div id="advisorImportHolder"></div>
  <section class="card stack"><h3>ครูและบุคลากร (${state.users.length} บัญชี)</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
  <tbody>${state.users.map(u=>`<tr><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td><td>${esc(roles[u.role])}</td><td>${u.active?'ใช้งาน':'พักบัญชี'}</td><td>${u.role==='teacher'||u.role==='staff'?`<button type="button" class="button secondary" data-edit-user="${u.id}">แก้ไข</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>
@@ -457,7 +457,7 @@ function renderAdminStudents(){
    <td><button type="button" class="button secondary" data-edit-student="${s.id}">แก้ไข</button>
    <button type="button" class="button ${s.active?'ghost':'secondary'}" data-toggle-student="${s.id}">${s.active?'พักข้อมูล':'เปิดใช้งาน'}</button></td></tr>`).join('');
  mount(`<section class="stack">
-  <div><h2>จัดการข้อมูลนักเรียน</h2><p class="muted">ข้อมูลจำลอง • เพิ่ม แก้ไข เปลี่ยนห้อง และพักข้อมูลโดยไม่ลบประวัติ</p></div>
+  <div><h2>จัดการข้อมูลนักเรียน</h2><p class="muted">เพิ่ม แก้ไข เปลี่ยนห้อง และพักข้อมูล โดยไม่ลบประวัติ</p></div>
   <div class="card stack"><div class="row between"><div class="field smallbox"><label for="adminStudentRoom">ห้องเรียน</label><select id="adminStudentRoom">${rooms(adminStudentState.roomId)}</select></div>
    <div><strong>${activeCount} คน</strong><p class="muted">พักข้อมูล ${items.length-activeCount} คน</p></div></div>
    <div class="field"><label for="adminStudentSearch">ค้นหารายชื่อหรือรหัสนักเรียน</label><input id="adminStudentSearch" placeholder="พิมพ์ชื่อหรือรหัสนักเรียน" type="search"></div>
@@ -466,7 +466,7 @@ function renderAdminStudents(){
   <div class="grid two">
    <section class="card stack"><h3>เพิ่มนักเรียน</h3><form class="stack" id="adminAddStudent">
     <div class="field"><label>ห้องเรียน</label><select name="classroom_id">${rooms(adminStudentState.roomId)}</select></div>
-    <div class="field"><label>เลขประจำตัวนักเรียน</label><input name="student_no" required maxlength="40" placeholder="DEMO001"></div>
+    <div class="field"><label>เลขประจำตัวนักเรียน</label><input name="student_no" required maxlength="40" placeholder="000123"></div>
     <div class="field"><label>ชื่อ–สกุล</label><input name="full_name" required maxlength="120" placeholder="นักเรียนตัวอย่าง"></div>
     <div class="field"><label>เลขที่</label><input type="number" name="roll_no" min="1" max="100" required></div>
     <input type="hidden" name="active" value="1"><button class="button full" type="submit">เพิ่มนักเรียน</button>
@@ -494,7 +494,7 @@ function renderAdminStudents(){
        <tbody>${adminTransferState.items.map(p=>`<tr><td>${p.school_year}/${p.term}</td><td>${esc(p.from_room)} → ${esc(p.to_room)}</td><td>${p.state==='planned'?'รอยืนยัน':p.state==='applied'?'ย้ายแล้ว':'ยกเลิก'}</td>
         <td>${p.state==='planned'&&p.from_classroom_id===edit.classroom_id?
          `<button type="button" class="button secondary" data-execute-transfer="${p.id}" data-target="${esc(p.to_room)}">ย้ายวันนี้</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีแผนย้ายห้องที่บันทึกไว้</p>'}
-    <div class="warn">การย้ายห้องจริงมีผลตั้งแต่วันที่ยืนยันวันนี้ หากวันนี้มีข้อมูลเช็กชื่อหรือมาสาย ระบบจะปฏิเสธการย้าย กรุณาดำเนินการก่อนเริ่มเช็กชื่อ และใช้เฉพาะข้อมูลจำลอง</div>
+    <div class="warn">การย้ายห้องมีผลตั้งแต่วันที่ยืนยัน หากวันนี้มีข้อมูลเช็กชื่อหรือมาสาย ระบบจะปฏิเสธการย้าย กรุณาดำเนินการก่อนเริ่มเช็กชื่อ</div>
     <h3>ประวัติการสังกัดห้อง</h3>
     ${adminTransferState.studentId===edit.id&&adminTransferState.history.length?
       `<div class="table-wrap"><table class="table"><thead><tr><th>ห้องเรียน</th><th>เลขที่</th><th>เริ่มวันที่</th><th>สิ้นสุดก่อนวันที่</th></tr></thead>

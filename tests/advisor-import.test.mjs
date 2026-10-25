@@ -90,7 +90,7 @@ test('example Excel includes Advisors, Instructions and Rooms with Thai Tahoma f
  const decoder=new TextDecoder(),zip=decoder.decode(bytes);
  assert.match(zip,/Advisors/);
  assert.match(zip,/classroom/);
- assert.match(zip,/teacher_demo01/);
+ assert.match(zip,/teacher001/);
  assert.match(zip,/Tahoma/);
 });
 test('UI displays one-click Excel/CSV template, secure preview and safe chunked import',()=>{

@@ -20,7 +20,7 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
   const plan=planStudentAccounts(students,accounts);
   const guardians=accounts.filter(a=>a.role==='guardian'&&a.active);
   const guardianOpts=guardians.map(a=>`<option value="${a.id}">${esc(a.display_name)} (${esc(a.username)})</option>`).join('');
-  mount(`<section class="stack"><div><h2>บัญชีนักเรียนและผู้ปกครอง</h2><p class="muted">Admin ออกบัญชีทดลอง แยกสิทธิ์จากครูและผู้ดูแล • ไม่ใช้ข้อมูลส่วนบุคคลจริง</p></div>
+  mount(`<section class="stack"><div><h2>บัญชีนักเรียนและผู้ปกครอง</h2><p class="muted">จัดการบัญชีและสิทธิ์การเข้าถึงของนักเรียนและผู้ปกครอง แยกจากบัญชีครูและบุคลากร</p></div>
    ${notice?`<section class="card stack"><h3>ข้อมูลรับบัญชี (แสดงครั้งเดียว)</h3><div class="warn">เก็บรหัสชั่วคราวอย่างปลอดภัย แจ้งเจ้าของบัญชีหลังยืนยันตัวตนเท่านั้น ห้ามส่งในกลุ่มสาธารณะหรือเผยแพร่ภาพหน้าจอ</div>
     <div class="field"><label>Username</label><input readonly value="${esc(notice.username)}"></div>
     <div class="field"><label>รหัสผ่านชั่วคราว</label><input readonly value="${esc(notice.temporary_password)}"></div>
@@ -29,15 +29,15 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
     <section class="card stack"><h3>สร้างบัญชีนักเรียน</h3>
      <div class="field"><label>เลือกห้องเรียน</label><select id="portalAdminRoom">${roomOpts}</select></div>
      <form id="portalCreateStudent" class="stack">
-      <div class="field"><label>นักเรียนจำลอง</label><select required name="student_id">${studentOpts}</select></div>
+      <div class="field"><label>นักเรียน</label><select required name="student_id">${studentOpts}</select></div>
       <div class="field"><label>Username (ค่าเริ่มต้นคือเลขประจำตัวนักเรียน)</label><input id="selectedStudentNumber" name="username" maxlength="40" required value="${esc(students[0]?.student_no||'')}" autocomplete="off"></div>
       <div class="field"><label>รหัสผ่านเริ่มต้น (ไม่บังคับ: เว้นว่างเพื่อให้ระบบสุ่ม)</label><input name="password" type="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="อย่างน้อย 4 ตัวอักษร"></div>
       <button type="submit" class="button full" ${students.length?'':'disabled'}>สร้างบัญชีนักเรียน</button>
      </form></section>
     <section class="card stack"><h3>สร้างบัญชีผู้ปกครอง</h3>
      <form id="portalCreateGuardian" class="stack">
-      <div class="field"><label>ชื่อผู้ปกครองตัวอย่าง</label><input name="display_name" required maxlength="100" placeholder="ผู้ปกครองทดสอบ"></div>
-      <div class="field"><label>Username ใหม่</label><input name="username" required minlength="3" maxlength="40" placeholder="เช่น guardian-demo01"></div>
+      <div class="field"><label>ชื่อ–สกุลผู้ปกครอง</label><input name="display_name" required maxlength="100" placeholder="ชื่อ–สกุลผู้ปกครอง"></div>
+      <div class="field"><label>Username ใหม่</label><input name="username" required minlength="3" maxlength="40" placeholder="เช่น guardian001"></div>
       <button class="button full" type="submit">สร้างบัญชีผู้ปกครอง</button>
      </form></section></div>
    <section class="card stack"><h3>สร้างบัญชีนักเรียนจากรายชื่อทั้งห้อง</h3>
@@ -88,7 +88,7 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
   }));
   $('#portalBulkCreate')?.addEventListener('click',()=>safeRun(async()=>{
    if(!plan.ready.length)return;
-   if(!confirm('สร้างบัญชีนักเรียนจำลอง '+plan.ready.length+' คน โดยใช้เลขประจำตัวนักเรียนเป็น Username และสุ่มรหัสชั่วคราวแยกรายคน?'))return;
+   if(!confirm('สร้างบัญชีนักเรียน '+plan.ready.length+' คน โดยใช้เลขประจำตัวนักเรียนเป็น Username และสุ่มรหัสชั่วคราวแยกรายคน?'))return;
    const button=$('#portalBulkCreate'),status=$('#portalBulkProgress');
    button.disabled=true;issuedCredentials=[];
    let errors=[];

@@ -167,7 +167,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    <button type="button" class="button full" id="unifiedCommit" hidden>ยืนยันนำเข้าทั้งหมด</button>
    <button type="button" class="button secondary" id="unifiedCancel" hidden>หยุดหลังจบชุดปัจจุบัน</button>
    <p class="muted">ระบบแบ่งการบันทึกเป็นชุดละ 10 คนเพื่อความเสถียร แต่ละชุดบันทึกแบบครบหรือไม่บันทึกเลย หากเกิดข้อผิดพลาดระหว่างทาง รายการที่สำเร็จแล้วจะไม่ถูกย้อนกลับทั้งไฟล์</p>
-   <p class="warn">ใช้เฉพาะข้อมูลจำลองในฐาน Dev ก่อนผ่านการทบทวน PDPA และขั้นตอนเปิดระบบจริง</p>
+   <p class="warn">ก่อนนำเข้า โปรดตรวจสอบความถูกต้องของข้อมูล สิทธิ์ผู้ใช้งาน และข้อกำหนด PDPA ของโรงเรียน</p>
   </section>`;
   container.querySelector('#downloadUnifiedExcel').addEventListener('click',downloadStudentExampleXlsx);
   container.querySelector('#unifiedForm').addEventListener('submit',e=>{e.preventDefault();preflight(container)});
