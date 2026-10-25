@@ -392,6 +392,11 @@ async function adminRoutes(req,env,user,path){
   const stmts=plan.items.map(({student})=>env.DB.prepare(
    'INSERT INTO students(student_no,classroom_id,roll_no,full_name) VALUES(?,?,?,?)'
    ).bind(student.student_no,roomId,student.roll_no,student.full_name));
+  for(const {student} of plan.items){
+   stmts.push(env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
+    SELECT id,?,?,?,? FROM students WHERE student_no=?`)
+     .bind(roomId,student.roll_no,bangkokToday(),user.id,student.student_no));
+  }
   stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
    .bind(user.id,'students_imported','classrooms',String(roomId)));
   await env.DB.batch(stmts); // atomic; any late duplicate rolls back all rows
@@ -402,9 +407,11 @@ async function adminRoutes(req,env,user,path){
   if(!studentId)throw error(400,'กรุณาเลือกนักเรียน');
   const student=await env.DB.prepare('SELECT id FROM students WHERE id=?').bind(studentId).first();
   if(!student)throw error(404,'ไม่พบนักเรียน');
-  const {results}=await env.DB.prepare(`SELECT p.id,p.school_year,p.term,p.state,p.to_classroom_id,p.from_classroom_id,
+  const {results}=await env.DB.prepare(`SELECT p.id,p.school_year,p.term,CASE WHEN application.id IS NOT NULL THEN 'applied' ELSE p.state END AS state,
+   application.effective_date,p.to_classroom_id,p.from_classroom_id,
    source.label AS from_room,dest.label AS to_room
    FROM student_transfer_plans p
+   LEFT JOIN student_transfer_applications application ON application.plan_id=p.id
    JOIN classrooms source ON source.id=p.from_classroom_id
    JOIN classrooms dest ON dest.id=p.to_classroom_id
    WHERE p.student_id=? ORDER BY p.school_year DESC,p.term DESC`).bind(studentId).all();
@@ -420,6 +427,10 @@ async function adminRoutes(req,env,user,path){
   const target=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(dest).first();
   if(!student||!target)throw error(404,'ไม่พบนักเรียนหรือห้องปลายทาง');
   if(student.classroom_id===dest)throw error(400,'ห้องปลายทางต้องไม่ใช่ห้องเรียนปัจจุบัน');
+  const applied=await env.DB.prepare(`SELECT a.id FROM student_transfer_applications a
+   JOIN student_transfer_plans p ON p.id=a.plan_id WHERE p.student_id=? AND p.school_year=? AND p.term=?`)
+   .bind(studentId,year,term).first();
+  if(applied)throw error(409,'แผนนี้ถูกดำเนินการแล้ว ไม่สามารถแก้ไขย้อนหลัง');
   await env.DB.batch([
    env.DB.prepare(`INSERT INTO student_transfer_plans(student_id,from_classroom_id,to_classroom_id,school_year,term,state,created_by)
     VALUES(?,?,?,?,?,?,?)
@@ -431,6 +442,56 @@ async function adminRoutes(req,env,user,path){
     .bind(user.id,'student_transfer_plan_saved','students',String(studentId))
   ]);
   return json({ok:true,message:'บันทึกแผนย้ายห้องแล้ว ยังไม่เปลี่ยนห้องเรียนปัจจุบัน'});
+ }
+ if(req.method==='GET'&&path==='/api/admin/enrollments'){
+  const studentId=positiveInt(new URL(req.url).searchParams.get('student_id'));
+  if(!studentId)throw error(400,'กรุณาเลือกนักเรียน');
+  const {results}=await env.DB.prepare(`SELECT h.classroom_id,c.label AS classroom_label,h.roll_no,h.start_date,h.end_date
+   FROM student_enrollments h JOIN classrooms c ON c.id=h.classroom_id
+   WHERE h.student_id=? ORDER BY h.start_date DESC`).bind(studentId).all();
+  return json({items:results});
+ }
+ const transferExecute=/^\/api\/admin\/transfer-plans\/(\d+)\/execute$/.exec(path);
+ if(req.method==='POST'&&transferExecute){
+  const planId=positiveInt(transferExecute[1]);
+  const plan=await env.DB.prepare(`SELECT p.*,s.classroom_id AS current_room,s.roll_no AS current_roll,s.active
+   FROM student_transfer_plans p JOIN students s ON s.id=p.student_id WHERE p.id=?`).bind(planId).first();
+  if(!plan)throw error(404,'ไม่พบแผนย้ายห้อง');
+  if(plan.state!=='planned'||!plan.active)throw error(409,'แผนถูกยกเลิกหรือนักเรียนไม่ได้ใช้งาน');
+  if(plan.current_room!==plan.from_classroom_id)throw error(409,'ห้องปัจจุบันไม่ตรงกับแผน กรุณาจัดทำแผนใหม่');
+  const already=await env.DB.prepare('SELECT id FROM student_transfer_applications WHERE plan_id=?').bind(planId).first();
+  if(already)throw error(409,'ดำเนินการตามแผนนี้แล้ว');
+  const today=bangkokToday();
+  const active=await env.DB.prepare(`SELECT id,start_date FROM student_enrollments
+   WHERE student_id=? AND classroom_id=? AND end_date IS NULL`).bind(plan.student_id,plan.current_room).first();
+  if(!active||active.start_date>=today)throw error(409,'ไม่สามารถย้ายห้องซ้ำในวันเดียวกัน หรือข้อมูลการสังกัดห้องไม่ถูกต้อง');
+  const hasToday=await env.DB.prepare(`SELECT
+    (SELECT COUNT(*) FROM attendance_daily WHERE student_id=? AND school_date=?)
+   +(SELECT COUNT(*) FROM attendance_period WHERE student_id=? AND school_date=?)
+   +(SELECT COUNT(*) FROM late_records WHERE student_id=? AND school_date=?)
+   +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=? AND school_date=?) AS total`)
+   .bind(plan.student_id,today,plan.student_id,today,plan.student_id,today,plan.student_id,today).first();
+  if(hasToday.total>0)throw error(409,'มีการเช็กชื่อหรือบันทึกมาสายในวันนี้แล้ว ให้ดำเนินการย้ายก่อนเริ่มเช็กชื่อในวันใหม่');
+  const occupied=await env.DB.prepare(`SELECT roll_no FROM student_enrollments
+   WHERE classroom_id=? AND end_date IS NULL`).bind(plan.to_classroom_id).all();
+  const used=new Set(occupied.results.map(x=>x.roll_no));
+  let roll=1;
+  while(used.has(roll)&&roll<=100)roll++;
+  if(roll>100)throw error(409,'ห้องปลายทางมีเลขที่เต็ม 100 คน');
+  await env.DB.batch([
+   env.DB.prepare(`UPDATE student_enrollments SET end_date=? WHERE id=? AND end_date IS NULL`).bind(today,active.id),
+   env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
+    VALUES(?,?,?,?,?)`).bind(plan.student_id,plan.to_classroom_id,roll,today,user.id),
+   env.DB.prepare(`UPDATE students SET classroom_id=?,roll_no=? WHERE id=? AND classroom_id=?`)
+    .bind(plan.to_classroom_id,roll,plan.student_id,plan.from_classroom_id),
+   env.DB.prepare(`INSERT INTO student_transfer_applications
+    (plan_id,student_id,from_classroom_id,to_classroom_id,old_roll_no,new_roll_no,effective_date,executed_by)
+    VALUES(?,?,?,?,?,?,?,?)`)
+    .bind(planId,plan.student_id,plan.from_classroom_id,plan.to_classroom_id,plan.current_roll,roll,today,user.id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_transferred','students',String(plan.student_id))
+  ]);
+  return json({ok:true,effective_date:today,roll_no:roll,message:'ย้ายห้องสำเร็จ ประวัติการสังกัดห้องเดิมยังคงอยู่'});
  }
  if(req.method==='GET'&&path==='/api/admin/students'){
   const roomId=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
@@ -447,7 +508,12 @@ async function adminRoutes(req,env,user,path){
   if(!room)throw error(404,'ไม่พบห้องเรียน');
   const res=await env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,?,?,?)')
    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active).run();
-  await log(env.DB,user.id,'student_created','students',res.meta.last_row_id);
+  await env.DB.batch([
+   env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
+     VALUES(?,?,?,?,?)`).bind(res.meta.last_row_id,student.classroom_id,student.roll_no,bangkokToday(),user.id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_created','students',String(res.meta.last_row_id))
+  ]);
   return json({ok:true,id:res.meta.last_row_id},201);
  }
  const studentEdit = /^\/api\/admin\/students\/(\d+)$/.exec(path);
@@ -458,19 +524,13 @@ async function adminRoutes(req,env,user,path){
   if(!old)throw error(404,'ไม่พบนักเรียน');
   const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
   if(!room)throw error(404,'ไม่พบห้องเรียน');
-  if(old.classroom_id!==student.classroom_id){
-   const history=await env.DB.prepare(`SELECT
-      (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
-     +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
-     +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
-     +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
-     +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
-     .bind(id,id,id,id,id).first();
-   if(history.total>0)throw error(409,'มีประวัติการเช็กชื่อหรือพฤติกรรมแล้ว ไม่สามารถย้ายห้องจนกว่าจะรองรับประวัติการย้ายห้อง');
-  }
+  if(old.classroom_id!==student.classroom_id)
+   throw error(409,'กรุณาใช้แผนย้ายห้องและปุ่มยืนยันย้ายห้อง เพื่อรักษาประวัติการเช็กชื่อ');
   await env.DB.batch([
    env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
     .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('UPDATE student_enrollments SET roll_no=? WHERE student_id=? AND end_date IS NULL')
+    .bind(student.roll_no,id),
    env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
     .bind(user.id,'student_updated','students',String(id))
   ]);
