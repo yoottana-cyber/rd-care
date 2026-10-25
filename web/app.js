@@ -88,6 +88,7 @@ function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
 async function showTab(tab){state.tab=tab;
+ if(tab!=='adminStudents'&&adminImportState.students.some(s=>'password' in s)){adminImportState.students=[];adminImportState.preview=null}
  if(tab==='dashboard')return loadDashboard();
  if(tab==='attendance')return loadAttendance();
  if(tab==='late')return loadLate();
@@ -466,17 +467,24 @@ function renderAdminStudents(){
     if(/\.xlsx$/i.test(file.name)){
      rows=await readXlsxRows(file);
     }else if(/\.csv$/i.test(file.name)){
-     rows=parseCsv((await file.text()).replace(/^\uFEFF/,'').trim());
+     rows=parseCsv((await file.text()).replace(/^\uFEFF/,'').trim(),[3,5]);
     }else throw Error('กรุณาใช้ไฟล์ .xlsx หรือ .csv');
     filename=file.name;
    }else{
-    rows=parseCsv(String(data.get('csv')||'').replace(/^\uFEFF/,'').trim());
+    rows=parseCsv(String(data.get('csv')||'').replace(/^\uFEFF/,'').trim(),[3,5]);
     filename='ข้อความ CSV';
    }
-   const header=rows[0]?.slice(0,3).map(x=>String(x??'').trim().toLowerCase()).join(',')==='roll_no,student_no,full_name';
+   const first=rows[0]?.map(x=>String(x??'').trim().toLowerCase()).join(',');
+   const header=first==='roll_no,student_no,full_name'||first==='roll_no,student_no,full_name,username,password';
    if(header)rows.shift();
-   if(rows.length<1||rows.length>60)throw Error('นำเข้าได้ครั้งละ 1–60 คน (ไม่รวมบรรทัดหัวตาราง)');
-   const students=rows.map((r,i)=>({roll_no:Number(r[0]),student_no:String(r[1]??'').trim(),full_name:String(r[2]??'').trim(),source_row:r.source_row||(i+1+(header?1:0))}));
+   if(rows.length<1||rows.length>60)throw Error('นำเข้าได้ครั้งละ 1–60 คน (ไม่รวมหัวตาราง)');
+   if(rows.some(r=>![3,5].includes(r.length)))
+    throw Error('แต่ละแถวต้องมี 3 หรือ 5 คอลัมน์: roll_no,student_no,full_name[,username,password]');
+   const students=rows.map((r,i)=>({
+    roll_no:Number(r[0]),student_no:String(r[1]??'').trim(),full_name:String(r[2]??'').trim(),
+    ...(r.length===5?{username:String(r[3]??'').trim(),password:String(r[4]??'')}:{}),
+    source_row:r.source_row||(i+1+(header?1:0))
+   }));
    const roomId=adminStudentState.roomId;
    const plan=await api('/api/admin/import-students/preview',{method:'POST',body:{classroom_id:roomId,students}});
    if(adminStudentState.roomId!==roomId||state.tab!=='adminStudents')return;
@@ -496,9 +504,9 @@ function renderAdminStudents(){
  }));
 }
 
-function parseCsv(csv){const rows=[];let row=[],col='',quoted=false;
+function parseCsv(csv,columns=[3]){const rows=[];let row=[],col='',quoted=false;
  for(let i=0;i<csv.length;i++){const ch=csv[i];if(ch==='"'){if(quoted&&csv[i+1]==='"'){col+='"';i++}else quoted=!quoted;}else if(ch===','&&!quoted){row.push(col);col=''}else if((ch==='\r'||ch==='\n')&&!quoted){if(ch==='\r'&&csv[i+1]==='\n')i++;row.push(col);if(row.some(x=>x.trim()))rows.push(row);row=[];col=''}else col+=ch;}
- if(quoted)throw Error('ไฟล์ CSV มีเครื่องหมายคำพูดไม่ครบ');row.push(col);if(row.some(x=>x.trim()))rows.push(row);if(rows.some(r=>r.length!==3))throw Error('CSV ต้องมี 3 คอลัมน์: roll_no,student_no,full_name');return rows;
+ if(quoted)throw Error('ไฟล์ CSV มีเครื่องหมายคำพูดไม่ครบ');row.push(col);if(row.some(x=>x.trim()))rows.push(row);if(rows.some(r=>!columns.includes(r.length)))throw Error('CSV ต้องมี 3 หรือ 5 คอลัมน์ ตามไฟล์ตัวอย่าง');return rows;
 }
 async function start(){if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});if(portalUi.hasSession()){await portalUi.resume();return}if(!state.token){renderLogin();return}try{await boot()}catch{state.token='';sessionStorage.removeItem('rd_token');renderLogin()}}
 window.addEventListener('online',()=>toast('เชื่อมต่ออินเทอร์เน็ตแล้ว'));
