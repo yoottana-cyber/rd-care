@@ -1,6 +1,7 @@
 import { STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername, httpErrorStatus } from './core.js';
 import { passwordHash } from './password.js';
 import { validateStudentInput, validatePersonnelInput } from './admin-validation.js';
+import { planStudentImport } from './student-import.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -349,21 +350,33 @@ async function adminRoutes(req,env,user,path){
   await log(env.DB,user.id,'timetable_created','timetable',res.meta.last_row_id);
   return json({ok:true,id:res.meta.last_row_id},201);
  }
- if(req.method==='POST'&&path==='/api/admin/import-students'){
+ if(req.method==='POST'&&(path==='/api/admin/import-students/preview'||path==='/api/admin/import-students')){
   const b=await payload(req),roomId=positiveInt(b.classroom_id);
+  if(!roomId||!Array.isArray(b.students)||b.students.length<1||b.students.length>60)
+   throw error(400,'กรุณาเลือกห้องและส่งนักเรียนครั้งละ 1–60 คน');
   const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(roomId).first();
-  if(!room||!Array.isArray(b.students)||b.students.length<1||b.students.length>60)throw error(400,'กรุณาเลือกห้องและส่งนักเรียนครั้งละไม่เกิน 60 คน');
-  const seenIds=new Set(),seenRolls=new Set();
-  const stmts=[];
-  for(const student of b.students){
-   const roll=Number(student.roll_no),no=cleanText(student.student_no,40),name=cleanText(student.full_name,120);
-   if(!Number.isInteger(roll)||roll<1||roll>100||!no||!name||seenIds.has(no)||seenRolls.has(roll))throw error(400,'เลขที่ ชื่อ และรหัสนักเรียนต้องถูกต้องและไม่ซ้ำกัน');
-   seenIds.add(no);seenRolls.add(roll);
-   stmts.push(env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name) VALUES(?,?,?,?)').bind(no,roomId,roll,name));
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  // One batched lookup compares IDs across the school and roll numbers within the destination room.
+  const ids=[...new Set(b.students.map(x=>String(x?.student_no??'').trim().toLowerCase()).filter(x=>x&&x.length<=40))];
+  const rolls=[...new Set(b.students.map(x=>Number(x?.roll_no)).filter(x=>Number.isInteger(x)&&x>0&&x<=100))];
+  let existing=[];
+  if(ids.length||rolls.length){
+   const conditions=[],bind=[];
+   if(ids.length){conditions.push(`lower(student_no) IN (${ids.map(()=>'?').join(',')})`);bind.push(...ids)}
+   if(rolls.length){conditions.push(`(classroom_id=? AND roll_no IN (${rolls.map(()=>'?').join(',')}))`);bind.push(roomId,...rolls)}
+   const lookup=await env.DB.prepare('SELECT id,student_no,roll_no,classroom_id FROM students WHERE '+conditions.join(' OR ')).bind(...bind).all();
+   existing=lookup.results;
   }
-  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)').bind(user.id,'students_imported','classrooms',roomId));
-  await env.DB.batch(stmts);
-  return json({ok:true,imported:b.students.length},201);
+  const plan=planStudentImport(b.students,roomId,existing);
+  if(path.endsWith('/preview'))return json(plan);
+  if(!plan.ready) return json({error:'พบข้อมูลซ้ำหรือไม่ถูกต้อง กรุณาตรวจรายการก่อนนำเข้า',...plan},409);
+  const stmts=plan.items.map(({student})=>env.DB.prepare(
+   'INSERT INTO students(student_no,classroom_id,roll_no,full_name) VALUES(?,?,?,?)'
+   ).bind(student.student_no,roomId,student.roll_no,student.full_name));
+  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+   .bind(user.id,'students_imported','classrooms',String(roomId)));
+  await env.DB.batch(stmts); // atomic; any late duplicate rolls back all rows
+  return json({ok:true,imported:plan.items.length,items:plan.items.map(x=>({...x,status:'imported',message:'นำเข้าสำเร็จ'}))},201);
  }
  if(req.method==='GET'&&path==='/api/admin/students'){
   const roomId=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
