@@ -2,6 +2,7 @@ import {API_BASE_URL} from './config.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
+import {createAdvisorImport} from './advisor-import.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
@@ -13,6 +14,7 @@ const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboa
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
+const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
 const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
@@ -28,7 +30,7 @@ async function api(path,{method='GET',body,auth=true}={}){
  try{
   const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
+  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();advisorImporter.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
   return data;
  }catch(e){if(e.name==='AbortError')throw Error('การเชื่อมต่อล่าช้า กรุณาลองใหม่');throw e}
  finally{clearTimeout(timer)}
@@ -155,12 +157,13 @@ function bindGlobalStudentSearch(){
  });
 }
 function $$(sel){return [...document.querySelectorAll(sel)]}
-async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
+async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
 function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
 async function showTab(tab){state.tab=tab;
  if(tab!=='adminStudents')unifiedImport.clear();
+ if(tab!=='admin')advisorImporter.clear();
  if(tab==='dashboard')return loadDashboard();
  if(tab==='attendance')return loadAttendance();
  if(tab==='late')return loadLate();
@@ -373,6 +376,7 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
  <section class="card stack"><h3>เพิ่มตารางสอนรายคาบ</h3><form id="addSlot" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูผู้สอน</label><select name="teacher_user_id">${teacherOptions()}</select></div>
  <div class="grid two"><div class="field"><label>วันในสัปดาห์</label><select name="day_of_week">${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}</select></div><div class="field"><label>คาบ</label><input type="number" name="period" min="1" max="12" value="1" required></div></div><div class="field"><label>ชื่อวิชา</label><input name="subject" placeholder="วิทยาการคำนวณ" required maxlength="120"></div><button class="button full" ${!teacherOptions()?'disabled':''}>เพิ่มคาบเรียน</button></form></section>
  <section class="card stack"><h3>นำเข้านักเรียน (CSV)</h3><form id="importStudents" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ข้อความ CSV (ไม่เกิน 60 คนต่อครั้ง)</label><textarea name="csv" required placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง" rows="7"></textarea></div><p class="muted">ก่อนทดลองด้วยข้อมูลจริง ต้องกำหนดสิทธิ์/ฐานกฎหมายและแจ้งผู้เกี่ยวข้องตามนโยบายโรงเรียน</p><button class="button full">นำเข้ารายชื่อ</button></form></section></div>
+ <div id="advisorImportHolder"></div>
  <section class="card stack"><h3>ครูและบุคลากร (${state.users.length} บัญชี)</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
  <tbody>${state.users.map(u=>`<tr><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td><td>${esc(roles[u.role])}</td><td>${u.active?'ใช้งาน':'พักบัญชี'}</td><td>${u.role==='teacher'||u.role==='staff'?`<button type="button" class="button secondary" data-edit-user="${u.id}">แก้ไข</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>
  ${(()=>{
@@ -384,7 +388,8 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
    <button class="button" type="submit">บันทึกข้อมูลบุคลากร</button></form>`:'<p class="muted">กด “แก้ไข” เพื่อปรับชื่อหรือสถานะครู/บุคลากร</p>';
  })()}
  </section></div>`);
- $$('[data-edit-user]').forEach(btn=>btn.addEventListener('click',()=>{
+ advisorImporter.render($('#advisorImportHolder'));
+ $('[data-edit-user]').forEach(btn=>btn.addEventListener('click',()=>{
   adminEditUserId=Number(btn.dataset.editUser);renderAdmin();
  }));
  $('#adminPersonnelEdit')?.addEventListener('submit',e=>safeRun(async()=>{
