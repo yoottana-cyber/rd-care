@@ -1,7 +1,7 @@
 import {API_BASE_URL} from './config.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
-import {readXlsxRows} from './xlsx-reader.js';
+import {createUnifiedImport} from './unified-import.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
 const $=(selector)=>document.querySelector(selector);
@@ -9,7 +9,7 @@ const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>'
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
-const adminImportState={roomId:null,students:[],preview:null,filename:''};
+const unifiedImport=createUnifiedImport({api,rooms:state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
 const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
@@ -88,7 +88,7 @@ function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
 async function showTab(tab){state.tab=tab;
- if(tab!=='adminStudents'&&adminImportState.students.some(s=>'password' in s)){adminImportState.students=[];adminImportState.preview=null}
+ if(tab!=='adminStudents')unifiedImport.clear();
  if(tab==='dashboard')return loadDashboard();
  if(tab==='attendance')return loadAttendance();
  if(tab==='late')return loadLate();
@@ -365,26 +365,9 @@ function renderAdminStudents(){
       `<div class="table-wrap"><table class="table"><thead><tr><th>ห้องเรียน</th><th>เลขที่</th><th>เริ่มวันที่</th><th>สิ้นสุดก่อนวันที่</th></tr></thead>
        <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(h.start_date)}</td><td>${esc(h.end_date||'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
    </section>`:''}
-  <section class="card stack"><h3>นำเข้ารายชื่อนักเรียน Excel / CSV</h3>
-   <p class="muted">รองรับ .xlsx และ CSV UTF-8 • 3 คอลัมน์สำหรับรายชื่ออย่างเดียว (สูงสุด 60 คน) หรือ 5 คอลัมน์รวม Username/Password เพื่อสร้างบัญชีทันที (สูงสุด 10 คน)</p>
-   <p><a href="./templates/student-login-import-template.csv" download>ดาวน์โหลดไฟล์ตัวอย่าง CSV สำหรับนำเข้าพร้อมบัญชี</a></p>
-   <form id="adminImportCsv" class="stack"><div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
-    <div class="field"><label>หรือวางข้อความ CSV</label><textarea name="csv" placeholder="roll_no,student_no,full_name,username,password&#10;1,DEMO0101,นักเรียนตัวอย่าง,demo0101,Demo#1234"></textarea></div>
-    <p class="muted">คอลัมน์: roll_no,student_no,full_name,username,password (หรือ 3 คอลัมน์แรกแบบเดิม) • Username ตั้งเองได้ • Password อย่างน้อย 4 ตัว • หากรหัสขึ้นต้น 0 ให้ตั้งคอลัมน์ Excel เป็น Text</p>
-    <p class="warn">รหัสผ่าน 4 ตัวมีความเสี่ยง ควรใช้รหัสที่ยาวและไม่ซ้ำกัน ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน และต้องเก็บไฟล์บัญชีที่มีรหัสผ่านให้ปลอดภัย</p>
-    <button class="button full" type="submit">ตรวจสอบข้อมูลก่อนนำเข้า</button>
-   </form>
-   ${adminImportState.preview && adminImportState.roomId===adminStudentState.roomId?
-    `<div class="summary"><strong>${adminImportState.preview.ok?'ผลการนำเข้า':'ผลตรวจสอบ'} ${esc(adminImportState.filename)}:</strong> ${adminImportState.preview.valid} รายการ${adminImportState.preview.ok?'นำเข้าสำเร็จ':'พร้อมนำเข้า'} / ${adminImportState.preview.errors} รายการมีปัญหา</div>
-     <div class="table-wrap"><table class="table"><thead><tr><th>แถว</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ–สกุล</th><th>Username / บัญชี</th><th>สถานะ/ข้อผิดพลาด</th></tr></thead>
-     <tbody>${adminImportState.preview.items.map(item=>`<tr><td>${item.source_row}</td><td>${esc(item.student.roll_no)}</td>
-      <td>${esc(item.student.student_no)}</td><td>${esc(item.student.full_name)}</td>
-      <td>${item.create_account?esc(item.login_username)+' (สร้างบัญชี)':'ไม่สร้างบัญชี'}</td>
-      <td class="${item.status==='error'?'import-error':item.status==='imported'?'import-success':''}">${item.status==='ready'?'พร้อมนำเข้า':esc(item.message)}</td></tr>`).join('')}</tbody></table></div>
-     ${adminImportState.preview.ok?'':`<button type="button" id="adminConfirmImport" class="button full" ${adminImportState.preview.ready?'':'disabled'}>ยืนยันนำเข้า ${adminImportState.preview.items.length} คน</button>`}
-     ${adminImportState.preview.ready?'':'<p class="warn">พบข้อมูลไม่ถูกต้องหรือซ้ำ ระบบจะยังไม่บันทึกจนกว่าทุกแถวจะผ่านการตรวจสอบ</p>'}`:'<div class="muted">กรุณาตรวจสอบข้อมูลก่อนกดยืนยัน ไม่มีการเขียนข้อมูลลง D1 ระหว่างตรวจสอบ</div>'}
-   <div class="warn">ใช้เฉพาะข้อมูลจำลองในระยะทดสอบ ห้ามนำเข้ารายชื่อนักเรียนจริงก่อนทบทวนสิทธิ์และ PDPA</div>
- </section>`);
+  <div id="unifiedImportHolder"></div>
+`);
+ unifiedImport.render($('#unifiedImportHolder'));
  $('#adminStudentRoom').addEventListener('change',e=>safeRun(async()=>{
   adminStudentState.roomId=Number(e.target.value);adminStudentState.editId=null;adminImportState.preview=null;adminImportState.students=[];await loadAdminStudents();
  }));
@@ -457,51 +440,7 @@ function renderAdminStudents(){
    await loadAdminStudents();
   }finally{if(btn.isConnected)btn.disabled=false}
  })));
- $('#adminImportCsv').addEventListener('submit',e=>safeRun(async()=>{
-  e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
-  try{
-   const data=new FormData(form),file=data.get('file');
-   let rows,filename;
-   if(file&&file.size){
-    if(file.size>3_000_000)throw Error('ไฟล์ใหญ่เกิน 3 MB');
-    if(/\.xlsx$/i.test(file.name)){
-     rows=await readXlsxRows(file);
-    }else if(/\.csv$/i.test(file.name)){
-     rows=parseCsv((await file.text()).replace(/^\uFEFF/,'').trim(),[3,5]);
-    }else throw Error('กรุณาใช้ไฟล์ .xlsx หรือ .csv');
-    filename=file.name;
-   }else{
-    rows=parseCsv(String(data.get('csv')||'').replace(/^\uFEFF/,'').trim(),[3,5]);
-    filename='ข้อความ CSV';
-   }
-   const first=rows[0]?.map(x=>String(x??'').trim().toLowerCase()).join(',');
-   const header=first==='roll_no,student_no,full_name'||first==='roll_no,student_no,full_name,username,password';
-   if(header)rows.shift();
-   if(rows.length<1||rows.length>60)throw Error('นำเข้าได้ครั้งละ 1–60 คน (ไม่รวมหัวตาราง)');
-   if(rows.some(r=>![3,5].includes(r.length)))
-    throw Error('แต่ละแถวต้องมี 3 หรือ 5 คอลัมน์: roll_no,student_no,full_name[,username,password]');
-   const students=rows.map((r,i)=>({
-    roll_no:Number(r[0]),student_no:String(r[1]??'').trim(),full_name:String(r[2]??'').trim(),
-    ...(r.length===5?{username:String(r[3]??'').trim(),password:String(r[4]??'')}:{}),
-    source_row:r.source_row||(i+1+(header?1:0))
-   }));
-   const roomId=adminStudentState.roomId;
-   const plan=await api('/api/admin/import-students/preview',{method:'POST',body:{classroom_id:roomId,students}});
-   if(adminStudentState.roomId!==roomId||state.tab!=='adminStudents')return;
-   adminImportState.roomId=roomId;adminImportState.students=students;adminImportState.preview=plan;adminImportState.filename=filename;
-   renderAdminStudents();
-  }finally{button.disabled=false}
- }));
- $('#adminConfirmImport')?.addEventListener('click',()=>safeRun(async()=>{
-  if(!adminImportState.preview?.ready||adminImportState.roomId!==adminStudentState.roomId)return;
-  if(!confirm(`ยืนยันเพิ่มนักเรียนจำลอง ${adminImportState.students.length} คนเข้าห้องที่เลือก?\nระบบจะนำเข้าแบบทั้งหมดหรือไม่บันทึกเลย`))return;
-  const button=$('#adminConfirmImport');button.disabled=true;
-  try{
-   const result=await api('/api/admin/import-students',{method:'POST',body:{classroom_id:adminImportState.roomId,students:adminImportState.students}});
-   adminImportState.preview=result;adminImportState.students=[];
-   referenceCache.clear();toast(`นำเข้าสำเร็จ ${result.imported} คน`);await loadAdminStudents();
-  }finally{if(button.isConnected)button.disabled=false}
- }));
+
 }
 
 function parseCsv(csv,columns=[3]){const rows=[];let row=[],col='',quoted=false;
