@@ -185,6 +185,7 @@ export async function portalAdminRoutes(req,env,actor,path){
   const password=chosen?String(b.password):randomHex(16);
   if(password.length<4||password.length>128)
    fail(400,'รหัสผ่านต้องมีความยาว 4–128 ตัวอักษร');
+  if(/^\d{13}$/.test(password))fail(400,'ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน');
   const salt=randomHex(16),hash=await passwordHash(password,salt);
   const result=await env.DB.prepare(`INSERT INTO portal_accounts
    (username,display_name,role,student_id,password_salt,password_hash,created_by)
