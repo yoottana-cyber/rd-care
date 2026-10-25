@@ -61,7 +61,7 @@ export async function readXlsxRows(file){
  const xml=parseXml(sheet);
  const rows=[];
  for(const r of xml.getElementsByTagName('row')){
-  if(rows.length>=1500)throw Error('กรุณาแบ่ง Excel เป็นไฟล์เล็กลง (สูงสุด 1,500 แถว)');
+  if(rows.length>=12000)throw Error('Excel มีมากกว่า 12,000 แถว กรุณาแบ่งเป็นหลายไฟล์');
   const row=[];
   for(const cell of r.getElementsByTagName('c')){
    const ref=cell.getAttribute('r')||'';
