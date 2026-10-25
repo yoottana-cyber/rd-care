@@ -1,5 +1,5 @@
-const CACHE='rd-care-shell-v10';
-const ASSETS=['./','./index.html','./app.css','./app.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-admin.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='rd-care-shell-v11';
+const ASSETS=['./','./index.html','./app.css','./app.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-admin.js','./portal-batch.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

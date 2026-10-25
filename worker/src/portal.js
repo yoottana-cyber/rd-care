@@ -1,5 +1,6 @@
 import {passwordHash} from './password.js';
 import {validUsername,validDate,bangkokToday} from './core.js';
+import {studentUsername} from './student-username.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -162,16 +163,20 @@ export async function portalAdminRoutes(req,env,actor,path){
  }
  if(req.method==='POST'&&path==='/api/admin/portal/accounts'){
   const b=await bodyJson(req),role=checkedRole(b.role);
-  const username=typeof b.username==='string'?b.username.trim().toLowerCase():'';
-  if(!validUsername(username))fail(400,'Username ต้องมี 3–40 ตัวอักษร');
-  let studentId=null,displayName;
+  let username='',studentId=null,displayName;
   if(role==='student'){
    studentId=positiveInt(b.student_id);
    if(!studentId)fail(400,'กรุณาเลือกนักเรียน');
-   const st=await env.DB.prepare('SELECT id,full_name FROM students WHERE id=? AND active=1').bind(studentId).first();
+   const st=await env.DB.prepare('SELECT id,student_no,full_name FROM students WHERE id=? AND active=1').bind(studentId).first();
    if(!st)fail(404,'ไม่พบนักเรียนที่ใช้งานอยู่');
+   username=studentUsername(st);
+   // Reject supplied username that differs from the authoritative student number.
+   if(b.username!==undefined&&String(b.username).trim().toLowerCase()!==username)
+    fail(400,'Username นักเรียนต้องตรงกับเลขประจำตัวนักเรียนเท่านั้น');
    displayName=st.full_name;
   }else{
+   username=typeof b.username==='string'?b.username.trim().toLowerCase():'';
+   if(!validUsername(username))fail(400,'Username ต้องมี 3–40 ตัวอักษร');
    displayName=typeof b.display_name==='string'?b.display_name.trim():'';
    if(!displayName||displayName.length>100||/[\u0000-\u001f\u007f]/.test(displayName))
     fail(400,'กรุณากรอกชื่อผู้ปกครองไม่เกิน 100 ตัวอักษร');
