@@ -44,6 +44,10 @@ test('login style is scoped, mobile responsive and does not change the dashboard
  assert.doesNotMatch(css,/ratsada-campus|url\(/);
  assert.match(css,/linear-gradient\(145deg,#f9fdfb/);
  assert.match(css,/\.login-role-tabs/);
+ assert.match(css,/width:138px;height:auto/);
+ assert.match(css,/image-rendering:-webkit-optimize-contrast/);
+ assert.match(css,/background:#ffffff;border:1px/);
+ assert.match(css,/width:112px;height:auto/);
  assert.match(css,/\[data-theme="dark"\] \.login-wrap/);
  assert.match(css,/@media\(max-width:570px\)/);
  assert.match(css,/focus-visible/);
@@ -56,7 +60,7 @@ test('new login assets are precached for PWA and remain self-hosted',()=>{
  for(const name of ['login.css','ratsada-crest.webp'])
   assert.ok(sw.includes(name),name);
  assert.doesNotMatch(sw,/ratsada-campus\.webp/);
- assert.match(sw,/rd-care-shell-v24/);
+ assert.match(sw,/rd-care-shell-v25/);
  const index=read('web/index.html');
  assert.match(index,/img-src 'self' data:/);
  const manifest=JSON.parse(read('web/manifest.webmanifest'));

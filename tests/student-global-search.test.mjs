@@ -43,6 +43,6 @@ test('reference-inspired UI offers working authorized search and desktop collaps
  assert.match(app,/adminStudentState\.editId=Number\(button\.dataset\.searchStudent\)/);
  assert.match(css,/@media\(max-width:780px\)/);
  assert.match(css,/\.rd-workspace>\.nav\{display:flex\}/);
- assert.match(sw,/rd-care-shell-v(18|19|20|21|22|23|24)/);
+ assert.match(sw,/rd-care-shell-v(18|19|20|21|22|23|24|25)/);
  assert.match(sw,/reference-ui\.css/);
 });
