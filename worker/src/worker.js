@@ -495,7 +495,16 @@ async function adminRoutes(req,env,user,path){
    const lookup=await env.DB.prepare('SELECT id,student_no,roll_no,classroom_id FROM students WHERE '+conditions.join(' OR ')).bind(...bind).all();
    existing=lookup.results;
   }
-  const plan=planStudentImport(b.students,roomId,existing);
+  const credentials=b.students.filter(x=>String(x?.username??'').trim()||x?.password);
+  const names=[...new Set(credentials.map(x=>String(x.username||x.student_no||'').trim().toLowerCase())
+   .filter(x=>x&&x.length<=40))];
+  let registered=[];
+  if(names.length){
+   const accounts=await env.DB.prepare('SELECT username FROM portal_accounts WHERE lower(username) IN ('+
+     names.map(()=>'?').join(',')+')').bind(...names).all();
+   registered=accounts.results;
+  }
+  const plan=planStudentImport(b.students,roomId,existing,registered);
   if(path.endsWith('/preview'))return json(plan);
   if(!plan.ready) return json({error:'พบข้อมูลซ้ำหรือไม่ถูกต้อง กรุณาตรวจรายการก่อนนำเข้า',...plan},409);
   const stmts=plan.items.map(({student})=>env.DB.prepare(
