@@ -1,4 +1,4 @@
-const CACHE='rd-care-shell-v21';
+const CACHE='rd-care-shell-v22';
 const ASSETS=['./','./index.html','./app.css','./theme.css','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./advisor-import.js','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./templates/advisor-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -17,4 +17,4 @@ self.addEventListener('fetch',e=>{
  }
  e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request)));
 });
-// ยังไม่เปิดรับ Push ในรุ่นทดสอบ เพราะต้องมีระบบผูกอุปกรณ์/ยินยอมก่อน
+// ยังไม่เปิดรับ Push จนกว่าจะมีระบบผูกอุปกรณ์และจัดการความยินยอม
