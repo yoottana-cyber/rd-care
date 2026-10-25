@@ -16,6 +16,7 @@ jobs:
           node --check worker/src/password.js
           node --check worker/src/admin-validation.js
           node --check worker/src/student-import.js
+          node --check worker/src/late-self.js
           node --check worker/src/worker.js
           node --check web/app.js
           node --check web/run-safely.js
@@ -42,3 +43,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'transfer_*_test.py' -v
       - name: Historical student enrollment invariants
         run: python3 -m unittest discover -s tests -p 'enrollment_*_test.py' -v
+      - name: Late self-report SQL lifecycle
+        run: python3 -m unittest discover -s tests -p 'late_self_test.py' -v
