@@ -55,7 +55,8 @@ test('rejects duplicate rooms, short teacher passwords, and national ID password
  const usersDup=planAdvisorImport([row(),row('ม.2/3')],roomMap);
  assert.equal(usersDup.ready,false);
  assert.match(usersDup.items[1].message,/Username ซ้ำ/);
- assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','1234')],roomMap).items[0].message,/12/);
+ assert.equal(planAdvisorImport([row('ม.1/1','teacher_demo01','1234')],roomMap).ready,true);
+ assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','123')],roomMap).items[0].message,/4/);
  assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','1234567890123')],roomMap).items[0].message,/เลขประจำตัวประชาชน/);
 });
 test('admin-only endpoint refuses teacher, anonymous and oversized commit before accessing D1',async()=>{
