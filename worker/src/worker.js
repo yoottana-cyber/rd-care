@@ -756,3 +756,1095 @@ export default {
   return new Response(response.body,{status:response.status,headers});
  }
 };
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=new RegExp('^/api/admin/users/([0-9]+)
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=/^\\/api\\/admin\\/users\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=/^\\/api\\/admin\\/users\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=/^\\/api\\/admin\\/users\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=/^\\/api\\/admin\\/users\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=new RegExp('^/api/admin/users/([0-9]+)
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=/^\\/api\\/admin\\/users\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
+).exec(path);
+ if(req.method==='POST'&&studentEdit){
+  const id=positiveInt(studentEdit[1]),b=await payload(req);let student;
+  try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
+  const old=await env.DB.prepare('SELECT id,classroom_id FROM students WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบนักเรียน');
+  const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
+  if(!room)throw error(404,'ไม่พบห้องเรียน');
+  if(old.classroom_id!==student.classroom_id){
+   // Existing attendance joins the current classroom: block unsafe historical moves.
+   const history=await env.DB.prepare(`SELECT
+     (SELECT COUNT(*) FROM attendance_daily WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_period WHERE student_id=?)
+    +(SELECT COUNT(*) FROM late_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM behavior_records WHERE student_id=?)
+    +(SELECT COUNT(*) FROM attendance_alerts WHERE student_id=?) AS total`)
+    .bind(id,id,id,id,id).first();
+   if(history.total>0)throw error(409,'นักเรียนมีประวัติการเช็กชื่อ/พฤติกรรมแล้ว ไม่สามารถย้ายห้องได้จนกว่าจะมีระบบประวัติการย้ายห้อง');
+  }
+  await env.DB.batch([
+   env.DB.prepare('UPDATE students SET student_no=?,classroom_id=?,roll_no=?,full_name=?,active=? WHERE id=?')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'student_updated','students',String(id))
+  ]);
+  return json({ok:true,id});
+ }
+ const userEdit=/^\\/api\\/admin\\/users\\/(\\d+)$/.exec(path);
+ if(req.method==='POST'&&userEdit){
+  const id=positiveInt(userEdit[1]),b=await payload(req);
+  const old=await env.DB.prepare('SELECT id,role FROM users WHERE id=?').bind(id).first();
+  if(!old)throw error(404,'ไม่พบบัญชี');
+  if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
+  let update;
+  try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
+  await env.DB.batch([
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
+   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,'personnel_updated','users',String(id))
+  ]);
+  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  return json({ok:true,id});
+ }
+ throw error(404,'ไม่พบ API');
+}
+async function route(req,env){
+ const url=new URL(req.url),path=url.pathname;
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
+ if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
+ const user=await currentUser(req,env);
+ if(req.method==='POST'&&path==='/api/auth/logout'){
+  await env.DB.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest((req.headers.get('authorization')||'').slice(7))).run();
+  return json({ok:true});
+ }
+ if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
+ if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
+ if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
+ if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
+ if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
+ const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
+ if(path.startsWith('/api/admin/'))return adminRoutes(req,env,user,path);
+ throw error(404,'ไม่พบ API');
+}
+export default {
+ async fetch(req,env){
+  const origin=req.headers.get('origin');
+  const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
+  if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
+  const cors={
+   ...(origin?{'access-control-allow-origin':origin}:{}),
+   'vary':'Origin',
+   'access-control-allow-methods':'GET,POST,OPTIONS',
+   'access-control-allow-headers':'Authorization,Content-Type,X-Setup-Token',
+   'access-control-max-age':'600',
+   'cache-control':'no-store',
+   'x-content-type-options':'nosniff',
+   'referrer-policy':'no-referrer'
+  };
+  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
+  let response;
+  try{response=await route(req,env);}
+  catch(e){
+   const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
+   if(code===500)console.error('RD Care API:',e);
+   response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
+  }
+  const headers=new Headers(response.headers);
+  for(const [k,v] of Object.entries(cors))headers.set(k,v);
+  return new Response(response.body,{status:response.status,headers});
+ }
+};
