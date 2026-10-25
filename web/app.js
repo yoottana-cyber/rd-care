@@ -25,7 +25,7 @@ async function api(path,{method='GET',body,auth=true}={}){
  try{
   const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
+  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
   return data;
  }catch(e){if(e.name==='AbortError')throw Error('การเชื่อมต่อล่าช้า กรุณาลองใหม่');throw e}
  finally{clearTimeout(timer)}
@@ -83,7 +83,7 @@ function chrome(content){
 }
 function mount(content){$('#app').innerHTML=chrome(content);$$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));$('#logout').addEventListener('click',()=>safeRun(logout));}
 function $$(sel){return [...document.querySelectorAll(sel)]}
-async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
+async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
 function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
