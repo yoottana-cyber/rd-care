@@ -74,7 +74,7 @@ export async function readXlsxRows(file){
      cell.getElementsByTagName('v')[0]?.textContent||'';
    row[index]=type==='s'?(strings[Number(value)]??''):value;
   }
-  if(row.some(x=>String(x??'').trim()))rows.push(row);
+  if(row.some(x=>String(x??'').trim())){row.source_row=Number(r.getAttribute('r'))||rows.length+1;rows.push(row)}
  }
  return rows;
 }
