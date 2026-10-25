@@ -1,8 +1,10 @@
 import {API_BASE_URL} from './config.js';
 import {runSafely} from './run-safely.js';
+import {createRequestCache} from './request-cache.js';
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],behaviors:[],behaviorTotal:0};
+const referenceCache=createRequestCache();
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
@@ -15,7 +17,7 @@ async function api(path,{method='GET',body,auth=true}={}){
  try{
   const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401&&auth){state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
+  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
   return data;
  }catch(e){if(e.name==='AbortError')throw Error('การเชื่อมต่อล่าช้า กรุณาลองใหม่');throw e}
  finally{clearTimeout(timer)}
@@ -45,7 +47,7 @@ function chrome(content){
 }
 function mount(content){$('#app').innerHTML=chrome(content);$$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));$('#logout').addEventListener('click',()=>safeRun(logout));}
 function $$(sel){return [...document.querySelectorAll(sel)]}
-async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
+async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
 function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
@@ -66,11 +68,23 @@ function renderDashboard(){const s=state.stats||{};mount(`<section class="stack"
 }
 async function loadAttendance(){
  if(!state.roomId){mount(`<div class="card empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>`);return}
- const students=await api(`/api/students?classroom_id=${state.roomId}`);state.students=students.items;
- const slots=await api(`/api/timetable?date=${state.date}&classroom_id=${state.roomId}`);state.slots=slots.items;
+ const roomId=state.roomId,date=state.date;
+ // Independent lookups run in parallel; repeat switches use a short memory-only cache.
+ const [students,slots]=await Promise.all([
+  referenceCache.get('students:'+roomId,()=>api(`/api/students?classroom_id=${roomId}`)),
+  referenceCache.get('timetable:'+roomId+':'+date,()=>api(`/api/timetable?date=${date}&classroom_id=${roomId}`))
+ ]);
+ if(state.tab!=='attendance'||state.roomId!==roomId||state.date!==date)return;
+ state.students=students.items;state.slots=slots.items;
  if(!state.slots.some(s=>s.id===state.slotId))state.slotId=state.slots[0]?.id||null;
+ const kind=state.kind,slotId=state.slotId;
  let entries=[];
- if(state.kind==='daily'||state.slotId){const q=`?kind=${state.kind}&classroom_id=${state.roomId}&date=${state.date}`+(state.kind==='period'?`&timetable_id=${state.slotId}`:'');entries=(await api('/api/attendance'+q)).items;}
+ if(kind==='daily'||slotId){
+  const q=`?kind=${kind}&classroom_id=${roomId}&date=${date}`+(kind==='period'?`&timetable_id=${slotId}`:'');
+  entries=(await api('/api/attendance'+q)).items;
+ }
+ // Drop responses from a previous room/date/period to avoid a stale form render.
+ if(state.tab!=='attendance'||state.roomId!==roomId||state.date!==date||state.kind!==kind||state.slotId!==slotId)return;
  state.savedCount=entries.length;
  state.statuses=Object.fromEntries(state.students.map(s=>[s.id,'present']));
  for(const a of entries)state.statuses[a.student_id]=a.status;
@@ -146,7 +160,7 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
   const records=parseCsv(String(f.get('csv')||'').trim());
   if(records[0]?.join(',').toLowerCase()==='roll_no,student_no,full_name')records.shift();
   return {classroom_id:Number(f.get('classroom_id')),students:records.map(r=>({roll_no:Number(r[0]),student_no:r[1],full_name:r[2]}))};
- });
+ },async()=>{referenceCache.clear();await loadAdmin()});
 }
 function parseCsv(csv){const rows=[];let row=[],col='',quoted=false;
  for(let i=0;i<csv.length;i++){const ch=csv[i];if(ch==='"'){if(quoted&&csv[i+1]==='"'){col+='"';i++}else quoted=!quoted;}else if(ch===','&&!quoted){row.push(col);col=''}else if((ch==='\r'||ch==='\n')&&!quoted){if(ch==='\r'&&csv[i+1]==='\n')i++;row.push(col);if(row.some(x=>x.trim()))rows.push(row);row=[];col=''}else col+=ch;}
