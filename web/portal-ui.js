@@ -82,7 +82,10 @@ export function createPortalUi({root,onStaffLogin}){
  }
  async function showDashboard(){
   try{
-   const data=await call('/api/portal/children');state.children=data.items;
+   const session=state.token;
+   const data=await call('/api/portal/children');
+   if(session!==state.token||!state.account)return;
+   state.children=data.items;
    if(!state.children.some(s=>s.id===state.studentId))state.studentId=state.children[0]?.id||null;
    if(state.studentId)await loadRecords();else renderDashboard();
   }catch(error){if(!state.token){showLogin(state.role);return}frame('<p class="warn">ไม่สามารถโหลดข้อมูลที่ได้รับสิทธิ์</p><button class="button secondary full" id="portalRetry">ลองอีกครั้ง</button>');message(error.message,true);select('#portalRetry').addEventListener('click',showDashboard)}
