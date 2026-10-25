@@ -1,19 +1,16 @@
-/* School identity login: Ratsada green/white, genuine school aerial photo and emblem. */
+/* School identity login: clean Ratsada green/white background and school emblem. */
 /* Scoped selectors intentionally leave the attendance/admin dashboard untouched. */
 .login-wrap{
  position:relative;isolation:isolate;min-height:100dvh;
  display:grid;place-items:center;padding:36px 18px 30px;
- background:#dcf2e7 url('./media/ratsada-campus.webp') center center/cover no-repeat fixed;
+ background:linear-gradient(145deg,#f9fdfb 0%,#edf9f2 44%,#dcf1e5 100%);
 }
 .login-wrap::before{
- content:"";position:absolute;inset:0;z-index:-1;
- background:linear-gradient(120deg,rgba(5,56,36,.38),rgba(10,97,58,.24) 45%,rgba(13,65,46,.4)),
-  linear-gradient(0deg,rgba(2,35,27,.35),transparent 55%);
+ content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+ background:radial-gradient(circle at 17% 16%,rgba(124,211,163,.15),transparent 36%),
+  radial-gradient(circle at 86% 89%,rgba(92,191,136,.12),transparent 34%);
 }
-.login-wrap::after{
- content:"";position:absolute;inset:0;pointer-events:none;z-index:-1;
- background:radial-gradient(circle at 50% 47%,rgba(255,255,255,.18),transparent 62%);
-}
+.login-wrap::after{display:none}
 .login-card,.portal-card.login-card{
  width:min(476px,100%);max-width:100%;padding:0;
  background:#fff;color:#153c2b;border:1px solid rgba(246,255,247,.76);
@@ -124,10 +121,11 @@
 .login-wrap .login-content .ok{color:#19633e;background:#eaf9f0;border-color:#c6ebd4}
 .login-wrap .login-content .warn{color:#7f5421;background:#fff8eb}
 [data-theme="dark"] .login-wrap{
- background:#143d2b url('./media/ratsada-campus.webp') center/cover no-repeat fixed;
+ background:linear-gradient(145deg,#0f241a 0%,#183627 55%,#244735 100%);
 }
 [data-theme="dark"] .login-wrap::before{
- background:linear-gradient(120deg,rgba(0,28,18,.57),rgba(2,56,35,.44),rgba(2,30,22,.63));
+ background:radial-gradient(circle at 14% 12%,rgba(58,154,99,.14),transparent 42%),
+  radial-gradient(circle at 86% 88%,rgba(41,129,87,.12),transparent 35%);
 }
 [data-theme="dark"] .login-wrap .login-card,
 [data-theme="dark"] .login-wrap .portal-card.login-card{background:#172a20;color:#e9fbee;border-color:#365345}
@@ -151,7 +149,7 @@
 [data-theme="dark"] .login-wrap .login-content .button.secondary:hover,
 [data-theme="dark"] .login-wrap .login-content .button.ghost:hover{background:#2c5a3e}
 @media(max-width:570px){
- .login-wrap{padding:14px 11px 18px;min-height:100dvh;background-attachment:scroll}
+ .login-wrap{padding:14px 11px 18px;min-height:100dvh}
  .login-wrap .login-card,.login-wrap .portal-card.login-card{border-radius:21px}
  .login-wrap .login-brand{padding:17px 18px 19px}
  .login-wrap .login-crest{width:77px;height:77px;margin-bottom:7px}
