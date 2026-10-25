@@ -3,9 +3,9 @@ const respond=(data,status=200)=>new Response(JSON.stringify(data),{status,heade
 function fail(code,message){throw Object.assign(new Error(message),{code})}
 export function normalizeStudentSearch(value){
  if(typeof value!=='string')fail(400,'คำค้นต้องเป็นข้อความ');
+ if(/[\u0000-\u001f\u007f]/.test(value))fail(400,'คำค้นมีอักขระที่ไม่รองรับ');
  const query=value.trim().replace(/\s+/g,' ');
  if(query.length<2||query.length>60)fail(400,'กรุณาพิมพ์คำค้น 2–60 ตัวอักษร');
- if(/[\u0000-\u001f\u007f]/.test(query))fail(400,'คำค้นมีอักขระที่ไม่รองรับ');
  return query.toLowerCase();
 }
 export async function searchStudents(req,env,user){
