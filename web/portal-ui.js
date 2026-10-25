@@ -34,7 +34,7 @@ export function createPortalUi({root,onStaffLogin}){
     <button type="button" class="button ${role==='student'?'':'secondary'}" data-role="student">นักเรียน</button>
     <button type="button" class="button ${role==='guardian'?'':'secondary'}" data-role="guardian">ผู้ปกครอง</button></div>
    <form id="portalLoginForm" class="stack">
-    <div class="field"><label>Username</label><input name="username" required autocomplete="username" maxlength="40"></div>
+    <div class="field"><label>${role==='student'?'เลขประจำตัวนักเรียน (Username)':'Username ผู้ปกครอง'}</label><input name="username" required autocomplete="username" maxlength="40" ${role==='student'?'inputmode="numeric"':''}></div>
     <div class="field"><label>รหัสผ่าน</label><input name="password" type="password" required autocomplete="current-password"></div>
     <button type="submit" class="button full">เข้าสู่ระบบ</button></form>
    <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
