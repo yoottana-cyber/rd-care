@@ -511,15 +511,18 @@ async function adminRoutes(req,env,user,path){
   try{student=validateStudentInput(b)}catch(e){throw error(400,e.message)}
   const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(student.classroom_id).first();
   if(!room)throw error(404,'ไม่พบห้องเรียน');
-  const res=await env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,?,?,?)')
-   .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active).run();
-  await env.DB.batch([
+  // Student, enrollment and audit must be one transaction, not separate writes.
+  const [insert]=await env.DB.batch([
+   env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,?,?,?)')
+    .bind(student.student_no,student.classroom_id,student.roll_no,student.full_name,student.active),
    env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
-     VALUES(?,?,?,?,?)`).bind(res.meta.last_row_id,student.classroom_id,student.roll_no,bangkokToday(),user.id),
-   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
-    .bind(user.id,'student_created','students',String(res.meta.last_row_id))
+     SELECT id,?,?,?,? FROM students WHERE student_no=?`)
+    .bind(student.classroom_id,student.roll_no,bangkokToday(),user.id,student.student_no),
+   env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
+      SELECT ?,'student_created','students',CAST(id AS TEXT) FROM students WHERE student_no=?`)
+    .bind(user.id,student.student_no)
   ]);
-  return json({ok:true,id:res.meta.last_row_id},201);
+  return json({ok:true,id:insert.meta.last_row_id},201);
  }
  const studentEdit = /^\/api\/admin\/students\/(\d+)$/.exec(path);
  if(req.method==='POST'&&studentEdit){
