@@ -21,7 +21,7 @@ function setup({owner=7,advisor=7,existingNote='หัวข้อเดิม',
     },
     async all(){
      if(sql.includes('SELECT s.id FROM students s'))return {results:[{id:10}]};
-     if(sql.includes('SELECT p.student_id,p.status FROM attendance_period p'))return {results:[{student_id:10,status:'present'}]};
+     if(sql.includes('FROM attendance_period p')&&sql.includes('JOIN student_enrollments h'))return {results:[{student_id:10,status:'present'}]};
      if(sql.includes('FROM attendance_daily d'))return {results:dailyItems};
      throw Error('Unexpected all query: '+sql);
     },
