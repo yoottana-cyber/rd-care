@@ -17,11 +17,13 @@ test('public screens and downloadable templates have no simulation/trial labels'
   assert.doesNotMatch(code,/\bDEMO\d+\b|teacher_demo\d+|\bdemo-stu\d+\b/i,path);
  }
 });
-test('system does not conceal disabled guardian push notifications',()=>{
- const staff=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
+test('guardian Push requires an explicit opt-in',()=>{
  const portal=readFileSync(new URL('../web/portal-ui.js',import.meta.url),'utf8');
- assert.match(staff,/ยังไม่เปิดใช้งาน Push ผู้ปกครอง/);
- assert.match(portal,/ยังไม่เปิดใช้งานการแจ้งเตือน Push/);
+ const guardian=readFileSync(new URL('../web/guardian-push.js',import.meta.url),'utf8');
+ assert.match(portal,/id="guardianPushEnable"/);
+ assert.match(portal,/โรงเรียนยืนยันความสัมพันธ์แล้ว/);
+ assert.match(guardian,/Notification.requestPermission\(\)/);
+ assert.match(guardian,/\/api\/portal\/push\/subscribe/);
 });
 test('import screens continue to warn about data permissions and PDPA',()=>{
  const importer=readFileSync(new URL('../web/unified-import.js',import.meta.url),'utf8');
