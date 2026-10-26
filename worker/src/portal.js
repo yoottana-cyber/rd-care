@@ -1,6 +1,7 @@
 import {passwordHash} from './password.js';
 import {validUsername,validDate,bangkokToday} from './core.js';
 import {studentUsername} from './student-username.js';
+import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -111,8 +112,12 @@ async function records(req,env,a){
  const [daily,period,late,behavior,total]=await env.DB.batch([
   env.DB.prepare(`SELECT school_date,status FROM attendance_daily
    WHERE student_id=? AND school_date BETWEEN ? AND ? ORDER BY school_date DESC LIMIT 90`).bind(id,from,to),
-  env.DB.prepare(`SELECT p.school_date,p.status,t.period,t.subject FROM attendance_period p
+  env.DB.prepare(`SELECT p.school_date,
+     CASE WHEN tr.student_id IS NOT NULL AND p.status='absent' THEN 'truancy' ELSE p.status END AS status,
+     t.period,t.subject FROM attendance_period p
     JOIN timetable t ON t.id=p.timetable_id
+    LEFT JOIN period_truancy tr ON tr.student_id=p.student_id
+     AND tr.timetable_id=p.timetable_id AND tr.school_date=p.school_date
     WHERE p.student_id=? AND p.school_date BETWEEN ? AND ?
     ORDER BY p.school_date DESC,t.period LIMIT 500`).bind(id,from,to),
   env.DB.prepare(`SELECT school_date,arrived_at,state FROM late_records
@@ -140,6 +145,8 @@ export async function portalRoutes(req,env,path){
  if(req.method==='GET'&&path==='/api/portal/auth/me')return reply({account:publicAccount(a)});
  if(req.method==='POST'&&path==='/api/portal/auth/change-password')return changePassword(req,env,a);
  if(a.must_change_password)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนดูข้อมูลนักเรียน');
+ if(path.startsWith('/api/portal/push/'))return guardianPushRoutes(req,env,a,path);
+ if(req.method==='GET'&&path==='/api/portal/truancy')return reply({items:await guardianTruancyItems(env,a)});
  if(req.method==='GET'&&path==='/api/portal/children')return reply({items:await children(env,a)});
  if(req.method==='GET'&&path==='/api/portal/records')return records(req,env,a);
  fail(404,'ไม่พบ API');
