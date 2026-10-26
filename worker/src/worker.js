@@ -9,6 +9,7 @@ import {advisorImportEndpoint} from './advisor-import.js';
 import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint} from './unified-roster.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
+import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -743,6 +744,8 @@ async function route(req,env){
   const {results}=await env.DB.prepare('SELECT id,grade,room,label FROM classrooms ORDER BY grade,room').all();
   return json({items:results});
  }
+ if(req.method==='GET'&&path==='/api/my-timetable/week-status')return periodWeekStatus(req,env,user);
+ if(req.method==='GET'&&path==='/api/my-timetable/report')return periodCourseReport(req,env,user);
  if(path.startsWith('/api/my-timetable'))return teacherTimetableRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
  if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
