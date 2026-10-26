@@ -3,6 +3,7 @@ import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
 import {createAdvisorImport} from './advisor-import.js';
+import {createMyTimetable,periodChoices} from './my-timetable.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
@@ -22,6 +23,20 @@ const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
+async function refreshClassroomList(){
+ const result=await api('/api/classrooms');
+ state.rooms=result.items;referenceCache.clear();
+ if(!state.rooms.some(room=>room.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
+}
+async function openPeriodLesson(lesson){
+ if(!lesson)return;
+ state.kind='period';state.slotId=lesson.id;state.roomId=lesson.classroom_id;
+ const today=dateToday(), todayDow=((new Date(today+'T00:00:00Z').getUTCDay()+6)%7)+1;
+ const daysBack=(todayDow-lesson.day_of_week+7)%7;
+ state.date=new Date(Date.parse(today+'T00:00:00Z')-daysBack*86400000).toISOString().slice(0,10);
+ await showTab('periodAttendance');
+}
+const myTimetable=createMyTimetable({api,mount,toast,refreshRooms:refreshClassroomList,safeRun,openPeriodAttendance:lesson=>safeRun(()=>openPeriodLesson(lesson))});
 const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
@@ -112,7 +127,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อ','✅'],['late','มาสาย','⏰'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],['late','มาสาย','⏰'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${state.tab===id?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
@@ -191,10 +206,14 @@ function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
 async function showTab(tab){state.tab=tab;
+ if(tab==='attendance')state.kind='daily';
+ if(tab==='periodAttendance')state.kind='period';
  if(tab!=='adminStudents')unifiedImport.clear();
  if(tab!=='admin')advisorImporter.clear();
  if(tab==='dashboard')return loadDashboard();
- if(tab==='attendance')return loadAttendance();
+ if(tab==='attendance'||tab==='periodAttendance')return loadAttendance();
+ if(tab==='myTimetable')return myTimetable.load();
+ if(tab==='advisorCenter')return loadAdvisorCenter();
  if(tab==='late')return loadLate();
  if(tab==='behavior')return loadBehavior();
  if(tab==='alerts')return loadAlerts();
@@ -258,54 +277,82 @@ function renderDashboard(){
  $$('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
 }
 async function loadAttendance(){
- if(!state.roomId){mount(`<div class="card empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>`);return}
- const roomId=state.roomId,date=state.date;
- // Independent lookups run in parallel; repeat switches use a short memory-only cache.
- const [students,slots]=await Promise.all([
-  referenceCache.get('students:'+roomId+':'+date,()=>api(`/api/students?classroom_id=${roomId}&date=${date}`)),
-  referenceCache.get('timetable:'+roomId+':'+date,()=>api(`/api/timetable?date=${date}&classroom_id=${roomId}`))
- ]);
- if(state.tab!=='attendance'||state.roomId!==roomId||state.date!==date)return;
- state.students=students.items;state.slots=slots.items;
- if(!state.slots.some(s=>s.id===state.slotId))state.slotId=state.slots[0]?.id||null;
- const kind=state.kind,slotId=state.slotId;
- let entries=[];
- if(kind==='daily'||slotId){
-  const q=`?kind=${kind}&classroom_id=${roomId}&date=${date}`+(kind==='period'?`&timetable_id=${slotId}`:'');
-  entries=(await api('/api/attendance'+q)).items;
+ const kind=state.kind,tab=state.tab,date=state.date;
+ let roomId=state.roomId;
+ if(kind==='daily'){
+  const eligible=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
+  if(!eligible.length){
+   mount('<section class="card stack"><h2>เช็กชื่อรายวัน</h2><p class="warn">ยังไม่ได้รับมอบหมายเป็นครูที่ปรึกษา จึงยังไม่สามารถเช็กชื่อรายวันได้ แต่สามารถสร้างตารางสอนและเช็กชื่อรายคาบของห้องที่สอนได้</p></section>');
+   return;
+  }
+  if(!eligible.some(r=>r.id===roomId))roomId=eligible[0].id;
+  state.roomId=roomId;state.slots=[];
+ }else{
+  const response=await api('/api/timetable?date='+encodeURIComponent(date)+(state.user?.role==='teacher'?'&scope=mine':''));
+  if(state.tab!==tab||state.date!==date)return;
+  state.slots=response.items;
+  let slot=state.slots.find(r=>r.id===state.slotId);
+  if(!slot){slot=state.slots[0];state.slotId=slot?.id||null;}
+  if(!slot){
+   mount(`<section class="stack"><h2>เช็กชื่อรายคาบ</h2>
+    <div class="card stack"><div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(date)}"></div>
+    <p class="warn">วันนี้ยังไม่มีตารางสอนที่สามารถเช็กชื่อได้ ${state.user?.role==='teacher'?'กรุณาสร้างตารางสอนของตนเอง หรือเลือกวันที่มีคาบสอน':'กรุณาเลือกวันที่มีตารางสอน'}</p>
+    ${state.user?.role==='teacher'?'<button class="button" data-tab="myTimetable" type="button">+ สร้างตารางสอนของฉัน</button>':''}</div></section>`);
+   $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
+   return;
+  }
+  roomId=slot.classroom_id;state.roomId=roomId;
  }
- // Drop responses from a previous room/date/period to avoid a stale form render.
- if(state.tab!=='attendance'||state.roomId!==roomId||state.date!==date||state.kind!==kind||state.slotId!==slotId)return;
+ const studentsResponse=await referenceCache.get('students:'+roomId+':'+date,()=>api('/api/students?classroom_id='+roomId+'&date='+encodeURIComponent(date)));
+ if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId)return;
+ state.students=studentsResponse.items;
+ const slotId=kind==='period'?state.slotId:null;
+ const q='?kind='+kind+'&classroom_id='+roomId+'&date='+encodeURIComponent(date)+(kind==='period'?'&timetable_id='+slotId:'');
+ const entries=(await api('/api/attendance'+q)).items;
+ if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId||(kind==='period'&&state.slotId!==slotId))return;
  state.savedCount=entries.length;
- state.statuses=Object.fromEntries(state.students.map(s=>[s.id,'present']));
- for(const a of entries)state.statuses[a.student_id]=a.status;
+ state.statuses=Object.fromEntries(state.students.map(x=>[x.id,'present']));
+ for(const entry of entries)state.statuses[entry.student_id]=entry.status;
  renderAttendance();
 }
 function statusCounts(){return Object.fromEntries(['present','absent','late','leave'].map(s=>[s,Object.values(state.statuses).filter(x=>x===s).length]));}
 function statusSummary(){const c=statusCounts();return `มา ${c.present} • ขาด ${c.absent} • สาย ${c.late} • ลา ${c.leave}`;}
 function renderAttendance(){
- const slotOptions=state.slots.map(s=>`<option value="${s.id}" ${s.id===state.slotId?'selected':''}>คาบ ${s.period} • ${esc(s.subject)} (${esc(s.teacher_name)})</option>`).join('');
+ const daily=state.kind==='daily';
+ const eligible=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
+ const roomSelect=eligible.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
+ const slotOptions=state.slots.map(t=>{
+  const period=Number(t.end_period||t.period)===t.period?t.period:t.period+'-'+t.end_period;
+  return `<option value="${t.id}" ${t.id===state.slotId?'selected':''}>คาบ ${period} • ${esc(t.classroom_label)} • ${esc(t.subject_code||'')}${t.subject_code?' / ':''}${esc(t.subject)}${state.user?.role==='teacher'?'':' ('+esc(t.teacher_name)+')'}</option>`;
+ }).join('');
  const students=state.students.map(s=>`<div class="student" data-id="${s.id}"><div><div class="student-name">${s.roll_no}. ${esc(s.full_name)}</div><div class="student-sub">รหัส ${esc(s.student_no)}</div></div><div class="pills">${Object.keys(names).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${names[status]}</button>`).join('')}</div></div>`).join('');
- mount(`<section class="stack"><div><h2>เช็กชื่อนักเรียน</h2><p class="muted">แตะเฉพาะนักเรียนที่ขาด สาย หรือลา แล้วกดบันทึกทั้งห้อง</p></div><div class="card stack">${filters()}
-  <div class="row"><button class="button ${state.kind==='daily'?'':'secondary'}" data-kind="daily">ประจำวัน</button><button class="button ${state.kind==='period'?'':'secondary'}" data-kind="period">รายคาบ</button></div>
-  ${state.kind==='period'?`<div class="field"><label>เลือกคาบเรียนตามตาราง</label><select id="slot">${slotOptions||'<option value="">ยังไม่กำหนดตารางสอนวันนี้</option>'}</select></div>`:''}
+ mount(`<section class="stack"><div><h2>${daily?'📅 เช็กชื่อรายวัน':'✅ เช็กชื่อรายคาบ'}</h2>
+  <p class="muted">${daily?'สำหรับครูที่ปรึกษา • เช็กชื่อห้องที่รับผิดชอบ':'สำหรับครูผู้สอน • เลือกวิชาจากตารางสอนของตนเองได้ แม้จะไม่ใช่ครูที่ปรึกษาของห้อง'}</p></div>
+ <div class="card stack">
+ ${daily?`<div class="row"><div class="field smallbox"><label for="room">ห้องที่รับผิดชอบ</label><select id="room">${roomSelect}</select></div>
+ <div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" max="${dateToday()}" value="${esc(state.date)}"></div></div>`:
+ `<div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(state.date)}"></div>
+ <div class="field"><label for="slot">รายวิชาและคาบเรียน</label><select id="slot">${slotOptions}</select></div>
+ ${state.user?.role==='teacher'?'<button type="button" class="button secondary" data-tab="myTimetable">📚 จัดการตารางสอนของฉัน</button>':''}`}
  </div><div class="card stack"><div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
- ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การกดบันทึกใหม่จะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคนเพื่อช่วยเช็กชื่อเร็วขึ้น ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
+ ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การบันทึกซ้ำจะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคน ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
  <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
- <button id="saveAttendance" class="button full" ${!state.students.length||state.kind==='period'&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
- bindFilters(loadAttendance);
- $$('[data-kind]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{state.kind=btn.dataset.kind;await loadAttendance()})));
+ <button id="saveAttendance" class="button full" ${!state.students.length||!daily&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
+ if(daily)bindFilters(loadAttendance);
+ $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
  $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));
  $$('[data-student]').forEach(btn=>btn.addEventListener('click',()=>{state.statuses[Number(btn.dataset.student)]=btn.dataset.status;updateAttendanceControls()}));
- $('#markAll')?.addEventListener('click',()=>{for(const s of state.students)state.statuses[s.id]='present';updateAttendanceControls()});
+ $('#markAll')?.addEventListener('click',()=>{for(const student of state.students)state.statuses[student.id]='present';updateAttendanceControls()});
  $('#saveAttendance')?.addEventListener('click',()=>safeRun(saveAttendance));
 }
 function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();}
 async function saveAttendance(){
  if(!state.students.length)return;
  const button=$('#saveAttendance');button.disabled=true;
- try{const result=await api('/api/attendance',{method:'POST',body:{kind:state.kind,date:state.date,classroom_id:state.roomId,timetable_id:state.slotId,entries:state.students.map(s=>({student_id:s.id,status:state.statuses[s.id]}))}});toast(`บันทึกสำเร็จ ${result.saved} คน`);await loadAttendance();}
- finally{button.disabled=false}
+ try{
+  const result=await api('/api/attendance',{method:'POST',body:{kind:state.kind,date:state.date,classroom_id:state.roomId,timetable_id:state.kind==='period'?state.slotId:null,entries:state.students.map(s=>({student_id:s.id,status:state.statuses[s.id]}))}});
+  toast('บันทึกสำเร็จ '+result.saved+' คน');await loadAttendance();
+ }finally{if(button.isConnected)button.disabled=false}
 }
 async function loadLate(){
  if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}
