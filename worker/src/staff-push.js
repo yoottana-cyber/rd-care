@@ -47,7 +47,7 @@ export async function diagnoseVapid(env){
  const required=['VAPID_PUBLIC_KEY','VAPID_PRIVATE_KEY','VAPID_SUBJECT'];
  const missing=required.filter(name=>!String(env[name]||'').trim());
  if(missing.length)return {ready:false,code:'missing_settings',missing};
- if(!/^(mailto:[^\\s@]+@[^\\s@]+|https:\/\/[^\\s]+)$/.test(env.VAPID_SUBJECT))
+ if(!/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/.test(env.VAPID_SUBJECT))
   return {ready:false,code:'invalid_subject',missing:[]};
  try{
   const pub=fromB64(env.VAPID_PUBLIC_KEY);
