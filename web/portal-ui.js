@@ -12,7 +12,7 @@ export function createPortalUi({root,onStaffLogin}){
  const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today()};
  let requestVersion=0;
  let lateQrToken=null,lateQrReceipt=null;
- function acceptLateQr(value){lateQrToken=/^[a-f0-9]{40}$/.test(value)?value:null;lateQrReceipt=null;}
+ function acceptLateQr(value){lateQrToken=value==='gate'||/^[a-f0-9]{40}$/.test(value)?value:null;lateQrReceipt=null;}
  const select=s=>root.querySelector(s);
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
  const guardianPush=createGuardianPush({call,select,message});
@@ -162,7 +162,7 @@ export function createPortalUi({root,onStaffLogin}){
      <div class="field"><label for="lateQrReason">สาเหตุที่มาสาย (ไม่บังคับ)</label>
       <textarea id="lateQrReason" maxlength="300" name="reason" placeholder="ระบุสาเหตุ หากต้องการ"></textarea></div>
      <button type="submit" class="button full">✅ ยืนยันลงชื่อมาสาย</button>
-    </form><p class="muted">QR มีเวลาจำกัด หากหมดอายุต้องสแกนใหม่ที่จุดครูเวร</p>
+    </form><p class="muted">QR ถาวรใช้ซ้ำได้ทุกวัน แต่ลงชื่อได้เฉพาะหลัง 08.00 น. และต้องรอครูเวรตรวจสอบ</p>
    </section>`:''}
    ${state.account.role==='student'&&lateQrReceipt?`<section class="card stack"><h3>✅ ลงชื่อมาสายสำเร็จ</h3>
     <p>${esc(lateQrReceipt.date)} เวลา ${esc(lateQrReceipt.arrivedAt)} น.</p>
