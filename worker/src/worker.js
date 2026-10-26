@@ -87,10 +87,12 @@ async function login(req,env){
   throw error(401,'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
  }
  await env.DB.prepare('DELETE FROM login_attempts WHERE username=?').bind(username).run();
+ // "Remember me" is an explicit per-device choice; never extend a normal session.
+ const sessionSeconds=b.remember===true?30*86400:8*3600;
  const token=randomHex(32);
  await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)')
-  .bind(await digest(token),user.id,now()+8*3600).run();
- return json({token,user:{id:user.id,username:user.username,display_name:user.display_name,role:user.role},expires_in:8*3600});
+  .bind(await digest(token),user.id,now()+sessionSeconds).run();
+ return json({token,user:{id:user.id,username:user.username,display_name:user.display_name,role:user.role},expires_in:sessionSeconds});
 }
 async function setup(req,env){
  if(!env.SETUP_TOKEN||env.SETUP_TOKEN==='REPLACE_WITH_A_LONG_RANDOM_ONE_TIME_SECRET')throw error(503,'ยังไม่ได้ตั้งค่า SETUP_TOKEN');
