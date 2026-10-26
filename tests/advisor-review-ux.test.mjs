@@ -7,7 +7,7 @@ import {bangkokToday} from '../worker/src/core.js';
 test('advisor center uses a collection selector and absence review restricts classroom choices',()=>{
  const app=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
  assert.ok(app.includes("$$('[data-advisor-review]').forEach"));
- assert.ok(!app.includes("$('[data-advisor-review]').forEach"));
+ assert.doesNotMatch(app,/(?<!\$)\$\('\[data-advisor-review\]'\)\.forEach/);
  assert.ok(app.includes('roomOptions(advisorOnly=false)'));
  assert.ok(app.includes('filters({date:false,advisorOnly:true})'));
  assert.ok(app.includes("r.advisor_user_id===state.user.id"));
