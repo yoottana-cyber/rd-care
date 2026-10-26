@@ -10,6 +10,7 @@ function setup({owner=7,existingNote='หัวข้อเดิม'}={}){
   prepare(sql){
    const entry={sql,params:[]};executed.push(entry);
    return {bind(...args){entry.params=args;return {
+    sql,params:args,
     async first(){
      if(sql.includes('FROM sessions s'))return {id:7,role:'teacher',display_name:'ครูทดสอบ',active:1};
      if(sql.includes('SELECT advisor_user_id FROM classrooms'))return {advisor_user_id:7};
