@@ -11,7 +11,7 @@ import {unifiedRosterEndpoint} from './unified-roster.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
-import {deliverTruancyPush,advisorTruancyItems} from './truancy-push.js';
+import {deliverTruancyPush,advisorTruancyItems,truancyPushReadiness} from './truancy-push.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -322,7 +322,19 @@ async function writeAttendance(req,env,user){
  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
   .bind(user.id,'attendance_saved',kind,`${date}:${roomId}:${slot?.id||0}`));
  await env.DB.batch(stmts);
- return json({ok:true,saved:b.entries.length,message:'บันทึกสำเร็จ (กรณีขาดรายคาบจะรอการตรวจสอบก่อนแจ้งผู้ปกครอง)'});
+ // The caller needs to know when no target device is enrolled. Never mislead
+ // teachers with a generic "saved" toast that implies a delivered Push.
+ let push=null;
+ if(kind==='period'){
+  const marked=b.entries.filter(row=>row.status==='truancy').map(row=>row.student_id);
+  if(marked.length){
+   try{push=await truancyPushReadiness(env,roomId,marked)}
+   catch(e){console.warn('RD Care truancy readiness failed',e?.name||'database');
+    push={events:marked.length,ready:false,reason:'readiness_unknown'};}
+  }
+ }
+ return json({ok:true,saved:b.entries.length,push,
+  message:'บันทึกเช็กชื่อสำเร็จ'});
 }
 async function addLate(req,env,user){
  const b=await payload(req),stId=positiveInt(b.student_id);
