@@ -19,7 +19,7 @@ export function createLateGate({api,mount,toast,safeRun}){
    <div class="late-qr-layout">
     <section class="card stack late-qr-station">
      <h3>QR สำหรับนักเรียน</h3>
-     <p class="muted">QR มีอายุ 90 วินาที เปลี่ยนอัตโนมัติเมื่อเปิดจุดสแกน และนักเรียนต้องเข้าบัญชีของตนเองเพื่อยืนยัน</p>
+     <p class="muted">QR มีอายุ 180 วินาที เปลี่ยนอัตโนมัติเมื่อเปิดจุดสแกน และนักเรียนต้องเข้าบัญชีของตนเองเพื่อยืนยัน</p>
      <div class="late-qr-image" id="lateQrImage">${state.qr?.svg||'<div class="empty">กดเปิดจุดสแกนเพื่อสร้าง QR</div>'}</div>
      <strong id="lateQrRemaining" role="timer" class="late-qr-time">${state.qr?'กำลังตรวจสอบเวลา':'ยังไม่เปิดจุดสแกน'}</strong>
      <div class="row"><button id="lateQrStart" class="button" type="button">${state.qr?'สร้าง QR ใหม่':'เปิดจุดสแกน QR'}</button>
