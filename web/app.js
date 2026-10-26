@@ -554,7 +554,7 @@ async function loadAdvisorCenter(){
  <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
  <p class="muted">ระบบยังไม่ส่ง Push ถึงผู้ปกครองโดยอัตโนมัติ</p></section>`);
  $('#advisorRoom')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);await loadAdvisorCenter()}));
- $('[data-advisor-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+ $$('[data-advisor-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
   if(!confirm(button.dataset.state==='confirmed'?'ยืนยันว่าไม่เข้าคาบเรียน?':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;
   button.disabled=true;
   try{
