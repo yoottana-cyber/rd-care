@@ -5,6 +5,9 @@ import {createUnifiedImport} from './unified-import.js';
 import {createAdvisorImport} from './advisor-import.js';
 import {createMyTimetable,periodChoices} from './my-timetable.js';
 import {createPeriodCenter} from './period-center.js';
+import {createPwaTools} from './pwa-client.js';
+import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
+import {createNotificationSettings} from './notification-settings.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
@@ -21,6 +24,9 @@ const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
+const pwaTools=createPwaTools({api,toast});
+const notificationSettings=createNotificationSettings({pwaTools,mount,toast,safeRun,showTab,
+ getAlerts:()=>state.stats?.alerts||0});
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
@@ -126,7 +132,11 @@ function renderStudentLate(){
 async function boot(){
  const [me,rooms]=await Promise.all([api('/api/auth/me'),api('/api/classrooms')]);state.user=me.user;state.rooms=rooms.items;
  if(!state.rooms.some(r=>r.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
- await showTab('dashboard');
+ const requested=new URLSearchParams(location.search).get('tab');
+ if(requested==='notifications'){
+  history.replaceState(null,'',location.pathname);
+  await showTab('notifications');
+ }else await showTab('dashboard');
 }
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
@@ -136,6 +146,8 @@ function chrome(content){
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
  <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>ระบบการดูแลและช่วยเหลือนักเรียน</h1><p>RD Care • โรงเรียนรัษฎา</p></div></div>
+ <div class="rd-mobile-header-actions"><button type="button" data-tab="notifications" aria-label="ศูนย์แจ้งเตือน">♧</button>
+ <button type="button" id="rdHeaderMenu" aria-label="เปิดเมนู">☰</button></div>
  <div class="user"><span class="rd-date-chip" aria-label="วันที่ปัจจุบัน">📅 ${esc(displayDate)}</span><span class="rd-user-avatar" aria-hidden="true">${esc((state.user.display_name||'ค').trim().charAt(0))}</span><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออกจากระบบ</button></div></header>
  <div class="rd-layout" id="rdLayout">
  <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><div class="rd-side-brand"><img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="38" height="38" decoding="async"><span><strong>RD CARE</strong><small>RATSADA SCHOOL</small></span></div><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><p class="rd-nav-caption">เมนูหลัก</p><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
@@ -149,13 +161,15 @@ function chrome(content){
  <nav class="nav" aria-label="เมนูหลักบนมือถือ">${bottom}</nav>
  ${content}
  </div>
- </div><footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • ยังไม่เปิดใช้งาน Push ผู้ปกครอง</footer></main>`;
+ </div>${mobileMarkup({navs,user:state.user,active:id=>state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'),pending:Number(state.stats?.alerts||0)})}
+ <footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน</footer></main>`;
 }
 function mount(content){
  $('#app').innerHTML=chrome(content);
  bindThemeButtons();
  $$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));
  $('#logout').addEventListener('click',()=>safeRun(logout));
+ bindMobileMenu({install:()=>pwaTools.install(),logout,safeRun});
  const layout=$('#rdLayout');
  try{if(sessionStorage.getItem('rd_sidebar_collapsed')==='1')layout?.classList.add('sidebar-collapsed')}catch{}
  $('#sidebarToggle')?.addEventListener('click',()=>{
@@ -205,7 +219,7 @@ function bindGlobalStudentSearch(){
  });
 }
 function $$(sel){return [...document.querySelectorAll(sel)]}
-async function logout(){try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
+async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
 function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
@@ -215,6 +229,7 @@ async function showTab(tab){state.tab=tab;
  if(tab!=='adminStudents')unifiedImport.clear();
  if(tab!=='admin')advisorImporter.clear();
  if(tab==='dashboard')return loadDashboard();
+ if(tab==='notifications')return notificationSettings.load();
  if(tab==='attendance'||tab==='periodCheckin')return loadAttendance();
  if(tab==='periodAttendance')return state.user?.role==='teacher'?periodCenter.load():loadAttendance();
  if(tab==='myTimetable')return myTimetable.load();
