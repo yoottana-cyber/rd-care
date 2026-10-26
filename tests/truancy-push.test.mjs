@@ -69,6 +69,6 @@ test('guardian can unsubscribe only their own endpoint and status does not leak 
 });
 test('dispatcher is disabled without VAPID and does not query private school DB',async()=>{
  const fake=db();
- assert.deepEqual(await deliverTruancyPush({DB:fake}),{enabled:false,delivered:0});
+ assert.deepEqual(await deliverTruancyPush({DB:fake}),{enabled:false,processed:0,delivered:0});
  assert.equal(fake.calls.length,0);
 });
