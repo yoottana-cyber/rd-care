@@ -33,7 +33,7 @@ test('PWA manifest supports home-screen install and SW notification clicks use a
  assert.match(worker,/addEventListener\('push'/);
  assert.match(worker,/addEventListener\('notificationclick'/);
  assert.match(worker,/\?tab=notifications/);
- assert.match(worker,/staff-tasks/);
+ assert.match(worker,/school-notices/);
  assert.match(app,/notificationSettings\.load/);
  assert.match(app,/bindMobileMenu/);
  assert.match(app,/pwaTools\.disable/);
