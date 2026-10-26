@@ -68,6 +68,8 @@ jobs:
           PY
       - name: Teacher timetable migration and overlap validation
         run: python3 -m unittest discover -s tests -p 'teacher_timetable_migration_test.py' -v
+      - name: Truancy edit and Push dispatch regression (real D1 SQL)
+        run: python3 -m unittest discover -s tests -p 'truancy_dispatch_selection_test.py' -v
       - name: Urgent truancy alert schema and bounded retry lifecycle
         run: python3 -m unittest discover -s tests -p 'truancy_migration_test.py' -v
       - name: Staff Push subscription migration
