@@ -90,13 +90,15 @@ function loginPage(){
    <button id="portalGuardianLogin" type="button" class="button secondary">เข้าสู่ระบบผู้ปกครอง</button>
    <button id="studentLateEntry" type="button" class="button secondary">นักเรียนแจ้งมาสาย</button>
   </div>
+  <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้ง RD Care ลงมือถือ</button>
+   <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
   <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
   <p class="login-message">ระบบยังไม่ส่งการแจ้งเตือน Push ถึงผู้ปกครองโดยอัตโนมัติ</p>
  </div>
  <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
 }
-function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian')); }
+function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian'));$('#loginInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install())); }
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card">
  <header class="login-brand">
