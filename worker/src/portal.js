@@ -55,10 +55,13 @@ async function login(req,env){
   fail(401,'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
  }
  await env.DB.prepare('DELETE FROM portal_login_attempts WHERE username=?').bind(failureKey).run();
+ // Student/guardian accounts are remembered only after choosing the option and
+ // never while a first-login password change is required.
+ const sessionSeconds=b.remember===true&&!a.must_change_password?30*86400:8*3600;
  const token=randomHex(32);
  await env.DB.prepare('INSERT INTO portal_sessions(token_hash,account_id,expires_at) VALUES(?,?,?)')
-  .bind(await digest(token),a.id,unixNow()+8*3600).run();
- return reply({token,account:publicAccount(a),expires_in:8*3600});
+  .bind(await digest(token),a.id,unixNow()+sessionSeconds).run();
+ return reply({token,account:publicAccount(a),expires_in:sessionSeconds});
 }
 async function changePassword(req,env,a){
  const b=await bodyJson(req);
