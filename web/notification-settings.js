@@ -32,7 +32,7 @@ export function createNotificationSettings({api,pwaTools,mount,toast,safeRun,sho
     <div class="row">
      <button type="button" class="button" id="rdEnablePush" ${!st.canPush||!st.enabled||st.permission==='denied'||st.subscribed?'disabled':''}>เปิดรับ Push</button>
      <button type="button" class="button secondary" id="rdDisablePush" ${!st.subscribed?'disabled':''}>ปิด Push อุปกรณ์นี้</button></div>
-    <p class="muted">การแจ้งเตือนถึงผู้ปกครองยังไม่ได้เปิดใช้งาน และจะไม่สมัครรับแจ้งเตือนโดยอัตโนมัติ</p>
+    <p class="muted">ผู้ปกครองเปิดรับ Push ได้จากบัญชีผู้ปกครองที่ยืนยันแล้ว เฉพาะเหตุหนีเรียน และไม่มีการสมัครรับแจ้งเตือนอัตโนมัติ</p>
    </section></section>`);
   document.querySelector('#rdInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install()));
   // Must call requestPermission in the synchronous click activation path (especially iOS).
