@@ -4,6 +4,7 @@ import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
 import {createAdvisorImport} from './advisor-import.js';
 import {createMyTimetable,periodChoices} from './my-timetable.js';
+import {createPeriodCenter} from './period-center.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
@@ -28,15 +29,18 @@ async function refreshClassroomList(){
  state.rooms=result.items;referenceCache.clear();
  if(!state.rooms.some(room=>room.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
 }
-async function openPeriodLesson(lesson){
+async function openPeriodLesson(lesson,requestedDate=null){
  if(!lesson)return;
  state.kind='period';state.slotId=lesson.id;state.roomId=lesson.classroom_id;
  const today=dateToday(), todayDow=((new Date(today+'T00:00:00Z').getUTCDay()+6)%7)+1;
  const daysBack=(todayDow-lesson.day_of_week+7)%7;
- state.date=new Date(Date.parse(today+'T00:00:00Z')-daysBack*86400000).toISOString().slice(0,10);
- await showTab('periodAttendance');
+ state.date=requestedDate||new Date(Date.parse(today+'T00:00:00Z')-daysBack*86400000).toISOString().slice(0,10);
+ await showTab('periodCheckin');
 }
 const myTimetable=createMyTimetable({api,mount,toast,refreshRooms:refreshClassroomList,safeRun,openPeriodAttendance:lesson=>safeRun(()=>openPeriodLesson(lesson))});
+const periodCenter=createPeriodCenter({api,mount,safeRun,today:dateToday,toast,
+ openLesson:(lesson,lessonDate)=>safeRun(()=>openPeriodLesson(lesson,lessonDate)),
+ openEditor:()=>safeRun(()=>showTab('myTimetable'))});
 const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
@@ -128,8 +132,8 @@ function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
  const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],['late','มาสาย','⏰'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
- const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${state.tab===id?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
- const bottom=navs.map(([id,label,ico])=>`<button class="${state.tab===id?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
+ const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
+ const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
  <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>ระบบการดูแลและช่วยเหลือนักเรียน</h1><p>RD Care • โรงเรียนรัษฎา</p></div></div>
  <div class="user"><span class="rd-date-chip" aria-label="วันที่ปัจจุบัน">📅 ${esc(displayDate)}</span><span class="rd-user-avatar" aria-hidden="true">${esc((state.user.display_name||'ค').trim().charAt(0))}</span><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออกจากระบบ</button></div></header>
@@ -207,11 +211,12 @@ function filters({date=true}={}){return `<div class="row"><div class="field smal
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
 async function showTab(tab){state.tab=tab;
  if(tab==='attendance')state.kind='daily';
- if(tab==='periodAttendance')state.kind='period';
+ if(tab==='periodAttendance'||tab==='periodCheckin')state.kind='period';
  if(tab!=='adminStudents')unifiedImport.clear();
  if(tab!=='admin')advisorImporter.clear();
  if(tab==='dashboard')return loadDashboard();
- if(tab==='attendance'||tab==='periodAttendance')return loadAttendance();
+ if(tab==='attendance'||tab==='periodCheckin')return loadAttendance();
+ if(tab==='periodAttendance')return state.user?.role==='teacher'?periodCenter.load():loadAttendance();
  if(tab==='myTimetable')return myTimetable.load();
  if(tab==='advisorCenter')return loadAdvisorCenter();
  if(tab==='late')return loadLate();
@@ -329,7 +334,8 @@ function renderAttendance(){
   return `<option value="${t.id}" ${t.id===state.slotId?'selected':''}>คาบ ${period} • ${esc(t.classroom_label)} • ${esc(t.subject_code||'')}${t.subject_code?' / ':''}${esc(t.subject)}${state.user?.role==='teacher'?'':' ('+esc(t.teacher_name)+')'}</option>`;
  }).join('');
  const students=state.students.map(s=>`<div class="student" data-id="${s.id}"><div><div class="student-name">${s.roll_no}. ${esc(s.full_name)}</div><div class="student-sub">รหัส ${esc(s.student_no)}</div></div><div class="pills">${Object.keys(names).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${names[status]}</button>`).join('')}</div></div>`).join('');
- mount(`<section class="stack"><div><h2>${daily?'📅 เช็กชื่อรายวัน':'✅ เช็กชื่อรายคาบ'}</h2>
+ mount(`<section class="stack">${!daily&&state.user?.role==='teacher'?'<div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>':''}
+ <div><h2>${daily?'📅 เช็กชื่อรายวัน':'✅ เช็กชื่อรายคาบ'}</h2>
   <p class="muted">${daily?'สำหรับครูที่ปรึกษา • เช็กชื่อห้องที่รับผิดชอบ':'สำหรับครูผู้สอน • เลือกวิชาจากตารางสอนของตนเองได้ แม้จะไม่ใช่ครูที่ปรึกษาของห้อง'}</p></div>
  <div class="card stack">
  ${daily?`<div class="row"><div class="field smallbox"><label for="room">ห้องที่รับผิดชอบ</label><select id="room">${roomSelect}</select></div>
