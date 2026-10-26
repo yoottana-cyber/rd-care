@@ -35,10 +35,25 @@ test('QR token must be 160-bit lowercase hex with no user-chosen student ID',()=
  assert.match(backend,/crypto\.subtle\.digest\('SHA-256'/);
  assert.doesNotMatch(backend,/b\.student_id/);
 });
-test('duty teacher UI rotates token and refreshes students automatically',()=>{
- const fs=readFileSync(new URL('../web/late-gate.js',import.meta.url),'utf8');
- assert.match(fs,/late\/qr\/rotate/);
- assert.match(fs,/late\/qr\/queue/);
- assert.match(fs,/setInterval/);
- assert.match(fs,/late\/qr\/.*review/);
+test('permanent QR is printable and the duty teacher list refreshes',()=>{
+ const ui=readFileSync(new URL('../web/late-gate.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../web/late-gate.css',import.meta.url),'utf8');
+ const portal=readFileSync(new URL('../web/portal-ui.js',import.meta.url),'utf8');
+ assert.match(ui,/\/api\/late\/qr\/print/);
+ assert.match(ui,/window\.print\(\)/);
+ assert.match(ui,/\/api\/late\/qr\/queue/);
+ assert.match(ui,/setInterval/);
+ assert.match(ui,/\/api\/late\/qr\/.*review/);
+ assert.doesNotMatch(ui,/\/api\/late\/qr\/rotate/);
+ assert.match(css,/@media print/);
+ assert.match(portal,/value==='gate'/);
+});
+test('permanent QR route uses fixed public URL, and keeps manual approval',()=>{
+ const backend=readFileSync(new URL('../worker/src/late-qr.js',import.meta.url),'utf8');
+ assert.match(backend,/late_qr=gate/);
+ assert.match(backend,/b\.token==='gate'/);
+ assert.match(backend,/late_static_qr_submissions/);
+ assert.match(backend,/openGate\(\)/);
+ assert.match(backend,/state='pending'/);
+ assert.match(backend,/source=isPermanent/);
 });
