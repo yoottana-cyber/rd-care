@@ -7,7 +7,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]/'worker'/'migrations'
 def make_db():
  db=sqlite3.connect(':memory:')
  db.execute('PRAGMA foreign_keys=ON')
- for file in ['0001_initial.sql','0002_notification_outbox.sql','0006_student_guardian_portal.sql','0013_truancy_push.sql']:
+ for file in ['0001_initial.sql','0002_notification_outbox.sql','0006_student_guardian_portal.sql','0013_truancy_push.sql','0014_truancy_priority_retries.sql']:
   db.executescript((ROOT/file).read_text(encoding='utf8'))
  db.execute("INSERT INTO users(id,username,display_name,role,password_salt,password_hash) VALUES(1,'t','Teacher','teacher','salt','hash')")
  db.execute("INSERT INTO classrooms(id,grade,room,label,advisor_user_id) VALUES(1,1,1,'ม.1/1',1)")
@@ -45,6 +45,25 @@ class TruancySchemaTest(unittest.TestCase):
    db.execute(q);db.execute(q)
    self.assertEqual(db.execute("SELECT COUNT(*) FROM truancy_push_deliveries").fetchone()[0],1)
   finally: db.close()
+
+ def test_priority_push_limits_retries_to_three_attempts_per_device(self):
+  db=make_db()
+  try:
+   db.execute("INSERT INTO truancy_events(student_id,timetable_id,school_date,recorded_by) VALUES(1,1,'2026-10-26',1)")
+   db.execute("INSERT INTO truancy_push_deliveries(event_id,generation,recipient_type,subscription_id) VALUES(1,1,'advisor',5)")
+   claim="""UPDATE truancy_push_deliveries SET state='sending',attempts=attempts+1,updated_at=CURRENT_TIMESTAMP
+     WHERE event_id=1 AND generation=1 AND recipient_type='advisor' AND subscription_id=5
+     AND attempts<3 AND (state='pending'
+       OR (state IN ('sending','failed') AND updated_at<datetime('now','-2 minutes')))"""
+   self.assertEqual(db.execute(claim).rowcount,1)
+   for attempt in (1,2):
+    db.execute("UPDATE truancy_push_deliveries SET state='failed',updated_at=datetime('now','-3 minutes') WHERE subscription_id=5")
+    self.assertEqual(db.execute(claim).rowcount,1)
+   self.assertEqual(db.execute("SELECT attempts FROM truancy_push_deliveries").fetchone()[0],3)
+   db.execute("UPDATE truancy_push_deliveries SET state='failed',updated_at=datetime('now','-3 minutes') WHERE subscription_id=5")
+   self.assertEqual(db.execute(claim).rowcount,0)
+   self.assertEqual(db.execute("SELECT attempts FROM truancy_push_deliveries").fetchone()[0],3)
+  finally:db.close()
 
  def test_daily_attendance_cannot_be_saved_as_truancy(self):
   db=make_db()
