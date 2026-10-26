@@ -24,10 +24,30 @@ class TeacherTimetableMigrationTests(unittest.TestCase):
             "INSERT INTO timetable(id,classroom_id,teacher_user_id,day_of_week,period,subject)"
             " VALUES(5,1,1,1,2,'วิทยาการคำนวณ')"
         )
-        for number in range(2, 9):
-            db.executescript((MIGRATIONS / f"000{number}_"
-                f"{ {2:'notification_outbox',3:'student_transfer_plans',4:'historical_enrollments',5:'late_self_requests',6:'student_guardian_portal',7:'teacher_timetable',8:'teacher_timetable_approvals'}[number] }.sql"
-                ).read_text(encoding="utf-8"))
+        migrations = {
+            2: "notification_outbox", 3: "student_transfer_plans",
+            4: "historical_enrollments", 5: "late_self_requests",
+            6: "student_guardian_portal", 7: "teacher_timetable",
+            8: "teacher_timetable_approvals"
+        }
+        for number, name in migrations.items():
+            db.executescript((MIGRATIONS / f"{number:04d}_{name}.sql").read_text(encoding="utf-8"))
+        # Simulate a request waiting under the previous version and one overlapping it.
+        db.execute(
+            "INSERT INTO timetable(classroom_id,teacher_user_id,day_of_week,period,end_period,"
+            "subject_code,subject,active,approval_status)"
+            " VALUES(1,1,3,1,2,'ว22103','วิทยาการคำนวณ',0,'pending')"
+        )
+        db.execute(
+            "INSERT INTO timetable(classroom_id,teacher_user_id,day_of_week,period,end_period,"
+            "subject_code,subject,active,approval_status)"
+            " VALUES(1,1,3,2,3,'ว22104','วิทยาการคำนวณเพิ่มเติม',0,'pending')"
+        )
+        db.executescript((MIGRATIONS / "0009_teacher_timetable_immediate.sql").read_text(encoding="utf-8"))
+        states = db.execute(
+            "SELECT period,active,approval_status FROM timetable WHERE day_of_week=3 ORDER BY period"
+        ).fetchall()
+        self.assertEqual(states, [(1,1,'approved'),(2,0,'rejected')])
         lesson = db.execute(
             "SELECT id,period,COALESCE(end_period,period),subject_code,subject"
             " FROM timetable WHERE id=5"
