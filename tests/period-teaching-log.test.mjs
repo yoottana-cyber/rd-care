@@ -58,7 +58,7 @@ test('optional note saved in same batch as period attendance, including edited n
  const res=await post(env,{teaching_note:'  เรื่อง เงื่อนไข if  '});
  assert.equal(res.status,200);
  const result=await res.json();assert.equal(result.saved,1);
- assert.equal(batched.length,6); // attendance, alert resolution, notification cleanup, note, note audit, attendance audit
+ assert.equal(batched.length,8); // attendance, truancy correction cleanup (2), alert resolution, outbox cleanup, note, and audits
  const note=executed.find(x=>x.sql.includes('INSERT INTO period_teaching_logs'));
  assert.deepEqual(note.params,[5,today,'เรื่อง เงื่อนไข if',7]);
  assert.ok(batched.some(x=>x.sql.includes('INSERT INTO attendance_period')));
