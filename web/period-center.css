@@ -134,3 +134,30 @@
  .period-report-filters .button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.period-slot,.period-tabs button{transition:none!important;transform:none!important}}
+
+
+/* Optional teaching note on each dated period attendance sheet. */
+.teaching-note-card{margin-top:8px;padding:17px 18px;border:1px solid #dce7ef;border-radius:12px;background:linear-gradient(120deg,#f6fcfa,#f7f9ff);display:flex;flex-direction:column;gap:10px}
+.teaching-note-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.teaching-note-heading h3{margin:0 0 3px;color:#375a55;font-size:15px;font-weight:650}
+.teaching-note-heading p{font-size:11px;margin:0}
+.teaching-note-optional{font-size:11px;color:#6c8591;font-weight:450}
+.teaching-note-label{color:#405868;font-size:11px;font-weight:600}
+.teaching-note-card textarea{display:block;min-height:102px;width:100%;box-sizing:border-box;resize:vertical;padding:12px 14px;border:1px solid #cbdbe4;border-radius:10px;background:#fff;color:#2d3e53;font:inherit;font-size:12px;line-height:1.8}
+.teaching-note-card textarea:focus{border-color:#2eaa83;outline:3px solid #d6f4e7}
+.teaching-note-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:10px;color:#728597}
+.teaching-note-foot #teachingNoteCount{font-variant-numeric:tabular-nums;white-space:nowrap}
+.teaching-log-history{display:flex;flex-direction:column;gap:10px;margin:7px 0 10px}
+.teaching-log-history h4,.period-report-details h4{font-size:13px;font-weight:650;color:#37536b;margin:6px 0 2px}
+.teaching-log-item{padding:13px 15px;background:#f6f9fc;border:1px solid #e5eaf1;border-radius:10px}
+.teaching-log-item>div{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.teaching-log-item strong{font-size:11px;color:#266f62}
+.teaching-log-item span{font-size:10px}
+.teaching-log-item p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.75;margin:7px 0 0;color:#42566c}
+[data-theme="dark"] .teaching-note-card{background:#21394a;border-color:#3b5867}
+[data-theme="dark"] .teaching-note-heading h3,[data-theme="dark"] .teaching-note-label{color:#d7f1e8}
+[data-theme="dark"] .teaching-note-card textarea{background:#172536;border-color:#496070;color:#edf6ff}
+[data-theme="dark"] .teaching-log-item{background:#24374a;border-color:#3b4f66}
+[data-theme="dark"] .teaching-log-item p{color:#d5e1f2}
+[data-theme="dark"] .teaching-log-history h4,[data-theme="dark"] .period-report-details h4{color:#e0ebf7}
+@media(max-width:550px){.teaching-note-card{padding:13px}.teaching-note-foot{flex-direction:column;align-items:flex-start;gap:3px}}
