@@ -1,0 +1,42 @@
+// Staff PWA installation / push opt-in settings; all permission prompts require a tap.
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function createNotificationSettings({pwaTools,mount,toast,safeRun,showTab,getAlerts}){
+ async function load(){
+  const st=await pwaTools.check();
+  const info=!st.canPush?'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนแบบ Push':
+   !st.enabled?'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่ากุญแจ VAPID จึงยังไม่พร้อมเปิด Push':
+   st.permission==='denied'?'การแจ้งเตือนถูกปฏิเสธ โปรดอนุญาตในตั้งค่าอุปกรณ์':
+   st.subscribed?'อุปกรณ์นี้เปิดรับการแจ้งเตือนแล้ว':'ยังไม่ได้เปิด Push บนอุปกรณ์นี้';
+  const pending=Math.max(0,Number(getAlerts()||0));
+  mount(`<section class="stack rd-notification-settings">
+   <div class="rd-mobile-welcome"><h2>🔔 ศูนย์แจ้งเตือน</h2>
+   <p>เข้าถึงงานสำคัญและตั้งค่า RD Care บนโทรศัพท์ของคุณ</p></div>
+   <section class="card stack">
+    <div class="row between"><h3>งานรอการตรวจสอบ</h3><span class="tag">${pending.toLocaleString('th-TH')} รายการ</span></div>
+    <p class="muted">เปิดดูรายการในระบบหลังเข้าสู่บัญชี โดยไม่ส่งชื่อหรือข้อมูลนักเรียนไปแสดงบนหน้าจอล็อก</p>
+    <button type="button" class="button secondary" data-tab="alerts">ตรวจสอบการขาดเรียน</button>
+    <button type="button" class="button secondary" data-tab="advisorCenter">ศูนย์ครูที่ปรึกษา</button>
+   </section>
+   <section class="card stack"><h3>📱 ติดตั้ง RD Care ลงมือถือ</h3>
+    <p class="muted">ใช้งานเหมือนแอปผ่านไอคอนบนหน้าจอหลัก พร้อมโหมดเต็มหน้าจอ</p>
+    <div class="row between"><span class="tag">${st.installed?'ติดตั้งแอปแล้ว':'ยังไม่อยู่ในโหมดแอป'}</span>
+     <button type="button" class="button" id="rdInstallApp" ${st.installed?'disabled':''}>⬇️ ติดตั้งแอป</button></div>
+    <p class="muted">iPhone/iPad: เปิดผ่าน Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม จากนั้นเปิดผ่านไอคอน RD Care</p>
+   </section>
+   <section class="card stack"><h3>🔔 Push Notification สำหรับครู</h3>
+    <p class="muted">แจ้งเตือนเมื่อมีรายการขาดรายคาบที่ครูที่ปรึกษาต้องตรวจสอบ โดยใช้ข้อความทั่วไป ไม่มีข้อมูลส่วนตัวของนักเรียน และเปิดรับโดยสมัครใจเท่านั้น</p>
+    <div class="${st.enabled&&st.subscribed?'ok':'summary'}" role="status">${esc(info)}</div>
+    <div class="row">
+     <button type="button" class="button" id="rdEnablePush" ${!st.canPush||!st.enabled||st.permission==='denied'||st.subscribed?'disabled':''}>เปิดรับ Push</button>
+     <button type="button" class="button secondary" id="rdDisablePush" ${!st.subscribed?'disabled':''}>ปิด Push อุปกรณ์นี้</button></div>
+    <p class="muted">การแจ้งเตือนถึงผู้ปกครองยังไม่ได้เปิดใช้งาน และจะไม่สมัครรับแจ้งเตือนโดยอัตโนมัติ</p>
+   </section></section>`);
+  document.querySelector('#rdInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install()));
+  // Must call requestPermission in the synchronous click activation path (especially iOS).
+  document.querySelector('#rdEnablePush')?.addEventListener('click',()=>{
+   safeRun(async()=>{await pwaTools.enable();await load()});
+  });
+  document.querySelector('#rdDisablePush')?.addEventListener('click',()=>safeRun(async()=>{await pwaTools.disable();await load()}));
+ }
+ return {load};
+}
