@@ -53,7 +53,10 @@ export async function periodCourseReport(req,env,user){
       AND a.status!='present'
     ORDER BY a.school_date DESC,h.roll_no LIMIT 500`)
     .bind(selected,user.id,from,to).all();
-  return json({items:results,from,to,limited:results.length>=500});
+  const {results:teachingLogs}=await env.DB.prepare(`SELECT school_date,note,updated_at
+   FROM period_teaching_logs WHERE timetable_id=? AND school_date BETWEEN ? AND ?
+   ORDER BY school_date DESC LIMIT 185`).bind(selected,from,to).all();
+  return json({items:results,teaching_logs:teachingLogs,from,to,limited:results.length>=500});
  }
  const {results}=await env.DB.prepare(`SELECT t.id AS timetable_id,t.classroom_id,t.day_of_week,t.period,
   COALESCE(t.end_period,t.period) AS end_period,t.subject,t.subject_code,
