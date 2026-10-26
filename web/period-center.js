@@ -27,7 +27,7 @@ function defaultFrom(today){return addDays(today,-29);}
 function number(value){return (Number(value)||0).toLocaleString('th-TH');}
 export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toast,today}){
  let view='week',week=weekMonday(today()),lessons=[],statuses=[],report=[],
-  from=defaultFrom(today()),to=today(),detailSlot=null,details=[],detailLimited=false;
+  from=defaultFrom(today()),to=today(),detailSlot=null,details=[],teachingLogs=[],detailLimited=false;
  const current=()=>today();
  const statusFor=(id,schoolDate)=>statuses.find(x=>x.timetable_id===id&&x.school_date===schoolDate);
  const activeLessons=()=>lessons.filter(x=>x.approval_status==='approved'&&x.active!==0);
@@ -121,13 +121,13 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
   const query=new URLSearchParams(request);
   const r=await api('/api/my-timetable/report?'+query);
   if(view!=='report'||from!==request.from||to!==request.to)return;
-  report=r.items;detailSlot=null;details=[];renderReport();
+  report=r.items;detailSlot=null;details=[];teachingLogs=[];renderReport();
  }
  async function loadDetails(id){
   const query=new URLSearchParams({from,to,timetable_id:String(id)});
   const r=await api('/api/my-timetable/report?'+query);
   if(view!=='report')return;
-  detailSlot=id;details=r.items;detailLimited=r.limited;renderReport();
+  detailSlot=id;details=r.items;teachingLogs=r.teaching_logs||[];detailLimited=r.limited;renderReport();
  }
  function renderReport(){
   const lessonCount=report.length;
@@ -157,12 +157,17 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
       <td>${esc(days[x.day_of_week-1])} · ${lessonPeriod(x)}</td>
       <td>${number(x.dates_recorded)}</td><td>${number(x.present)}</td>
       <td><strong class="period-danger">${number(x.absent)}</strong></td><td>${number(x.late)}</td><td>${number(x.leave)}</td>
-      <td><button type="button" class="button secondary" data-report-lesson="${x.timetable_id}">ดูรายชื่อ</button></td></tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่พบวิชาที่ลงตารางในบัญชีนี้</td></tr>'}</tbody></table></div>
+      <td><button type="button" class="button secondary" data-report-lesson="${x.timetable_id}">รายชื่อ / บันทึกการสอน</button></td></tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่พบวิชาที่ลงตารางในบัญชีนี้</td></tr>'}</tbody></table></div>
    </section>
    ${selected?`<section class="card stack period-report-details"><div class="period-panel-title">
     <div><h3>เหตุการณ์ที่ต้องติดตาม — ${esc(selected.classroom_label)}</h3>
      <p class="muted">${esc(selected.subject_code)} ${esc(selected.subject)} · เฉพาะรายการไม่เข้าคาบ มาสาย และลาในช่วงที่เลือก</p></div>
     <button type="button" id="closePeriodDetail" class="button ghost">ปิดรายละเอียด</button></div>
+    <div class="teaching-log-history"><h4>📝 บันทึกการสอนย้อนหลัง (${teachingLogs.length} รายการ)</h4>
+    ${teachingLogs.length?teachingLogs.map(log=>`<article class="teaching-log-item">
+     <div><strong>${esc(log.school_date)}</strong><span class="muted">บันทึก/แก้ไขล่าสุด ${esc(log.updated_at||'')}</span></div>
+     <p>${esc(log.note)}</p></article>`).join(''):'<p class="muted">ไม่มีบันทึกการสอนในช่วงวันที่เลือก (การบันทึกส่วนนี้ไม่บังคับ)</p>'}</div>
+    <h4>รายชื่อนักเรียนที่ต้องติดตาม</h4>
     <div class="table-wrap"><table class="table"><thead><tr><th>วันที่</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ-สกุล</th><th>สถานะ</th></tr></thead>
      <tbody>${details.length?details.map(x=>`<tr><td>${esc(x.school_date)}</td><td>${number(x.roll_no)}</td><td>${esc(x.student_no)}</td><td>${esc(x.full_name)}</td>
      <td><span class="period-event period-event-${esc(x.status)}">${esc(statusName[x.status]||x.status)}</span></td></tr>`).join(''):'<tr><td colspan="5" class="empty">ไม่มีรายการไม่เข้าคาบ มาสาย หรือลา ในช่วงวันที่นี้</td></tr>'}</tbody></table></div>
@@ -178,7 +183,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
    from=f;to=t;safeRun(loadReport);
   });
   document.querySelectorAll('[data-report-lesson]').forEach(b=>b.addEventListener('click',()=>safeRun(()=>loadDetails(Number(b.dataset.reportLesson)))));
-  document.querySelector('#closePeriodDetail')?.addEventListener('click',()=>{detailSlot=null;details=[];renderReport()});
+  document.querySelector('#closePeriodDetail')?.addEventListener('click',()=>{detailSlot=null;details=[];teachingLogs=[];renderReport()});
  }
  async function load(){return view==='week'?loadWeek():loadReport()}
  return {load};
