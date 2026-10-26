@@ -46,7 +46,7 @@ test('owner mismatch prevents another teacher from editing',async()=>{
  assert.equal(wrote,false);
 });
 
-test('new teacher timetable stays pending until an administrator approves',async()=>{
+test('new teacher timetable is activated immediately without admin approval',async()=>{
  const sqlUsed=[];
  const db={prepare(sql){
   sqlUsed.push(sql);
@@ -60,6 +60,20 @@ test('new teacher timetable stays pending until an administrator approves',async
   method:'POST',body:JSON.stringify(good)
  }),{DB:db},{id:7,role:'teacher'},'/api/my-timetable');
  assert.equal(response.status,201);
- assert.deepEqual((await response.json()).approval_status,'pending');
- assert.ok(sqlUsed.some(s=>s.includes("VALUES(?,?,?,?,?,?,?,0,'pending')")),'pending timetable must not grant roster access');
+ assert.deepEqual((await response.json()).approval_status,'approved');
+ assert.ok(sqlUsed.some(s=>s.includes("VALUES(?,?,?,?,?,?,?,1,'approved')")),'new timetable should be usable immediately');
+});
+
+test('conflicting teacher-created timeslots cannot be activated',async()=>{
+ let wrote=false;
+ const db={prepare(sql){
+  if(sql.includes('SELECT id FROM classrooms WHERE id'))return {bind:()=>({first:async()=>({id:2})})};
+  if(sql.includes('SELECT id FROM timetable')&&sql.includes('active=1'))return {bind:()=>({first:async()=>({id:14})})};
+  if(sql.includes('INSERT INTO timetable')||sql.includes('UPDATE timetable'))wrote=true;
+  throw Error('Unexpected SQL: '+sql);
+ }};
+ await assert.rejects(()=>teacherTimetableRoutes(
+  new Request('https://test.local/api/my-timetable',{method:'POST',body:JSON.stringify(good)}),
+  {DB:db},{id:7,role:'teacher'},'/api/my-timetable'),{code:409});
+ assert.equal(wrote,false);
 });
