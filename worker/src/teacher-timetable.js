@@ -1,5 +1,7 @@
-// Teacher-owned timetable: self-service without granting advisor permissions.
-import {cleanText} from './core.js';
+// Teacher-owned timetable: record and activate a verified teacher session's lesson immediately.
+// This does not grant daily (homeroom) attendance rights; the timetable grants only period attendance.
+// The database approval_status='approved' is retained as a legacy active-state marker, not an approval workflow.
+// Keep actor ownership checks, classroom/teacher period conflicts, and attendance-history protections.
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const response=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const int=v=>{const n=Number(v);return Number.isSafeInteger(n)&&n>0?n:null};
