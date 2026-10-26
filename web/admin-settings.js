@@ -1,0 +1,263 @@
+// RD Care settings console. Reuses the existing school APIs and advisor-import workflow.
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+// Correct the HTML quote mapping without touching sensitive data.
+const safe=v=>esc(v).replace(/&quot(?!;)/g,'&quot;');
+export const adminTabs=[
+ {id:'overview',label:'ภาพรวม',icon:'◫'},
+ {id:'people',label:'บัญชีบุคลากร',icon:'♙'},
+ {id:'teaching',label:'ครูและตารางสอน',icon:'▤'},
+ {id:'import',label:'นำเข้าข้อมูล',icon:'⇩'}
+];
+export function adminMetrics(users,rooms){
+ const staff=users.filter(u=>['teacher','staff'].includes(u.role));
+ return {users:users.length,teachers:staff.filter(u=>u.role==='teacher'&&u.active).length,
+  rooms:rooms.length,advisors:rooms.filter(r=>r.advisor_user_id).length,
+  inactive:staff.filter(u=>!u.active).length};
+}
+const roleText={teacher:'ครูผู้สอน',staff:'กิจการนักเรียน',admin:'ผู้ดูแลระบบ'};
+export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
+ reload,refreshRooms,clearStudentCache,advisorImporter,parseCsv,periodChoices}){
+ let tab='overview',editUserId=null,search='',filterRole='all',filterStatus='all';
+ const users=()=>getUsers()||[],rooms=()=>getRooms()||[];
+ const roomsHtml=()=>rooms().map(r=>`<option value="${r.id}">${safe(r.label)}</option>`).join('');
+ const teachersHtml=()=>users().filter(u=>u.active&&u.role==='teacher')
+  .map(u=>`<option value="${u.id}">${safe(u.display_name)} (@${safe(u.username)})</option>`).join('');
+ const panel=(icon,title,subtitle)=>`<div class="rd-settings-panel-head">
+  <span class="rd-settings-panel-symbol" aria-hidden="true">${icon}</span>
+  <div><h3>${title}</h3><p>${subtitle}</p></div></div>`;
+ const jump=(id,title)=>`<button type="button" class="rd-settings-link" data-settings-go="${id}">${title}<span aria-hidden="true">›</span></button>`;
+ function overview(){
+  const m=adminMetrics(users(),rooms());
+  return `<div class="rd-settings-content"><div class="rd-settings-section-heading">
+   <div><h3>ภาพรวมการจัดการ</h3><p>เลือกหมวดงานเพื่อดูรายละเอียดและแก้ไขข้อมูล</p></div></div>
+   <div class="rd-settings-feature-grid">
+    <article class="rd-settings-feature"><span aria-hidden="true">👥</span><h4>บัญชีครูและบุคลากร</h4>
+     <p>เพิ่มบัญชี ค้นหาและแก้ไขข้อมูล หรือจัดการสถานะผู้ใช้งาน</p>${jump('people','จัดการบุคลากร')}</article>
+    <article class="rd-settings-feature"><span aria-hidden="true">📚</span><h4>โครงสร้างการสอน</h4>
+     <p>กำหนดครูที่ปรึกษาและเพิ่มรายวิชาตามห้องเรียนและช่วงคาบ</p>${jump('teaching','จัดการการสอน')}</article>
+    <article class="rd-settings-feature"><span aria-hidden="true">📥</span><h4>ศูนย์นำเข้าข้อมูล</h4>
+     <p>นำเข้านักเรียน CSV หรือครูที่ปรึกษาจาก Excel / CSV</p>${jump('import','นำเข้าข้อมูล')}</article>
+   </div>
+   <div class="rd-settings-notice"><strong>สิ่งที่ควรตรวจสอบ</strong>
+    <p>ยังไม่ได้กำหนดครูที่ปรึกษา <b>${m.rooms-m.advisors}</b> ห้อง
+    · พักบัญชีบุคลากร <b>${m.inactive}</b> บัญชี</p></div></div>`;
+ }
+ function people(){
+  const person=users().find(u=>u.id===editUserId&&['teacher','staff'].includes(u.role));
+  return `<div class="rd-settings-content"><div class="rd-settings-section-heading">
+   <div><h3>บัญชีครูและบุคลากร</h3><p>สร้างบัญชีใหม่และจัดการบุคลากรอย่างเป็นระบบ</p></div>
+   <span class="rd-settings-counter">${users().length} บัญชี</span></div>
+   <div class="rd-settings-people-grid">
+    <section class="rd-settings-panel">${panel('＋','เพิ่มบัญชีใหม่','ครูผู้สอนและฝ่ายกิจการนักเรียน')}
+     <form id="addUser" class="rd-settings-form">
+      <div class="field"><label for="staffUsername">ชื่อเข้าสู่ระบบ (Username)</label>
+       <input id="staffUsername" name="username" autocomplete="off" pattern="[A-Za-z0-9._-]+" minlength="3" maxlength="40" placeholder="เช่น teacher01" required>
+       <small>ใช้อักษรอังกฤษ ตัวเลข จุด หรือขีดกลาง</small></div>
+      <div class="field"><label for="staffDisplay">ชื่อที่แสดง</label>
+       <input id="staffDisplay" name="display_name" maxlength="100" placeholder="ชื่อ–สกุล" autocomplete="off" required></div>
+      <div class="field"><label for="staffRole">บทบาท</label><select name="role" id="staffRole">
+       <option value="teacher">ครูผู้สอน</option><option value="staff">ฝ่ายกิจการนักเรียน</option></select></div>
+      <div class="field"><label for="staffPassword" id="staffPasswordLabel">รหัสผ่านชั่วคราว (อย่างน้อย 4 ตัว)</label>
+       <input id="staffPassword" name="password" type="password" minlength="4" maxlength="128" autocomplete="new-password" required>
+       <small>แนะนำรหัสผ่านที่คาดเดายากและไม่ซ้ำ</small></div>
+      <button class="button full" type="submit">＋ สร้างบัญชี</button>
+     </form></section>
+    <section class="rd-settings-panel rd-settings-roster">${panel('♙','รายชื่อบุคลากร','ค้นหาและแก้ไขบัญชี')}
+     <div class="rd-settings-filters">
+      <div class="field"><label for="settingsSearch">ค้นหาชื่อหรือ Username</label>
+       <input type="search" id="settingsSearch" placeholder="ค้นหาบุคลากร" value="${safe(search)}"></div>
+      <div class="field"><label for="settingsRoleFilter">บทบาท</label>
+       <select id="settingsRoleFilter"><option value="all" ${filterRole==='all'?'selected':''}>ทุกบทบาท</option>
+       <option value="teacher" ${filterRole==='teacher'?'selected':''}>ครู</option>
+       <option value="staff" ${filterRole==='staff'?'selected':''}>กิจการนักเรียน</option>
+       <option value="admin" ${filterRole==='admin'?'selected':''}>ผู้ดูแลระบบ</option></select></div>
+      <div class="field"><label for="settingsStatusFilter">สถานะ</label>
+       <select id="settingsStatusFilter"><option value="all" ${filterStatus==='all'?'selected':''}>ทั้งหมด</option>
+       <option value="active" ${filterStatus==='active'?'selected':''}>ใช้งาน</option>
+       <option value="inactive" ${filterStatus==='inactive'?'selected':''}>พักบัญชี</option></select></div>
+     </div>
+     <p class="rd-settings-filter-count" id="settingsResultCount" role="status"></p>
+     <div class="table-wrap"><table class="table rd-settings-table"><thead>
+      <tr><th>ชื่อ / Username</th><th>บทบาท</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>
+      ${users().map(u=>`<tr data-settings-user data-name="${safe((u.display_name+' '+u.username).toLocaleLowerCase())}"
+       data-role="${u.role}" data-status="${u.active?'active':'inactive'}">
+       <td><div class="rd-settings-person"><span aria-hidden="true" class="rd-settings-avatar">${safe(u.display_name?.charAt(0)||'ค')}</span>
+       <div><strong>${safe(u.display_name)}</strong><small>@${safe(u.username)}</small></div></div></td>
+       <td>${safe(roleText[u.role]||u.role)}</td><td><span class="rd-settings-status ${u.active?'on':'off'}">${u.active?'ใช้งาน':'พักบัญชี'}</span></td>
+       <td>${['teacher','staff'].includes(u.role)?`<button type="button" class="button secondary"
+        data-edit-user="${u.id}">แก้ไข</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีข้อมูล</td></tr>'}
+     </tbody></table></div></section>
+   </div>
+   ${person?`<section class="rd-settings-panel rd-settings-person-edit" id="settingsPersonEdit">
+     ${panel('✎','แก้ไขข้อมูลบุคลากร','Username: '+safe(person.username))}
+     <form id="adminPersonnelEdit" class="rd-settings-form">
+      <div class="rd-settings-fields-two"><div class="field"><label for="editStaffName">ชื่อที่แสดง</label>
+       <input id="editStaffName" name="display_name" maxlength="100" value="${safe(person.display_name)}" required></div>
+      <div class="field"><label for="editStaffActive">สถานะบัญชี</label><select id="editStaffActive" name="active">
+       <option value="1" ${person.active?'selected':''}>ใช้งาน</option>
+       <option value="0" ${person.active?'':'selected'}>ระงับการใช้งาน</option></select></div></div>
+      <p class="rd-settings-field-hint">การระงับบัญชีจะยกเลิก Session ของบุคลากรทันที แต่ยังเก็บประวัติไว้</p>
+      <div class="rd-settings-actions"><button class="button" type="submit">บันทึกการเปลี่ยนแปลง</button>
+       <button class="button ghost" type="button" id="cancelSettingsEdit">ยกเลิก</button></div>
+     </form></section>`:''}
+  </div>`;
+ }
+ function teaching(){
+  const disabled=!rooms().length||!teachersHtml();
+  return `<div class="rd-settings-content"><div class="rd-settings-section-heading">
+   <div><h3>โครงสร้างการสอน</h3><p>แบ่งงานครูที่ปรึกษาออกจากการกำหนดผู้สอนรายคาบ</p></div></div>
+   <div class="rd-settings-teaching-grid">
+    <section class="rd-settings-panel">${panel('🏫','กำหนดครูที่ปรึกษา','เลือกห้องเรียนและครูผู้รับผิดชอบ')}
+     <form id="assignAdvisor" class="rd-settings-form">
+      <div class="field"><label for="advisorRoom">ห้องเรียน</label>
+       <select id="advisorRoom" name="classroom_id" required>${roomsHtml()}</select></div>
+      <div class="field"><label for="advisorTeacher">ครูที่ปรึกษา</label>
+       <select id="advisorTeacher" name="teacher_user_id" required>${teachersHtml()}</select></div>
+      <p class="rd-settings-field-hint">ตรวจสอบห้องและครูที่รับผิดชอบก่อนบันทึก</p>
+      <button class="button full" type="submit" ${disabled?'disabled':''}>บันทึกครูที่ปรึกษา</button></form></section>
+    <section class="rd-settings-panel">${panel('▤','เพิ่มตารางสอนรายคาบ','ตั้งรายวิชา ผู้สอน วัน และช่วงคาบ')}
+     <form id="addSlot" class="rd-settings-form">
+      <div class="rd-settings-fields-two">
+       <div class="field"><label for="slotRoom">ห้องเรียน</label><select id="slotRoom" name="classroom_id">${roomsHtml()}</select></div>
+       <div class="field"><label for="slotTeacher">ครูผู้สอน</label><select id="slotTeacher" name="teacher_user_id">${teachersHtml()}</select></div>
+       <div class="field"><label for="slotWeekday">วันสอน</label><select id="slotWeekday" name="day_of_week">
+       ${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((d,i)=>`<option value="${i+1}">${d}</option>`).join('')}</select></div>
+       <div class="field"><label for="slotPeriod">คาบสอน</label><select id="slotPeriod" name="period_range">
+        ${periodChoices.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div>
+       <div class="field"><label for="slotCode">รหัสวิชา</label><input name="subject_code" id="slotCode" maxlength="30" placeholder="เช่น ว22103" required></div>
+       <div class="field"><label for="slotSubject">ชื่อวิชา</label><input name="subject" id="slotSubject" maxlength="120" placeholder="เช่น วิทยาการคำนวณ" required></div>
+      </div><p class="rd-settings-field-hint">รองรับคาบเดี่ยวและคู่ 1, 1-2, 2, 2-3 จนถึงคาบ 10 และตรวจคาบซ้อนให้อัตโนมัติ</p>
+      <button type="submit" class="button full" ${disabled?'disabled':''}>＋ เพิ่มคาบเรียน</button></form></section>
+   </div><div class="rd-settings-notice">ครูสามารถเพิ่มตารางสอนของตนเองได้จากเมนู “ตารางสอนของฉัน” โดยไม่ต้องรออนุมัติ</div></div>`;
+ }
+ function imports(){
+  return `<div class="rd-settings-content"><div class="rd-settings-section-heading">
+   <div><h3>ศูนย์นำเข้าข้อมูล</h3><p>แยกประเภทไฟล์และตรวจสอบความถูกต้องก่อนบันทึก</p></div></div>
+   <div class="rd-settings-import-grid">
+    <section class="rd-settings-panel">${panel('🎓','นำเข้านักเรียน (CSV)','ไม่เกิน 60 คนต่อครั้ง')}
+     <form id="importStudents" class="rd-settings-form">
+      <div class="field"><label for="importStudentRoom">ห้องเรียน</label>
+       <select id="importStudentRoom" name="classroom_id" required>${roomsHtml()}</select></div>
+      <div class="field"><label for="importStudentText">ข้อมูล CSV</label>
+       <textarea id="importStudentText" name="csv" rows="8" required spellcheck="false"
+        placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง"></textarea></div>
+      <div class="rd-settings-notice">ตรวจชื่อ รหัสนักเรียน และการคุ้มครองข้อมูลส่วนบุคคลก่อนนำเข้า</div>
+      <button type="submit" class="button full" ${rooms().length?'':'disabled'}>⇩ นำเข้ารายชื่อนักเรียน</button>
+     </form></section>
+    <div id="advisorImportHolder" class="rd-settings-advisor-import"></div>
+   </div></div>`;
+ }
+ const layout=()=>{const m=adminMetrics(users(),rooms());
+  const statItems=[['◉','บัญชีทั้งหมด',m.users],['♙','ครูที่ใช้งาน',m.teachers],['▦','ห้องเรียน',m.rooms],['✓','มีครูที่ปรึกษา',m.advisors]];
+  return `<section class="rd-settings">
+   <header class="rd-settings-hero"><div><span>RD CARE · ADMINISTRATION</span>
+    <h2>ศูนย์จัดการระบบ</h2><p>จัดการบัญชีครู ห้องเรียน ตารางสอน และการนำเข้าข้อมูลในที่เดียว</p></div>
+    <div class="rd-settings-hero-icon" aria-hidden="true">⚙</div></header>
+   <div class="rd-settings-stats">${statItems.map(([icon,label,value])=>`<div class="rd-settings-stat">
+    <span aria-hidden="true">${icon}</span><div><small>${label}</small><strong>${value.toLocaleString('th-TH')}</strong></div></div>`).join('')}</div>
+   <nav class="rd-settings-tabs" aria-label="หมวดตั้งค่าระบบ">
+    ${adminTabs.map(t=>`<button type="button" data-settings-go="${t.id}" class="${tab===t.id?'active':''}"
+      ${tab===t.id?'aria-current="page"':''}><span aria-hidden="true">${t.icon}</span>${t.label}</button>`).join('')}</nav>
+   ${tab==='people'?people():tab==='teaching'?teaching():tab==='import'?imports():overview()}
+   </section>`;
+ };
+ function applyFilters(){
+  const query=search.trim().toLocaleLowerCase();let count=0;
+  document.querySelectorAll('[data-settings-user]').forEach(row=>{
+   const show=(!query||row.dataset.name.includes(query))&&(filterRole==='all'||row.dataset.role===filterRole)&&
+    (filterStatus==='all'||row.dataset.status===filterStatus);
+   row.hidden=!show;if(show)count++;
+  });
+  const label=document.querySelector('#settingsResultCount');
+  if(label)label.textContent='แสดง '+count+' จาก '+users().length+' บัญชี';
+ }
+ function onSubmit(id,action,message){
+  const form=document.getElementById(id);
+  form?.addEventListener('submit',event=>{
+   event.preventDefault();
+   safeRun(async()=>{
+    const button=form.querySelector('button[type="submit"]');
+    if(button?.disabled)return;
+    if(button)button.disabled=true;
+    try{
+     const saved=await action(new FormData(form));
+     if(saved===false)return;
+     toast(message);await reload();
+    }finally{if(button?.isConnected)button.disabled=false}
+   });
+  });
+ }
+ function bindPeople(){
+  const role=document.querySelector('#staffRole'),password=document.querySelector('#staffPassword');
+  const sync=()=>{
+   if(!role||!password)return;
+   password.minLength=role.value==='teacher'?4:12;
+   const label=document.querySelector('#staffPasswordLabel');
+   if(label)label.textContent='รหัสผ่านชั่วคราว (อย่างน้อย '+password.minLength+' ตัว)';
+  };role?.addEventListener('change',sync);sync();
+  document.querySelector('#settingsSearch')?.addEventListener('input',e=>{search=e.target.value;applyFilters()});
+  document.querySelector('#settingsRoleFilter')?.addEventListener('change',e=>{filterRole=e.target.value;applyFilters()});
+  document.querySelector('#settingsStatusFilter')?.addEventListener('change',e=>{filterStatus=e.target.value;applyFilters()});
+  applyFilters();
+  document.querySelectorAll('[data-edit-user]').forEach(button=>button.addEventListener('click',()=>{
+   editUserId=Number(button.dataset.editUser);render();
+   document.querySelector('#settingsPersonEdit')?.scrollIntoView({behavior:'smooth',block:'center'});
+  }));
+  document.querySelector('#cancelSettingsEdit')?.addEventListener('click',()=>{editUserId=null;render()});
+  onSubmit('adminPersonnelEdit',async f=>{
+   const u=users().find(u=>u.id===editUserId);
+   if(!u)throw Error('ไม่พบบัญชี');
+   const active=Number(f.get('active'));
+   if(!active&&!confirm('ระงับบัญชี '+u.display_name+' และยกเลิก Session ทุกอุปกรณ์?'))return false;
+   await api('/api/admin/users/'+u.id,{method:'POST',body:{display_name:String(f.get('display_name')).trim(),active}});
+   editUserId=null;return true;
+  },'บันทึกข้อมูลบุคลากรสำเร็จ');
+  onSubmit('addUser',async f=>{
+   await api('/api/admin/users',{method:'POST',body:{
+    username:String(f.get('username')).trim(),display_name:String(f.get('display_name')).trim(),
+    password:String(f.get('password')),role:f.get('role')}});
+   return true;
+  },'สร้างบัญชีสำเร็จ');
+ }
+ function bindTeaching(){
+  onSubmit('assignAdvisor',async f=>{
+   await api('/api/admin/advisor',{method:'POST',body:{
+    classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id'))}});
+   await refreshRooms();return true;
+  },'บันทึกครูที่ปรึกษาสำเร็จ');
+  onSubmit('addSlot',async f=>{
+   const periods=String(f.get('period_range')).split('-').map(Number);
+   await api('/api/admin/timetable',{method:'POST',body:{
+    classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id')),
+    day_of_week:Number(f.get('day_of_week')),period:periods[0],end_period:periods[1]||periods[0],
+    subject_code:String(f.get('subject_code')).trim(),subject:String(f.get('subject')).trim()}});
+   return true;
+  },'เพิ่มตารางสอนแล้ว');
+ }
+ function bindImports(){
+  onSubmit('importStudents',async f=>{
+   const records=parseCsv(String(f.get('csv')||'').trim());
+   if(records[0]?.join(',').toLowerCase()==='roll_no,student_no,full_name')records.shift();
+   if(records.length<1||records.length>60||records.some(r=>r.length!==3))
+    throw Error('กรุณาระบุข้อมูล 1–60 คน และให้ครบ 3 คอลัมน์');
+   await api('/api/admin/import-students',{method:'POST',body:{
+    classroom_id:Number(f.get('classroom_id')),
+    students:records.map(r=>({roll_no:Number(r[0]),student_no:r[1],full_name:r[2]}))}});
+   clearStudentCache();return true;
+  },'นำเข้านักเรียนสำเร็จ');
+  advisorImporter.render(document.querySelector('#advisorImportHolder'));
+ }
+ function render(){
+  mount(layout());
+  document.querySelectorAll('[data-settings-go]').forEach(button=>button.addEventListener('click',()=>{
+   const target=button.dataset.settingsGo;
+   if(!adminTabs.some(x=>x.id===target)||tab===target)return;
+   tab=target;editUserId=null;render();
+   document.querySelector('.rd-settings')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }));
+  if(tab==='people')bindPeople();
+  if(tab==='teaching')bindTeaching();
+  if(tab==='import')bindImports();
+ }
+ return {render};
+}
