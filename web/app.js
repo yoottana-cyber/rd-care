@@ -102,7 +102,7 @@ function loginPage(){
   <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้ง RD Care ลงมือถือ</button>
    <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
   <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
-  <p class="login-message">ระบบยังไม่ส่งการแจ้งเตือน Push ถึงผู้ปกครองโดยอัตโนมัติ</p>
+  <p class="login-message">Push ผู้ปกครองเปิดรับได้เฉพาะการแจ้งเหตุหนีเรียน ผ่านบัญชีที่ยืนยันและอนุญาตแล้ว</p>
  </div>
  <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
@@ -173,7 +173,7 @@ function chrome(content){
  ${content}
  </div>
  </div>${mobileMarkup({navs,user:state.user,active:id=>state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'),pending:Number(state.stats?.alerts||0)})}
- <footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • ยังไม่เปิดใช้งาน Push ผู้ปกครอง</footer></main>`;
+ <footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • Push ผู้ปกครองต้องเปิดรับด้วยตนเอง</footer></main>`;
 }
 function mount(content){
  $('#app').innerHTML=chrome(content);
@@ -572,7 +572,7 @@ async function loadAdvisorCenter(){
  ${items.length?items.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong>
  <p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
- <p class="muted">ระบบยังไม่ส่ง Push ถึงผู้ปกครองโดยอัตโนมัติ</p></section>`);
+ <p class="muted">แจ้งผู้ปกครองผ่าน Push เฉพาะเหตุหนีเรียนและอุปกรณ์ที่สมัครรับแล้ว</p></section>`);
  $('#advisorRoom')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);await loadAdvisorCenter()}));
  $$('[data-advisor-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
   if(!confirm(button.dataset.state==='confirmed'?'ยืนยันว่าไม่เข้าคาบเรียน?':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;
@@ -599,11 +599,11 @@ async function loadAlerts(){
  }catch(e){mount(`<div class="card"><h2>งานตรวจสอบ</h2><p class="warn">${esc(e.message)}</p><p class="muted">หน้านี้ให้ครูที่ปรึกษาและผู้ดูแลระบบเข้าถึงได้</p></div>`)}
 }
 function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false,advisorOnly:true})}
- <div class="warn">นักเรียนที่ขาดรายวันแล้วจะไม่ถูกแจ้งขาดรายคาบซ้ำ • การยืนยันรายการอื่นยังไม่ส่ง Push ถึงผู้ปกครอง</div>
+ <div class="warn">นักเรียนที่ขาดรายวันแล้วจะไม่ถูกแจ้งขาดรายคาบซ้ำ • รายการขาดปกติจะไม่ส่ง Push ถึงผู้ปกครอง</div>
  ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-review="${a.id}" data-state="resolved">มีเหตุ/บันทึกผิด</button><button class="button" data-review="${a.id}" data-state="confirmed">ยืนยันไม่เข้าชั้นเรียน</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการรอตรวจสอบ</div>'}</div></div>`);
  bindFilters(loadAlerts);
- $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (ระบบยังไม่ส่งการแจ้งเตือนผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
+ $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (การยืนยันขาดปกติไม่ส่ง Push ถึงผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
 }
 async function loadAdmin(){if(state.user.role!=='admin')return;const accounts=await api('/api/admin/users');state.users=accounts.items;renderAdmin();}
 function renderAdmin(){adminSettings.render();}
