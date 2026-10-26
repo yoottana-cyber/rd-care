@@ -19,7 +19,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
+const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
@@ -320,6 +320,13 @@ async function loadAttendance(){
  const entries=attendanceData.items;
  if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId||(kind==='period'&&state.slotId!==slotId))return;
  state.savedCount=entries.length;
+ // Keep the daily register independent of this period's editable status.
+ // An absent daily record is not proof of absence in every later period.
+ state.dailyReferences=kind==='period'
+  ?Object.fromEntries((attendanceData.daily_items||[])
+    .filter(item=>['present','absent','late','leave'].includes(item.status))
+    .map(item=>[item.student_id,item.status]))
+  :{};
  state.teachingNote=kind==='period'?attendanceData.teaching_note||'':'';
  state.teachingNoteUpdatedAt=kind==='period'?attendanceData.teaching_note_updated_at||null:null;
  state.statuses=Object.fromEntries(state.students.map(x=>[x.id,'present']));
@@ -328,6 +335,34 @@ async function loadAttendance(){
 }
 function statusCounts(){return Object.fromEntries(['present','absent','late','leave'].map(s=>[s,Object.values(state.statuses).filter(x=>x===s).length]));}
 function statusSummary(){const c=statusCounts();return `มา ${c.present} • ขาด ${c.absent} • สาย ${c.late} • ลา ${c.leave}`;}
+
+function dailyReferenceStatus(studentId){
+ const recorded=state.dailyReferences[studentId];
+ return ['present','absent','late','leave'].includes(recorded)?recorded:'unrecorded';
+}
+function dailyReferenceCounts(){
+ const counts={present:0,absent:0,late:0,leave:0,unrecorded:0};
+ for(const student of state.students)counts[dailyReferenceStatus(student.id)]++;
+ return counts;
+}
+function renderDailyOverview(){
+ const c=dailyReferenceCounts();
+ const focus=state.students.filter(student=>['absent','leave'].includes(dailyReferenceStatus(student.id)));
+ const tiles=[['present','มา','✅'],['absent','ขาด','🔴'],['leave','ลา','🔵'],['late','สาย','🟠'],['unrecorded','ยังไม่บันทึก','⚪']];
+ return `<section class="daily-class-overview" aria-label="สถานะเช็กชื่อรายวันจากครูที่ปรึกษา">
+   <div class="daily-overview-heading"><div><h3>📋 เช็กชื่อรายวันของห้อง • ${esc(state.date)}</h3>
+   <p>ข้อมูลจากครูที่ปรึกษา ใช้ดูประกอบการเช็กชื่อรายคาบเท่านั้น ไม่ปรับสถานะรายคาบอัตโนมัติ</p></div>
+   <span class="daily-reference-readonly">ดูข้อมูลอย่างเดียว</span></div>
+   <div class="daily-overview-stats">${tiles.map(([status,label,icon])=>
+    `<div class="daily-overview-stat daily-ref-${status}"><span aria-hidden="true">${icon}</span>
+      <strong>${c[status].toLocaleString('th-TH')}</strong><small>${label}</small></div>`).join('')}</div>
+   ${focus.length?`<div class="daily-watch"><strong>ควรตรวจสอบก่อนเช็กชื่อรายคาบ (${focus.length} คน)</strong>
+     <div class="daily-watch-students">${focus.map(student=>
+       `<span class="daily-watch-person daily-ref-${dailyReferenceStatus(student.id)}">${esc(student.roll_no)}. ${esc(student.full_name)} — ${names[dailyReferenceStatus(student.id)]}</span>`).join('')}</div></div>`:
+     '<p class="daily-watch-empty">ยังไม่มีนักเรียนที่ถูกบันทึกว่า “ขาด” หรือ “ลา” ในข้อมูลรายวันของวันที่เลือก</p>'}
+   <p class="daily-reference-hint">สถานะรายวันไม่ได้ยืนยันการเข้าเรียนทุกคาบ หากไม่มีข้อมูลจะแสดง “ยังไม่บันทึก” ไม่ถือว่านักเรียนมาเรียนแล้ว</p>
+ </section>`;
+}
 function renderAttendance(){
  const daily=state.kind==='daily';
  const eligible=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
@@ -336,7 +371,8 @@ function renderAttendance(){
   const period=Number(t.end_period||t.period)===t.period?t.period:t.period+'-'+t.end_period;
   return `<option value="${t.id}" ${t.id===state.slotId?'selected':''}>คาบ ${period} • ${esc(t.classroom_label)} • ${esc(t.subject_code||'')}${t.subject_code?' / ':''}${esc(t.subject)}${state.user?.role==='teacher'?'':' ('+esc(t.teacher_name)+')'}</option>`;
  }).join('');
- const students=state.students.map(s=>`<div class="student" data-id="${s.id}"><div><div class="student-name">${s.roll_no}. ${esc(s.full_name)}</div><div class="student-sub">รหัส ${esc(s.student_no)}</div></div><div class="pills">${Object.keys(names).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${names[status]}</button>`).join('')}</div></div>`).join('');
+ const students=state.students.map(s=>`<div class="student" data-id="${s.id}"><div><div class="student-name">${s.roll_no}. ${esc(s.full_name)}</div><div class="student-sub">รหัส ${esc(s.student_no)}</div>
+ ${!daily?`<span class="daily-student-badge daily-ref-${dailyReferenceStatus(s.id)}" aria-label="สถานะเช็กชื่อรายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}">รายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}</span>`:''}</div><div class="pills">${Object.keys(names).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${names[status]}</button>`).join('')}</div></div>`).join('');
  mount(`<section class="stack">${!daily&&state.user?.role==='teacher'?'<div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>':''}
  <div><h2>${daily?'📅 เช็กชื่อรายวัน':'✅ เช็กชื่อรายคาบ'}</h2>
   <p class="muted">${daily?'สำหรับครูที่ปรึกษา • เช็กชื่อห้องที่รับผิดชอบ':'สำหรับครูผู้สอน • เลือกวิชาจากตารางสอนของตนเองได้ แม้จะไม่ใช่ครูที่ปรึกษาของห้อง'}</p></div>
@@ -346,7 +382,9 @@ function renderAttendance(){
  `<div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(state.date)}"></div>
  <div class="field"><label for="slot">รายวิชาและคาบเรียน</label><select id="slot">${slotOptions}</select></div>
  ${state.user?.role==='teacher'?'<button type="button" class="button secondary" data-tab="myTimetable">📚 จัดการตารางสอนของฉัน</button>':''}`}
- </div><div class="card stack"><div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
+ </div><div class="card stack">
+ ${!daily?renderDailyOverview():''}
+ <div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
  ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การบันทึกซ้ำจะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคน ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
  <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
  ${!daily?`<section class="teaching-note-card" aria-label="บันทึกการสอนรายคาบ"><div class="teaching-note-heading">
