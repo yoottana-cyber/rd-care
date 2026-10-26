@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 
 const visibleFiles=[
- 'web/app.js','web/portal-ui.js','web/portal-admin.js',
+ 'web/app.js','web/admin-settings.js','web/portal-ui.js','web/portal-admin.js',
  'web/unified-import.js','web/advisor-import.js','web/template-xlsx.js',
  'web/templates/advisor-all-rooms-import.csv','web/templates/student-all-rooms-import.csv',
  'web/templates/student-login-import-template.csv'
@@ -25,7 +25,7 @@ test('system does not conceal disabled guardian push notifications',()=>{
 });
 test('import screens continue to warn about data permissions and PDPA',()=>{
  const importer=readFileSync(new URL('../web/unified-import.js',import.meta.url),'utf8');
- const staff=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
+ const settings=readFileSync(new URL('../web/admin-settings.js',import.meta.url),'utf8');
  assert.match(importer,/ข้อกำหนด PDPA/);
- assert.match(staff,/การคุ้มครองข้อมูลส่วนบุคคล/);
+ assert.match(settings,/การคุ้มครองข้อมูลส่วนบุคคล/);
 });
