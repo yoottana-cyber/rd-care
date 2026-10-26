@@ -19,7 +19,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
+const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
@@ -316,9 +316,12 @@ async function loadAttendance(){
  state.students=studentsResponse.items;
  const slotId=kind==='period'?state.slotId:null;
  const q='?kind='+kind+'&classroom_id='+roomId+'&date='+encodeURIComponent(date)+(kind==='period'?'&timetable_id='+slotId:'');
- const entries=(await api('/api/attendance'+q)).items;
+ const attendanceData=await api('/api/attendance'+q);
+ const entries=attendanceData.items;
  if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId||(kind==='period'&&state.slotId!==slotId))return;
  state.savedCount=entries.length;
+ state.teachingNote=kind==='period'?attendanceData.teaching_note||'':'';
+ state.teachingNoteUpdatedAt=kind==='period'?attendanceData.teaching_note_updated_at||null:null;
  state.statuses=Object.fromEntries(state.students.map(x=>[x.id,'present']));
  for(const entry of entries)state.statuses[entry.student_id]=entry.status;
  renderAttendance();
@@ -346,12 +349,25 @@ function renderAttendance(){
  </div><div class="card stack"><div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
  ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การบันทึกซ้ำจะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคน ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
  <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
+ ${!daily?`<section class="teaching-note-card" aria-label="บันทึกการสอนรายคาบ"><div class="teaching-note-heading">
+  <div><h3>📝 บันทึกการสอน <span class="teaching-note-optional">(ไม่บังคับ)</span></h3>
+   <p class="muted">หัวข้อหรือเนื้อหาที่สอน กิจกรรมการเรียนรู้ ปัญหาหรือข้อเสนอแนะของคาบนี้</p></div>
+   ${state.teachingNoteUpdatedAt?'<span class="tag">มีบันทึกแล้ว</span>':''}
+  </div>
+  <label class="teaching-note-label" for="teachingNote">รายละเอียดการสอน (เว้นว่างได้)</label>
+  <textarea id="teachingNote" rows="4" maxlength="2000" placeholder="ตัวอย่าง: เรื่อง การเขียนโปรแกรมด้วยเงื่อนไข ทดลองทำใบงานและฝึกปฏิบัติ...">${esc(state.teachingNote)}</textarea>
+  <div class="teaching-note-foot"><span>บันทึกแยกตามวันที่ วิชา และคาบเรียน สามารถกลับมาแก้ไขได้</span><span id="teachingNoteCount">${state.teachingNote.length.toLocaleString('th-TH')} / 2,000</span></div>
+ </section>`:''}
  <button id="saveAttendance" class="button full" ${!state.students.length||!daily&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
  if(daily)bindFilters(loadAttendance);
  $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
  $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));
  $$('[data-student]').forEach(btn=>btn.addEventListener('click',()=>{state.statuses[Number(btn.dataset.student)]=btn.dataset.status;updateAttendanceControls()}));
  $('#markAll')?.addEventListener('click',()=>{for(const student of state.students)state.statuses[student.id]='present';updateAttendanceControls()});
+ $('#teachingNote')?.addEventListener('input',event=>{
+  state.teachingNote=event.target.value;
+  const count=$('#teachingNoteCount');if(count)count.textContent=state.teachingNote.length.toLocaleString('th-TH')+' / 2,000';
+ });
  $('#saveAttendance')?.addEventListener('click',()=>safeRun(saveAttendance));
 }
 function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();}
@@ -359,7 +375,11 @@ async function saveAttendance(){
  if(!state.students.length)return;
  const button=$('#saveAttendance');button.disabled=true;
  try{
-  const result=await api('/api/attendance',{method:'POST',body:{kind:state.kind,date:state.date,classroom_id:state.roomId,timetable_id:state.kind==='period'?state.slotId:null,entries:state.students.map(s=>({student_id:s.id,status:state.statuses[s.id]}))}});
+  const body={kind:state.kind,date:state.date,classroom_id:state.roomId,
+   timetable_id:state.kind==='period'?state.slotId:null,
+   entries:state.students.map(s=>({student_id:s.id,status:state.statuses[s.id]}))};
+  if(state.kind==='period')body.teaching_note=state.teachingNote;
+  const result=await api('/api/attendance',{method:'POST',body});
   toast('บันทึกสำเร็จ '+result.saved+' คน');await loadAttendance();
  }finally{if(button.isConnected)button.disabled=false}
 }
