@@ -134,7 +134,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
   const records=report.reduce((a,x)=>a+Number(x.recorded||0),0);
   const absences=report.reduce((a,x)=>a+Number(x.absent||0),0);
   const selected=report.find(x=>x.timetable_id===detailSlot);
-  const statusName={absent:'ไม่เข้าคาบ',late:'มาสาย',leave:'ลา'};
+  const statusName={absent:'ไม่เข้าคาบ',late:'มาสาย',leave:'ลา',truancy:'หนีเรียน'};
   mount(`<section class="period-center stack">${header()}
    <div class="period-stats">
     <div class="period-stat"><span>📖</span><div><strong>${number(lessonCount)}</strong><small>รายการวิชาที่สอน</small></div></div>
@@ -150,14 +150,14 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
      <button class="button" type="submit">ค้นหารายงาน</button></form>
     <div class="table-wrap"><table class="table period-report-table"><thead><tr>
      <th>ห้องเรียน</th><th>รหัสวิชา / ชื่อวิชา</th><th>วัน / คาบ</th><th>วันที่เช็ก</th>
-     <th>มา</th><th>ไม่เข้าคาบ</th><th>สาย</th><th>ลา</th><th>ดูรายละเอียด</th></tr></thead>
+     <th>มา</th><th>ไม่เข้าคาบ (รวมหนีเรียน)</th><th>หนีเรียน</th><th>สาย</th><th>ลา</th><th>ดูรายละเอียด</th></tr></thead>
      <tbody>${report.length?report.map(x=>`<tr>
       <td><strong>${esc(x.classroom_label)}</strong></td>
       <td><strong>${esc(x.subject_code||'—')}</strong><small>${esc(x.subject)}</small></td>
       <td>${esc(days[x.day_of_week-1])} · ${lessonPeriod(x)}</td>
       <td>${number(x.dates_recorded)}</td><td>${number(x.present)}</td>
-      <td><strong class="period-danger">${number(x.absent)}</strong></td><td>${number(x.late)}</td><td>${number(x.leave)}</td>
-      <td><button type="button" class="button secondary" data-report-lesson="${x.timetable_id}">รายชื่อ / บันทึกการสอน</button></td></tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่พบวิชาที่ลงตารางในบัญชีนี้</td></tr>'}</tbody></table></div>
+      <td><strong class="period-danger">${number(x.absent)}</strong></td><td><strong class="period-danger">${number(x.truancy)}</strong></td><td>${number(x.late)}</td><td>${number(x.leave)}</td>
+      <td><button type="button" class="button secondary" data-report-lesson="${x.timetable_id}">รายชื่อ / บันทึกการสอน</button></td></tr>`).join(''):'<tr><td colspan="10" class="empty">ไม่พบวิชาที่ลงตารางในบัญชีนี้</td></tr>'}</tbody></table></div>
    </section>
    ${selected?`<section class="card stack period-report-details"><div class="period-panel-title">
     <div><h3>เหตุการณ์ที่ต้องติดตาม — ${esc(selected.classroom_label)}</h3>
