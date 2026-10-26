@@ -43,10 +43,10 @@ async function noConflict(env,lesson,teacherId,skipId=0){
 }
 async function myTimetable(env,user){
  const {results}=await env.DB.prepare(`SELECT t.id,t.classroom_id,t.day_of_week,t.period,
-   COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,
+   COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,t.approval_status,
    c.label AS classroom_label
    FROM timetable t JOIN classrooms c ON c.id=t.classroom_id
-   WHERE t.teacher_user_id=? AND t.active=1 ORDER BY t.day_of_week,t.period,c.grade,c.room`)
+   WHERE t.teacher_user_id=? AND t.approval_status<>'archived' ORDER BY t.day_of_week,t.period,c.grade,c.room`)
    .bind(user.id).all();
  return response({items:results});
 }
@@ -54,7 +54,7 @@ async function saveLesson(req,env,user,id){
  const lesson=validateLesson(await body(req));
  await verifyRoom(env,lesson.classroom_id);
  if(id){
-  const old=await env.DB.prepare('SELECT id,teacher_user_id FROM timetable WHERE id=? AND active=1').bind(id).first();
+  const old=await env.DB.prepare("SELECT id,teacher_user_id FROM timetable WHERE id=? AND approval_status<>'archived'").bind(id).first();
   if(!old)fail(404,'ไม่พบตารางสอนนี้');
   if(old.teacher_user_id!==user.id)fail(403,'แก้ไขได้เฉพาะตารางสอนของตนเอง');
   const exists=await env.DB.prepare('SELECT 1 FROM attendance_period WHERE timetable_id=? LIMIT 1').bind(id).first();
@@ -64,30 +64,30 @@ async function saveLesson(req,env,user,id){
  let changedId=id;
  if(id){
   const result=await env.DB.prepare(`UPDATE timetable SET classroom_id=?,day_of_week=?,period=?,
-   end_period=?,subject_code=?,subject=? WHERE id=? AND teacher_user_id=? AND active=1
+   end_period=?,subject_code=?,subject=?,active=0,approval_status='pending',reviewed_by=NULL,reviewed_at=NULL WHERE id=? AND teacher_user_id=? AND approval_status<>'archived'
    AND NOT EXISTS (SELECT 1 FROM attendance_period WHERE timetable_id=?)`)
    .bind(lesson.classroom_id,lesson.day_of_week,lesson.period,lesson.end_period,
     lesson.subject_code,lesson.subject,id,user.id,id).run();
   if(!result.meta.changes)fail(409,'ตารางสอนถูกแก้ไขแล้ว กรุณาโหลดข้อมูลใหม่');
  }else{
   const result=await env.DB.prepare(`INSERT INTO timetable
-   (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject)
-   VALUES(?,?,?,?,?,?,?)`).bind(lesson.classroom_id,user.id,lesson.day_of_week,lesson.period,
+   (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject,active,approval_status)
+   VALUES(?,?,?,?,?,?,?,0,'pending')`).bind(lesson.classroom_id,user.id,lesson.day_of_week,lesson.period,
       lesson.end_period,lesson.subject_code,lesson.subject).run();
   changedId=result.meta.last_row_id;
  }
  await env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
   .bind(user.id,id?'teacher_timetable_updated':'teacher_timetable_created','timetable',String(changedId)).run();
- return response({ok:true,id:changedId},id?200:201);
+ return response({ok:true,id:changedId,approval_status:'pending',message:'รอผู้ดูแลระบบตรวจสอบ'},id?200:201);
 }
 async function archiveLesson(env,user,id){
- const lesson=await env.DB.prepare('SELECT id,teacher_user_id FROM timetable WHERE id=? AND active=1').bind(id).first();
+ const lesson=await env.DB.prepare("SELECT id,teacher_user_id FROM timetable WHERE id=? AND approval_status<>'archived'").bind(id).first();
  if(!lesson)fail(404,'ไม่พบตารางสอนนี้');
  if(lesson.teacher_user_id!==user.id)fail(403,'ลบได้เฉพาะตารางสอนของตนเอง');
  const exists=await env.DB.prepare('SELECT 1 FROM attendance_period WHERE timetable_id=? LIMIT 1').bind(id).first();
  if(exists)fail(409,'มีประวัติเช็กชื่อแล้ว ไม่สามารถลบคาบเรียนได้');
- const result=await env.DB.prepare(`UPDATE timetable SET active=0 WHERE id=? AND teacher_user_id=?
-  AND active=1 AND NOT EXISTS(SELECT 1 FROM attendance_period WHERE timetable_id=?)`)
+ const result=await env.DB.prepare(`UPDATE timetable SET active=0,approval_status='archived' WHERE id=? AND teacher_user_id=?
+  AND approval_status<>'archived' AND NOT EXISTS(SELECT 1 FROM attendance_period WHERE timetable_id=?)`)
   .bind(id,user.id,id).run();
  if(!result.meta.changes)fail(409,'ไม่สามารถลบตารางสอนที่เปลี่ยนแปลงไปแล้ว');
  await env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
