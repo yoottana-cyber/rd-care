@@ -549,15 +549,26 @@ async function loadAdvisorCenter(){
   return;
  }
  if(!advisory.some(r=>r.id===state.roomId))state.roomId=advisory[0].id;
- const selected=state.roomId,data=await api('/api/alerts?classroom_id='+selected);
+ const selected=state.roomId;
+ const [data,urgent]=await Promise.all([
+  api('/api/alerts?classroom_id='+selected),
+  api('/api/truancy/advisor')
+ ]);
  if(state.tab!=='advisorCenter'||state.roomId!==selected)return;
  const items=data.items;
+ const truancy=(urgent.items||[]).filter(e=>Number(e.classroom_id)===selected);
  mount(`<section class="stack"><div><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="muted">รับรายการไม่เข้าคาบจากครูผู้สอน และยืนยันผลก่อนบันทึกเหตุการณ์แจ้งผู้ปกครอง</p></div>
  <section class="card stack"><div class="row between"><div class="field smallbox"><label for="advisorRoom">ห้องที่รับผิดชอบ</label>
  <select id="advisorRoom">${advisory.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${esc(r.label)}</option>`).join('')}</select></div>
  <strong>รอตรวจสอบ ${items.length} รายการ</strong></div>
  <div class="row"><button class="button secondary" data-tab="attendance" type="button">📅 เช็กชื่อรายวัน</button><button class="button secondary" data-tab="alerts" type="button">🔎 ตรวจสอบการขาดเรียน</button></div></section>
- <section class="card stack"><h3>รายการรอการพิจารณา</h3>
+ <section class="card stack"><h3>🚨 รายการหนีเรียนที่แจ้งแล้ว</h3>
+ <p class="muted">แสดงเหตุการณ์จากครูผู้สอนที่แจ้งทันที แม้นักเรียนขาดรายวันแล้ว • ตรวจสอบข้อเท็จจริงและประสานผู้ปกครอง</p>
+ ${truancy.length?truancy.map(e=>`<div class="alert-item">
+  <strong>${esc(e.full_name)}</strong><p class="muted">${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
+  <span class="tag">หนีเรียน — มีการแจ้งเตือนผ่าน Push แก่ผู้สมัครรับ (หากอุปกรณ์พร้อม)</span>
+ </div>`).join(''):'<p class="muted">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}</section>
+ <section class="card stack"><h3>รายการรอการพิจารณา (ขาดรายคาบปกติ)</h3>
  ${items.length?items.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong>
  <p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
