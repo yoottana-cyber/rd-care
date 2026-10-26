@@ -1,0 +1,92 @@
+/* RD Care Mobile 2026 — calm, large-touch interface inspired by supplied RSD Clean screenshot. */
+.rd-mobile-bar,.rd-mobile-sheet,.rd-mobile-shade,.rd-mobile-header-actions,.rd-mobile-welcome{display:none}
+@media(max-width:780px){
+ html,body{overflow-x:hidden;background:#f5faf9;color:#203b4c}
+ .rd-shell{padding-bottom:calc(106px + env(safe-area-inset-bottom));}
+ .rd-shell>.top{min-height:72px;padding:12px 17px;box-shadow:0 2px 18px #173f4012;position:sticky;top:0;z-index:18;background:#fff}
+ .rd-shell>.top .brand-logo{width:49px;height:49px;flex-basis:49px;padding:5px;border:1px solid #cae4dc;border-radius:15px;box-shadow:0 3px 9px #20724c14}
+ .rd-shell>.top .brand h1{font-size:15px;line-height:1.35;color:#1e4055;max-width:235px}
+ .rd-shell>.top .brand p{font-size:10px;display:block;color:#81959e}
+ .rd-shell>.top .user{display:none}
+ .rd-mobile-header-actions{display:flex;align-items:center;gap:7px}
+ .rd-mobile-header-actions button{border:1px solid #e1eeea;border-radius:13px;background:#f7fbf9;color:#26785c;min-width:43px;min-height:43px;display:grid;place-items:center;font-size:19px}
+ .rd-shell>.rd-layout>.rd-workspace{padding:16px 16px 35px}
+ .rd-shell .nav{display:none!important}
+ .rd-mobile-bar{position:fixed;z-index:60;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;gap:0;
+  padding:10px 5px calc(10px + env(safe-area-inset-bottom));min-height:82px;background:#fff;border-top:1px solid #e0eae8;box-shadow:0 -7px 24px #213f4720}
+ .rd-mobile-bar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:59px;padding:6px 1px;background:transparent;border:0;border-radius:17px;font:600 10px 'Prompt',Tahoma,sans-serif;color:#788692;position:relative}
+ .rd-mobile-bar button:focus-visible,.rd-mobile-sheet button:focus-visible{outline:3px solid #e6b444;outline-offset:2px}
+ .rd-mobile-bar button.active{color:#078e7b;background:#e8f7f4}
+ .rd-mobile-bar .rd-mobile-icon{font-size:24px;line-height:1.1;filter:saturate(.9)}
+ .rd-mobile-bar .rd-mobile-label{line-height:1.5;white-space:nowrap}
+ .rd-mobile-bar .rd-mobile-primary{height:73px;width:min(76px,100%);min-height:73px;justify-self:center;align-self:center;margin-top:-37px;z-index:2;border-radius:50%;background:#19bd92;box-shadow:0 0 0 7px white,0 13px 24px #109c7670;color:#fff;padding:8px}
+ .rd-mobile-bar .rd-mobile-primary .rd-mobile-icon{font-size:28px;filter:none}
+ .rd-mobile-bar .rd-mobile-primary .rd-mobile-label{font-size:9px;color:#fff;font-weight:700}
+ .rd-mobile-bar .rd-mobile-primary.active{background:#139a79;color:#fff}
+ .rd-mobile-bar .rd-mobile-primary:after{content:'';position:absolute;inset:-8px;border:1px solid #d1f2e8;border-radius:50%;pointer-events:none}
+ .rd-mobile-bubble{position:absolute;top:2px;right:14px;display:grid;place-items:center;min-width:19px;height:19px;padding:0 4px;border-radius:20px;background:#ed505b;color:white;font-size:10px;font-weight:800;box-shadow:0 2px 4px #9d1d3033}
+ .rd-mobile-shade:not([hidden]){display:block;position:fixed;z-index:65;inset:0;background:#0a29336b;backdrop-filter:blur(2px)}
+ .rd-mobile-sheet:not([hidden]){display:flex;flex-direction:column;position:fixed;z-index:66;left:0;right:0;bottom:0;max-height:min(82dvh,710px);overflow:auto;
+  background:#fff;padding:21px 16px calc(26px + env(safe-area-inset-bottom));border-radius:26px 26px 0 0;box-shadow:0 -10px 45px #07262e33;gap:14px}
+ .rd-mobile-sheet-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
+ .rd-mobile-sheet-heading strong{font-size:19px;font-weight:700;color:#204357}
+ .rd-mobile-sheet-heading button{background:#eef5f4;border:0;border-radius:12px;color:#4d6671;width:39px;height:39px;font-size:19px}
+ .rd-mobile-sheet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+ .rd-mobile-sheet-grid button{display:flex;align-items:center;flex-direction:column;justify-content:center;gap:7px;min-height:91px;background:#f6faf9;border:1px solid #e5eeeb;border-radius:16px;padding:12px 4px;color:#334f60;font:600 11px 'Prompt',sans-serif;text-align:center}
+ .rd-mobile-sheet-grid button span:first-child{font-size:25px}
+ .rd-mobile-sheet-note{color:#778b94;font-size:11px;margin:0}
+ .rd-mobile-account{display:flex;gap:12px;align-items:center;background:#ecf8f5;padding:13px;border-radius:16px}
+ .rd-mobile-account strong{font-size:13px;color:#274f51}
+ .rd-mobile-account p{margin:2px 0 0;font-size:11px;color:#6d8688}
+ .rd-mobile-account .rd-user-avatar{display:grid!important;font-size:17px}
+ .rd-mobile-sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+ .rd-mobile-sheet-actions button{border:1px solid #d9e9e5;border-radius:12px;min-height:46px;background:#f8fcfa;color:#2b7062;font:600 11px 'Prompt',sans-serif}
+ .rd-mobile-sheet-actions button:last-child{color:#ac5261}
+ .rd-shell .foot{padding:14px 14px 25px;font-size:10px}
+ .rd-mobile-welcome{display:block;padding:20px 3px 4px}
+ .rd-mobile-welcome h2{font-weight:750;font-size:clamp(21px,5.7vw,27px);line-height:1.35;color:#173e53;letter-spacing:-.2px;margin:0 0 10px}
+ .rd-mobile-welcome p{margin:0;font-size:12px;color:#80949e}
+ .rd-mobile-welcome .field{margin-top:18px;max-width:260px}
+ .rd-mobile-welcome input{background:#fff;border:1px solid #d3e2e4;border-radius:14px;min-height:47px;padding:10px 13px;font-size:14px}
+ .dashboard-hero{border-radius:20px;padding:20px 19px;background:linear-gradient(135deg,#217e72,#20b49a);box-shadow:0 7px 26px #1eac9530;min-height:unset}
+ .dashboard-hero .rd-hero-avatar{display:none}
+ .dashboard-hero .rd-hero-greeting{gap:0}
+ .dashboard-hero .hero-chip{font-size:10px;background:#ffffff20}
+ .dashboard-hero h2{font-size:18px;color:#fff}
+ .dashboard-hero p{font-size:11px;color:#dffaf2}
+ .dashboard-hero .button{margin:8px 0 0!important;font-size:11px;color:#168368}
+ .rd-workspace h3.dashboard-section-title{font-size:17px;font-weight:700;color:#183e51}
+ .rd-workspace .stats{min-height:132px;border:1px solid #dcebea;border-radius:20px;background:#fff!important;box-shadow:0 8px 26px #1b697112;padding:22px 18px;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between}
+ .rd-workspace .stats small{font-size:12px;font-weight:500;color:#7b8c97}
+ .rd-workspace .stats strong{font-size:30px;font-weight:800;line-height:1.2;color:#1a3e54}
+ .rd-workspace .stats .stat-icon{align-self:flex-end;font-size:23px}
+ .rd-workspace .grid.four,.rd-workspace .grid.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+ .rd-workspace .card{border-radius:18px}
+ .smart-apps-card .quick-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+ .quick-action{min-height:102px}
+ .quick-action .quick-symbol{width:51px;height:51px;border-radius:15px;font-size:23px}
+ .quick-action .quick-text strong{font-size:10px}
+ .rd-global-search{border-radius:17px}
+ .toast{bottom:calc(93px + env(safe-area-inset-bottom))}
+}
+@media(max-width:420px){
+ .rd-shell>.top .brand h1{font-size:12px;max-width:210px}
+ .rd-shell>.top .brand p{font-size:9px}
+ .rd-mobile-bar .rd-mobile-label{font-size:9px}
+ .rd-mobile-bar .rd-mobile-icon{font-size:22px}
+ .rd-workspace .stats{min-height:115px;padding:16px}
+ .rd-workspace .stats strong{font-size:26px}
+ .rd-mobile-sheet-grid{gap:8px}
+}
+@media(max-width:350px){.rd-mobile-sheet-grid{grid-template-columns:repeat(2,1fr)}.rd-mobile-bar .rd-mobile-label{font-size:8px}}
+[data-theme="dark"] .rd-mobile-bar,[data-theme="dark"] .rd-mobile-sheet:not([hidden]){background:#203344;border-color:#40505b}
+[data-theme="dark"] .rd-mobile-sheet-heading strong{color:#eef5ff}
+[data-theme="dark"] .rd-mobile-sheet-grid button{background:#2a4052;color:#e5eff7;border-color:#40576a}
+[data-theme="dark"] .rd-mobile-account{background:#2a4a50}
+[data-theme="dark"] .rd-mobile-account strong{color:#efffff}
+[data-theme="dark"] .rd-mobile-welcome h2{color:#dcecf6}
+[data-theme="dark"] .rd-mobile-bar button.active{background:#265d55;color:#e8fff8}
+[data-theme="dark"] .rd-workspace .stats{background:#213447!important;border-color:#39535c}
+[data-theme="dark"] .rd-workspace .stats strong{color:#eef7ff}
+[data-theme="dark"] .rd-mobile-sheet-actions button{background:#294050;color:#d3e8ef;border-color:#405c69}
+@media(min-width:781px){.rd-mobile-bar,.rd-mobile-sheet,.rd-mobile-shade{display:none!important}}
