@@ -1,7 +1,5 @@
 // RD Care settings console. Reuses the existing school APIs and advisor-import workflow.
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
-// Correct the HTML quote mapping without touching sensitive data.
-const safe=v=>esc(v).replace(/&quot(?!;)/g,'&quot;');
+const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const adminTabs=[
  {id:'overview',label:'ภาพรวม',icon:'◫'},
  {id:'people',label:'บัญชีบุคลากร',icon:'♙'},
