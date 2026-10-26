@@ -18,7 +18,8 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
   const currentPeriod=edit?periodName(edit):'1';
   const options=periodChoices.map(value=>`<option value="${value}" ${value===currentPeriod?'selected':''}>คาบ ${value}</option>`).join('');
   mount(`<section class="stack teacher-timetable">
-   <div><h2>📚 ตารางสอนของฉัน</h2>
+   <div><div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>
+    <h2>📚 ตารางสอนของฉัน</h2>
     <p class="muted">ครูเพิ่มตารางสอนด้วยตนเองแล้วเช็กชื่อรายคาบได้ทันที ไม่ต้องรออนุมัติ • ระบบจะตรวจคาบซ้อนก่อนบันทึก</p></div>
    <section class="card stack">
     <h3>${edit?'แก้ไขรายการตารางสอน':'เพิ่มรายการตารางสอน'}</h3>
