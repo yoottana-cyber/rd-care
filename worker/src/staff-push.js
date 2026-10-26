@@ -92,7 +92,7 @@ export async function sendPriorityPush(device,env,audience){
  return fetch(device.endpoint,{method:'POST',headers:{
   Authorization:authorized,TTL:'3600',Urgency:'high',
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
- },body});
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }
 // Payload-free push: service worker displays only generic school notification.
 export async function sendGenericPush(endpoint,env){
