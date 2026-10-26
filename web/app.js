@@ -162,7 +162,7 @@ function chrome(content){
  ${content}
  </div>
  </div>${mobileMarkup({navs,user:state.user,active:id=>state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'),pending:Number(state.stats?.alerts||0)})}
- <footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน</footer></main>`;
+ <footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • ยังไม่เปิดใช้งาน Push ผู้ปกครอง</footer></main>`;
 }
 function mount(content){
  $('#app').innerHTML=chrome(content);
