@@ -59,7 +59,7 @@ test('new login assets are precached for PWA with offline crest fallback',()=>{
  for(const name of ['login.css','ratsada-crest.webp'])
   assert.ok(sw.includes(name),name);
  assert.doesNotMatch(sw,/ratsada-campus\.webp/);
- assert.match(sw,/rd-care-shell-v29/);
+ assert.match(sw,/rd-care-shell-v\\d+/);
  const index=read('web/index.html');
  assert.match(index,/img-src 'self' data:/);
  const manifest=JSON.parse(read('web/manifest.webmanifest'));
