@@ -19,11 +19,12 @@ export function createGuardianPush({call,select,message}){
   }
   try{
    const [config,sub]=await Promise.all([call('/api/portal/push/config'),subscription()]);
+   const owned=sub?await call('/api/portal/push/status',{method:'POST',body:{endpoint:sub.endpoint}}):{subscribed:false};
    target.textContent=!config.enabled?'เซิร์ฟเวอร์ยังไม่พร้อมส่ง Push':
     Notification.permission==='denied'?'ต้องอนุญาตการแจ้งเตือนจากการตั้งค่าอุปกรณ์':
-    sub?'มีการลงทะเบียน Push บนอุปกรณ์นี้แล้ว':'ยังไม่ได้เปิดรับ Push บนอุปกรณ์นี้';
-   if(enable)enable.disabled=!config.enabled||Notification.permission==='denied';
-   const disable=select('#guardianPushDisable');if(disable)disable.disabled=!sub;
+    owned.subscribed?'อุปกรณ์นี้เปิดรับ Push ผู้ปกครองแล้ว':'ยังไม่ได้เปิดรับ Push สำหรับบัญชีผู้ปกครองนี้';
+   if(enable)enable.disabled=!config.enabled||Notification.permission==='denied'||!!owned.subscribed;
+   const disable=select('#guardianPushDisable');if(disable)disable.disabled=!owned.subscribed;
   }catch(error){target.textContent='ยังตรวจสอบการแจ้งเตือนไม่ได้'}
  }
  async function enable(){
