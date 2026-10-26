@@ -66,5 +66,12 @@ export function createPwaTools({api,toast}){
   if(!silent)toast('ปิดการแจ้งเตือนบนอุปกรณ์นี้แล้ว');
   return true;
  }
- return {check,install,enable,disable,isStandalone,supported};
+ async function testPush(){
+  if(!supported())return {accepted:false,code:'unsupported'};
+  const registration=await sw();
+  const sub=await registration.pushManager.getSubscription();
+  if(!sub)return {accepted:false,code:'device_not_registered'};
+  return api('/api/push/test',{method:'POST',body:{endpoint:sub.endpoint}});
+ }
+ return {check,install,enable,disable,testPush,isStandalone,supported};
 }
