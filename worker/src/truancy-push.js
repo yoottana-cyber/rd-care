@@ -96,9 +96,34 @@ export async function advisorTruancyItems(env,user){
  ' ORDER BY e.id DESC LIMIT 60').bind(...args).all();
  return results;
 }
+// Feedback for the teacher who just saved a period mark. This is not a delivery
+// receipt: it describes subscribed, eligible recipients without exposing endpoints,
+// family details or student data to the browser.
+export async function truancyPushReadiness(env,roomId,studentIds){
+ const count=studentIds.length;
+ if(!count)return {events:0,advisorDevices:0,guardianDevices:0,ready:false,reason:'no_events'};
+ const enabled=ready(env);
+ const room=await env.DB.prepare(`SELECT c.advisor_user_id FROM classrooms c WHERE c.id=?`)
+   .bind(roomId).first();
+ const [advisor,guardians]=await Promise.all([
+  room?.advisor_user_id?env.DB.prepare(`SELECT COUNT(*) AS total
+    FROM staff_push_subscriptions p JOIN users u ON u.id=p.user_id AND u.active=1
+    WHERE p.user_id=?`).bind(room.advisor_user_id).first():Promise.resolve({total:0}),
+  env.DB.prepare(`SELECT COUNT(DISTINCT ps.id) AS total
+    FROM guardian_push_subscriptions ps
+    JOIN portal_accounts a ON a.id=ps.guardian_account_id AND a.role='guardian'
+      AND a.active=1 AND a.must_change_password=0
+    JOIN guardian_student_links l ON l.guardian_account_id=a.id
+    WHERE l.student_id IN (${studentIds.map(()=>'?').join(',')})`).bind(...studentIds).first()
+ ]);
+ const advisorDevices=Number(advisor?.total||0),guardianDevices=Number(guardians?.total||0);
+ return {events:count,advisorDevices,guardianDevices,ready:enabled,
+  reason:!enabled?'missing_vapid':advisorDevices+guardianDevices===0?'no_subscribers':'queued'};
+}
 // Priority dispatch: immediately after commit (waitUntil) and fallback on 5-min cron.
 // At most three attempts/device/event, never retry after the push service accepted it.
-// Only TODAY's confirmed classifications are pushed; old edits remain visible in-app.
+// Edits of the allowed 14-day attendance window count as new actionable incidents;
+// key off the recent EDIT timestamp, not today's lesson date.
 export async function deliverTruancyPush(env){
  if(!env.DB||!ready(env))return {enabled:false,processed:0,delivered:0};
  const {results:events}=await env.DB.prepare(`SELECT e.id,e.generation,e.student_id,
@@ -108,7 +133,8 @@ export async function deliverTruancyPush(env){
  JOIN attendance_period p ON p.student_id=e.student_id
    AND p.timetable_id=e.timetable_id AND p.school_date=e.school_date AND p.status='absent'
  JOIN timetable t ON t.id=e.timetable_id JOIN classrooms c ON c.id=t.classroom_id
- WHERE e.active=1 AND e.school_date=date('now','+7 hours')
+ WHERE e.active=1 AND e.school_date BETWEEN date('now','+7 hours','-14 days')
+    AND date('now','+7 hours')
    AND e.updated_at>=datetime('now','-1 day')
    AND (
     (c.advisor_user_id IS NOT NULL AND EXISTS(
