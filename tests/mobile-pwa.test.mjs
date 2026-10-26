@@ -38,3 +38,15 @@ test('PWA manifest supports home-screen install and SW notification clicks use a
  assert.match(app,/bindMobileMenu/);
  assert.match(app,/pwaTools\.disable/);
 });
+
+test('urgent attendance Push has an isolated notification tag and only safe destinations',()=>{
+ const worker=read('web/sw.js');
+ const app=read('web/app.js');
+ assert.match(worker,/rd-care-priority-review/);
+ assert.match(worker,/rd-care-school-notices/);
+ assert.match(worker,/metadata\?\.kind==='urgent_review'/);
+ assert.match(worker,/requireInteraction:urgent/);
+ assert.match(worker,/\.\/\?tab=advisorCenter/);
+ assert.match(app,/requested==='advisorCenter'/);
+ assert.doesNotMatch(worker,/student_no|full_name|นักเรียนหนีเรียน|รหัสประจำตัว/);
+});
