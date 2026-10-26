@@ -41,10 +41,12 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
    <nav class="period-tabs" aria-label="เมนูเช็กชื่อรายคาบ">
     <button type="button" data-period-view="week" class="${view==='week'?'active':''}" aria-current="${view==='week'?'page':'false'}">🗓️ ตารางสอนรายสัปดาห์</button>
     <button type="button" data-period-view="report" class="${view==='report'?'active':''}" aria-current="${view==='report'?'page':'false'}">📊 รายงานการเช็กชื่อ</button>
+    <button type="button" id="periodSettingsTab">⚙️ ตั้งค่าตารางสอน</button>
    </nav>`;
  }
  function bindCommon(){
   document.querySelector('#periodManage')?.addEventListener('click',()=>openEditor());
+  document.querySelector('#periodSettingsTab')?.addEventListener('click',()=>openEditor());
   document.querySelectorAll('[data-period-view]').forEach(el=>el.addEventListener('click',()=>safeRun(async()=>{
    if(el.dataset.periodView===view)return;
    view=el.dataset.periodView; await (view==='week'?loadWeek():loadReport());
@@ -76,6 +78,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
      <strong>${esc(weekTitle.format(new Date(utc(week))))} – ${esc(weekTitle.format(new Date(utc(weekEnd))))}</strong>
      <button type="button" class="button ghost" id="periodNextWeek" aria-label="สัปดาห์ถัดไป">›</button>
      <button type="button" class="button secondary" id="periodThisWeek">สัปดาห์นี้</button>
+     <label class="period-jump-label" for="periodWeekJump">เลือกวันที่ <input type="date" id="periodWeekJump" value="${esc(week)}" aria-label="เลือกวันที่เพื่อไปยังสัปดาห์นั้น"></label>
     </div></div>
     <div class="period-legend"><span><i class="period-dot done"></i> เช็กแล้ว</span><span><i class="period-dot pending"></i> ยังไม่เช็ก</span>
      <span><i class="period-dot absent"></i> มีรายการไม่เข้าคาบ</span></div>
@@ -102,6 +105,10 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
   document.querySelector('#periodPrevWeek')?.addEventListener('click',()=>safeRun(async()=>{week=addDays(week,-7);await loadWeek()}));
   document.querySelector('#periodNextWeek')?.addEventListener('click',()=>safeRun(async()=>{week=addDays(week,7);await loadWeek()}));
   document.querySelector('#periodThisWeek')?.addEventListener('click',()=>safeRun(async()=>{week=weekMonday(today());await loadWeek()}));
+  document.querySelector('#periodWeekJump')?.addEventListener('change',event=>safeRun(async()=>{
+   if(!event.target.value)return;
+   week=weekMonday(event.target.value);await loadWeek();
+  }));
   document.querySelector('[data-create-first]')?.addEventListener('click',()=>openEditor());
   document.querySelectorAll('[data-check-lesson]').forEach(button=>button.addEventListener('click',()=>{
    if(button.disabled)return;
