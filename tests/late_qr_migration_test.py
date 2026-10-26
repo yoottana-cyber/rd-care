@@ -9,7 +9,7 @@ MIGRATIONS=ROOT/'worker'/'migrations'
 def database():
  db=sqlite3.connect(':memory:')
  db.execute('PRAGMA foreign_keys=ON')
- for name in ('0001_initial.sql','0005_late_self_requests.sql','0015_late_qr_gate.sql'):
+ for name in ('0001_initial.sql','0005_late_self_requests.sql','0015_late_qr_gate.sql','0016_permanent_late_qr.sql'):
   db.executescript((MIGRATIONS/name).read_text(encoding='utf8'))
  db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
  VALUES(1,'duty','Duty Teacher','teacher','salt','hash')""")
@@ -59,4 +59,33 @@ class LateQrSchemaTests(unittest.TestCase):
   with self.assertRaises(sqlite3.IntegrityError):
    self.db.execute("""INSERT INTO late_records(student_id,school_date,arrived_at,reason,state,recorded_by,reviewed_by)
     VALUES(1,'2026-10-26','08:31','','verified',1,1)""")
+ def test_permanent_qr_supports_multiple_students_and_multiple_days(self):
+  # One fixed public QR URL is reused. No issued token or expiry is involved.
+  self.db.execute("""INSERT INTO late_self_requests(id,student_id,school_date,arrived_at)
+   VALUES(1,1,'2026-10-26','08:13')""")
+  self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
+   VALUES(1,1,'2026-10-26')""")
+  self.db.execute("""INSERT INTO late_self_requests(id,student_id,school_date,arrived_at)
+   VALUES(2,2,'2026-10-26','08:20')""")
+  self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
+   VALUES(2,2,'2026-10-26')""")
+  self.db.execute("""INSERT INTO late_self_requests(id,student_id,school_date,arrived_at)
+   VALUES(3,1,'2026-10-27','08:25')""")
+  self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
+   VALUES(3,1,'2026-10-27')""")
+  self.assertEqual(self.db.execute("SELECT COUNT(*) FROM late_static_qr_submissions").fetchone()[0],3)
+  self.assertEqual(self.db.execute("SELECT COUNT(*) FROM late_records").fetchone()[0],0)
+ def test_permanent_qr_duplicate_student_same_date_blocked(self):
+  self.db.execute("""INSERT INTO late_self_requests(id,student_id,school_date,arrived_at)
+   VALUES(1,1,'2026-10-26','08:20')""")
+  self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
+   VALUES(1,1,'2026-10-26')""")
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
+    VALUES(1,1,'2026-10-26')""")
+ def test_permanent_qr_requires_real_request_record(self):
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
+    VALUES(999,1,'2026-10-26')""")
+
 if __name__=='__main__':unittest.main()
