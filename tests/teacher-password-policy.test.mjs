@@ -41,7 +41,7 @@ test('three-character advisor password fails in frontend and backend',()=>{
  assert.equal(ui[0].status,'error');
 });
 test('teacher creation screen switches minimum when choosing staff',()=>{
- const app=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
- assert.match(app,/accountRole\.value==='teacher'\?4:12/);
- assert.match(app,/accountPassword\.minLength=min/);
+ const settings=readFileSync(new URL('../web/admin-settings.js',import.meta.url),'utf8');
+ assert.match(settings,/password\.minLength=role\.value==='teacher'\?4:12/);
+ assert.match(settings,/role\?\.addEventListener\('change',sync\)/);
 });
