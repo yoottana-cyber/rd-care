@@ -28,6 +28,7 @@ jobs:
           node --check worker/src/staff-push.js
           node --check worker/scripts/generate-vapid.mjs
           node --check worker/src/worker.js
+          node --check worker/src/truancy-push.js
           node --check web/my-timetable.js
           node --check web/period-center.js
           node --check web/mobile-nav.js
@@ -35,6 +36,7 @@ jobs:
           node --check web/pwa-client.js
           node --check web/auth-session.js
           node --check web/admin-settings.js
+          node --check web/guardian-push.js
           node --check web/app.js
           node --check web/theme.js
           node --check web/dashboard-charts.js
