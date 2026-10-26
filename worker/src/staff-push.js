@@ -80,6 +80,14 @@ export async function staffPushRoutes(req,env,user,path){
  }
  throw err(404,'ไม่พบ API แจ้งเตือน');
 }
+// Payload-free push: service worker displays only generic school notification.
+export async function sendGenericPush(endpoint,env){
+ if(!allowedEndpoint(endpoint))throw Error('Push endpoint not permitted');
+ const authorized=await makeVapidAuthorization(endpoint,env);
+ return fetch(endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'300',Urgency:'high'
+ }});
+}
 async function deliverOne(env,entry,device,key){
  const authorized=await makeVapidAuthorization(device.endpoint,env);
  const response=await fetch(device.endpoint,{method:'POST',headers:{
