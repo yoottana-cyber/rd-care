@@ -1,6 +1,6 @@
 // Staff PWA installation / push opt-in settings; all permission prompts require a tap.
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function createNotificationSettings({pwaTools,mount,toast,safeRun,showTab,getAlerts}){
+export function createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,getAlerts}){
  async function load(){
   const st=await pwaTools.check();
   const info=!st.canPush?'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนแบบ Push':
