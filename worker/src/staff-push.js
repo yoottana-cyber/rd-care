@@ -41,6 +41,27 @@ async function signer(env){
    y:toB64(pub.slice(33,65)),d:toB64(priv),ext:false,key_ops:['sign']},
    {name:'ECDSA',namedCurve:'P-256'},false,['sign']);
 }
+// Checks private/public key correspondence without returning key material.
+// Secrets may be present but invalid or copied from different VAPID keypairs.
+export async function diagnoseVapid(env){
+ const required=['VAPID_PUBLIC_KEY','VAPID_PRIVATE_KEY','VAPID_SUBJECT'];
+ const missing=required.filter(name=>!String(env[name]||'').trim());
+ if(missing.length)return {ready:false,code:'missing_settings',missing};
+ if(!/^(mailto:[^\\s@]+@[^\\s@]+|https:\/\/[^\\s]+)$/.test(env.VAPID_SUBJECT))
+  return {ready:false,code:'invalid_subject',missing:[]};
+ try{
+  const pub=fromB64(env.VAPID_PUBLIC_KEY);
+  if(pub.length!==65||pub[0]!==4)return {ready:false,code:'invalid_keypair',missing:[]};
+  const privateKey=await signer(env);
+  const publicKey=await crypto.subtle.importKey('raw',pub,{name:'ECDSA',namedCurve:'P-256'},false,['verify']);
+  const message=enc.encode('rd-care-vapid-self-check');
+  const sig=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},privateKey,message);
+  const matched=await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},publicKey,sig,message);
+  return {ready:matched,code:matched?'ready':'keypair_mismatch',missing:[]};
+ }catch{
+  return {ready:false,code:'invalid_keypair',missing:[]};
+ }
+}
 export async function makeVapidAuthorization(endpoint,env){
  if(!vapidReady(env))throw Error('VAPID configuration missing');
  const audience=new URL(endpoint).origin;
@@ -70,6 +91,38 @@ export async function staffPushRoutes(req,env,user,path){
     updated_at=CURRENT_TIMESTAMP WHERE staff_push_subscriptions.user_id=excluded.user_id`)
     .bind(user.id,subscription.endpoint,subscription.keys.p256dh,subscription.keys.auth).run();
   return json({ok:true,subscribed:true});
+ }
+ if(path==='/api/push/diagnostics'&&req.method==='GET'){
+  const config=await diagnoseVapid(env);
+  const count=await env.DB.prepare('SELECT COUNT(*) AS total FROM staff_push_subscriptions WHERE user_id=?')
+   .bind(user.id).first();
+  const recent=await env.DB.prepare(`SELECT d.state,d.attempts,d.last_http_status
+    FROM truancy_push_deliveries d
+    JOIN staff_push_subscriptions s ON s.id=d.subscription_id
+    WHERE d.recipient_type='advisor' AND s.user_id=?
+    ORDER BY d.updated_at DESC LIMIT 1`).bind(user.id).first();
+  return json({vapid:config,registeredDevices:Number(count?.total||0),
+   recent:recent?{state:recent.state,attempts:recent.attempts,
+    providerStatus:recent.last_http_status}:null});
+ }
+ if(path==='/api/push/test'&&req.method==='POST'){
+  const b=await input(req);
+  if(typeof b.endpoint!=='string'||b.endpoint.length>1800)throw err(400,'ข้อมูลอุปกรณ์ไม่ถูกต้อง');
+  const config=await diagnoseVapid(env);
+  if(!config.ready)return json({accepted:false,code:config.code,missing:config.missing});
+  const device=await env.DB.prepare('SELECT id,endpoint,p256dh,auth FROM staff_push_subscriptions WHERE user_id=? AND endpoint=?')
+   .bind(user.id,b.endpoint).first();
+  if(!device)return json({accepted:false,code:'device_not_registered'});
+  try{
+   const result=await sendPriorityPush(device,env,'advisor');
+   if(result.status===404||result.status===410)
+    await env.DB.prepare('DELETE FROM staff_push_subscriptions WHERE id=? AND user_id=?')
+     .bind(device.id,user.id).run();
+   return json({accepted:result.ok,code:result.ok?'accepted':'provider_rejected',providerStatus:result.status});
+  }catch(e){
+   console.warn('RD Care staff push self-test failed',e?.name||'network');
+   return json({accepted:false,code:'network_or_crypto_error'});
+  }
  }
  if(path==='/api/push/unsubscribe'&&req.method==='POST'){
   const body=await input(req);
