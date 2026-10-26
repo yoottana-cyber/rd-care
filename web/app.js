@@ -144,9 +144,9 @@ async function boot(){
  const [me,rooms]=await Promise.all([api('/api/auth/me'),api('/api/classrooms')]);state.user=me.user;state.rooms=rooms.items;
  if(!state.rooms.some(r=>r.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
  const requested=new URLSearchParams(location.search).get('tab');
- if(requested==='notifications'){
+ if(requested==='notifications'||requested==='advisorCenter'){
   history.replaceState(null,'',location.pathname);
-  await showTab('notifications');
+  await showTab(requested);
  }else await showTab('dashboard');
 }
 function roleName(){return roles[state.user?.role]||state.user?.role;}
