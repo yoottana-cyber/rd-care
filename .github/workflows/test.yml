@@ -33,6 +33,7 @@ jobs:
           node --check web/mobile-nav.js
           node --check web/notification-settings.js
           node --check web/pwa-client.js
+          node --check web/auth-session.js
           node --check web/app.js
           node --check web/theme.js
           node --check web/dashboard-charts.js
