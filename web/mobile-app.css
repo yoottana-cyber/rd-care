@@ -98,3 +98,38 @@
 .login-install small{font-size:10px;color:#7c8d97;line-height:1.5}
 .rd-notification-settings .card{max-width:100%}
 .rd-notification-settings .row button{flex:1 1 160px;min-height:45px}
+
+
+/* Priority school attendance review: visually separate from routine tasks, no
+   student identity appears in browser notification or unattended app preview. */
+.rd-priority-card{
+ display:flex;flex-direction:column;gap:11px;padding:17px 20px;
+ background:linear-gradient(120deg,#fff7f2,#fffaf6);
+ border:2px solid #efbca8;border-radius:17px;
+ box-shadow:0 8px 24px rgba(140,57,25,.09);
+}
+.rd-priority-heading{display:flex;align-items:center;gap:13px}
+.rd-priority-heading>span{display:grid;place-items:center;width:45px;height:45px;
+ flex:0 0 45px;border-radius:13px;background:#ffe6dd;font-size:23px}
+.rd-priority-heading>div{flex:1;min-width:0}
+.rd-priority-heading h3{font-weight:750;font-size:16px;color:#863e29;margin:0 0 4px}
+.rd-priority-heading p{font-size:11px;color:#8c6d63;margin:0;line-height:1.7}
+.rd-priority-count{font-size:28px;color:#ad4436;font-weight:800;min-width:40px;text-align:center;font-variant-numeric:tabular-nums}
+.rd-priority-description,.rd-priority-clear{margin:0;font-size:12px;line-height:1.75}
+.rd-priority-description{color:#7e5044}
+.rd-priority-clear{color:#467860}
+.rd-priority-action{align-self:flex-start;background:#a74435!important;color:#fff!important;
+ border:1px solid #8d392f!important;border-radius:10px;min-height:43px;padding:10px 16px;text-decoration:none;box-shadow:none}
+.rd-priority-action:hover{background:#8e382d!important}
+.guardian-truancy-notices{scroll-margin-top:90px}
+@media(max-width:580px){
+ .rd-priority-card{padding:14px 15px;gap:10px}
+ .rd-priority-heading h3{font-size:14px}
+ .rd-priority-heading p{font-size:10px}
+ .rd-priority-action{width:100%;justify-content:center;text-align:center}
+}
+[data-theme="dark"] .rd-priority-card{background:linear-gradient(120deg,#432f35,#393039);border-color:#996b60}
+[data-theme="dark"] .rd-priority-heading h3{color:#ffded5}
+[data-theme="dark"] .rd-priority-heading p,[data-theme="dark"] .rd-priority-description{color:#e5c1b8}
+[data-theme="dark"] .rd-priority-clear{color:#b6dec8}
+[data-theme="dark"] .rd-priority-count{color:#ffb8a9}
