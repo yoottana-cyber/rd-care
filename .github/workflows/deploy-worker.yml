@@ -48,6 +48,30 @@ jobs:
           node --check worker/src/admin-validation.js
           node --test tests/*.test.mjs
 
+      - name: Ensure dashboard variables are preserved
+        shell: bash
+        run: |
+          if ! grep -Eq '^keep_vars[[:space:]]*=[[:space:]]*true([[:space:]]*(#.*)?)?        working-directory: worker
+        run: npx --no-install wrangler d1 migrations apply rd-care-dev --remote
+
+      - name: Deploy RD Care Dev Worker
+        working-directory: worker
+        run: npx --no-install wrangler deploy
+
+      - name: Verify public health endpoint
+        shell: bash
+        run: |
+          node --input-type=module -e "
+            const r=await fetch('https://rd-care-api-dev.yoottana.workers.dev/api/health');
+            const body=await r.json();
+            if(!r.ok || body.ok!==true || body.service!=='RD Care API')process.exit(1);
+            process.stdout.write('RD Care Dev API health OK\\n');
+          "
+ worker/wrangler.toml; then
+            echo "::error::worker/wrangler.toml must set keep_vars = true to preserve dashboard variables such as VAPID_SUBJECT."
+            exit 1
+          fi
+
       - name: Apply pending D1 migrations first
         working-directory: worker
         run: npx --no-install wrangler d1 migrations apply rd-care-dev --remote
