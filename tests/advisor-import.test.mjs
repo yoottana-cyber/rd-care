@@ -96,11 +96,12 @@ test('example Excel includes Advisors, Instructions and Rooms with Thai Tahoma f
 test('UI displays one-click Excel/CSV template, secure preview and safe chunked import',()=>{
  const ui=readFileSync(new URL('../web/advisor-import.js',import.meta.url),'utf8');
  const app=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
+ const settings=readFileSync(new URL('../web/admin-settings.js',import.meta.url),'utf8');
  assert.match(ui,/readXlsxRows/);assert.match(ui,/readCsvFile/);
  assert.match(ui,/api\/admin\/advisors\/preview/);
  assert.match(ui,/api\/admin\/advisors\/commit/);
  assert.match(ui,/batches\(currentRows,5\)/);
- assert.match(app,/advisorImporter\.render/);
+ assert.match(settings,/advisorImporter\.render/);
  assert.match(app,/advisorImporter\.clear/);
  const sw=readFileSync(new URL('../web/sw.js',import.meta.url),'utf8');
  assert.match(sw,/advisor-import\.js/);assert.match(sw,/advisor-all-rooms-import\.csv/);
