@@ -1,6 +1,6 @@
 // Opt-in, relationship-verified truancy alerts for staff advisors and guardians.
 // Notification payloads are empty; never put students' identities or allegations on lock screens.
-import {validPushSubscription,sendGenericPush} from './staff-push.js';
+import {validPushSubscription,sendPriorityPush} from './staff-push.js';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{code:status})};
 const reply=(data)=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
@@ -73,57 +73,98 @@ export async function advisorTruancyItems(env,user){
  ' ORDER BY e.id DESC LIMIT 60').bind(...args).all();
  return results;
 }
+// Priority dispatch: immediately after commit (waitUntil) and fallback on 5-min cron.
+// At most three attempts/device/event, never retry after the push service accepted it.
+// Only TODAY's confirmed classifications are pushed; old edits remain visible in-app.
 export async function deliverTruancyPush(env){
- if(!env.DB||!ready(env))return {enabled:false,delivered:0};
- // Re-query actual current attendance and verified links at send time. Corrections,
- // disabled guardians or withdrawn relationships cannot receive pending notifications.
- const {results:events}=await env.DB.prepare(`SELECT e.id,e.generation,e.student_id,t.classroom_id,c.advisor_user_id
- FROM truancy_events e
- JOIN period_truancy tr ON tr.student_id=e.student_id AND tr.timetable_id=e.timetable_id AND tr.school_date=e.school_date
- JOIN attendance_period p ON p.student_id=e.student_id AND p.timetable_id=e.timetable_id AND p.school_date=e.school_date AND p.status='absent'
+ if(!env.DB||!ready(env))return {enabled:false,processed:0,delivered:0};
+ const {results:events}=await env.DB.prepare(`SELECT e.id,e.generation,e.student_id,
+  c.advisor_user_id FROM truancy_events e
+ JOIN period_truancy tr ON tr.student_id=e.student_id
+   AND tr.timetable_id=e.timetable_id AND tr.school_date=e.school_date
+ JOIN attendance_period p ON p.student_id=e.student_id
+   AND p.timetable_id=e.timetable_id AND p.school_date=e.school_date AND p.status='absent'
  JOIN timetable t ON t.id=e.timetable_id JOIN classrooms c ON c.id=t.classroom_id
- WHERE e.active=1 AND e.created_at>=datetime('now','-1 day')
- ORDER BY e.id DESC LIMIT 40`).all();
- let delivered=0;
+ WHERE e.active=1 AND e.school_date=date('now','+7 hours')
+   AND e.updated_at>=datetime('now','-1 day')
+   AND (
+    (c.advisor_user_id IS NOT NULL AND EXISTS(
+      SELECT 1 FROM staff_push_subscriptions s JOIN users u ON u.id=s.user_id AND u.active=1
+      WHERE s.user_id=c.advisor_user_id AND NOT EXISTS(
+       SELECT 1 FROM truancy_push_deliveries d
+       WHERE d.event_id=e.id AND d.generation=e.generation
+         AND d.recipient_type='advisor' AND d.subscription_id=s.id
+         AND (d.state='delivered' OR d.attempts>=3)
+      )
+    ))
+    OR EXISTS(
+      SELECT 1 FROM guardian_push_subscriptions ps
+      JOIN portal_accounts a ON a.id=ps.guardian_account_id
+        AND a.role='guardian' AND a.active=1 AND a.must_change_password=0
+      JOIN guardian_student_links l ON l.guardian_account_id=a.id
+      WHERE l.student_id=e.student_id AND NOT EXISTS(
+       SELECT 1 FROM truancy_push_deliveries d
+       WHERE d.event_id=e.id AND d.generation=e.generation
+         AND d.recipient_type='guardian' AND d.subscription_id=ps.id
+         AND (d.state='delivered' OR d.attempts>=3)
+      )
+    ))
+   )
+ ORDER BY e.id DESC LIMIT 25`).all();
+ let delivered=0,failed=0;
  for(const event of events){
-  const {results:staff}=event.advisor_user_id?await env.DB.prepare(`SELECT s.id,s.endpoint
+  const {results:staff}=event.advisor_user_id?await env.DB.prepare(`SELECT s.id,s.endpoint,s.p256dh,s.auth
    FROM staff_push_subscriptions s JOIN users u ON u.id=s.user_id AND u.active=1
    WHERE s.user_id=? LIMIT 5`).bind(event.advisor_user_id).all():{results:[]};
-  const {results:guardians}=await env.DB.prepare(`SELECT ps.id,ps.endpoint
+  const {results:guardians}=await env.DB.prepare(`SELECT ps.id,ps.endpoint,ps.p256dh,ps.auth
    FROM guardian_push_subscriptions ps JOIN portal_accounts a ON a.id=ps.guardian_account_id
    JOIN guardian_student_links l ON l.guardian_account_id=a.id
    WHERE a.role='guardian' AND a.active=1 AND a.must_change_password=0
     AND l.student_id=? LIMIT 30`).bind(event.student_id).all();
-  for(const [type,devices] of [['advisor',staff],['guardian',guardians]]){
-   for(const device of devices){
-    await env.DB.prepare(`INSERT OR IGNORE INTO truancy_push_deliveries
-     (event_id,generation,recipient_type,subscription_id) VALUES(?,?,?,?)`)
-     .bind(event.id,event.generation,type,device.id).run();
-    const claim=await env.DB.prepare(`UPDATE truancy_push_deliveries SET state='sending',updated_at=CURRENT_TIMESTAMP
-     WHERE event_id=? AND generation=? AND recipient_type=? AND subscription_id=?
-     AND (state='pending' OR (state IN ('sending','failed') AND updated_at<datetime('now','-10 minutes')))`)
-     .bind(event.id,event.generation,type,device.id).run();
-    if(!claim.meta?.changes)continue;
-    // Check active status again before delivery; a teacher may have just corrected the mark.
-    const active=await env.DB.prepare(`SELECT 1 AS ok FROM truancy_events e
-      JOIN period_truancy tr ON tr.student_id=e.student_id AND tr.timetable_id=e.timetable_id AND tr.school_date=e.school_date
-      WHERE e.id=? AND e.generation=? AND e.active=1`)
-     .bind(event.id,event.generation).first();
-    if(!active)continue;
-    let result='failed';
-    try{
-     const response=await sendGenericPush(device.endpoint,env);
-     if(response.ok){result='delivered';delivered++}
-     if(response.status===404||response.status===410){
-      await env.DB.prepare(`DELETE FROM ${type==='advisor'?'staff_push_subscriptions':'guardian_push_subscriptions'} WHERE id=?`)
-       .bind(device.id).run();
-     }
-    }catch(error){console.warn('RD truancy push delivery failed',error?.name||'network')}
-    await env.DB.prepare(`UPDATE truancy_push_deliveries SET state=?,updated_at=CURRENT_TIMESTAMP
-      WHERE event_id=? AND generation=? AND recipient_type=? AND subscription_id=?`)
-      .bind(result,event.id,event.generation,type,device.id).run();
-   }
+  // Place the advisor first, then guardians. Send small waves concurrently so
+  // many subscribed devices never block a parent behind unrelated deliveries.
+  const targets=[...staff.map(d=>({type:'advisor',device:d})),
+    ...guardians.map(d=>({type:'guardian',device:d}))];
+  async function sendTarget({type,device}){
+   await env.DB.prepare(`INSERT OR IGNORE INTO truancy_push_deliveries
+     (event_id,generation,recipient_type,subscription_id)
+     VALUES(?,?,?,?)`).bind(event.id,event.generation,type,device.id).run();
+   const claim=await env.DB.prepare(`UPDATE truancy_push_deliveries
+    SET state='sending',attempts=attempts+1,updated_at=CURRENT_TIMESTAMP
+    WHERE event_id=? AND generation=? AND recipient_type=? AND subscription_id=?
+      AND attempts<3 AND (state='pending'
+       OR (state IN ('sending','failed') AND updated_at<datetime('now','-2 minutes')))`)
+    .bind(event.id,event.generation,type,device.id).run();
+   if(!claim.meta?.changes)return;
+   // Recheck that the teacher has not corrected their entry while dispatching.
+   const active=await env.DB.prepare(`SELECT 1 AS ok FROM truancy_events e
+     JOIN period_truancy tr ON tr.student_id=e.student_id
+       AND tr.timetable_id=e.timetable_id AND tr.school_date=e.school_date
+     JOIN attendance_period p ON p.student_id=e.student_id
+       AND p.timetable_id=e.timetable_id AND p.school_date=e.school_date AND p.status='absent'
+     WHERE e.id=? AND e.generation=? AND e.active=1`)
+    .bind(event.id,event.generation).first();
+   if(!active)return;
+   let result='failed',httpStatus=null;
+   try{
+    const response=await sendPriorityPush(device,env,type);
+    httpStatus=response.status;
+    if(response.ok){result='delivered';delivered++}
+    if(response.status===404||response.status===410){
+     const table=type==='advisor'?'staff_push_subscriptions':'guardian_push_subscriptions';
+     await env.DB.prepare(`DELETE FROM ${table} WHERE id=?`).bind(device.id).run();
+    }
+   }catch(error){console.warn('RD priority push dispatch failed',error?.name||'network')}
+   if(result==='failed')failed++;
+   await env.DB.prepare(`UPDATE truancy_push_deliveries
+     SET state=?,last_http_status=?,updated_at=CURRENT_TIMESTAMP
+     WHERE event_id=? AND generation=? AND recipient_type=? AND subscription_id=?`)
+    .bind(result,httpStatus,event.id,event.generation,type,device.id).run();
+  }
+  // Four concurrent outbound requests is a balanced ceiling for Worker limits.
+  for(let i=0;i<targets.length;i+=4){
+   await Promise.allSettled(targets.slice(i,i+4).map(sendTarget));
   }
  }
- return {enabled:true,delivered};
+ return {enabled:true,processed:events.length,delivered,failed};
 }
