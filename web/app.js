@@ -56,6 +56,7 @@ const periodCenter=createPeriodCenter({api,mount,safeRun,today:dateToday,toast,
 const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
+const periodNames={...names,truancy:'หนีเรียน'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
 const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>renderLogin()});
@@ -362,8 +363,12 @@ async function loadAttendance(){
  for(const entry of entries)state.statuses[entry.student_id]=entry.status;
  renderAttendance();
 }
-function statusCounts(){return Object.fromEntries(['present','absent','late','leave'].map(s=>[s,Object.values(state.statuses).filter(x=>x===s).length]));}
-function statusSummary(){const c=statusCounts();return `มา ${c.present} • ขาด ${c.absent} • สาย ${c.late} • ลา ${c.leave}`;}
+function statusCounts(){return Object.fromEntries(Object.keys(state.kind==='period'?periodNames:names)
+ .map(status=>[status,Object.values(state.statuses).filter(x=>x===status).length]));}
+function statusSummary(){const c=statusCounts();
+ return `มา ${c.present} • ขาด ${c.absent} • สาย ${c.late} • ลา ${c.leave}`+
+ (state.kind==='period'?` • หนีเรียน ${c.truancy}`:'');
+}
 
 function dailyReferenceStatus(studentId){
  const recorded=state.dailyReferences[studentId];
@@ -401,7 +406,7 @@ function renderAttendance(){
   return `<option value="${t.id}" ${t.id===state.slotId?'selected':''}>คาบ ${period} • ${esc(t.classroom_label)} • ${esc(t.subject_code||'')}${t.subject_code?' / ':''}${esc(t.subject)}${state.user?.role==='teacher'?'':' ('+esc(t.teacher_name)+')'}</option>`;
  }).join('');
  const students=state.students.map(s=>`<div class="student" data-id="${s.id}"><div><div class="student-name">${s.roll_no}. ${esc(s.full_name)}</div><div class="student-sub">รหัส ${esc(s.student_no)}</div>
- ${!daily?`<span class="daily-student-badge daily-ref-${dailyReferenceStatus(s.id)}" aria-label="สถานะเช็กชื่อรายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}">รายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}</span>`:''}</div><div class="pills">${Object.keys(names).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${names[status]}</button>`).join('')}</div></div>`).join('');
+ ${!daily?`<span class="daily-student-badge daily-ref-${dailyReferenceStatus(s.id)}" aria-label="สถานะเช็กชื่อรายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}">รายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}</span>`:''}</div><div class="pills">${Object.keys(daily?names:periodNames).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${(daily?names:periodNames)[status]}</button>`).join('')}</div></div>`).join('');
  mount(`<section class="stack">${!daily&&state.user?.role==='teacher'?'<div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>':''}
  <div><h2>${daily?'📅 เช็กชื่อรายวัน':'✅ เช็กชื่อรายคาบ'}</h2>
   <p class="muted">${daily?'สำหรับครูที่ปรึกษา • เช็กชื่อห้องที่รับผิดชอบ':'สำหรับครูผู้สอน • เลือกวิชาจากตารางสอนของตนเองได้ แม้จะไม่ใช่ครูที่ปรึกษาของห้อง'}</p></div>
@@ -413,6 +418,7 @@ function renderAttendance(){
  ${state.user?.role==='teacher'?'<button type="button" class="button secondary" data-tab="myTimetable">📚 จัดการตารางสอนของฉัน</button>':''}`}
  </div><div class="card stack">
  ${!daily?renderDailyOverview():''}
+ ${!daily?'<p class="warn">🚨 หากบันทึก “หนีเรียน” ระบบจะแจ้งครูที่ปรึกษาและผู้ปกครองที่สมัครรับ Push โดยเร็ว และบันทึกเหตุการณ์ไว้ในระบบ กรุณาตรวจสอบข้อเท็จจริงก่อนเลือกสถานะนี้</p>':''}
  <div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
  ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การบันทึกซ้ำจะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคน ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
  <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
@@ -440,6 +446,9 @@ function renderAttendance(){
 function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();}
 async function saveAttendance(){
  if(!state.students.length)return;
+ if(state.kind==='period'&&Object.values(state.statuses).includes('truancy')&&!confirm(
+  'ยืนยันการบันทึกสถานะหนีเรียน? ระบบจะส่งแจ้งเตือนถึงครูที่ปรึกษาและผู้ปกครองที่เปิดรับ Push หลังบันทึก'
+ ))return;
  const button=$('#saveAttendance');button.disabled=true;
  try{
   const body={kind:state.kind,date:state.date,classroom_id:state.roomId,
