@@ -31,6 +31,13 @@ export async function guardianPushRoutes(req,env,account,path){
    .bind(account.id,subscription.endpoint,subscription.keys.p256dh,subscription.keys.auth).run();
   return reply({ok:true,subscribed:true});
  }
+ if(path==='/api/portal/push/status'&&req.method==='POST'){
+  const data=await read(req);
+  if(typeof data.endpoint!=='string'||data.endpoint.length>1800)fail(400,'ข้อมูลอุปกรณ์ไม่ถูกต้อง');
+  const owned=await env.DB.prepare('SELECT id FROM guardian_push_subscriptions WHERE endpoint=? AND guardian_account_id=?')
+    .bind(data.endpoint,account.id).first();
+  return reply({subscribed:!!owned});
+ }
  if(path==='/api/portal/push/unsubscribe'&&req.method==='POST'){
   const data=await read(req);
   if(typeof data.endpoint!=='string'||data.endpoint.length>1800)fail(400,'อุปกรณ์ไม่ถูกต้อง');
@@ -44,6 +51,10 @@ export async function guardianTruancyItems(env,account){
  if(account.role!=='guardian')return [];
  const {results}=await env.DB.prepare(`SELECT e.id,e.school_date,t.period,t.subject,s.full_name,
   e.created_at FROM truancy_events e
+  JOIN period_truancy tr ON tr.student_id=e.student_id AND tr.timetable_id=e.timetable_id
+    AND tr.school_date=e.school_date
+  JOIN attendance_period p ON p.student_id=e.student_id AND p.timetable_id=e.timetable_id
+    AND p.school_date=e.school_date AND p.status='absent'
   JOIN timetable t ON t.id=e.timetable_id
   JOIN students s ON s.id=e.student_id AND s.active=1
   JOIN guardian_student_links l ON l.student_id=e.student_id
