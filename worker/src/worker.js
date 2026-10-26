@@ -168,9 +168,20 @@ async function getAttendance(req,env,user){
  WHERE p.timetable_id=? AND p.school_date=? AND h.classroom_id=?
  AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date)`)
  .bind(timetableId,date,roomId).all();
+  // A class teacher's DAILY check-in is reference information only. Return only
+  // records for students enrolled in this lesson's room on the selected date,
+  // after the timetable/teacher authorization above has succeeded.
+  // Missing rows mean "not recorded", NEVER "present".
+  const {results:dailyItems}=await env.DB.prepare(`SELECT d.student_id,d.status FROM attendance_daily d
+   JOIN student_enrollments h ON h.student_id=d.student_id
+   WHERE h.classroom_id=? AND d.school_date=?
+     AND h.start_date<=d.school_date
+     AND (h.end_date IS NULL OR h.end_date>d.school_date)`)
+   .bind(roomId,date).all();
   const log=await env.DB.prepare('SELECT note,updated_at FROM period_teaching_logs WHERE timetable_id=? AND school_date=?')
    .bind(timetableId,date).first();
-  return json({items:results,teaching_note:log?.note||'',teaching_note_updated_at:log?.updated_at||null});
+  return json({items:results,daily_items:dailyItems,daily_date:date,
+   teaching_note:log?.note||'',teaching_note_updated_at:log?.updated_at||null});
  }
  throw error(400,'ประเภทการเช็กชื่อไม่ถูกต้อง');
 }
