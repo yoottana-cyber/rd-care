@@ -23,9 +23,11 @@ export async function periodWeekStatus(req,env,user){
  const last=new Date(utcDate(monday)+6*86400000).toISOString().slice(0,10);
  const {results}=await env.DB.prepare(`SELECT a.timetable_id,a.school_date,COUNT(*) AS recorded,
   SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent,
+  SUM(CASE WHEN tr.student_id IS NOT NULL THEN 1 ELSE 0 END) AS truancy,
   SUM(CASE WHEN a.status='late' THEN 1 ELSE 0 END) AS late,
   SUM(CASE WHEN a.status='leave' THEN 1 ELSE 0 END) AS leave
   FROM attendance_period a JOIN timetable t ON t.id=a.timetable_id
+  LEFT JOIN period_truancy tr ON tr.student_id=a.student_id AND tr.timetable_id=a.timetable_id AND tr.school_date=a.school_date
   WHERE t.teacher_user_id=? AND t.active=1 AND a.school_date BETWEEN ? AND ?
   GROUP BY a.timetable_id,a.school_date`).bind(user.id,monday,last).all();
  return json({items:results,from:monday,to:last});
@@ -41,10 +43,12 @@ export async function periodCourseReport(req,env,user){
   const own=await env.DB.prepare('SELECT id FROM timetable WHERE id=? AND teacher_user_id=? AND active=1')
    .bind(selected,user.id).first();
   if(!own)fail(404,'ไม่พบรายวิชาของครู');
-  const {results}=await env.DB.prepare(`SELECT a.school_date,a.status,h.roll_no,
-    s.full_name,s.student_no
+  const {results}=await env.DB.prepare(`SELECT a.school_date,
+     CASE WHEN tr.student_id IS NOT NULL AND a.status='absent' THEN 'truancy' ELSE a.status END AS status,
+     h.roll_no,s.full_name,s.student_no
     FROM attendance_period a
     JOIN timetable t ON t.id=a.timetable_id
+    LEFT JOIN period_truancy tr ON tr.student_id=a.student_id AND tr.timetable_id=a.timetable_id AND tr.school_date=a.school_date
     JOIN students s ON s.id=a.student_id
     JOIN student_enrollments h ON h.student_id=a.student_id
        AND h.classroom_id=t.classroom_id AND h.start_date<=a.school_date
@@ -65,10 +69,12 @@ export async function periodCourseReport(req,env,user){
   COUNT(DISTINCT a.school_date) AS dates_recorded,
   SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) AS present,
   SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent,
+  SUM(CASE WHEN tr.student_id IS NOT NULL THEN 1 ELSE 0 END) AS truancy,
   SUM(CASE WHEN a.status='late' THEN 1 ELSE 0 END) AS late,
   SUM(CASE WHEN a.status='leave' THEN 1 ELSE 0 END) AS leave
   FROM timetable t JOIN classrooms c ON c.id=t.classroom_id
   LEFT JOIN attendance_period a ON a.timetable_id=t.id AND a.school_date BETWEEN ? AND ?
+  LEFT JOIN period_truancy tr ON tr.student_id=a.student_id AND tr.timetable_id=a.timetable_id AND tr.school_date=a.school_date
   WHERE t.teacher_user_id=? AND t.active=1
   GROUP BY t.id
   ORDER BY c.grade,c.room,t.day_of_week,t.period`)
