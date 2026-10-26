@@ -5,6 +5,7 @@ import {createUnifiedImport} from './unified-import.js';
 import {createAdvisorImport} from './advisor-import.js';
 import {createAdminSettings} from './admin-settings.js';
 import {createMyTimetable,periodChoices} from './my-timetable.js';
+import {createLateGate} from './late-gate.js';
 import {createPeriodCenter} from './period-center.js';
 import {createPwaTools} from './pwa-client.js';
 import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
@@ -27,6 +28,7 @@ const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>'
 const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const pwaTools=createPwaTools({api,toast});
+const lateGate=createLateGate({api,mount,toast,safeRun});
 const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,
  getAlerts:()=>state.stats?.alerts||0});
 const adminStudentState={roomId:null,items:[],editId:null};
@@ -152,7 +154,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],['late','มาสาย','⏰'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
@@ -238,7 +240,7 @@ function roomOptions(advisorOnly=false){
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
-async function showTab(tab){state.tab=tab;
+async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();state.tab=tab;
  if(tab==='attendance')state.kind='daily';
  if(tab==='periodAttendance'||tab==='periodCheckin')state.kind='period';
  if(tab!=='adminStudents')unifiedImport.clear();
@@ -250,6 +252,7 @@ async function showTab(tab){state.tab=tab;
  if(tab==='myTimetable')return myTimetable.load();
  if(tab==='advisorCenter')return loadAdvisorCenter();
  if(tab==='late')return loadLate();
+ if(tab==='lateGate')return lateGate.load();
  if(tab==='behavior')return loadBehavior();
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
@@ -776,6 +779,13 @@ function parseCsv(csv,columns=[3]){const rows=[];let row=[],col='',quoted=false;
 }
 async function start(){
  if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+ const scanned=new URLSearchParams(location.search).get('late_qr');
+ if(scanned){
+  history.replaceState(null,'',location.pathname);
+  portalUi.acceptLateQr(scanned);
+  if(portalUi.hasSession()){await portalUi.resume();return}
+  portalUi.showLogin('student');return;
+ }
  if(portalUi.hasSession()&&(!state.token||getLastLoginArea()==='portal')){await portalUi.resume();return}
  if(!state.token){renderLogin();return}
  try{await boot()}catch(error){
