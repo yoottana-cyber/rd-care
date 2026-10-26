@@ -230,8 +230,12 @@ function bindGlobalStudentSearch(){
 }
 function $$(sel){return [...document.querySelectorAll(sel)]}
 async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
-function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
-function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
+function roomOptions(advisorOnly=false){
+ const rooms=advisorOnly&&state.user?.role==='teacher'?
+  state.rooms.filter(r=>r.advisor_user_id===state.user.id):state.rooms;
+ return rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
+}
+function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
 async function showTab(tab){state.tab=tab;
  if(tab==='attendance')state.kind='daily';
@@ -385,7 +389,7 @@ function renderDailyOverview(){
      <div class="daily-watch-students">${focus.map(student=>
        `<span class="daily-watch-person daily-ref-${dailyReferenceStatus(student.id)}">${esc(student.roll_no)}. ${esc(student.full_name)} — ${names[dailyReferenceStatus(student.id)]}</span>`).join('')}</div></div>`:
      '<p class="daily-watch-empty">ยังไม่มีนักเรียนที่ถูกบันทึกว่า “ขาด” หรือ “ลา” ในข้อมูลรายวันของวันที่เลือก</p>'}
-   <p class="daily-reference-hint">สถานะรายวันไม่ได้ยืนยันการเข้าเรียนทุกคาบ หากไม่มีข้อมูลจะแสดง “ยังไม่บันทึก” ไม่ถือว่านักเรียนมาเรียนแล้ว</p>
+   <p class="daily-reference-hint">นักเรียนที่บันทึกว่า “ขาด” รายวันแล้ว หากเช็กขาดรายคาบอีกจะไม่สร้างรายการแจ้งเตือนครูที่ปรึกษาซ้ำ แต่ยังเก็บผลรายคาบไว้ • สถานะรายวันไม่ได้ยืนยันการเข้าเรียนทุกคาบ</p>
  </section>`;
 }
 function renderAttendance(){
@@ -559,9 +563,23 @@ async function loadAdvisorCenter(){
   }finally{if(button.isConnected)button.disabled=false}
  })));
 }
-async function loadAlerts(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}try{const data=await api('/api/alerts?classroom_id='+state.roomId);state.alerts=data.items;renderAlerts()}catch(e){mount(`<div class="card"><h2>งานตรวจสอบ</h2><p class="warn">${esc(e.message)}</p><p class="muted">หน้านี้ให้ครูที่ปรึกษาและผู้ดูแลระบบเข้าถึงได้</p></div>`)} }
-function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false})}
- <div class="warn">การยืนยันรายการนี้ยังไม่ส่งการแจ้งเตือน Push ถึงผู้ปกครอง</div>
+async function loadAlerts(){
+ const allowed=state.user?.role==='teacher'?
+   state.rooms.filter(r=>r.advisor_user_id===state.user.id):state.rooms;
+ if(!allowed.length){
+  mount('<section class="card stack"><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">บัญชีนี้ยังไม่ได้รับมอบหมายเป็นครูที่ปรึกษา จึงไม่มีรายการตรวจสอบในส่วนนี้</p></section>');
+  return;
+ }
+ if(!allowed.some(r=>r.id===state.roomId))state.roomId=allowed[0].id;
+ const selected=state.roomId;
+ try{
+  const data=await api('/api/alerts?classroom_id='+selected);
+  if(state.tab!=='alerts'||state.roomId!==selected)return;
+  state.alerts=data.items;renderAlerts();
+ }catch(e){mount(`<div class="card"><h2>งานตรวจสอบ</h2><p class="warn">${esc(e.message)}</p><p class="muted">หน้านี้ให้ครูที่ปรึกษาและผู้ดูแลระบบเข้าถึงได้</p></div>`)}
+}
+function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false,advisorOnly:true})}
+ <div class="warn">นักเรียนที่ขาดรายวันแล้วจะไม่ถูกแจ้งขาดรายคาบซ้ำ • การยืนยันรายการอื่นยังไม่ส่ง Push ถึงผู้ปกครอง</div>
  ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-review="${a.id}" data-state="resolved">มีเหตุ/บันทึกผิด</button><button class="button" data-review="${a.id}" data-state="confirmed">ยืนยันไม่เข้าชั้นเรียน</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการรอตรวจสอบ</div>'}</div></div>`);
  bindFilters(loadAlerts);
