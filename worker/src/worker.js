@@ -11,6 +11,7 @@ import {unifiedRosterEndpoint} from './unified-roster.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
+import {lateGateStaffRoutes} from './late-qr.js';
 import {deliverTruancyPush,advisorTruancyItems,truancyPushReadiness} from './truancy-push.js';
 
 const encoder = new TextEncoder();
@@ -852,6 +853,7 @@ async function route(req,env,ctx){
  }
  if(req.method==='GET'&&path==='/api/auth/me')return json({user});
  if(path.startsWith('/api/push/'))return staffPushRoutes(req,env,user,path);
+ if(path.startsWith('/api/late/qr/'))return lateGateStaffRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
  if(req.method==='GET'&&path==='/api/classrooms/catalog'){
   const {results}=await env.DB.prepare('SELECT id,grade,room,label FROM classrooms ORDER BY grade,room').all();
