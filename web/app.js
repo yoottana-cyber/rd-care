@@ -479,7 +479,7 @@ function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตร
  bindFilters(loadAlerts);
  $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (ระบบยังไม่ส่งการแจ้งเตือนผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
 }
-async function loadAdmin(){if(state.user.role!=='admin')return;const [accounts,requests]=await Promise.all([api('/api/admin/users'),api('/api/admin/timetable/requests')]);state.users=accounts.items;timetableRequests=requests.items;renderAdmin();}
+async function loadAdmin(){if(state.user.role!=='admin')return;const [accounts,requests]=await Promise.all([api('/api/admin/users'),api('/api/admin/timetable/requests').catch(e=>({items:[],warning:e.message}))]);state.users=accounts.items;timetableRequests=requests.items;renderAdmin();if(requests.warning)toast('ระบบอนุมัติตารางสอนยังเชื่อมต่อไม่ได้: '+requests.warning,true);}
 function teacherOptions(){return state.users.filter(u=>u.role==='teacher'&&u.active).map(u=>`<option value="${u.id}">${esc(u.display_name)} (${esc(u.username)})</option>`).join('');}
 function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข้อมูลระบบ</h2><p class="muted">สำหรับผู้ดูแลระบบ • จัดการบัญชี ห้องเรียน และข้อมูลการใช้งาน</p></div>
  <section class="card stack"><div class="row between"><h3>📚 อนุมัติตารางสอนครู</h3><span class="tag">รอพิจารณา ${timetableRequests.length} รายการ</span></div>
