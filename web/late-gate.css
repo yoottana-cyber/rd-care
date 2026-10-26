@@ -27,7 +27,7 @@
 @media print{
  body *{visibility:hidden}
  .late-qr-print,.late-qr-print *{visibility:visible}
- .late-qr-print{position:absolute;left:0;top:0;width:100%;background:white;color:black;
+ .late-qr-print{position:fixed;left:0;top:0;width:180mm;background:white;color:black;
   padding:15mm 5mm;box-sizing:border-box;gap:20px}
  .late-qr-print-head h2{font-size:32pt;color:black}
  .late-qr-print-head h3{font-size:25pt}
