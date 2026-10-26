@@ -146,6 +146,13 @@ export function createPortalUi({root,onStaffLogin}){
   frame(`<div class="row between"><div><h2>${esc(state.account.display_name)}</h2>
    <p class="muted">${state.account.role==='guardian'?'ผู้ปกครอง':'นักเรียน'} • ดูข้อมูลเฉพาะที่ได้รับสิทธิ์</p></div>
    <button type="button" id="portalLogout" class="button secondary">ออกจากระบบ</button></div>
+   ${state.account.role==='guardian'&&state.truancy.some(e=>e.school_date===today())?`
+    <section class="rd-priority-card" aria-label="เหตุการณ์สำคัญวันนี้">
+     <div class="rd-priority-heading"><span aria-hidden="true">🚨</span><div>
+      <h3>มีรายการสำคัญให้ตรวจสอบ</h3>
+      <p>ข้อมูลการมาเรียนที่ควรตรวจสอบและประสานกับโรงเรียน</p></div></div>
+     <a class="button rd-priority-action" href="#guardianAlerts">ดูรายละเอียดและตั้งค่าแจ้งเตือน</a>
+    </section>`:''}
    ${state.children.length?`<div class="grid two">
      <div class="field"><label>นักเรียน${state.account.role==='guardian'?'ในความดูแล':''}</label>
       <select id="portalStudent">${state.children.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${esc(s.full_name)} • ${esc(s.classroom_label)}</option>`).join('')}</select></div>
@@ -158,7 +165,7 @@ export function createPortalUi({root,onStaffLogin}){
     <h3>ประวัติมาสาย</h3>${table(r.late,[['school_date','วันที่'],['arrived_at','เวลา'],['state','สถานะ']],row=>row.state==='verified'?'ยืนยันแล้ว':'รอตรวจสอบ')}
     <h3>คะแนนพฤติกรรม</h3><p class="muted">รวมเฉพาะช่วงวันที่เลือก: ${r.behavior_total} คะแนน</p>
     ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}`:''}
-   ${state.account.role==='guardian'?`<section class="card stack guardian-truancy-notices">
+   ${state.account.role==='guardian'?`<section class="card stack guardian-truancy-notices" id="guardianAlerts">
     <h3>🚨 แจ้งเตือนการไม่เข้าคาบเรียน</h3>
     <p class="muted">เฉพาะนักเรียนในความดูแลที่โรงเรียนยืนยันความสัมพันธ์แล้ว สามารถตรวจสอบเหตุการณ์และประสานครูที่ปรึกษาได้</p>
     ${state.truancy.length?state.truancy.map(e=>`<div class="alert-item">
