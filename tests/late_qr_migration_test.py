@@ -1,7 +1,6 @@
 """Verify QR late gate D1 schema and constraints with real SQLite."""
 import pathlib
 import sqlite3
-import re
 import unittest
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -86,13 +85,14 @@ class LateQrSchemaTests(unittest.TestCase):
     VALUES(1,1,'2026-10-26')""")
  def test_real_duty_queue_sql_contains_printed_qr_scans(self):
   worker=(ROOT/'worker'/'src'/'late-qr.js').read_text(encoding='utf8')
-  match=re.search(r'WITH scans AS \\([\\s\\S]*?ORDER BY q.created_at DESC,q.id DESC LIMIT 150',worker)
-  self.assertIsNotNone(match,'Actual D1 queue SQL should be tested')
+  start=worker.index('WITH scans AS (')
+  end=worker.index('ORDER BY q.created_at DESC,q.id DESC LIMIT 150',start)+len('ORDER BY q.created_at DESC,q.id DESC LIMIT 150')
+  query=worker[start:end]
   self.db.execute("""INSERT INTO late_self_requests(id,student_id,school_date,arrived_at)
    VALUES(1,1,'2026-10-26','08:30')""")
   self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
    VALUES(1,1,'2026-10-26')""")
-  rows=self.db.execute(match.group(0),('2026-10-26',1,'teacher')).fetchall()
+  rows=self.db.execute(query,('2026-10-26',1,'teacher')).fetchall()
   self.assertEqual(len(rows),1)
   self.assertEqual(rows[0][0],'static-1')
   self.assertEqual(rows[0][3],'08:30')
