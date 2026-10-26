@@ -45,7 +45,7 @@ async function noConflict(env,lesson,teacherId,skipId=0){
 }
 async function myTimetable(env,user){
  const {results}=await env.DB.prepare(`SELECT t.id,t.classroom_id,t.day_of_week,t.period,
-   COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,t.approval_status,
+   COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,t.active,t.approval_status,
    c.label AS classroom_label
    FROM timetable t JOIN classrooms c ON c.id=t.classroom_id
    WHERE t.teacher_user_id=? AND t.approval_status<>'archived' ORDER BY t.day_of_week,t.period,c.grade,c.room`)
