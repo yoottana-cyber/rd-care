@@ -55,7 +55,7 @@ export async function guardianTruancyItems(env,account){
 export async function advisorTruancyItems(env,user){
  const scope=['admin','staff'].includes(user.role)?'':' AND c.advisor_user_id=?';
  const args=['admin','staff'].includes(user.role)?[]:[user.id];
- const {results}=await env.DB.prepare(`SELECT e.id,e.school_date,t.period,t.subject,c.label AS classroom_label,s.full_name
+ const {results}=await env.DB.prepare(`SELECT e.id,e.school_date,t.classroom_id,t.period,t.subject,c.label AS classroom_label,s.full_name
  FROM truancy_events e JOIN timetable t ON t.id=e.timetable_id
  JOIN classrooms c ON c.id=t.classroom_id JOIN students s ON s.id=e.student_id AND s.active=1
  WHERE e.active=1 AND e.school_date>=date('now','-30 days')`+scope+
