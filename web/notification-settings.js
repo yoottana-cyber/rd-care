@@ -7,7 +7,10 @@ export function createNotificationSettings({pwaTools,mount,toast,safeRun,showTab
    !st.enabled?'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่ากุญแจ VAPID จึงยังไม่พร้อมเปิด Push':
    st.permission==='denied'?'การแจ้งเตือนถูกปฏิเสธ โปรดอนุญาตในตั้งค่าอุปกรณ์':
    st.subscribed?'อุปกรณ์นี้เปิดรับการแจ้งเตือนแล้ว':'ยังไม่ได้เปิด Push บนอุปกรณ์นี้';
-  const pending=Math.max(0,Number(getAlerts()||0));
+  // Direct notification opens may skip Dashboard; get the signed-in user's fresh task count.
+  const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const snapshot=await api('/api/dashboard?date='+encodeURIComponent(day)).catch(()=>({alerts:getAlerts()}));
+  const pending=Math.max(0,Number(snapshot?.alerts||0));
   mount(`<section class="stack rd-notification-settings">
    <div class="rd-mobile-welcome"><h2>🔔 ศูนย์แจ้งเตือน</h2>
    <p>เข้าถึงงานสำคัญและตั้งค่า RD Care บนโทรศัพท์ของคุณ</p></div>
