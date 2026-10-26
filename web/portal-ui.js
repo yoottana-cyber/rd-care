@@ -1,17 +1,19 @@
 import {API_BASE_URL} from './config.js';
 import {bindThemeButtons} from './theme.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea} from './auth-session.js';
+import {createGuardianPush} from './guardian-push.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
+const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา',truancy:'หนีเรียน'};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
 export function createPortalUi({root,onStaffLogin}){
- const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,from:minusDays(today(),29),to:today()};
+ const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today()};
  let requestVersion=0;
  const select=s=>root.querySelector(s);
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
+ const guardianPush=createGuardianPush({call,select,message});
  async function call(path,{method='GET',body,auth=true}={}){
   const headers={'content-type':'application/json'};
   if(auth&&state.token)headers.authorization='Bearer '+state.token;
@@ -103,6 +105,7 @@ export function createPortalUi({root,onStaffLogin}){
  }
  async function logout(){
   requestVersion++;
+  if(state.account?.role==='guardian')try{await guardianPush.disable({silent:true})}catch{}
   try{if(state.token)await call('/api/portal/auth/logout',{method:'POST',body:{}})}catch{}
   state.token='';state.account=null;state.records=null;state.children=[];
   clearAuthSession('rd_portal_token');showLogin();
@@ -110,9 +113,12 @@ export function createPortalUi({root,onStaffLogin}){
  async function showDashboard(){
   try{
    const session=state.token;
-   const data=await call('/api/portal/children');
+   const [data,notices]=await Promise.all([
+    call('/api/portal/children'),
+    state.account?.role==='guardian'?call('/api/portal/truancy'):Promise.resolve({items:[]})
+   ]);
    if(session!==state.token||!state.account)return;
-   state.children=data.items;
+   state.children=data.items;state.truancy=notices.items||[];
    if(!state.children.some(s=>s.id===state.studentId))state.studentId=state.children[0]?.id||null;
    if(state.studentId)await loadRecords();else renderDashboard();
   }catch(error){if(!state.token){showLogin(state.role);return}frame('<p class="warn">ไม่สามารถโหลดข้อมูลที่ได้รับสิทธิ์</p><button class="button secondary full" id="portalRetry">ลองอีกครั้ง</button>');message(error.message,true);select('#portalRetry').addEventListener('click',showDashboard)}
@@ -152,8 +158,22 @@ export function createPortalUi({root,onStaffLogin}){
     <h3>ประวัติมาสาย</h3>${table(r.late,[['school_date','วันที่'],['arrived_at','เวลา'],['state','สถานะ']],row=>row.state==='verified'?'ยืนยันแล้ว':'รอตรวจสอบ')}
     <h3>คะแนนพฤติกรรม</h3><p class="muted">รวมเฉพาะช่วงวันที่เลือก: ${r.behavior_total} คะแนน</p>
     ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}`:''}
-   <p class="muted">ยังไม่เปิดใช้งานการแจ้งเตือน Push ถึงผู้ปกครอง</p>`);
+   ${state.account.role==='guardian'?`<section class="card stack guardian-truancy-notices">
+    <h3>🚨 แจ้งเตือนการไม่เข้าคาบเรียน</h3>
+    <p class="muted">เฉพาะนักเรียนในความดูแลที่โรงเรียนยืนยันความสัมพันธ์แล้ว สามารถตรวจสอบเหตุการณ์และประสานครูที่ปรึกษาได้</p>
+    ${state.truancy.length?state.truancy.map(e=>`<div class="alert-item">
+     <strong>${esc(e.full_name)}</strong><p>${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
+     <span class="tag">ครูบันทึกสถานะหนีเรียน — โปรดตรวจสอบข้อเท็จจริง</span>
+    </div>`).join(''):'<p class="muted">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}
+    <div class="field"><label>การแจ้งเตือน Push อุปกรณ์นี้</label>
+     <p id="guardianPushStatus" class="muted" role="status">กำลังตรวจสอบความพร้อม</p></div>
+    <div class="row"><button type="button" class="button" id="guardianPushEnable">🔔 เปิดรับ Push</button>
+     <button type="button" class="button secondary" id="guardianPushDisable">ปิด Push อุปกรณ์นี้</button></div>
+    <p class="muted">iPhone: เปิดด้วย Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิด RD Care จากไอคอน ก่อนกดเปิดรับ Push</p>
+    <p class="muted">การแจ้งเตือนจะแสดงข้อความทั่วไปบนหน้าจอล็อก ไม่แสดงชื่อหรือข้อมูลของนักเรียน</p>
+   </section>`:''}`);
   select('#portalLogout').addEventListener('click',logout);
+  if(state.account.role==='guardian')guardianPush.bind();
   select('#portalStudent')?.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()});
   select('#portalSearch')?.addEventListener('click',()=>{
    state.from=select('#portalFrom').value;state.to=select('#portalTo').value;
