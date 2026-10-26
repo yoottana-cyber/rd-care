@@ -1,0 +1,58 @@
+# RD Care — Mobile App / PWA / Staff Web Push
+
+## Mobile UI
+- 5-action bottom navigation: ภาพรวม, แจ้งเตือน, เช็กชื่อ (กลาง), งานตรวจสอบ, เมนู
+- Full menu sheet holds all original modules, theme switch, app install and logout
+- Card-first dashboard, tap-friendly controls and iPhone safe-area support
+- The admin/teacher/student features and existing login APIs remain unchanged
+
+## Installing RD Care
+- Android Chrome/Edge: open https://rd-care.pages.dev, choose **ติดตั้งแอป** from menu or use browser Install App.
+- iOS Safari: open the site, tap **แชร์ (Share)** → **เพิ่มไปยังหน้าจอโฮม (Add to Home Screen)**, then launch the RD Care icon.
+- Installation requires HTTPS and a supported browser. The existing PWA manifest, 192/512 icons, and service worker provide offline app shell only; forms still require internet to save data.
+
+## Push capabilities implemented
+- Opt-in, **staff-only** device subscriptions bound to the currently logged-in staff user.
+- Staff device push currently relates only to **new pending class-advisor absence reviews**. Notifications carry generic text, no student name/status or class information on lock screens.
+- Outbox advisor events are sent after saved attendance, with cron retried approximately every 5 minutes. Multiple pending student events are consolidated into one generic notification per advisor.
+- Disabling Push removes that user's device subscription. Logout attempts to revoke server consent and removes the local browser subscription.
+- No automatic permission prompts. Guardian/student Push is **not active** and requires its own account verification/consent and content policy before deployment.
+- API endpoints: `GET /api/push/config`, `POST /api/push/subscribe`, `POST /api/push/unsubscribe`.
+- Database migration `0011_staff_web_push.sql`.
+
+## Required Cloudflare VAPID setup (no credentials in GitHub)
+The code deploys even if keys are absent. In that case the notification settings page truthfully displays **Push ยังไม่พร้อม** and does not request permission.
+
+A Cloudflare Worker administrator must create a permanent VAPID keypair once:
+
+```bash
+node worker/scripts/generate-vapid.mjs
+```
+
+Keep the **private** value secret and set these three Cloudflare Worker environment secrets for `rd-care-api-dev` (via Cloudflare dashboard, Worker settings → Variables and Secrets, or Wrangler commands):
+
+```bash
+cd worker
+npx wrangler secret put VAPID_PUBLIC_KEY
+npx wrangler secret put VAPID_PRIVATE_KEY
+npx wrangler secret put VAPID_SUBJECT
+```
+
+For the SUBJECT, use a real school-maintained administrative contact in `mailto:your-admin-address@example.ac.th` format (replace with the school's actual address). The VAPID key pair must remain stable across deployments; replacing the keys invalidates existing browser subscriptions.
+
+**Do not commit** `.dev.vars`, private keys or real subscription endpoints to GitHub. The public key is public by design; the private key is not.
+
+## Testing delivery
+1. Confirm Cloudflare Worker API `/api/health` is healthy and all migrations completed.
+2. Sign in on the installed RD Care PWA with a teacher account assigned as an advisor.
+3. Navigate to **แจ้งเตือน**, tap **เปิดรับ Push** and explicitly allow the browser permission.
+4. On a second staff account, mark a student absent in a taught lesson. The new pending advisor review should produce **one generic push** to the advisor's subscribed device.
+5. Tap the push to launch RD Care notifications. Open **ศูนย์ครูที่ปรึกษา** to inspect the actual review details after authentication.
+6. Switch off push in the app and confirm no more messages are received. Test logout and re-login separately.
+
+## Privacy and deployment boundaries
+- Push endpoints are validated against known HTTPS push providers to avoid arbitrary server requests.
+- No student personal information is delivered as a push payload. The service worker displays a fixed generic notification.
+- Only the authenticated user's push endpoint can be removed/updated by that account. A subscription already claimed by another account is rejected.
+- Device and account subscriptions must be audited before use with actual student personal data, and school privacy/retention policies should be approved first.
+- The app shell is cached offline; the service worker intentionally never caches `/api/*` responses containing school data.
