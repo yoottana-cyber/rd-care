@@ -42,6 +42,19 @@ jobs:
         working-directory: worker
         run: npm install --no-audit --no-fund
 
+      - name: Verify QR generator works without external services
+        working-directory: worker
+        run: |
+          node --input-type=module -e "
+            const module=await import('qrcode-generator');
+            const qr=module.default(0,'M');
+            qr.addData('https://rd-care.pages.dev/?late_qr='+'a'.repeat(40));
+            qr.make();
+            const svg=qr.createSvgTag({cellSize:6,margin:12,scalable:true});
+            if(!svg.includes('<svg')||!svg.includes('</svg>'))process.exit(1);
+            process.stdout.write('Local QR renderer OK\\n');
+          "
+
       - name: Validate Worker and admin APIs
         run: |
           node --check worker/src/worker.js
