@@ -8,6 +8,7 @@ import {searchStudents} from './student-search.js';
 import {advisorImportEndpoint} from './advisor-import.js';
 import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint} from './unified-roster.js';
+import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -127,14 +128,18 @@ async function getTimetable(req,env,user){
  const date=url.searchParams.get('date')||bangkokToday(); requireDate(date);
  const day=weekday(date);
  const roomId=positiveInt(url.searchParams.get('classroom_id'));
- let query=`SELECT t.id,t.classroom_id,t.teacher_user_id,t.day_of_week,t.period,t.subject,c.label AS classroom_label,u.display_name AS teacher_name
+ let query=`SELECT t.id,t.classroom_id,t.teacher_user_id,t.day_of_week,t.period,COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,c.label AS classroom_label,u.display_name AS teacher_name
   FROM timetable t JOIN classrooms c ON c.id=t.classroom_id JOIN users u ON u.id=t.teacher_user_id
   WHERE t.active=1 AND t.day_of_week=?`;
  const args=[day];
  if(roomId){await assertRoom(env,user,roomId);query+=' AND t.classroom_id=?';args.push(roomId);}
  if(!isStaff(user)){
-  query+=` AND (t.teacher_user_id=? OR c.advisor_user_id=?)`;
-  args.push(user.id,user.id);
+  if(url.searchParams.get('scope')==='mine'){
+   query+=' AND t.teacher_user_id=?';args.push(user.id);
+  }else{
+   query+=` AND (t.teacher_user_id=? OR c.advisor_user_id=?)`;
+   args.push(user.id,user.id);
+  }
  }
  query+=' ORDER BY t.period,c.grade,c.room';
  const {results}=await env.DB.prepare(query).bind(...args).all();
@@ -144,7 +149,7 @@ async function getAttendance(req,env,user){
  const q=new URL(req.url).searchParams;
  const roomId=positiveInt(q.get('classroom_id'));
  const kind=q.get('kind');const date=q.get('date')||bangkokToday();
- requireDate(date);await assertRoom(env,user,roomId);
+ requireDate(date);await assertRoom(env,user,roomId,kind==='daily'?'daily':'view');
  if(kind==='daily'){
   const {results}=await env.DB.prepare(`SELECT a.student_id,a.status FROM attendance_daily a
  JOIN student_enrollments h ON h.student_id=a.student_id
@@ -154,8 +159,9 @@ async function getAttendance(req,env,user){
  }
  if(kind==='period'){
   const timetableId=positiveInt(q.get('timetable_id'));
-  const slot=await env.DB.prepare('SELECT id,classroom_id FROM timetable WHERE id=? AND active=1').bind(timetableId).first();
-  if(!slot||slot.classroom_id!==roomId)throw error(400,'คาบเรียนไม่สัมพันธ์กับห้อง');
+  const slot=await env.DB.prepare('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=? AND active=1').bind(timetableId).first();
+  if(!slot||slot.classroom_id!==roomId||slot.day_of_week!==weekday(date))throw error(400,'คาบเรียนไม่สัมพันธ์กับห้องหรือวันที่');
+  if(user.role==='teacher'&&slot.teacher_user_id!==user.id)throw error(403,'ดูเช็กชื่อรายคาบได้เฉพาะวิชาของตนเอง');
   const {results}=await env.DB.prepare(`SELECT p.student_id,p.status FROM attendance_period p
  JOIN student_enrollments h ON h.student_id=p.student_id
  WHERE p.timetable_id=? AND p.school_date=? AND h.classroom_id=?
@@ -494,14 +500,20 @@ async function adminRoutes(req,env,user,path){
   return json({ok:true});
  }
  if(req.method==='POST'&&path==='/api/admin/timetable'){
-  const b=await payload(req),roomId=positiveInt(b.classroom_id),teacherId=positiveInt(b.teacher_user_id);
-  const day=Number(b.day_of_week),period=Number(b.period);
-  if(!roomId||!teacherId||!Number.isInteger(day)||day<1||day>7||!Number.isInteger(period)||period<1||period>12)throw error(400,'ข้อมูลคาบเรียนไม่ถูกต้อง');
+  const b=await payload(req),lesson=validateLesson({...b,subject_code:b.subject_code||'ไม่ระบุ'});
+  const teacherId=positiveInt(b.teacher_user_id);
   const t=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='teacher' AND active=1").bind(teacherId).first();
-  const c=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(roomId).first();
+  const c=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(lesson.classroom_id).first();
   if(!t||!c)throw error(400,'ไม่พบครูหรือห้องเรียน');
-  const res=await env.DB.prepare('INSERT INTO timetable(classroom_id,teacher_user_id,day_of_week,period,subject) VALUES(?,?,?,?,?)')
-   .bind(roomId,teacherId,day,period,requiredText(b.subject,120)).run();
+  const clash=await env.DB.prepare(`SELECT id FROM timetable WHERE active=1 AND day_of_week=?
+   AND (classroom_id=? OR teacher_user_id=?)
+   AND period<=? AND COALESCE(end_period,period)>=? LIMIT 1`)
+   .bind(lesson.day_of_week,lesson.classroom_id,teacherId,lesson.end_period,lesson.period).first();
+  if(clash)throw error(409,'ตารางสอนซ้อนกับคาบเดิมของครูหรือห้องเรียน');
+  const res=await env.DB.prepare(`INSERT INTO timetable
+   (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject)
+   VALUES(?,?,?,?,?,?,?)`)
+   .bind(lesson.classroom_id,teacherId,lesson.day_of_week,lesson.period,lesson.end_period,lesson.subject_code,lesson.subject).run();
   await log(env.DB,user.id,'timetable_created','timetable',res.meta.last_row_id);
   return json({ok:true,id:res.meta.last_row_id},201);
  }
@@ -727,6 +739,11 @@ async function route(req,env){
  }
  if(req.method==='GET'&&path==='/api/auth/me')return json({user});
  if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
+ if(req.method==='GET'&&path==='/api/classrooms/catalog'){
+  const {results}=await env.DB.prepare('SELECT id,grade,room,label FROM classrooms ORDER BY grade,room').all();
+  return json({items:results});
+ }
+ if(path.startsWith('/api/my-timetable'))return teacherTimetableRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
  if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
  if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
