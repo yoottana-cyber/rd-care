@@ -46,8 +46,7 @@ async function myTimetable(env,user){
    COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,t.approval_status,
    c.label AS classroom_label
    FROM timetable t JOIN classrooms c ON c.id=t.classroom_id
-   WHERE t.teacher_user_id=? AND ((t.approval_status='approved' AND t.active=1)
-   OR t.approval_status IN ('pending','rejected')) ORDER BY t.day_of_week,t.period,c.grade,c.room`)
+   WHERE t.teacher_user_id=? AND t.approval_status<>'archived' ORDER BY t.day_of_week,t.period,c.grade,c.room`)
    .bind(user.id).all();
  return response({items:results});
 }
@@ -65,7 +64,7 @@ async function saveLesson(req,env,user,id){
  let changedId=id;
  if(id){
   const result=await env.DB.prepare(`UPDATE timetable SET classroom_id=?,day_of_week=?,period=?,
-   end_period=?,subject_code=?,subject=?,active=0,approval_status='pending',reviewed_by=NULL,reviewed_at=NULL WHERE id=? AND teacher_user_id=? AND approval_status<>'archived'
+   end_period=?,subject_code=?,subject=?,active=1,approval_status='approved',reviewed_by=NULL,reviewed_at=NULL WHERE id=? AND teacher_user_id=? AND approval_status<>'archived'
    AND NOT EXISTS (SELECT 1 FROM attendance_period WHERE timetable_id=?)`)
    .bind(lesson.classroom_id,lesson.day_of_week,lesson.period,lesson.end_period,
     lesson.subject_code,lesson.subject,id,user.id,id).run();
@@ -73,13 +72,13 @@ async function saveLesson(req,env,user,id){
  }else{
   const result=await env.DB.prepare(`INSERT INTO timetable
    (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject,active,approval_status)
-   VALUES(?,?,?,?,?,?,?,0,'pending')`).bind(lesson.classroom_id,user.id,lesson.day_of_week,lesson.period,
+   VALUES(?,?,?,?,?,?,?,1,'approved')`).bind(lesson.classroom_id,user.id,lesson.day_of_week,lesson.period,
       lesson.end_period,lesson.subject_code,lesson.subject).run();
   changedId=result.meta.last_row_id;
  }
  await env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
   .bind(user.id,id?'teacher_timetable_updated':'teacher_timetable_created','timetable',String(changedId)).run();
- return response({ok:true,id:changedId,approval_status:'pending',message:'รอผู้ดูแลระบบตรวจสอบ'},id?200:201);
+ return response({ok:true,id:changedId,approval_status:'approved',message:'บันทึกตารางสอนสำเร็จ พร้อมเช็กชื่อรายคาบได้ทันที'},id?200:201);
 }
 async function archiveLesson(env,user,id){
  const lesson=await env.DB.prepare("SELECT id,teacher_user_id FROM timetable WHERE id=? AND approval_status<>'archived'").bind(id).first();
