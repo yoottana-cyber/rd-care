@@ -95,13 +95,13 @@ async function deliverOne(env,entry,device,key){
 }
 export async function deliverAdvisorPush(env){
  if(!env.DB||!vapidReady(env))return {processed:0,enabled:false};
- const {results:events}=await env.DB.prepare(`SELECT o.id AS outbox_id,c.advisor_user_id AS recipient_id
+ const {results:events}=await env.DB.prepare(`SELECT MIN(o.id) AS outbox_id,c.advisor_user_id AS recipient_id
   FROM notification_outbox o JOIN attendance_alerts a ON a.id=o.alert_id
   JOIN timetable t ON t.id=a.timetable_id JOIN classrooms c ON c.id=t.classroom_id
   JOIN users u ON u.id=c.advisor_user_id AND u.active=1
   WHERE o.state='pending' AND o.audience='advisor' AND o.event_type='attendance_review_requested'
     AND o.created_at>=datetime('now','-1 day') AND a.state='pending_review'
-  ORDER BY o.id LIMIT 25`).all();
+  GROUP BY c.advisor_user_id ORDER BY MIN(o.id) LIMIT 25`).all();
  let delivered=0;
  for(const event of events){
   const {results:devices}=await env.DB.prepare('SELECT id,endpoint FROM staff_push_subscriptions WHERE user_id=? ORDER BY id LIMIT 5')
@@ -125,11 +125,15 @@ export async function deliverAdvisorPush(env){
    }
    if(result.delivered)delivered++;
   }
-  // At least one successfully reached device completes this event; other devices
-  // can still receive a later new event (we do not repeatedly alert already-delivered devices).
+  // One generic alert per advisor covers all pending review tasks in this batch.
   await env.DB.prepare(`UPDATE notification_outbox SET state='delivered',updated_at=CURRENT_TIMESTAMP
-    WHERE id=? AND state='pending' AND EXISTS(SELECT 1 FROM staff_push_deliveries
-      WHERE outbox_id=? AND state='delivered')`).bind(event.outbox_id,event.outbox_id).run();
+    WHERE state='pending' AND audience='advisor' AND event_type='attendance_review_requested'
+      AND alert_id IN (
+        SELECT a.id FROM attendance_alerts a JOIN timetable t ON t.id=a.timetable_id
+        JOIN classrooms c ON c.id=t.classroom_id
+        WHERE c.advisor_user_id=? AND a.state='pending_review'
+      ) AND EXISTS(SELECT 1 FROM staff_push_deliveries
+        WHERE outbox_id=? AND state='delivered')`).bind(event.recipient_id,event.outbox_id).run();
  }
  return {processed:events.length,delivered,enabled:true};
 }
