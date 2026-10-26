@@ -499,6 +499,38 @@ async function adminRoutes(req,env,user,path){
   await log(env.DB,user.id,'advisor_assigned','classrooms',roomId);
   return json({ok:true});
  }
+ if(req.method==='GET'&&path==='/api/admin/timetable/requests'){
+  const {results}=await env.DB.prepare(`SELECT t.id,t.classroom_id,t.teacher_user_id,t.day_of_week,
+   t.period,COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,
+   c.label AS classroom_label,u.display_name AS teacher_name
+   FROM timetable t JOIN classrooms c ON c.id=t.classroom_id
+   JOIN users u ON u.id=t.teacher_user_id
+   WHERE t.approval_status='pending' ORDER BY t.day_of_week,t.period,t.id LIMIT 300`).all();
+  return json({items:results});
+ }
+ const timetableReview=/^\/api\/admin\/timetable\/requests\/(\d+)\/review$/.exec(path);
+ if(req.method==='POST'&&timetableReview){
+  const id=positiveInt(timetableReview[1]),decision=(await payload(req)).decision;
+  if(!['approved','rejected'].includes(decision))throw error(400,'ผลการพิจารณาไม่ถูกต้อง');
+  const lesson=await env.DB.prepare(`SELECT t.*,u.active AS teacher_active FROM timetable t
+    JOIN users u ON u.id=t.teacher_user_id WHERE t.id=? AND t.approval_status='pending'`).bind(id).first();
+  if(!lesson)throw error(409,'รายการไม่ได้รออนุมัติแล้ว');
+  if(!lesson.teacher_active&&decision==='approved')throw error(409,'บัญชีครูผู้สอนไม่ได้เปิดใช้งาน');
+  if(decision==='approved'){
+   const conflict=await env.DB.prepare(`SELECT id FROM timetable WHERE active=1 AND id<>?
+    AND day_of_week=? AND (classroom_id=? OR teacher_user_id=?)
+    AND period<=? AND COALESCE(end_period,period)>=? LIMIT 1`)
+     .bind(id,lesson.day_of_week,lesson.classroom_id,lesson.teacher_user_id,
+       lesson.end_period??lesson.period,lesson.period).first();
+   if(conflict)throw error(409,'อนุมัติไม่ได้เนื่องจากตารางสอนซ้อนกับคาบเรียนที่เปิดใช้งานอยู่');
+  }
+  const result=await env.DB.prepare(`UPDATE timetable SET approval_status=?,active=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP
+   WHERE id=? AND approval_status='pending'`)
+   .bind(decision,decision==='approved'?1:0,user.id,id).run();
+  if(!result.meta.changes)throw error(409,'รายการได้รับการพิจารณาแล้ว');
+  await log(env.DB,user.id,'timetable_'+decision,'timetable',id);
+  return json({ok:true,approval_status:decision});
+ }
  if(req.method==='POST'&&path==='/api/admin/timetable'){
   const b=await payload(req),lesson=validateLesson({...b,subject_code:b.subject_code||'ไม่ระบุ'});
   const teacherId=positiveInt(b.teacher_user_id);
