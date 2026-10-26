@@ -1,6 +1,6 @@
 // Opt-in, relationship-verified truancy alerts for staff advisors and guardians.
 // Notification payloads are empty; never put students' identities or allegations on lock screens.
-import {validPushSubscription,sendPriorityPush} from './staff-push.js';
+import {validPushSubscription,sendPriorityPush,diagnoseVapid} from './staff-push.js';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{code:status})};
 const reply=(data)=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
@@ -37,6 +37,29 @@ export async function guardianPushRoutes(req,env,account,path){
   const owned=await env.DB.prepare('SELECT id FROM guardian_push_subscriptions WHERE endpoint=? AND guardian_account_id=?')
     .bind(data.endpoint,account.id).first();
   return reply({subscribed:!!owned});
+ }
+ if(path==='/api/portal/push/test'&&req.method==='POST'){
+  const data=await read(req);
+  if(typeof data.endpoint!=='string'||data.endpoint.length>1800)fail(400,'ข้อมูลอุปกรณ์ไม่ถูกต้อง');
+  const diagnostic=await diagnoseVapid(env);
+  if(!diagnostic.ready)return reply({accepted:false,code:diagnostic.code,missing:diagnostic.missing});
+  const verified=await env.DB.prepare('SELECT 1 AS ok FROM guardian_student_links WHERE guardian_account_id=? LIMIT 1')
+   .bind(account.id).first();
+  if(!verified)fail(403,'บัญชีไม่มีนักเรียนในความดูแลที่ยืนยันแล้ว');
+  const device=await env.DB.prepare(`SELECT id,endpoint,p256dh,auth FROM guardian_push_subscriptions
+    WHERE guardian_account_id=? AND endpoint=?`).bind(account.id,data.endpoint).first();
+  if(!device)return reply({accepted:false,code:'device_not_registered'});
+  try{
+   const result=await sendPriorityPush(device,env,'guardian');
+   if(result.status===404||result.status===410)
+    await env.DB.prepare('DELETE FROM guardian_push_subscriptions WHERE id=? AND guardian_account_id=?')
+     .bind(device.id,account.id).run();
+   return reply({accepted:result.ok,code:result.ok?'accepted':'provider_rejected',
+     providerStatus:result.status});
+  }catch(e){
+   console.warn('RD Care guardian push self-test failed',e?.name||'network');
+   return reply({accepted:false,code:'network_or_crypto_error'});
+  }
  }
  if(path==='/api/portal/push/unsubscribe'&&req.method==='POST'){
   const data=await read(req);
