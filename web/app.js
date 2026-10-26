@@ -8,6 +8,7 @@ import {createPeriodCenter} from './period-center.js';
 import {createPwaTools} from './pwa-client.js';
 import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
 import {createNotificationSettings} from './notification-settings.js';
+import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLastLoginArea} from './auth-session.js';
 import {createPortalUi} from './portal-ui.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
@@ -22,7 +23,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:sessionStorage.getItem('rd_token')||'',user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
+const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const pwaTools=createPwaTools({api,toast});
 const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,
@@ -62,7 +63,7 @@ async function api(path,{method='GET',body,auth=true}={}){
  try{
   const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();advisorImporter.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
+  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();advisorImporter.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
   return data;
  }catch(e){if(e.name==='AbortError')throw Error('การเชื่อมต่อล่าช้า กรุณาลองใหม่');throw e}
  finally{clearTimeout(timer)}
@@ -84,6 +85,8 @@ function loginPage(){
   <form id="loginForm">
    <div class="field"><label for="username">ชื่อผู้ใช้งาน (Username)</label><input id="username" name="username" required autocomplete="username" maxlength="40" placeholder="กรอกชื่อผู้ใช้งาน"></div>
    <div class="field"><label for="password">รหัสผ่าน (Password)</label><input id="password" name="password" type="password" required autocomplete="current-password" placeholder="กรอกรหัสผ่าน"></div>
+   <label class="remember-login"><input type="checkbox" id="rememberStaff" checked>
+    <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong><small>สูงสุด 30 วัน • ไม่แนะนำสำหรับคอมพิวเตอร์สาธารณะ</small></span></label>
    <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
   </form>
   <div class="login-links">
@@ -98,7 +101,7 @@ function loginPage(){
  <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
 }
-function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value}});state.token=data.token;state.user=data.user;sessionStorage.setItem('rd_token',data.token);await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian'));$('#loginInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install())); }
+function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const remember=$('#rememberStaff').checked;const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value,remember}});state.token=data.token;state.user=data.user;saveAuthSession('rd_token',data.token,data.expires_in,remember);setLastLoginArea('staff');await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{if(button.isConnected)button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian'));$('#loginInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install())); }
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card">
  <header class="login-brand">
@@ -221,7 +224,7 @@ function bindGlobalStudentSearch(){
  });
 }
 function $$(sel){return [...document.querySelectorAll(sel)]}
-async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;sessionStorage.removeItem('rd_token');renderLogin();}
+async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
 function roomOptions(){return state.rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');}
 function filters({date=true}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions()}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
@@ -776,7 +779,19 @@ function parseCsv(csv,columns=[3]){const rows=[];let row=[],col='',quoted=false;
  for(let i=0;i<csv.length;i++){const ch=csv[i];if(ch==='"'){if(quoted&&csv[i+1]==='"'){col+='"';i++}else quoted=!quoted;}else if(ch===','&&!quoted){row.push(col);col=''}else if((ch==='\r'||ch==='\n')&&!quoted){if(ch==='\r'&&csv[i+1]==='\n')i++;row.push(col);if(row.some(x=>x.trim()))rows.push(row);row=[];col=''}else col+=ch;}
  if(quoted)throw Error('ไฟล์ CSV มีเครื่องหมายคำพูดไม่ครบ');row.push(col);if(row.some(x=>x.trim()))rows.push(row);if(rows.some(r=>!columns.includes(r.length)))throw Error('CSV ต้องมี 3 หรือ 5 คอลัมน์ ตามไฟล์ตัวอย่าง');return rows;
 }
-async function start(){if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});if(portalUi.hasSession()){await portalUi.resume();return}if(!state.token){renderLogin();return}try{await boot()}catch{state.token='';sessionStorage.removeItem('rd_token');renderLogin()}}
+async function start(){
+ if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+ if(portalUi.hasSession()&&(!state.token||getLastLoginArea()==='portal')){await portalUi.resume();return}
+ if(!state.token){renderLogin();return}
+ try{await boot()}catch(error){
+  // A broken/offline network should not erase a remembered session. Only 401 does that
+  // inside api(); after connectivity returns the user can continue without re-entering credentials.
+  if(!state.token)return;
+  $('#app').innerHTML='<section class="login-wrap"><div class="card login-card stack"><h2>ยังไม่สามารถเชื่อมต่อ RD Care</h2><p>ระบบเก็บการเข้าสู่ระบบของอุปกรณ์นี้ไว้แล้ว ลองเชื่อมต่อใหม่ได้โดยไม่ต้องกรอกรหัสผ่าน</p><button type="button" id="retryRememberedLogin" class="button full">เชื่อมต่ออีกครั้ง</button><button type="button" id="forgetRememberedLogin" class="button secondary full">ออกจากระบบ</button></div></section>';
+  $('#retryRememberedLogin')?.addEventListener('click',()=>start());
+  $('#forgetRememberedLogin')?.addEventListener('click',()=>{clearAuthSession('rd_token');state.token='';state.user=null;renderLogin()});
+ }
+}
 window.addEventListener('online',()=>toast('เชื่อมต่ออินเทอร์เน็ตแล้ว'));
 window.addEventListener('offline',()=>toast('ออฟไลน์: ระบบจะไม่บันทึกข้อมูลจนกว่าจะเชื่อมต่อ',true));
 start();
