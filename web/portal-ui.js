@@ -11,6 +11,8 @@ const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400
 export function createPortalUi({root,onStaffLogin}){
  const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today()};
  let requestVersion=0;
+ let lateQrToken=null,lateQrReceipt=null;
+ function acceptLateQr(value){lateQrToken=/^[a-f0-9]{40}$/.test(value)?value:null;lateQrReceipt=null;}
  const select=s=>root.querySelector(s);
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
  const guardianPush=createGuardianPush({call,select,message});
@@ -153,6 +155,18 @@ export function createPortalUi({root,onStaffLogin}){
       <p>ข้อมูลการมาเรียนที่ควรตรวจสอบและประสานกับโรงเรียน</p></div></div>
      <a class="button rd-priority-action" href="#guardianAlerts">ดูรายละเอียดและตั้งค่าแจ้งเตือน</a>
     </section>`:''}
+   ${state.account.role==='student'&&lateQrToken?`<section class="card stack late-qr-student-confirm">
+    <h3>⏰ ลงชื่อมาสายจาก QR ครูเวร</h3>
+    <p class="muted">กรุณาตรวจสอบว่าอยู่ที่จุดครูเวรในโรงเรียน และยืนยันด้วยบัญชีนักเรียนของตนเอง • ระบบบันทึกเวลาจากเซิร์ฟเวอร์</p>
+    <form id="studentLateQrForm" class="stack">
+     <div class="field"><label for="lateQrReason">สาเหตุที่มาสาย (ไม่บังคับ)</label>
+      <textarea id="lateQrReason" maxlength="300" name="reason" placeholder="ระบุสาเหตุ หากต้องการ"></textarea></div>
+     <button type="submit" class="button full">✅ ยืนยันลงชื่อมาสาย</button>
+    </form><p class="muted">QR มีเวลาจำกัด หากหมดอายุต้องสแกนใหม่ที่จุดครูเวร</p>
+   </section>`:''}
+   ${state.account.role==='student'&&lateQrReceipt?`<section class="card stack"><h3>✅ ลงชื่อมาสายสำเร็จ</h3>
+    <p>${esc(lateQrReceipt.date)} เวลา ${esc(lateQrReceipt.arrivedAt)} น.</p>
+    <p class="warn">ส่งรายการให้ครูเวรแล้ว รอครูเวรตรวจสอบและยืนยัน</p></section>`:''}
    ${state.children.length?`<div class="grid two">
      <div class="field"><label>นักเรียน${state.account.role==='guardian'?'ในความดูแล':''}</label>
       <select id="portalStudent">${state.children.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${esc(s.full_name)} • ${esc(s.classroom_label)}</option>`).join('')}</select></div>
@@ -182,6 +196,19 @@ export function createPortalUi({root,onStaffLogin}){
     <p class="muted">การแจ้งเตือนจะแสดงข้อความทั่วไปบนหน้าจอล็อก ไม่แสดงชื่อหรือข้อมูลของนักเรียน</p>
    </section>`:''}`);
   select('#portalLogout').addEventListener('click',logout);
+  select('#studentLateQrForm')?.addEventListener('submit',async event=>{
+   event.preventDefault();
+   const button=event.currentTarget.querySelector('button');
+   button.disabled=true;
+   try{
+    const data=await call('/api/portal/late/qr',{method:'POST',body:{
+     token:lateQrToken,reason:String(new FormData(event.currentTarget).get('reason')||'')
+    }});
+    lateQrReceipt=data;lateQrToken=null;
+    await showDashboard();
+    message('ลงชื่อมาสายสำเร็จแล้ว รอครูเวรยืนยัน');
+   }catch(error){message(error.message,true);if(button.isConnected)button.disabled=false}
+  });
   if(state.account.role==='guardian')guardianPush.bind();
   select('#portalStudent')?.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()});
   select('#portalSearch')?.addEventListener('click',()=>{
@@ -198,6 +225,10 @@ export function createPortalUi({root,onStaffLogin}){
   if(!state.token)return false;
   try{
    const me=await call('/api/portal/auth/me');state.account=me.account;state.role=me.account.role;
+   if(lateQrToken&&state.account.role!=='student'){
+    state.token='';clearAuthSession('rd_portal_token');showLogin('student');
+    message('สแกน QR ลงชื่อมาสายต้องเข้าสู่ระบบด้วยบัญชีนักเรียน');return true;
+   }
    if(state.account.must_change_password)showPasswordChange();else await showDashboard();
   }catch(error){
    if(!state.token){showLogin(state.role);return true}
@@ -207,5 +238,5 @@ export function createPortalUi({root,onStaffLogin}){
   }
   return true;
  }
- return {showLogin,resume,hasSession:()=>!!state.token};
+ return {showLogin,resume,acceptLateQr,hasSession:()=>!!state.token};
 }
