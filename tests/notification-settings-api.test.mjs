@@ -21,7 +21,8 @@ test('mobile notification settings receives authenticated api dependency and loa
    getAlerts:()=>0
   });
   await settings.load();
-  assert.equal(calls.length,1);
+  assert.equal(calls.length,2);
+  assert.equal(calls[1],'/api/truancy/advisor');
   assert.match(calls[0],/^\/api\/dashboard\?date=\d{4}-\d{2}-\d{2}$/);
   assert.match(rendered[0],/6 รายการ/);
   assert.match(rendered[0],/เซิร์ฟเวอร์ยังไม่ได้ตั้งค่ากุญแจ VAPID/);
