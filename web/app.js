@@ -24,7 +24,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
+const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
 const referenceCache=createRequestCache();
 const pwaTools=createPwaTools({api,toast});
 const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,
@@ -418,7 +418,14 @@ function renderAttendance(){
  ${state.user?.role==='teacher'?'<button type="button" class="button secondary" data-tab="myTimetable">📚 จัดการตารางสอนของฉัน</button>':''}`}
  </div><div class="card stack">
  ${!daily?renderDailyOverview():''}
- ${!daily?'<p class="warn">🚨 หากบันทึก “หนีเรียน” ระบบจะแจ้งครูที่ปรึกษาและผู้ปกครองที่สมัครรับ Push โดยเร็ว และบันทึกเหตุการณ์ไว้ในระบบ กรุณาตรวจสอบข้อเท็จจริงก่อนเลือกสถานะนี้</p>':''}
+ ${!daily?'<p class="warn">🚨 เมื่อบันทึก “หนีเรียน” ระบบจะตรวจอุปกรณ์ของครูที่ปรึกษาและผู้ปกครองที่เปิดรับ Push แล้ว และแสดงผลตรวจสอบหลังบันทึก • การแก้ไขย้อนหลังจะส่งเหตุที่เพิ่งแก้ภายในช่วง 14 วันที่อนุญาต โปรดตรวจสอบก่อนยืนยัน</p>':''}
+ ${!daily&&state.pushFeedback?`<div class="${state.pushFeedback.ready&&state.pushFeedback.reason==='queued'?'ok':'warn'}" role="status">
+ <strong>ผลการแจ้งเตือนหนีเรียนล่าสุด</strong> • ${Number(state.pushFeedback.events)||0} รายการ
+ <p>${state.pushFeedback.reason==='missing_vapid'?'ยังส่ง Push ไม่ได้ เพราะเซิร์ฟเวอร์ตั้งค่า VAPID ไม่ครบ':
+ state.pushFeedback.reason==='no_subscribers'?'บันทึกหนีเรียนแล้ว แต่ยังไม่มีอุปกรณ์ของครูที่ปรึกษาหรือผู้ปกครองสมัครรับ Push':
+ state.pushFeedback.reason==='queued'?`กำลังนำส่ง Push ไปยังอุปกรณ์ที่สมัครรับแล้ว • ครูที่ปรึกษา ${Number(state.pushFeedback.advisorDevices)||0} เครื่อง • ผู้ปกครอง ${Number(state.pushFeedback.guardianDevices)||0} เครื่อง (ไม่ใช่หลักฐานว่าส่งถึงมือถือแล้ว)`:
+ 'บันทึกแล้ว แต่ยังตรวจสอบการนำส่ง Push ไม่ได้ กรุณาดูหน้าตรวจสอบการแจ้งเตือน'}</p>
+ </div>`:''}
  <div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
  ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การบันทึกซ้ำจะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคน ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
  <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
@@ -456,7 +463,9 @@ async function saveAttendance(){
    entries:state.students.map(s=>({student_id:s.id,status:state.statuses[s.id]}))};
   if(state.kind==='period')body.teaching_note=state.teachingNote;
   const result=await api('/api/attendance',{method:'POST',body});
-  toast('บันทึกสำเร็จ '+result.saved+' คน');await loadAttendance();
+  state.pushFeedback=state.kind==='period'?result.push||null:null;
+  toast('บันทึกสำเร็จ '+result.saved+' คน'+(result.push?.reason==='no_subscribers'?' • ยังไม่มีอุปกรณ์รับ Push':''));
+  await loadAttendance();
  }finally{if(button.isConnected)button.disabled=false}
 }
 async function loadLate(){
