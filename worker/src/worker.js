@@ -180,7 +180,7 @@ async function getAttendance(req,env,user){
    .bind(roomId,date).all();
   const log=await env.DB.prepare('SELECT note,updated_at FROM period_teaching_logs WHERE timetable_id=? AND school_date=?')
    .bind(timetableId,date).first();
-  return json({items:results,daily_items:dailyItems,daily_date:date,
+  return json({items:results,daily_items:dailyItems,daily_date:date,daily_read_only:true,
    teaching_note:log?.note||'',teaching_note_updated_at:log?.updated_at||null});
  }
  throw error(400,'ประเภทการเช็กชื่อไม่ถูกต้อง');
