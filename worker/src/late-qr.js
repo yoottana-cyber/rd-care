@@ -1,5 +1,5 @@
 // School gate QR check-in. Server time in Bangkok is authoritative.
-// A QR is an expiring gate challenge, NOT student authentication.
+// Permanent printed QR is a public URL, NOT student authentication. Students must log in.
 const textEncoder=new TextEncoder();
 const stamp=()=>Math.floor(Date.now()/1000);
 export const schoolTime=(value=new Date())=>{
@@ -27,6 +27,14 @@ function openGate(){
 export async function lateGateStaffRoutes(req,env,user,path){
  allowedStaff(user);
  const day=schoolDay();
+ if(path==='/api/late/qr/print'&&req.method==='GET'){
+  // Stable printed QR is a public entry point, not a secret or an attendance receipt.
+  // A school can print the same code once, and reuse it indefinitely.
+  const url='https://rd-care.pages.dev/?late_qr=gate';
+  const {default:qrcode}=await import('qrcode-generator');
+  const qr=qrcode(0,'M');qr.addData(url);qr.make();
+  return reply({url,svg:qr.createSvgTag({cellSize:8,margin:16,scalable:true}),permanent:true});
+ }
  if(path==='/api/late/qr/rotate'&&req.method==='POST'){
   openGate();
   const token=[...crypto.getRandomValues(new Uint8Array(20))].map(v=>v.toString(16).padStart(2,'0')).join('');
@@ -50,28 +58,39 @@ export async function lateGateStaffRoutes(req,env,user,path){
   return reply({ok:true,disabled:Number(result.meta?.changes||0)});
  }
  if(path==='/api/late/qr/queue'&&req.method==='GET'){
-  const {results}=await env.DB.prepare(`SELECT q.id,q.school_date,q.created_at,
-   r.arrived_at,r.reason,r.state,s.student_no,s.full_name,
-   c.label AS classroom_label,h.roll_no
-   FROM late_qr_submissions q
+  const {results}=await env.DB.prepare(`WITH scans AS (
+    SELECT 'legacy-'||id AS id,request_id,student_id,school_date,issued_by,created_at
+      FROM late_qr_submissions
+    UNION ALL
+    SELECT 'static-'||id AS id,request_id,student_id,school_date,
+      NULL AS issued_by,created_at FROM late_static_qr_submissions
+   )
+   SELECT q.id,q.school_date,q.created_at,
+    r.arrived_at,r.reason,r.state,s.student_no,s.full_name,
+    c.label AS classroom_label,h.roll_no
+   FROM scans q
    JOIN late_self_requests r ON r.id=q.request_id
    JOIN students s ON s.id=q.student_id
    LEFT JOIN student_enrollments h ON h.student_id=s.id
     AND h.start_date<=q.school_date AND (h.end_date IS NULL OR h.end_date>q.school_date)
    LEFT JOIN classrooms c ON c.id=h.classroom_id
-   WHERE q.school_date=? AND (q.issued_by=? OR ? IN('staff','admin'))
-   ORDER BY q.id DESC LIMIT 150`).bind(day,user.id,user.role).all();
+   WHERE q.school_date=? AND (q.issued_by=? OR q.issued_by IS NULL OR ? IN('staff','admin'))
+   ORDER BY q.created_at DESC,q.id DESC LIMIT 150`).bind(day,user.id,user.role).all();
   return reply({date:day,time:schoolTime(),items:results,pending:results.filter(x=>x.state==='pending').length});
  }
- const match=/^\/api\/late\/qr\/(\d+)\/review$/.exec(path);
+ const match=/^\/api\/late\/qr\/(static-\d+|legacy-\d+|\d+)\/review$/.exec(path);
  if(match&&req.method==='POST'){
-  const b=await read(req),id=Number(match[1]);
+  const b=await read(req),isPermanent=match[1].startsWith('static-');
+  const id=Number(match[1].replace(/^(static-|legacy-)/,''));
   if(!['verified','rejected'].includes(b.state))fail(400,'สถานะไม่ถูกต้อง');
-  const item=await env.DB.prepare(`SELECT q.id,q.request_id,q.issued_by,r.student_id,
-   r.school_date,r.state FROM late_qr_submissions q
-   JOIN late_self_requests r ON r.id=q.request_id WHERE q.id=?`).bind(id).first();
+  const source=isPermanent?'late_static_qr_submissions':'late_qr_submissions';
+  const item=await env.DB.prepare(`SELECT q.id,q.request_id,
+   ${isPermanent?'NULL AS issued_by':'q.issued_by'},r.student_id,r.school_date,r.state
+   FROM ${source} q JOIN late_self_requests r ON r.id=q.request_id WHERE q.id=?`)
+   .bind(id).first();
   if(!item)fail(404,'ไม่พบรายการลงชื่อ');
-  if(item.issued_by!==user.id&&!['staff','admin'].includes(user.role))fail(403,'ตรวจสอบได้เฉพาะรายการจาก QR ของครูเวรคนนี้');
+  if(!isPermanent&&item.issued_by!==user.id&&!['staff','admin'].includes(user.role))
+   fail(403,'ตรวจสอบได้เฉพาะรายการจาก QR ของครูเวรคนนี้');
   if(item.state!=='pending')fail(409,'รายการนี้ได้รับการตรวจสอบแล้ว');
   if(b.state==='verified'){
    const existing=await env.DB.prepare('SELECT id FROM late_records WHERE student_id=? AND school_date=?')
@@ -104,14 +123,15 @@ export async function submitStudentLateQr(req,env,account){
  if(account.role!=='student'||account.must_change_password||!account.student_id||!account.active)
   fail(403,'กรุณาเข้าสู่ระบบด้วยบัญชีนักเรียนและเปลี่ยนรหัสผ่านชั่วคราวก่อน');
  openGate();
- const b=await read(req),token=secureCode(b.token);
+ const b=await read(req),permanent=b.token==='gate';
+ const token=permanent?'gate':secureCode(b.token);
  const reason=typeof b.reason==='string'?b.reason.trim():'';
  if(reason.length>300||/[\u0000-\u001f\u007f]/.test(reason))fail(400,'เหตุผลต้องไม่เกิน 300 ตัวอักษร');
  const day=schoolDay(),now=stamp();
- const qr=await env.DB.prepare(`SELECT id,issued_by FROM late_qr_tokens
+ const qr=permanent?null:await env.DB.prepare(`SELECT id,issued_by FROM late_qr_tokens
  WHERE token_hash=? AND school_date=? AND expires_at>? LIMIT 1`)
  .bind(await hashed(token),day,now).first();
- if(!qr)fail(410,'QR หมดอายุหรือถูกเปลี่ยนแล้ว กรุณาสแกน QR ล่าสุดที่จุดครูเวร');
+ if(!permanent&&!qr)fail(410,'QR หมดอายุหรือถูกเปลี่ยนแล้ว กรุณาสแกนใหม่');
  const student=await env.DB.prepare(`SELECT s.id FROM students s
  JOIN student_enrollments h ON h.student_id=s.id AND h.start_date<=?
    AND (h.end_date IS NULL OR h.end_date>?)
@@ -128,9 +148,13 @@ export async function submitStudentLateQr(req,env,account){
   await env.DB.batch([
    env.DB.prepare(`INSERT INTO late_self_requests(student_id,school_date,arrived_at,reason)
     VALUES(?,?,?,?)`).bind(student.id,day,arrival,reason),
-   env.DB.prepare(`INSERT INTO late_qr_submissions(request_id,token_id,student_id,school_date,issued_by)
-    SELECT id,?,?,?,? FROM late_self_requests WHERE student_id=? AND school_date=?`)
-    .bind(qr.id,student.id,day,qr.issued_by,student.id,day)
+   permanent?
+     env.DB.prepare(`INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
+      SELECT id,?,? FROM late_self_requests WHERE student_id=? AND school_date=?`)
+      .bind(student.id,day,student.id,day):
+     env.DB.prepare(`INSERT INTO late_qr_submissions(request_id,token_id,student_id,school_date,issued_by)
+      SELECT id,?,?,?,? FROM late_self_requests WHERE student_id=? AND school_date=?`)
+      .bind(qr.id,student.id,day,qr.issued_by,student.id,day)
   ]);
  }catch(e){if(/UNIQUE constraint/.test(e?.message||''))fail(409,'ลงชื่อมาสายวันนี้แล้ว');throw e}
  return reply({ok:true,date:day,arrivedAt:arrival,state:'pending',
