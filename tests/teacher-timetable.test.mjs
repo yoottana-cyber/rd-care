@@ -45,3 +45,21 @@ test('owner mismatch prevents another teacher from editing',async()=>{
   {DB:db},{id:7,role:'teacher'},'/api/my-timetable/9/update'),{code:403});
  assert.equal(wrote,false);
 });
+
+test('new teacher timetable stays pending until an administrator approves',async()=>{
+ const sqlUsed=[];
+ const db={prepare(sql){
+  sqlUsed.push(sql);
+  if(sql.includes('SELECT id FROM classrooms WHERE id'))return {bind:()=>({first:async()=>({id:2})})};
+  if(sql.includes('SELECT id FROM timetable')&&sql.includes('active=1'))return {bind:()=>({first:async()=>null})};
+  if(sql.includes('INSERT INTO timetable'))return {bind:()=>({run:async()=>({meta:{last_row_id:34}})})};
+  if(sql.includes('INSERT INTO audit_logs'))return {bind:()=>({run:async()=>({meta:{changes:1}})})};
+  throw Error('Unexpected SQL: '+sql);
+ }};
+ const response=await teacherTimetableRoutes(new Request('https://test.local/api/my-timetable',{
+  method:'POST',body:JSON.stringify(good)
+ }),{DB:db},{id:7,role:'teacher'},'/api/my-timetable');
+ assert.equal(response.status,201);
+ assert.deepEqual((await response.json()).approval_status,'pending');
+ assert.ok(sqlUsed.some(s=>s.includes("VALUES(?,?,?,?,?,?,?,0,'pending')")),'pending timetable must not grant roster access');
+});
