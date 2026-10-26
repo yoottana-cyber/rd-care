@@ -27,6 +27,10 @@
 .period-week-controls strong{font-size:11px;font-weight:600;min-width:205px;text-align:center;color:#3f5571}
 .period-week-controls .button{min-height:33px;padding:5px 12px;font-size:11px}
 .period-week-controls #periodPrevWeek,.period-week-controls #periodNextWeek{font-size:18px;width:33px;padding:0}
+.period-jump-label{display:inline-flex;align-items:center;gap:7px;padding:4px 8px;background:#f2f8fc;border:1px solid #e1ebf2;border-radius:8px;color:#586f87;font-size:10px;font-weight:600}
+.period-jump-label input{border:0;background:transparent;color:#40556d;font:inherit;font-size:10px;width:123px;min-height:28px;cursor:pointer}
+.period-jump-label input:focus-visible{outline:2px solid #279a83}
+
 .period-legend{display:flex;gap:17px;flex-wrap:wrap;font-size:10px;color:#6a798c}
 .period-legend span{display:flex;align-items:center;gap:5px}
 .period-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#f6ad55}
@@ -99,6 +103,8 @@
 [data-theme="dark"] .period-event-absent{background:#5d2b40;color:#ffe1e9}
 [data-theme="dark"] .period-event-late{background:#554326;color:#ffeba3}
 [data-theme="dark"] .period-event-leave{background:#2a4468;color:#e2efff}
+[data-theme="dark"] .period-jump-label{background:#263f55;border-color:#426076;color:#d0e3f0}
+[data-theme="dark"] .period-jump-label input{color:#ecf6ff}
 @media(max-width:850px){
  .period-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
  .period-stat{gap:8px;padding:11px 10px;min-height:73px}
@@ -111,8 +117,8 @@
 @media(max-width:560px){
  .period-top{flex-direction:column;align-items:start;padding:15px}
  .period-top .button{align-self:stretch}
- .period-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
- .period-tabs button{font-size:10px;padding:9px 5px}
+ .period-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+ .period-tabs button{font-size:9px;padding:9px 4px}
  .period-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
  .period-stat{flex-direction:column;text-align:center;gap:5px;padding:10px 5px}
  .period-stat strong{font-size:19px}
@@ -120,7 +126,9 @@
  .period-center .period-week-panel,.period-center .period-report-panel,.period-center .period-report-details{padding:13px 10px}
  .period-week-controls{width:100%;justify-content:space-between}
  .period-week-controls strong{min-width:0;flex:1;font-size:10px}
- .period-week-controls #periodThisWeek{width:100%;margin-top:4px}
+ .period-week-controls #periodThisWeek{margin-top:4px;flex:1}
+ .period-jump-label{margin-top:4px;flex:1;justify-content:space-between}
+ .period-jump-label input{width:110px}
  .period-report-filters{gap:9px}
  .period-report-filters .field{flex-basis:46%;min-width:0}
  .period-report-filters .button{width:100%}
