@@ -30,7 +30,7 @@ export async function lateGateStaffRoutes(req,env,user,path){
  if(path==='/api/late/qr/rotate'&&req.method==='POST'){
   openGate();
   const token=[...crypto.getRandomValues(new Uint8Array(20))].map(v=>v.toString(16).padStart(2,'0')).join('');
-  const until=stamp()+90;
+  const until=stamp()+180;
   await env.DB.batch([
    env.DB.prepare('UPDATE late_qr_tokens SET expires_at=? WHERE issued_by=? AND school_date=? AND expires_at>?').bind(stamp()-1,user.id,day,stamp()),
    env.DB.prepare('INSERT INTO late_qr_tokens(issued_by,school_date,token_hash,expires_at) VALUES(?,?,?,?)')
@@ -41,7 +41,7 @@ export async function lateGateStaffRoutes(req,env,user,path){
   const {default:qrcode}=await import('qrcode-generator');
   const qr=qrcode(0,'M');qr.addData(url);qr.make();
   return reply({url,svg:qr.createSvgTag({cellSize:6,margin:12,scalable:true}),
-   expiresAt:until,schoolDate:day,schoolTime:schoolTime(),validSeconds:90});
+   expiresAt:until,schoolDate:day,schoolTime:schoolTime(),validSeconds:180});
  }
  if(path==='/api/late/qr/queue'&&req.method==='GET'){
   const {results}=await env.DB.prepare(`SELECT q.id,q.school_date,q.created_at,
