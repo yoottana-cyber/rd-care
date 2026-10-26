@@ -164,3 +164,28 @@
 @media(prefers-reduced-motion:reduce){
  .login-wrap .login-role-tabs button,.login-wrap .login-content button{transition:none!important}
 }
+
+/* Remember this device — useful on personal desktop browsers and installed PWA. */
+.login-wrap .remember-login,.portal-wrap .remember-login{
+ display:flex;align-items:flex-start;gap:10px;margin:9px 0 14px;
+ padding:12px 13px;border:1px solid #d6e9e0;border-radius:12px;
+ background:#f3faf6;cursor:pointer;text-align:left
+}
+.login-wrap .remember-login input,.portal-wrap .remember-login input{
+ flex:0 0 19px;width:19px;height:19px;margin:2px 0 0;
+ accent-color:#168766;cursor:pointer
+}
+.login-wrap .remember-login span,.portal-wrap .remember-login span{
+ display:flex;flex-direction:column;gap:3px;min-width:0
+}
+.login-wrap .remember-login strong,.portal-wrap .remember-login strong{
+ font-size:12px;color:#295b4b;line-height:1.5;font-weight:600
+}
+.login-wrap .remember-login small,.portal-wrap .remember-login small{
+ font-size:10px;line-height:1.55;color:#708579
+}
+[data-theme="dark"] .remember-login{
+ background:#223f37!important;border-color:#34594b!important
+}
+[data-theme="dark"] .remember-login strong{color:#d8f5e5!important}
+[data-theme="dark"] .remember-login small{color:#b5cfc0!important}
