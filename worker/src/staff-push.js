@@ -101,6 +101,8 @@ export async function deliverAdvisorPush(env){
   JOIN users u ON u.id=c.advisor_user_id AND u.active=1
   WHERE o.state='pending' AND o.audience='advisor' AND o.event_type='attendance_review_requested'
     AND o.created_at>=datetime('now','-1 day') AND a.state='pending_review'
+    AND NOT EXISTS(SELECT 1 FROM attendance_daily d
+      WHERE d.student_id=a.student_id AND d.school_date=a.school_date AND d.status='absent')
   GROUP BY c.advisor_user_id ORDER BY MIN(o.id) LIMIT 25`).all();
  let delivered=0;
  for(const event of events){
@@ -132,6 +134,8 @@ export async function deliverAdvisorPush(env){
         SELECT a.id FROM attendance_alerts a JOIN timetable t ON t.id=a.timetable_id
         JOIN classrooms c ON c.id=t.classroom_id
         WHERE c.advisor_user_id=? AND a.state='pending_review'
+          AND NOT EXISTS(SELECT 1 FROM attendance_daily d
+            WHERE d.student_id=a.student_id AND d.school_date=a.school_date AND d.status='absent')
       ) AND EXISTS(SELECT 1 FROM staff_push_deliveries
         WHERE outbox_id=? AND state='delivered')`).bind(event.recipient_id,event.outbox_id).run();
  }
