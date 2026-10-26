@@ -157,7 +157,7 @@ export async function deliverTruancyPush(env){
          AND d.recipient_type='guardian' AND d.subscription_id=ps.id
          AND (d.state='delivered' OR d.attempts>=3)
       )
-    ))
+    )
    )
  ORDER BY e.id DESC LIMIT 25`).all();
  let delivered=0,failed=0;
