@@ -43,6 +43,12 @@ export async function lateGateStaffRoutes(req,env,user,path){
   return reply({url,svg:qr.createSvgTag({cellSize:6,margin:12,scalable:true}),
    expiresAt:until,schoolDate:day,schoolTime:schoolTime(),validSeconds:180});
  }
+ if(path==='/api/late/qr/stop'&&req.method==='POST'){
+  const result=await env.DB.prepare(`UPDATE late_qr_tokens SET expires_at=?
+   WHERE issued_by=? AND school_date=? AND expires_at>?`)
+   .bind(stamp()-1,user.id,day,stamp()).run();
+  return reply({ok:true,disabled:Number(result.meta?.changes||0)});
+ }
  if(path==='/api/late/qr/queue'&&req.method==='GET'){
   const {results}=await env.DB.prepare(`SELECT q.id,q.school_date,q.created_at,
    r.arrived_at,r.reason,r.state,s.student_no,s.full_name,
