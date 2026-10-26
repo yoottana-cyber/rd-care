@@ -216,23 +216,57 @@ async function writeAttendance(req,env,user){
    stmts.push(env.DB.prepare(`INSERT INTO attendance_daily(student_id,school_date,status,recorded_by) VALUES(?,?,?,?)
      ON CONFLICT(student_id,school_date) DO UPDATE SET status=excluded.status,recorded_by=excluded.recorded_by,updated_at=CURRENT_TIMESTAMP`)
     .bind(e.student_id,date,e.status,user.id));
+   if(e.status==='absent'){
+    // The advisor has already recorded this student's absence for the day:
+    // withdraw pending per-lesson review events regardless of save order.
+    stmts.push(env.DB.prepare(`UPDATE notification_outbox SET state='cancelled',updated_at=CURRENT_TIMESTAMP
+      WHERE state='pending' AND alert_id IN (
+       SELECT id FROM attendance_alerts
+       WHERE student_id=? AND school_date=? AND state='pending_review')`)
+     .bind(e.student_id,date));
+    stmts.push(env.DB.prepare(`UPDATE attendance_alerts SET state='resolved',
+      reviewed_by=NULL,reviewed_at=NULL
+      WHERE student_id=? AND school_date=? AND state='pending_review'`)
+     .bind(e.student_id,date));
+   }
   }else{
    stmts.push(env.DB.prepare(`INSERT INTO attendance_period(student_id,timetable_id,school_date,status,recorded_by) VALUES(?,?,?,?,?)
      ON CONFLICT(student_id,timetable_id,school_date) DO UPDATE SET status=excluded.status,recorded_by=excluded.recorded_by,updated_at=CURRENT_TIMESTAMP`)
     .bind(e.student_id,slot.id,date,e.status,user.id));
    if(e.status==='absent'){
+    // A recorded DAILY absence already explains the period absence. Keep the
+    // period attendance row, but never create/reopen advisor review work.
     stmts.push(env.DB.prepare(`INSERT INTO attendance_alerts(student_id,timetable_id,school_date,state)
-      VALUES(?,?,?,'pending_review') ON CONFLICT(student_id,timetable_id,school_date) DO UPDATE SET
+      SELECT ?,?,?,'pending_review' WHERE NOT EXISTS (
+       SELECT 1 FROM attendance_daily d WHERE d.student_id=? AND d.school_date=?
+         AND d.status='absent')
+      ON CONFLICT(student_id,timetable_id,school_date) DO UPDATE SET
       state=CASE WHEN attendance_alerts.state='resolved' THEN 'pending_review' ELSE attendance_alerts.state END`)
+     .bind(e.student_id,slot.id,date,e.student_id,date));
+    // Cancel an older pending event if the daily absence was recorded later,
+    // without touching already-delivered or guardian-confirmed history.
+    stmts.push(env.DB.prepare(`UPDATE notification_outbox SET state='cancelled',updated_at=CURRENT_TIMESTAMP
+      WHERE state='pending' AND alert_id IN (
+       SELECT a.id FROM attendance_alerts a
+       JOIN attendance_daily d ON d.student_id=a.student_id AND d.school_date=a.school_date
+       WHERE a.student_id=? AND a.timetable_id=? AND a.school_date=?
+         AND a.state='pending_review' AND d.status='absent')`)
      .bind(e.student_id,slot.id,date));
+    stmts.push(env.DB.prepare(`UPDATE attendance_alerts SET state='resolved',reviewed_by=NULL,reviewed_at=NULL
+      WHERE student_id=? AND timetable_id=? AND school_date=? AND state='pending_review'
+       AND EXISTS(SELECT 1 FROM attendance_daily d WHERE d.student_id=? AND d.school_date=?
+          AND d.status='absent')`)
+     .bind(e.student_id,slot.id,date,e.student_id,date));
     // Record an internal review request for the class advisor, not a Push send.
     stmts.push(env.DB.prepare(`INSERT INTO notification_outbox(alert_id,event_type,audience,state)
       SELECT id,'attendance_review_requested','advisor','pending'
       FROM attendance_alerts
       WHERE student_id=? AND timetable_id=? AND school_date=? AND state='pending_review'
+        AND NOT EXISTS(SELECT 1 FROM attendance_daily d
+          WHERE d.student_id=? AND d.school_date=? AND d.status='absent')
       ON CONFLICT(alert_id,event_type,audience) DO UPDATE SET
       state=CASE WHEN notification_outbox.state='cancelled' THEN 'pending' ELSE notification_outbox.state END,
-      updated_at=CURRENT_TIMESTAMP`).bind(e.student_id,slot.id,date));
+      updated_at=CURRENT_TIMESTAMP`).bind(e.student_id,slot.id,date,e.student_id,date));
    }else{
     stmts.push(env.DB.prepare(`UPDATE attendance_alerts SET state='resolved',reviewed_by=? ,reviewed_at=CURRENT_TIMESTAMP
       WHERE student_id=? AND timetable_id=? AND school_date=? AND state!='resolved'`).bind(user.id,e.student_id,slot.id,date));
@@ -425,7 +459,10 @@ async function listAlerts(req,env,user){
   FROM attendance_alerts a JOIN students s ON s.id=a.student_id JOIN timetable t ON t.id=a.timetable_id
   JOIN student_enrollments h ON h.student_id=s.id AND h.classroom_id=t.classroom_id
   WHERE t.classroom_id=? AND h.start_date<=a.school_date AND (h.end_date IS NULL OR h.end_date>a.school_date)
-  AND a.state='pending_review' ORDER BY a.school_date DESC,t.period DESC LIMIT 50`).bind(roomId).all();
+  AND a.state='pending_review'
+  AND NOT EXISTS(SELECT 1 FROM attendance_daily d
+    WHERE d.student_id=a.student_id AND d.school_date=a.school_date AND d.status='absent')
+  ORDER BY a.school_date DESC,t.period DESC LIMIT 50`).bind(roomId).all();
  return json({items:results});
 }
 async function reviewAlert(req,env,user,id){
@@ -440,6 +477,11 @@ async function reviewAlert(req,env,user,id){
   if(room?.advisor_user_id!==user.id)throw error(403,'เฉพาะครูที่ปรึกษา');
  }
  if(record.state!=='pending_review')throw error(409,'รายการนี้ได้รับการตรวจสอบแล้ว');
+ // Reject a stale confirmation even if the daily register changed after the
+ // user opened the advisor screen; a daily absence supersedes the review task.
+ const daily=await env.DB.prepare(`SELECT status FROM attendance_daily
+  WHERE student_id=? AND school_date=?`).bind(record.student_id,record.school_date).first();
+ if(daily?.status==='absent')throw error(409,'นักเรียนขาดเรียนรายวันแล้ว ไม่ต้องยืนยันขาดรายคาบซ้ำ');
  if(b.state==='confirmed'){
   const att=await env.DB.prepare(`SELECT status FROM attendance_period WHERE student_id=? AND timetable_id=? AND school_date=?`)
    .bind(record.student_id,record.timetable_id,record.school_date).first();
@@ -480,7 +522,7 @@ async function dashboard(req,env,user){
   env.DB.prepare('SELECT COUNT(*) total FROM attendance_daily d JOIN student_enrollments h ON h.student_id=d.student_id AND h.start_date<=d.school_date AND (h.end_date IS NULL OR h.end_date>d.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE d.school_date=?'+filter).bind(date,...a),
   env.DB.prepare('SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=?'+filter).bind(date,...a),
   env.DB.prepare("SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=? AND p.status='absent'"+filter).bind(date,...a),
-  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN student_enrollments h ON h.student_id=al.student_id AND h.start_date<=al.school_date AND (h.end_date IS NULL OR h.end_date>al.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE al.school_date=? AND al.state='pending_review'"+filter).bind(date,...a),
+  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN student_enrollments h ON h.student_id=al.student_id AND h.start_date<=al.school_date AND (h.end_date IS NULL OR h.end_date>al.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE al.school_date=? AND al.state='pending_review' AND NOT EXISTS(SELECT 1 FROM attendance_daily d WHERE d.student_id=al.student_id AND d.school_date=al.school_date AND d.status='absent')"+filter).bind(date,...a),
   env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN student_enrollments h ON h.student_id=l.student_id AND h.start_date<=l.school_date AND (h.end_date IS NULL OR h.end_date>l.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE l.school_date=?'+filter).bind(date,...a),
   env.DB.prepare("SELECT d.school_date day,d.status,COUNT(*) total FROM attendance_daily d"+
     " JOIN student_enrollments h ON h.student_id=d.student_id AND h.start_date<=d.school_date"+
