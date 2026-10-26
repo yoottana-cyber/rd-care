@@ -76,7 +76,7 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
     editId=null;await refreshRooms();await load();toast('ลบรายการตารางสอนแล้ว');
    }finally{if(button.isConnected)button.disabled=false}
   }));
-  document.querySelectorAll('[data-open-lesson]').forEach(button=>button.addEventListener('click',()=>openPeriodAttendance(id(button.dataset.openLesson))));
+  document.querySelectorAll('[data-open-lesson]').forEach(button=>button.addEventListener('click',()=>openPeriodAttendance(lessons.find(row=>row.id===id(button.dataset.openLesson)))));
  }
  return {load};
 }
