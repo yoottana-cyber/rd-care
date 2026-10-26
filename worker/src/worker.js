@@ -10,6 +10,7 @@ import {validateUserPassword,userPasswordMinimum} from './user-password-policy.j
 import {unifiedRosterEndpoint} from './unified-roster.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
+import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -757,7 +758,7 @@ async function adminRoutes(req,env,user,path){
  }
  throw error(404,'ไม่พบ API');
 }
-async function route(req,env){
+async function route(req,env,ctx){
  const url=new URL(req.url),path=url.pathname;
  if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
  if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
@@ -770,6 +771,7 @@ async function route(req,env){
   return json({ok:true});
  }
  if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(path.startsWith('/api/push/'))return staffPushRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
  if(req.method==='GET'&&path==='/api/classrooms/catalog'){
   const {results}=await env.DB.prepare('SELECT id,grade,room,label FROM classrooms ORDER BY grade,room').all();
@@ -781,7 +783,13 @@ async function route(req,env){
  if(req.method==='GET'&&path==='/api/students')return getStudents(req,env,user);
  if(req.method==='GET'&&path==='/api/timetable')return getTimetable(req,env,user);
  if(req.method==='GET'&&path==='/api/attendance')return getAttendance(req,env,user);
- if(req.method==='POST'&&path==='/api/attendance')return writeAttendance(req,env,user);
+ if(req.method==='POST'&&path==='/api/attendance'){
+  const result=await writeAttendance(req,env,user);
+  // Only after the successful DB write; never delay or block the teacher's check-in.
+  // Scheduled cron also retries the internal advisor outbox.
+  if(result.ok&&ctx?.waitUntil)ctx.waitUntil(deliverAdvisorPush(env).catch(e=>console.warn('RD push delivery',e?.name)));
+  return result;
+ }
  if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
  if(req.method==='POST'&&path==='/api/late/self/code')return issueLateSelfCode(req,env,user);
  if(req.method==='GET'&&path==='/api/late/self/requests')return listLateSelf(req,env,user);
@@ -798,7 +806,10 @@ async function route(req,env){
  throw error(404,'ไม่พบ API');
 }
 export default {
- async fetch(req,env){
+ async scheduled(event,env,ctx){
+  ctx.waitUntil(deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled push',e?.name)));
+ },
+ async fetch(req,env,ctx){
   const origin=req.headers.get('origin');
   const allowed=(env.ALLOWED_ORIGINS||'').split(',').map(x=>x.trim()).filter(Boolean);
   if(origin&&!allowed.includes(origin))return json({error:'origin_not_allowed'},403);
@@ -814,7 +825,7 @@ export default {
   };
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
   let response;
-  try{response=await route(req,env);}
+  try{response=await route(req,env,ctx);}
   catch(e){
    const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
    if(code===500)console.error('RD Care API:',e);
