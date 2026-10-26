@@ -1,6 +1,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {lateGateOpen,schoolTime,schoolDay,submitStudentLateQr,lateGateStaffRoutes} from '../worker/src/late-qr.js';
 const at=t=>new Date(t);
 test('QR gate is closed before and at 08:00 Bangkok, open from 08:01',()=>{
@@ -27,7 +28,7 @@ test('unprivileged accounts cannot open school duty QR screen',async()=>{
  await assert.rejects(()=>lateGateStaffRoutes(req,{}, {role:'student',id:3},'/api/late/qr/queue'),{code:403});
 });
 test('QR token must be 160-bit lowercase hex with no user-chosen student ID',()=>{
- const backend=(await import('node:fs')).readFileSync(new URL('../worker/src/late-qr.js',import.meta.url),'utf8');
+ const backend=readFileSync(new URL('../worker/src/late-qr.js',import.meta.url),'utf8');
  assert.match(backend,/secureCode\(b\.token\)/);
  assert.match(backend,/account\.student_id/);
  assert.match(backend,/expired|expires_at/);
@@ -35,7 +36,7 @@ test('QR token must be 160-bit lowercase hex with no user-chosen student ID',()=
  assert.doesNotMatch(backend,/b\.student_id/);
 });
 test('duty teacher UI rotates token and refreshes students automatically',()=>{
- const fs=(await import('node:fs')).readFileSync(new URL('../web/late-gate.js',import.meta.url),'utf8');
+ const fs=readFileSync(new URL('../web/late-gate.js',import.meta.url),'utf8');
  assert.match(fs,/late\/qr\/rotate/);
  assert.match(fs,/late\/qr\/queue/);
  assert.match(fs,/setInterval/);
