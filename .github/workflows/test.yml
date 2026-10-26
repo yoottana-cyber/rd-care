@@ -25,9 +25,14 @@ jobs:
           node --check worker/src/user-password-policy.js
           node --check worker/src/teacher-timetable.js
           node --check worker/src/period-reports.js
+          node --check worker/src/staff-push.js
+          node --check worker/scripts/generate-vapid.mjs
           node --check worker/src/worker.js
           node --check web/my-timetable.js
           node --check web/period-center.js
+          node --check web/mobile-nav.js
+          node --check web/notification-settings.js
+          node --check web/pwa-client.js
           node --check web/app.js
           node --check web/theme.js
           node --check web/dashboard-charts.js
@@ -58,6 +63,8 @@ jobs:
           PY
       - name: Teacher timetable migration and overlap validation
         run: python3 -m unittest discover -s tests -p 'teacher_timetable_migration_test.py' -v
+      - name: Staff Push subscription migration
+        run: python3 -m unittest discover -s tests -p 'staff_push_migration_test.py' -v
       - name: Notification outbox schema and lifecycle
         run: python3 -m unittest discover -s tests -p 'notification_*_test.py' -v
       - name: School-year room transfer plan schema
