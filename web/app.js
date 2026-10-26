@@ -39,6 +39,7 @@ async function openPeriodLesson(lesson){
 const myTimetable=createMyTimetable({api,mount,toast,refreshRooms:refreshClassroomList,safeRun,openPeriodAttendance:lesson=>safeRun(()=>openPeriodLesson(lesson))});
 const adminTransferState={studentId:null,items:[],history:[]};
 let adminEditUserId=null;
+let timetableRequests=[];
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
@@ -478,9 +479,18 @@ function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตร
  bindFilters(loadAlerts);
  $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (ระบบยังไม่ส่งการแจ้งเตือนผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
 }
-async function loadAdmin(){if(state.user.role!=='admin')return;const data=await api('/api/admin/users');state.users=data.items;renderAdmin();}
+async function loadAdmin(){if(state.user.role!=='admin')return;const [accounts,requests]=await Promise.all([api('/api/admin/users'),api('/api/admin/timetable/requests')]);state.users=accounts.items;timetableRequests=requests.items;renderAdmin();}
 function teacherOptions(){return state.users.filter(u=>u.role==='teacher'&&u.active).map(u=>`<option value="${u.id}">${esc(u.display_name)} (${esc(u.username)})</option>`).join('');}
 function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข้อมูลระบบ</h2><p class="muted">สำหรับผู้ดูแลระบบ • จัดการบัญชี ห้องเรียน และข้อมูลการใช้งาน</p></div>
+ <section class="card stack"><div class="row between"><h3>📚 อนุมัติตารางสอนครู</h3><span class="tag">รอพิจารณา ${timetableRequests.length} รายการ</span></div>
+ <p class="muted">ครูสร้างตารางสอนของตนเองได้ แต่ต้องผ่านการตรวจสอบก่อนมีสิทธิ์เปิดรายชื่อนักเรียนและเช็กชื่อของห้องที่สอน</p>
+ ${timetableRequests.length?`<div class="table-wrap"><table class="table"><thead><tr><th>ครูผู้สอน</th><th>วัน / คาบ</th><th>ห้อง</th><th>รหัสวิชา / วิชา</th><th>จัดการ</th></tr></thead>
+ <tbody>${timetableRequests.map(t=>`<tr><td>${esc(t.teacher_name)}</td><td>${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'][t.day_of_week-1]} • ${t.period===t.end_period?t.period:t.period+'-'+t.end_period}</td>
+ <td>${esc(t.classroom_label)}</td><td>${esc(t.subject_code)} / ${esc(t.subject)}</td><td><div class="row">
+ <button class="button" type="button" data-timetable-review="${t.id}" data-decision="approved">อนุมัติ</button>
+ <button class="button secondary" type="button" data-timetable-review="${t.id}" data-decision="rejected">ไม่อนุมัติ</button>
+ </div></td></tr>`).join('')}</tbody></table></div>`:'<p class="empty">ไม่มีตารางสอนใหม่ที่รออนุมัติ</p>'}
+ </section>
  <div class="grid two"><section class="card stack"><h3>เพิ่มบัญชีครู/บุคลากร</h3><form id="addUser" class="stack"><div class="field"><label>ชื่อเข้าสู่ระบบ (ภาษาอังกฤษ/ตัวเลข)</label><input name="username" required minlength="3" pattern="[A-Za-z0-9._-]+"></div><div class="field"><label>ชื่อที่แสดง</label><input name="display_name" required maxlength="100"></div><div class="field"><label>รหัสผ่านชั่วคราว (ครูอย่างน้อย 4 ตัว)</label><input name="password" type="password" required minlength="4"></div><div class="field"><label>บทบาท</label><select name="role"><option value="teacher">ครู</option><option value="staff">งานกิจการนักเรียน</option></select></div><button class="button full">สร้างบัญชี</button></form></section>
  <section class="card stack"><h3>กำหนดครูที่ปรึกษา</h3><form id="assignAdvisor" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูที่ปรึกษา</label><select name="teacher_user_id">${teacherOptions()}</select></div><button class="button full" ${!teacherOptions()?'disabled':''}>บันทึกครูที่ปรึกษา</button></form></section>
  <section class="card stack"><h3>เพิ่มตารางสอนรายคาบ</h3><form id="addSlot" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูผู้สอน</label><select name="teacher_user_id">${teacherOptions()}</select></div>
@@ -499,6 +509,16 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
  })()}
  </section></div>`);
  advisorImporter.render($('#advisorImportHolder'));
+ $('[data-timetable-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+  const id=Number(button.dataset.timetableReview),decision=button.dataset.decision;
+  if(!confirm(decision==='approved'?'ยืนยันอนุมัติให้ครูผู้สอนเข้าถึงข้อมูลห้องนี้และเช็กชื่อรายคาบ?':'ไม่อนุมัติคำขอตารางสอนนี้?'))return;
+  button.disabled=true;
+  try{
+   await api('/api/admin/timetable/requests/'+id+'/review',{method:'POST',body:{decision}});
+   toast(decision==='approved'?'อนุมัติตารางสอนแล้ว':'บันทึกผลไม่อนุมัติแล้ว');
+   await loadAdmin();
+  }finally{if(button.isConnected)button.disabled=false}
+ })));
  const accountForm=$('#addUser'),accountRole=accountForm?.querySelector('select[name="role"]');
  const accountPassword=accountForm?.querySelector('input[name="password"]');
  const syncPasswordMinimum=()=>{
