@@ -2,6 +2,7 @@ import {passwordHash} from './password.js';
 import {validUsername,validDate,bangkokToday} from './core.js';
 import {studentUsername} from './student-username.js';
 import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
+import {submitStudentLateQr} from './late-qr.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -145,6 +146,7 @@ export async function portalRoutes(req,env,path){
  if(req.method==='GET'&&path==='/api/portal/auth/me')return reply({account:publicAccount(a)});
  if(req.method==='POST'&&path==='/api/portal/auth/change-password')return changePassword(req,env,a);
  if(a.must_change_password)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนดูข้อมูลนักเรียน');
+ if(req.method==='POST'&&path==='/api/portal/late/qr')return submitStudentLateQr(req,env,a);
  if(path.startsWith('/api/portal/push/'))return guardianPushRoutes(req,env,a,path);
  if(req.method==='GET'&&path==='/api/portal/truancy')return reply({items:await guardianTruancyItems(env,a)});
  if(req.method==='GET'&&path==='/api/portal/children')return reply({items:await children(env,a)});
