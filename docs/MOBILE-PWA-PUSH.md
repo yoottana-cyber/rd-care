@@ -20,6 +20,26 @@
 - API endpoints: `GET /api/push/config`, `POST /api/push/subscribe`, `POST /api/push/unsubscribe`.
 - Database migration `0011_staff_web_push.sql`.
 
+## กรณี VAPID_SUBJECT หายหลัง Deploy
+
+GitHub Actions deploys Worker `rd-care-api-dev` ด้วย Wrangler และตั้งแต่แก้ไขล่าสุด
+`worker/wrangler.toml` มี `keep_vars = true` เพื่อเก็บตัวแปรที่เพิ่มผ่าน
+Cloudflare Dashboard ต่อไปหลัง Deploy และ workflow ตรวจว่าต้องเปิดการตั้งค่านี้เสมอ
+
+- **ให้เพิ่ม `VAPID_SUBJECT` กลับเพียงครั้งเดียว** ถ้าค่าหายไปก่อนแก้:
+  Cloudflare → Workers & Pages → `rd-care-api-dev` → Settings → Variables and Secrets → Add
+  ใช้ชื่อ `VAPID_SUBJECT` และค่า `mailto:` ตามด้วยอีเมลผู้ดูแลโรงเรียนจริง
+- แนะนำใช้ประเภท **Secret** สำหรับทั้ง 3 VAPID bindings เพราะ secrets ถูกคงไว้ระหว่าง
+  Wrangler Deploy ตามเอกสาร Cloudflare; `keep_vars = true` ยังช่วยเก็บค่าประเภท Text
+  ที่ตั้งผ่าน Dashboard
+- **ห้ามสร้างชุดกุญแจ VAPID ใหม่ทุกครั้งที่ Deploy** ใช้ Public/Private คู่เดิมต่อเนื่อง
+  เพื่อไม่ให้มือถือครูและผู้ปกครองต้องสมัครรับ Push ใหม่
+- ปุ่มตรวจสอบและส่ง Push ทดสอบในหน้า RD Care จะตรวจว่าค่า VAPID ครบ ถูกต้อง
+  และอุปกรณ์สมัครรับแจ้งเตือนแล้วหรือยัง โดยไม่แสดงกุญแจลับ
+- Worker Deploy ไปที่ `rd-care-api-dev` เท่านั้น การตั้งค่าบน Cloudflare Pages
+  `rd-care` ไม่ได้ตั้งค่าตัวแปรให้ Worker API
+- ไม่มีการเก็บ VAPID Private Key หรืออีเมลจริงของโรงเรียนใน GitHub
+
 ## Required Cloudflare VAPID setup (no credentials in GitHub)
 The code deploys even if keys are absent. In that case the notification settings page truthfully displays **Push ยังไม่พร้อม** and does not request permission.
 
