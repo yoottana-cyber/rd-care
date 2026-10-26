@@ -46,7 +46,8 @@ async function myTimetable(env,user){
    COALESCE(t.end_period,t.period) AS end_period,t.subject_code,t.subject,t.approval_status,
    c.label AS classroom_label
    FROM timetable t JOIN classrooms c ON c.id=t.classroom_id
-   WHERE t.teacher_user_id=? AND t.approval_status<>'archived' ORDER BY t.day_of_week,t.period,c.grade,c.room`)
+   WHERE t.teacher_user_id=? AND ((t.approval_status='approved' AND t.active=1)
+   OR t.approval_status IN ('pending','rejected')) ORDER BY t.day_of_week,t.period,c.grade,c.room`)
    .bind(user.id).all();
  return response({items:results});
 }
