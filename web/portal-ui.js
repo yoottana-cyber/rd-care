@@ -1,5 +1,6 @@
 import {API_BASE_URL} from './config.js';
 import {bindThemeButtons} from './theme.js';
+import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea} from './auth-session.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -7,7 +8,7 @@ const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'�
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
 export function createPortalUi({root,onStaffLogin}){
- const state={token:sessionStorage.getItem('rd_portal_token')||'',account:null,role:'student',children:[],studentId:null,records:null,from:minusDays(today(),29),to:today()};
+ const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,from:minusDays(today(),29),to:today()};
  let requestVersion=0;
  const select=s=>root.querySelector(s);
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
@@ -17,7 +18,7 @@ export function createPortalUi({root,onStaffLogin}){
   const response=await fetch(API_BASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json().catch(()=>({}));
   if(!response.ok){
-   if(response.status===401&&auth){state.token='';sessionStorage.removeItem('rd_portal_token');}
+   if(response.status===401&&auth){state.token='';clearAuthSession('rd_portal_token');}
    throw Error(data.error||'ไม่สามารถติดต่อระบบได้');
   }
   return data;
@@ -55,6 +56,9 @@ export function createPortalUi({root,onStaffLogin}){
    <form id="portalLoginForm" class="stack">
     <div class="field"><label>${role==='student'?'เลขประจำตัวนักเรียน (Username)':'Username ผู้ปกครอง'}</label><input name="username" required autocomplete="username" maxlength="40" ${role==='student'?'inputmode="numeric"':''}></div>
     <div class="field"><label>รหัสผ่าน</label><input name="password" type="password" required autocomplete="current-password"></div>
+    <label class="remember-login"><input type="checkbox" name="remember">
+     <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong>
+      <small>เลือกเฉพาะมือถือหรือคอมพิวเตอร์ส่วนตัว • สูงสุด 30 วัน</small></span></label>
     <button type="submit" class="button full">เข้าสู่ระบบ</button></form>
    <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
    <button type="button" id="portalBack" class="button secondary full">กลับหน้าเข้าสู่ระบบครู</button>`,true);
@@ -66,8 +70,11 @@ export function createPortalUi({root,onStaffLogin}){
    try{
     const f=new FormData(form);
     const r=await call('/api/portal/auth/login',{method:'POST',auth:false,
-     body:{username:String(f.get('username')).trim(),password:String(f.get('password')),role:state.role}});
-    state.token=r.token;state.account=r.account;sessionStorage.setItem('rd_portal_token',r.token);
+     body:{username:String(f.get('username')).trim(),password:String(f.get('password')),role:state.role,
+      remember:f.get('remember')==='on'}});
+    state.token=r.token;state.account=r.account;
+    saveAuthSession('rd_portal_token',r.token,r.expires_in,f.get('remember')==='on'&&!r.account.must_change_password);
+    setLastLoginArea('portal');
     if(state.account.must_change_password)showPasswordChange();
     else await showDashboard();
    }catch(error){message(error.message,true)}finally{if(button.isConnected)button.disabled=false}
@@ -89,7 +96,7 @@ export function createPortalUi({root,onStaffLogin}){
    try{
     await call('/api/portal/auth/change-password',{method:'POST',body:{
       current_password:String(f.get('current_password')),new_password:String(f.get('new_password'))}});
-    state.token='';sessionStorage.removeItem('rd_portal_token');showLogin(state.role);
+    state.token='';clearAuthSession('rd_portal_token');showLogin(state.role);
     message('ตั้งรหัสผ่านส่วนตัวสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่');
    }catch(error){message(error.message,true)}finally{if(button.isConnected)button.disabled=false}
   });
@@ -98,7 +105,7 @@ export function createPortalUi({root,onStaffLogin}){
   requestVersion++;
   try{if(state.token)await call('/api/portal/auth/logout',{method:'POST',body:{}})}catch{}
   state.token='';state.account=null;state.records=null;state.children=[];
-  sessionStorage.removeItem('rd_portal_token');showLogin();
+  clearAuthSession('rd_portal_token');showLogin();
  }
  async function showDashboard(){
   try{
@@ -163,7 +170,12 @@ export function createPortalUi({root,onStaffLogin}){
   try{
    const me=await call('/api/portal/auth/me');state.account=me.account;state.role=me.account.role;
    if(state.account.must_change_password)showPasswordChange();else await showDashboard();
-  }catch{state.token='';sessionStorage.removeItem('rd_portal_token');showLogin()}
+  }catch(error){
+   if(!state.token){showLogin(state.role);return true}
+   frame('<h2>ยังไม่สามารถเชื่อมต่อ RD Care</h2><p class="muted">ระบบจดจำการเข้าสู่ระบบของอุปกรณ์นี้ไว้แล้ว กรุณาลองใหม่เมื่อมีอินเทอร์เน็ต</p><button class="button full" id="portalRetryRestore">เชื่อมต่ออีกครั้ง</button><button class="button secondary full" id="portalForgetRestore">ออกจากระบบ</button>');
+   select('#portalRetryRestore')?.addEventListener('click',()=>resume());
+   select('#portalForgetRestore')?.addEventListener('click',logout);
+  }
   return true;
  }
  return {showLogin,resume,hasSession:()=>!!state.token};
