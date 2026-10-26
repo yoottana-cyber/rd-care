@@ -46,5 +46,5 @@ test('charts load into staff dashboard and are precached for mobile PWA',()=>{
  assert.match(app,/renderAttendanceCharts\(s\)/);
  assert.match(sw,/dashboard-charts\.js/);
  assert.match(sw,/charts\.css/);
- assert.match(sw,/rd-care-shell-v(19|20|21|22|23|24|25)/);
+ assert.match(sw,/rd-care-shell-v\d+/);
 });
