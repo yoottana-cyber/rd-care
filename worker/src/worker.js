@@ -1,4 +1,4 @@
-import { STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername, httpErrorStatus } from './core.js';
+import { STATUS, PERIOD_STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername, httpErrorStatus } from './core.js';
 import { passwordHash } from './password.js';
 import { validateStudentInput, validatePersonnelInput } from './admin-validation.js';
 import { planStudentImport } from './student-import.js';
@@ -11,6 +11,7 @@ import {unifiedRosterEndpoint} from './unified-roster.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
+import {deliverTruancyPush,advisorTruancyItems} from './truancy-push.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -166,7 +167,11 @@ async function getAttendance(req,env,user){
   const slot=await env.DB.prepare('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=? AND active=1').bind(timetableId).first();
   if(!slot||slot.classroom_id!==roomId||slot.day_of_week!==weekday(date))throw error(400,'คาบเรียนไม่สัมพันธ์กับห้องหรือวันที่');
   if(user.role==='teacher'&&slot.teacher_user_id!==user.id)throw error(403,'ดูเช็กชื่อรายคาบได้เฉพาะวิชาของตนเอง');
-  const {results}=await env.DB.prepare(`SELECT p.student_id,p.status FROM attendance_period p
+  const {results}=await env.DB.prepare(`SELECT p.student_id,
+    CASE WHEN tr.student_id IS NOT NULL AND p.status='absent' THEN 'truancy' ELSE p.status END AS status
+ FROM attendance_period p
+ LEFT JOIN period_truancy tr ON tr.student_id=p.student_id AND tr.timetable_id=p.timetable_id
+   AND tr.school_date=p.school_date
  JOIN student_enrollments h ON h.student_id=p.student_id
  WHERE p.timetable_id=? AND p.school_date=? AND h.classroom_id=?
  AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date)`)
@@ -200,7 +205,8 @@ async function writeAttendance(req,env,user){
  AND s.active=1 ORDER BY h.roll_no`).bind(roomId,date,date).all();
  if(!students.length)throw error(400,'ห้องเรียนยังไม่มีนักเรียน');
  const ids=new Set(students.map(x=>x.id));
- if(!validateEntries(b.entries,ids))throw error(400,'รายการต้องมีนักเรียนทุกคนในห้อง สถานะถูกต้อง และไม่ซ้ำกัน');
+ if(!validateEntries(b.entries,ids,100,kind==='period'?PERIOD_STATUS:STATUS))
+  throw error(400,'รายการต้องมีนักเรียนทุกคนในห้อง สถานะถูกต้อง และไม่ซ้ำกัน');
  const stmts=[];
  let slot;
  if(kind==='period'){
@@ -232,7 +238,25 @@ async function writeAttendance(req,env,user){
   }else{
    stmts.push(env.DB.prepare(`INSERT INTO attendance_period(student_id,timetable_id,school_date,status,recorded_by) VALUES(?,?,?,?,?)
      ON CONFLICT(student_id,timetable_id,school_date) DO UPDATE SET status=excluded.status,recorded_by=excluded.recorded_by,updated_at=CURRENT_TIMESTAMP`)
-    .bind(e.student_id,slot.id,date,e.status,user.id));
+    .bind(e.student_id,slot.id,date,e.status==='truancy'?'absent':e.status,user.id));
+   if(e.status==='truancy'){
+    // A separate classified event: no duplicate advisor-absence-review is needed.
+    stmts.push(env.DB.prepare(`INSERT INTO period_truancy(student_id,timetable_id,school_date,recorded_by)
+     VALUES(?,?,?,?) ON CONFLICT(student_id,timetable_id,school_date)
+     DO UPDATE SET recorded_by=excluded.recorded_by,updated_at=CURRENT_TIMESTAMP`)
+     .bind(e.student_id,slot.id,date,user.id));
+    stmts.push(env.DB.prepare(`INSERT INTO truancy_events(student_id,timetable_id,school_date,recorded_by)
+      VALUES(?,?,?,?) ON CONFLICT(student_id,timetable_id,school_date)
+      DO UPDATE SET active=1,recorded_by=excluded.recorded_by,
+       generation=CASE WHEN truancy_events.active=0 THEN truancy_events.generation+1 ELSE truancy_events.generation END,
+       updated_at=CURRENT_TIMESTAMP`).bind(e.student_id,slot.id,date,user.id));
+   }else{
+    stmts.push(env.DB.prepare(`DELETE FROM period_truancy
+      WHERE student_id=? AND timetable_id=? AND school_date=?`).bind(e.student_id,slot.id,date));
+    stmts.push(env.DB.prepare(`UPDATE truancy_events SET active=0,updated_at=CURRENT_TIMESTAMP
+      WHERE student_id=? AND timetable_id=? AND school_date=? AND active=1`)
+      .bind(e.student_id,slot.id,date));
+   }
    if(e.status==='absent'){
     // A recorded DAILY absence already explains the period absence. Keep the
     // period attendance row, but never create/reopen advisor review work.
@@ -831,8 +855,15 @@ async function route(req,env,ctx){
   const result=await writeAttendance(req,env,user);
   // Only after the successful DB write; never delay or block the teacher's check-in.
   // Scheduled cron also retries the internal advisor outbox.
-  if(result.ok&&ctx?.waitUntil)ctx.waitUntil(deliverAdvisorPush(env).catch(e=>console.warn('RD push delivery',e?.name)));
+  if(result.ok&&ctx?.waitUntil)ctx.waitUntil(Promise.all([
+   deliverAdvisorPush(env).catch(e=>console.warn('RD advisor push',e?.name)),
+   deliverTruancyPush(env).catch(e=>console.warn('RD truancy push',e?.name))
+  ]));
   return result;
+ }
+ if(req.method==='GET'&&path==='/api/truancy/advisor'){
+  requireRole(user,['teacher','staff','admin']);
+  return json({items:await advisorTruancyItems(env,user)});
  }
  if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
  if(req.method==='POST'&&path==='/api/late/self/code')return issueLateSelfCode(req,env,user);
@@ -851,7 +882,10 @@ async function route(req,env,ctx){
 }
 export default {
  async scheduled(event,env,ctx){
-  ctx.waitUntil(deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled push',e?.name)));
+  ctx.waitUntil(Promise.all([
+   deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
+   deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name))
+  ]));
  },
  async fetch(req,env,ctx){
   const origin=req.headers.get('origin');
