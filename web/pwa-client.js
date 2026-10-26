@@ -56,9 +56,13 @@ export function createPwaTools({api,toast}){
   if(!supported())return false;
   const subscription=await (await sw()).pushManager.getSubscription();
   if(!subscription)return false;
-  // Revoke server consent while the bearer session is still present.
-  await api('/api/push/unsubscribe',{method:'POST',body:{endpoint:subscription.endpoint}});
+  // Always unsubscribe locally, even if the user is offline during logout.
+  // The server will then expire an unreachable device subscription on delivery.
+  let problem=null;
+  try{await api('/api/push/unsubscribe',{method:'POST',body:{endpoint:subscription.endpoint}})}
+  catch(e){problem=e}
   await subscription.unsubscribe();
+  if(problem&&!silent)throw problem;
   if(!silent)toast('ปิดการแจ้งเตือนบนอุปกรณ์นี้แล้ว');
   return true;
  }
