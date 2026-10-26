@@ -45,9 +45,10 @@ export function createLateGate({api,mount,toast,safeRun}){
     </section>
    </div></div>`);
   document.querySelector('#lateQrStart')?.addEventListener('click',()=>safeRun(rotate));
-  document.querySelector('#lateQrStop')?.addEventListener('click',()=>{
-   state.qr=null;render();toast('ปิดการแสดง QR บนจอนี้แล้ว');
-  });
+  document.querySelector('#lateQrStop')?.addEventListener('click',()=>safeRun(async()=>{
+   await api('/api/late/qr/stop',{method:'POST',body:{}});
+   state.qr=null;render();toast('ปิดจุดสแกนและยกเลิก QR ที่ยังไม่หมดอายุแล้ว');
+  }));
   document.querySelector('#lateQrRefresh')?.addEventListener('click',()=>safeRun(()=>poll(true)));
   document.querySelectorAll('[data-qr-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
     const id=Number(button.dataset.qrReview),decision=button.dataset.status;
