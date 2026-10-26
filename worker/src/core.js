@@ -1,4 +1,5 @@
 export const STATUS = new Set(['present','absent','late','leave']);
+export const PERIOD_STATUS = new Set([...STATUS,'truancy']);
 export const isAdmin = (u) => u?.role === 'admin';
 export const isStaff = (u) => ['admin','staff'].includes(u?.role);
 export function validDate(value) {
@@ -18,11 +19,11 @@ export function schoolDateAllowed(date) {
   const difference=(Date.parse(date+'T00:00:00Z')-Date.parse(today+'T00:00:00Z'))/86400000;
   return difference<=0 && difference>=-14;
 }
-export function validateEntries(entries, validIds, max=100) {
+export function validateEntries(entries, validIds, max=100, statuses=STATUS) {
   if (!Array.isArray(entries) || !entries.length || entries.length>max) return false;
   const ids = new Set();
   for (const row of entries) {
-    if (!Number.isSafeInteger(row.student_id) || !validIds.has(row.student_id) || !STATUS.has(row.status) || ids.has(row.student_id)) return false;
+    if (!Number.isSafeInteger(row.student_id) || !validIds.has(row.student_id) || !statuses.has(row.status) || ids.has(row.student_id)) return false;
     ids.add(row.student_id);
   }
   return ids.size === validIds.size;
