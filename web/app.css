@@ -19,3 +19,13 @@
  .brand-logo{width:46px;height:46px;flex-basis:46px;padding:4px}
  .login-head .brand-logo{width:72px;height:72px}
 }
+
+
+/* Period-only truancy choice is intentionally distinct from routine absence. */
+.pill.truancy{background:#ffe2e2;border-color:#de6b75;color:#9e2439}
+.pills:has([data-status="truancy"]){flex-wrap:wrap;justify-content:flex-end}
+.pills [data-status="truancy"]{border-color:#db6b74;color:#a43142}
+.pills [data-status="truancy"].truancy{background:#c3374e;color:#fff;border-color:#bd3048}
+.guardian-truancy-notices .alert-item{border-left:3px solid #db5061;padding-left:12px}
+.guardian-truancy-notices #guardianPushStatus{margin:0}
+@media(max-width:780px){.pills:has([data-status="truancy"]){max-width:280px}.pills [data-status="truancy"]{min-height:38px}}
