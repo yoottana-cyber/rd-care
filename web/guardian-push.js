@@ -25,6 +25,7 @@ export function createGuardianPush({call,select,message}){
     owned.subscribed?'อุปกรณ์นี้เปิดรับ Push ผู้ปกครองแล้ว':'ยังไม่ได้เปิดรับ Push สำหรับบัญชีผู้ปกครองนี้';
    if(enable)enable.disabled=!config.enabled||Notification.permission==='denied'||!!owned.subscribed;
    const disable=select('#guardianPushDisable');if(disable)disable.disabled=!owned.subscribed;
+   const test=select('#guardianPushTest');if(test)test.disabled=!owned.subscribed||!config.enabled;
   }catch(error){target.textContent='ยังตรวจสอบการแจ้งเตือนไม่ได้'}
  }
  async function enable(){
@@ -56,7 +57,29 @@ export function createGuardianPush({call,select,message}){
   if(problem&&!silent)throw problem;
   if(!silent){message('ปิดรับ Push อุปกรณ์นี้แล้ว');await refresh()}
  }
+ async function testPush(){
+  const sub=await subscription();
+  if(!sub)throw Error('อุปกรณ์นี้ยังไม่ได้เปิดรับ Push');
+  const result=await call('/api/portal/push/test',{method:'POST',body:{endpoint:sub.endpoint}});
+  const errors={
+   missing_settings:'Cloudflare Worker ยังตั้งค่ากุญแจ VAPID ไม่ครบ',
+   invalid_subject:'VAPID_SUBJECT ไม่ถูกต้อง',
+   invalid_keypair:'กุญแจ VAPID ไม่ถูกต้อง',
+   keypair_mismatch:'กุญแจ VAPID Public/Private ไม่ใช่คู่เดียวกัน',
+   device_not_registered:'บัญชีนี้ยังไม่ได้สมัครรับ Push บนอุปกรณ์นี้',
+   provider_rejected:'ผู้ให้บริการ Push ปฏิเสธคำขอ (HTTP '+(result.providerStatus||'?')+')',
+   network_or_crypto_error:'เครือข่ายหรือการเข้ารหัสแจ้งเตือนมีปัญหา'
+  };
+  const target=select('#guardianPushTestStatus');
+  if(target)target.textContent=result.accepted?
+   'ผู้ให้บริการตอบรับ Push ทดสอบแล้ว โปรดตรวจสอบการแจ้งเตือนบนมือถือ':
+   (errors[result.code]||'ส่ง Push ทดสอบไม่สำเร็จ');
+ }
  function bind(){
+  select('#guardianPushTest')?.addEventListener('click',()=>testPush().catch(e=>{
+   const output=select('#guardianPushTestStatus');
+   if(output)output.textContent=e.message;
+  }));
   select('#guardianPushEnable')?.addEventListener('click',()=>{
    // Do not wrap enable() inside an awaited task or timeout before permission prompt.
    enable().catch(error=>message(error.message,true));
