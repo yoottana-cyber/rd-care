@@ -257,5 +257,5 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
   if(tab==='teaching')bindTeaching();
   if(tab==='import')bindImports();
  }
- return {render};
+ return {render,open:id=>{if(adminTabs.some(t=>t.id===id))tab=id;render()}};
 }
