@@ -40,10 +40,10 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
    </section>
    <section class="card stack"><div class="row between"><h3>ตารางสอนรายสัปดาห์ (${lessons.length} รายการ)</h3><span class="muted">เรียงตามวันและคาบ</span></div>
    ${lessons.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วัน</th><th>คาบ</th><th>ห้อง</th><th>รหัสวิชา</th><th>ชื่อวิชา</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-    <tbody>${lessons.map(s=>`<tr><td>${days[s.day_of_week-1]}</td><td><strong>${periodName(s)}</strong></td><td>${escapeHtml(s.classroom_label)}</td><td>${escapeHtml(s.subject_code||'—')}</td><td>${escapeHtml(s.subject)}</td><td><span class="tag">${s.approval_status==='approved'?'พร้อมเช็กชื่อ':'ยังไม่เปิดใช้ (แก้คาบซ้อน)'}</span></td><td><div class="row">
+    <tbody>${lessons.map(s=>`<tr><td>${days[s.day_of_week-1]}</td><td><strong>${periodName(s)}</strong></td><td>${escapeHtml(s.classroom_label)}</td><td>${escapeHtml(s.subject_code||'—')}</td><td>${escapeHtml(s.subject)}</td><td><span class="tag">${s.approval_status==='approved'&&s.active===1?'พร้อมเช็กชื่อ':'ยังไม่เปิดใช้ (แก้คาบซ้อน)'}</span></td><td><div class="row">
      <button type="button" class="button secondary" data-edit-lesson="${s.id}">แก้ไข</button>
      <button type="button" class="button ghost" data-archive-lesson="${s.id}">ลบ</button>
-     <button type="button" class="button secondary" data-open-lesson="${s.id}" ${s.approval_status==='approved'?'':'disabled'}>เช็กชื่อ</button>
+     <button type="button" class="button secondary" data-open-lesson="${s.id}" ${s.approval_status==='approved'&&s.active===1?'':'disabled'}>เช็กชื่อ</button>
     </div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีตารางสอน กรุณาเพิ่มวิชาที่สอนด้านบน</div>'}
     <p class="muted">บันทึกแล้วเริ่มเช็กชื่อได้ทันที • ตารางสอนเดิมที่คาบซ้อนจะยังปิดใช้งานจนกว่าจะแก้ไข • รายการที่เคยเช็กชื่อแล้วแก้หรือลบไม่ได้เพื่อรักษาประวัติ</p>
    </section>
