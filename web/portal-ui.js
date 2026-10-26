@@ -175,7 +175,9 @@ export function createPortalUi({root,onStaffLogin}){
     <div class="field"><label>การแจ้งเตือน Push อุปกรณ์นี้</label>
      <p id="guardianPushStatus" class="muted" role="status">กำลังตรวจสอบความพร้อม</p></div>
     <div class="row"><button type="button" class="button" id="guardianPushEnable">🔔 เปิดรับ Push</button>
-     <button type="button" class="button secondary" id="guardianPushDisable">ปิด Push อุปกรณ์นี้</button></div>
+     <button type="button" class="button secondary" id="guardianPushDisable">ปิด Push อุปกรณ์นี้</button>
+     <button type="button" class="button secondary" id="guardianPushTest">ส่ง Push ทดสอบ</button></div>
+    <p id="guardianPushTestStatus" class="muted" role="status">การทดสอบไม่ส่งข้อมูลนักเรียนและไม่สร้างเหตุการณ์หนีเรียน</p>
     <p class="muted">iPhone: เปิดด้วย Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิด RD Care จากไอคอน ก่อนกดเปิดรับ Push</p>
     <p class="muted">การแจ้งเตือนจะแสดงข้อความทั่วไปบนหน้าจอล็อก ไม่แสดงชื่อหรือข้อมูลของนักเรียน</p>
    </section>`:''}`);
