@@ -562,11 +562,11 @@ async function loadAdvisorCenter(){
  <select id="advisorRoom">${advisory.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${esc(r.label)}</option>`).join('')}</select></div>
  <strong>รอตรวจสอบ ${items.length} รายการ</strong></div>
  <div class="row"><button class="button secondary" data-tab="attendance" type="button">📅 เช็กชื่อรายวัน</button><button class="button secondary" data-tab="alerts" type="button">🔎 ตรวจสอบการขาดเรียน</button></div></section>
- <section class="card stack"><h3>🚨 รายการหนีเรียนที่แจ้งแล้ว</h3>
+ <section class="card stack"><h3>🚨 รายการหนีเรียนที่ครูบันทึก</h3>
  <p class="muted">แสดงเหตุการณ์จากครูผู้สอนที่แจ้งทันที แม้นักเรียนขาดรายวันแล้ว • ตรวจสอบข้อเท็จจริงและประสานผู้ปกครอง</p>
  ${truancy.length?truancy.map(e=>`<div class="alert-item">
   <strong>${esc(e.full_name)}</strong><p class="muted">${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
-  <span class="tag">หนีเรียน — มีการแจ้งเตือนผ่าน Push แก่ผู้สมัครรับ (หากอุปกรณ์พร้อม)</span>
+  <span class="tag">หนีเรียน — ระบบจะส่ง Push ไปยังอุปกรณ์ที่เปิดรับและพร้อมใช้งาน</span>
  </div>`).join(''):'<p class="muted">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}</section>
  <section class="card stack"><h3>รายการรอการพิจารณา (ขาดรายคาบปกติ)</h3>
  ${items.length?items.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong>
