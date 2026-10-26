@@ -238,7 +238,10 @@ function renderDashboard(){
   ['รายการมาสาย',s.late,'⏰','stat-indigo']
  ];
  const actions=[
-  ['attendance','✅','เช็กชื่อ','บันทึกการมาเรียน','quick-purple'],
+  ['attendance','📅','เช็กชื่อรายวัน','สำหรับครูที่ปรึกษา','quick-purple'],
+  ['periodAttendance','✅','เช็กชื่อรายคาบ','สำหรับครูผู้สอน','quick-teal'],
+  ...(state.user?.role==='teacher'?[['myTimetable','📚','ตารางสอนของฉัน','สร้างตารางสอนรายสัปดาห์','quick-blue']]:[]),
+  ['advisorCenter','🧑‍🏫','ศูนย์ครูที่ปรึกษา','ตรวจสอบงานขาดเรียน','quick-purple'],
   ['late','⏰','มาสาย','ตรวจสอบรายการมาสาย','quick-teal'],
   ['behavior','⭐','พฤติกรรม','บันทึกและตรวจสอบ','quick-orange'],
   ['alerts','🔔','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
@@ -437,6 +440,36 @@ function renderBehavior(){mount(`<div class="stack"><div><h2>คะแนนพ�
  $('#behaviorStudent')?.addEventListener('change',e=>safeRun(async()=>{state.studentId=Number(e.target.value);await loadBehavior()}));
  $('#behaviorForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api('/api/behavior',{method:'POST',body:{student_id:Number(f.get('student_id')),points:Number(f.get('points')),reason:f.get('reason')}});toast('บันทึกคะแนนสำเร็จ');await loadBehavior()}));
 }
+async function loadAdvisorCenter(){
+ const advisory=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
+ if(!advisory.length){
+  mount('<section class="card stack"><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="warn">ยังไม่มีห้องที่ได้รับมอบหมายเป็นครูที่ปรึกษา สามารถติดต่อผู้ดูแลระบบเพื่อผูกห้องเรียนได้</p></section>');
+  return;
+ }
+ if(!advisory.some(r=>r.id===state.roomId))state.roomId=advisory[0].id;
+ const selected=state.roomId,data=await api('/api/alerts?classroom_id='+selected);
+ if(state.tab!=='advisorCenter'||state.roomId!==selected)return;
+ const items=data.items;
+ mount(`<section class="stack"><div><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="muted">รับรายการไม่เข้าคาบจากครูผู้สอน และยืนยันผลก่อนบันทึกเหตุการณ์แจ้งผู้ปกครอง</p></div>
+ <section class="card stack"><div class="row between"><div class="field smallbox"><label for="advisorRoom">ห้องที่รับผิดชอบ</label>
+ <select id="advisorRoom">${advisory.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${esc(r.label)}</option>`).join('')}</select></div>
+ <strong>รอตรวจสอบ ${items.length} รายการ</strong></div>
+ <div class="row"><button class="button secondary" data-tab="attendance" type="button">📅 เช็กชื่อรายวัน</button><button class="button secondary" data-tab="alerts" type="button">🔎 ตรวจสอบการขาดเรียน</button></div></section>
+ <section class="card stack"><h3>รายการรอการพิจารณา</h3>
+ ${items.length?items.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong>
+ <p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
+ <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
+ <p class="muted">ระบบยังไม่ส่ง Push ถึงผู้ปกครองโดยอัตโนมัติ</p></section>`);
+ $('#advisorRoom')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);await loadAdvisorCenter()}));
+ $('[data-advisor-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+  if(!confirm(button.dataset.state==='confirmed'?'ยืนยันว่าไม่เข้าคาบเรียน?':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;
+  button.disabled=true;
+  try{
+   await api('/api/alerts/'+Number(button.dataset.advisorReview)+'/review',{method:'POST',body:{state:button.dataset.state}});
+   toast('บันทึกผลการตรวจสอบแล้ว');await loadAdvisorCenter();
+  }finally{if(button.isConnected)button.disabled=false}
+ })));
+}
 async function loadAlerts(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}try{const data=await api('/api/alerts?classroom_id='+state.roomId);state.alerts=data.items;renderAlerts()}catch(e){mount(`<div class="card"><h2>งานตรวจสอบ</h2><p class="warn">${esc(e.message)}</p><p class="muted">หน้านี้ให้ครูที่ปรึกษาและผู้ดูแลระบบเข้าถึงได้</p></div>`)} }
 function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false})}
  <div class="warn">การยืนยันรายการนี้ยังไม่ส่งการแจ้งเตือน Push ถึงผู้ปกครอง</div>
@@ -451,7 +484,7 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
  <div class="grid two"><section class="card stack"><h3>เพิ่มบัญชีครู/บุคลากร</h3><form id="addUser" class="stack"><div class="field"><label>ชื่อเข้าสู่ระบบ (ภาษาอังกฤษ/ตัวเลข)</label><input name="username" required minlength="3" pattern="[A-Za-z0-9._-]+"></div><div class="field"><label>ชื่อที่แสดง</label><input name="display_name" required maxlength="100"></div><div class="field"><label>รหัสผ่านชั่วคราว (ครูอย่างน้อย 4 ตัว)</label><input name="password" type="password" required minlength="4"></div><div class="field"><label>บทบาท</label><select name="role"><option value="teacher">ครู</option><option value="staff">งานกิจการนักเรียน</option></select></div><button class="button full">สร้างบัญชี</button></form></section>
  <section class="card stack"><h3>กำหนดครูที่ปรึกษา</h3><form id="assignAdvisor" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูที่ปรึกษา</label><select name="teacher_user_id">${teacherOptions()}</select></div><button class="button full" ${!teacherOptions()?'disabled':''}>บันทึกครูที่ปรึกษา</button></form></section>
  <section class="card stack"><h3>เพิ่มตารางสอนรายคาบ</h3><form id="addSlot" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ครูผู้สอน</label><select name="teacher_user_id">${teacherOptions()}</select></div>
- <div class="grid two"><div class="field"><label>วันในสัปดาห์</label><select name="day_of_week">${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}</select></div><div class="field"><label>คาบ</label><input type="number" name="period" min="1" max="12" value="1" required></div></div><div class="field"><label>ชื่อวิชา</label><input name="subject" placeholder="วิทยาการคำนวณ" required maxlength="120"></div><button class="button full" ${!teacherOptions()?'disabled':''}>เพิ่มคาบเรียน</button></form></section>
+ <div class="grid two"><div class="field"><label>วันในสัปดาห์</label><select name="day_of_week">${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((n,i)=>`<option value="${i+1}">${n}</option>`).join('')}</select></div><div class="field"><label>คาบ (ถึงคาบ 10)</label><select name="period_range">${periodChoices.map(p=>`<option value="${p}">${p}</option>`).join('')}</select></div></div><div class="field"><label>รหัสวิชา</label><input name="subject_code" placeholder="ว22103" required maxlength="30"></div><div class="field"><label>ชื่อวิชา</label><input name="subject" placeholder="วิทยาการคำนวณ" required maxlength="120"></div><button class="button full" ${!teacherOptions()?'disabled':''}>เพิ่มคาบเรียน</button></form></section>
  <section class="card stack"><h3>นำเข้านักเรียน (CSV)</h3><form id="importStudents" class="stack"><div class="field"><label>ห้องเรียน</label><select name="classroom_id">${state.rooms.map(r=>`<option value="${r.id}">${esc(r.label)}</option>`).join('')}</select></div><div class="field"><label>ข้อความ CSV (ไม่เกิน 60 คนต่อครั้ง)</label><textarea name="csv" required placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง" rows="7"></textarea></div><p class="muted">ก่อนนำเข้าข้อมูล โปรดตรวจสอบสิทธิ์และการคุ้มครองข้อมูลส่วนบุคคลตามนโยบายโรงเรียน</p><button class="button full">นำเข้ารายชื่อ</button></form></section></div>
  <div id="advisorImportHolder"></div>
  <section class="card stack"><h3>ครูและบุคลากร (${state.users.length} บัญชี)</h3><div class="table-wrap"><table class="table"><thead><tr><th>ชื่อ</th><th>Username</th><th>บทบาท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
@@ -494,7 +527,10 @@ function renderAdmin(){mount(`<div class="stack"><div><h2>จัดการข�
  const formApi=(id,path,makeBody,after=loadAdmin)=>{$('#'+id).addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api(path,{method:'POST',body:makeBody(f)});toast('บันทึกสำเร็จ');await after()}));};
  formApi('addUser','/api/admin/users',f=>({username:f.get('username'),display_name:f.get('display_name'),password:f.get('password'),role:f.get('role')}));
  formApi('assignAdvisor','/api/admin/advisor',f=>({classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id'))}));
- formApi('addSlot','/api/admin/timetable',f=>({classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id')),day_of_week:Number(f.get('day_of_week')),period:Number(f.get('period')),subject:f.get('subject')}));
+ formApi('addSlot','/api/admin/timetable',f=>{
+   const p=String(f.get('period_range')).split('-').map(Number);
+   return {classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id')),day_of_week:Number(f.get('day_of_week')),period:p[0],end_period:p[1]||p[0],subject_code:String(f.get('subject_code')||'').trim(),subject:f.get('subject')};
+ });
  formApi('importStudents','/api/admin/import-students',f=>{
   const records=parseCsv(String(f.get('csv')||'').trim());
   if(records[0]?.join(',').toLowerCase()==='roll_no,student_no,full_name')records.shift();
