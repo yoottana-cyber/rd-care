@@ -300,7 +300,7 @@ async function loadAttendance(){
   if(!slot){
    mount(`<section class="stack"><h2>เช็กชื่อรายคาบ</h2>
     <div class="card stack"><div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(date)}"></div>
-    <p class="warn">วันนี้ยังไม่มีตารางสอนที่สามารถเช็กชื่อได้ ${state.user?.role==='teacher'?'กรุณาสร้างตารางสอนของตนเอง หรือเลือกวันที่มีคาบสอน':'กรุณาเลือกวันที่มีตารางสอน'}</p>
+    <p class="warn">วันนี้ยังไม่มีคาบสอนที่อนุมัติแล้ว ${state.user?.role==='teacher'?'กรุณาสร้างตารางสอนของตนเอง หรือเลือกวันที่มีคาบสอน':'กรุณาเลือกวันที่มีตารางสอน'}</p>
     ${state.user?.role==='teacher'?'<button class="button" data-tab="myTimetable" type="button">+ สร้างตารางสอนของฉัน</button>':''}</div></section>`);
    $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
    return;
