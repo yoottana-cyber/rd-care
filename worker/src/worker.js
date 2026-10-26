@@ -168,7 +168,9 @@ async function getAttendance(req,env,user){
  WHERE p.timetable_id=? AND p.school_date=? AND h.classroom_id=?
  AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date)`)
  .bind(timetableId,date,roomId).all();
-  return json({items:results});
+  const log=await env.DB.prepare('SELECT note,updated_at FROM period_teaching_logs WHERE timetable_id=? AND school_date=?')
+   .bind(timetableId,date).first();
+  return json({items:results,teaching_note:log?.note||'',teaching_note_updated_at:log?.updated_at||null});
  }
  throw error(400,'ประเภทการเช็กชื่อไม่ถูกต้อง');
 }
@@ -188,6 +190,8 @@ async function writeAttendance(req,env,user){
  const stmts=[];
  let slot;
  if(kind==='period'){
+  if(Object.hasOwn(b,'teaching_note')&&(typeof b.teaching_note!=='string'||b.teaching_note.length>2000))
+   throw error(400,'บันทึกการสอนต้องเป็นข้อความไม่เกิน 2,000 ตัวอักษร');
   const tId=positiveInt(b.timetable_id);
   slot=await env.DB.prepare('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=? AND active=1').bind(tId).first();
   if(!slot||slot.classroom_id!==roomId||slot.day_of_week!==weekday(date))throw error(400,'คาบเรียนหรือวันเรียนไม่ตรงกับตารางสอน');
@@ -226,6 +230,22 @@ async function writeAttendance(req,env,user){
       WHERE student_id=? AND timetable_id=? AND school_date=?)`).bind(e.student_id,slot.id,date));
    }
   }
+ }
+ // The note is optional; old clients that omit teaching_note leave stored notes unchanged.
+ // Emptying the visible field deliberately removes a previous note.
+ if(kind==='period'&&Object.hasOwn(b,'teaching_note')){
+  const note=b.teaching_note.trim();
+  if(note){
+   stmts.push(env.DB.prepare(`INSERT INTO period_teaching_logs(timetable_id,school_date,note,recorded_by)
+    VALUES(?,?,?,?) ON CONFLICT(timetable_id,school_date) DO UPDATE SET
+    note=excluded.note,recorded_by=excluded.recorded_by,updated_at=CURRENT_TIMESTAMP`)
+    .bind(slot.id,date,note,user.id));
+  }else{
+   stmts.push(env.DB.prepare('DELETE FROM period_teaching_logs WHERE timetable_id=? AND school_date=?')
+    .bind(slot.id,date));
+  }
+  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+   .bind(user.id,note?'teaching_note_saved':'teaching_note_cleared','period_teaching_logs',`${slot.id}:${date}`));
  }
  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
   .bind(user.id,'attendance_saved',kind,`${date}:${roomId}:${slot?.id||0}`));
