@@ -67,22 +67,15 @@ test('teacher cannot access administrator timetable approval queue',async()=>{
  }
 });
 
-test('admin cannot approve teacher timetable with overlapping approved period',async()=>{
- let written=false;
- const user={id:1,username:'admin',display_name:'Admin',role:'admin',active:1};
- const db={prepare(sql){
-  if(sql.includes('FROM sessions s'))return {bind:()=>({first:async()=>user})};
-  if(sql.includes("WHERE t.id=? AND t.approval_status='pending'"))return {bind:()=>({first:async()=>({
-   id:5,day_of_week:1,classroom_id:2,teacher_user_id:7,period:2,end_period:3,teacher_active:1
-  })})};
-  if(sql.includes('SELECT id FROM timetable WHERE active=1'))return {bind:()=>({first:async()=>({id:4})})};
-  if(/UPDATE|INSERT/.test(sql))written=true;
-  throw Error('Unexpected SQL: '+sql);
- }};
- const response=await worker.fetch(new Request('https://test.local/api/admin/timetable/requests/5/review',{
-  method:'POST',headers:{'content-type':'application/json',...bearer},
-  body:JSON.stringify({decision:'approved'})
- }),{DB:db});
- assert.equal(response.status,409);
- assert.equal(written,false);
+test('old administrator approval endpoints are retired',async()=>{
+ const admin=contextFor('admin');
+ for(const [method,path,body] of [
+  ['GET','/api/admin/timetable/requests',undefined],
+  ['POST','/api/admin/timetable/requests/5/review',JSON.stringify({decision:'approved'})]
+ ]){
+  const response=await worker.fetch(new Request('https://test.local'+path,{
+   method,headers:body?{'content-type':'application/json',...bearer}:bearer,body
+  }),admin);
+  assert.equal(response.status,404,path);
+ }
 });
