@@ -147,7 +147,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   if(!container)return;
   container.innerHTML=`<section class="card stack"><h3>นำเข้านักเรียนและบัญชีจากทุกห้องในไฟล์เดียว</h3>
    <p class="muted">ไฟล์มาตรฐาน 6 คอลัมน์: classroom,roll_no,student_no,full_name,username,password • ไม่ต้องเลือกห้องเรียน • รองรับรายชื่อจำนวนมาก โดยระบบแบ่งชุดนำเข้าอัตโนมัติ</p>
-   <p class="row" style="flex-wrap:wrap"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV (.csv)</a></p>
+   <p class="row" style="flex-wrap:wrap"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV UTF-8 สำหรับ Excel (.csv)</a></p>
    <form id="unifiedForm" class="stack">
      <div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".xlsx,.csv,text/csv"></div>
      <div class="field"><label>รหัสภาษาไทยของไฟล์ CSV</label><select name="encoding">
