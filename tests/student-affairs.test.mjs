@@ -104,7 +104,7 @@ test('unassigned teachers and administrators are excluded from privileged affair
   {id:3,role:'admin',student_affairs:0}]){
   for(const [path,method] of managed){
    await assert.rejects(()=>studentAffairsRoutes(
-    req(path,method,{name:'bad',category:'minor',points:-1}),env,actor,path),{code:403});
+    req(path,method,method==='POST'?{name:'bad',category:'minor',points:-1}:undefined),env,actor,path),{code:403});
   }
  }
 });
