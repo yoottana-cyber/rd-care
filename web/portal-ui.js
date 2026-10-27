@@ -195,8 +195,8 @@ export function createPortalUi({root,onStaffLogin}){
     <h3>คะแนนพฤติกรรม</h3><p class="muted">รวมเฉพาะช่วงวันที่เลือก: ${r.behavior_total} คะแนน</p>
     ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}`:''}
    ${state.account.role==='guardian'?`<section class="card stack guardian-truancy-notices" id="guardianAlerts">
-    <h3>🚨 แจ้งเตือนการไม่เข้าคาบเรียน</h3>
-    <p class="muted">เฉพาะนักเรียนในความดูแลที่โรงเรียนยืนยันความสัมพันธ์แล้ว สามารถตรวจสอบเหตุการณ์และประสานครูที่ปรึกษาได้</p>
+    <h3>🔔 แจ้งเตือนการมาเรียน</h3>
+    <p class="muted">ผู้ปกครองที่ผูกบัญชีกับนักเรียนแล้วสามารถรับ Push เมื่อมีการบันทึกหนีเรียนหรือ QR ลงชื่อมาสายอัตโนมัติ และดูรายละเอียดการมาเรียนของนักเรียนในความดูแลได้</p>
     ${state.truancy.length?state.truancy.map(e=>`<div class="alert-item">
      <strong>${esc(e.full_name)}</strong><p>${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
      <span class="tag">ครูบันทึกสถานะหนีเรียน — โปรดตรวจสอบข้อเท็จจริง</span>
@@ -208,7 +208,7 @@ export function createPortalUi({root,onStaffLogin}){
      <button type="button" class="button secondary" id="guardianPushTest">ส่ง Push ทดสอบ</button></div>
     <p id="guardianPushTestStatus" class="muted" role="status">การทดสอบไม่ส่งข้อมูลนักเรียนและไม่สร้างเหตุการณ์หนีเรียน</p>
     <p class="muted">iPhone: เปิดด้วย Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิด RD Care จากไอคอน ก่อนกดเปิดรับ Push</p>
-    <p class="muted">การแจ้งเตือนจะแสดงข้อความทั่วไปบนหน้าจอล็อก ไม่แสดงชื่อหรือข้อมูลของนักเรียน</p>
+    <p class="muted">Push หนีเรียนและมาสายจะแสดงข้อความทั่วไปบนหน้าจอล็อก ไม่แสดงชื่อหรือข้อมูลของนักเรียน</p>
    </section>`:''}`);
   select('#portalLogout').addEventListener('click',logout);
   select('#studentLateQrForm')?.addEventListener('submit',async event=>{
