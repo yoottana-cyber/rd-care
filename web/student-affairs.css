@@ -36,8 +36,12 @@
 .rd-affairs-state{font-size:11px;font-weight:850;padding:5px 9px;border-radius:99px}
 .rd-affairs-state.ready{background:#e5f9eb;color:#08794d}
 .rd-affairs-state.pending{background:#fff0d8;color:#9a681a}
-.rd-affairs-progress{height:8px;background:#e4efe9;overflow:hidden;border-radius:99px}
-.rd-affairs-progress>div{background:#0a9861;height:100%;border-radius:99px}
+.rd-affairs-progress{display:block;width:100%;height:10px;appearance:none;overflow:hidden;border:0;
+ background:#e4efe9;border-radius:99px}
+.rd-affairs-progress::-webkit-progress-bar{background:#e4efe9;border-radius:99px}
+.rd-affairs-progress::-webkit-progress-value{background:#0a9861;border-radius:99px}
+.rd-affairs-progress::-moz-progress-bar{background:#0a9861;border-radius:99px}
+.rd-affairs-search-wide{flex:1;min-width:150px}
 .rd-affairs-person select{height:43px;max-width:100%}
 .rd-affairs-rule b{font-size:21px;color:#168456}
 .rd-affairs-rule.inactive{opacity:.66}
