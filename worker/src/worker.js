@@ -893,7 +893,11 @@ async function route(req,env,ctx){
  if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
  if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
  if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
- if(req.method==='POST'&&path==='/api/behavior')return addBehavior(req,env,user);
+ // Legacy free-form scoring is staff-only. Teachers use approved rules via /api/affairs/behavior/record.
+ if(req.method==='POST'&&path==='/api/behavior'){
+  requireRole(user,['staff','admin']);
+  return addBehavior(req,env,user);
+ }
  if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
  const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
  if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));

@@ -28,7 +28,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0,notice:null};
+const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0,behaviorRules:[],notice:null};
 const referenceCache=createRequestCache();
 const pwaTools=createPwaTools({api,toast});
 const lateGate=createLateGate({api,mount,toast,safeRun});
@@ -613,15 +613,60 @@ function renderLate(){
   }finally{if(button.isConnected)button.disabled=false}
  })));
 }
-async function loadBehavior(){if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}const a=await api(`/api/students?classroom_id=${state.roomId}`);state.students=a.items;state.studentId=state.students.some(s=>s.id===state.studentId)?state.studentId:state.students[0]?.id||null;
- if(state.studentId){const b=await api('/api/behavior?student_id='+state.studentId);state.behaviors=b.items;state.behaviorTotal=b.total;}else {state.behaviors=[];state.behaviorTotal=0}renderBehavior();}
-function renderBehavior(){mount(`<div class="stack"><div><h2>คะแนนพฤติกรรมนักเรียน</h2><p class="muted">บันทึกแบบเพิ่ม/ลดคะแนน พร้อมผู้บันทึกและประวัติย้อนหลัง</p></div>
- <div class="card stack">${filters({date:false})}<form id="behaviorForm" class="stack"><div class="field"><label>นักเรียน</label><select id="behaviorStudent" name="student_id">${state.students.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${s.roll_no}. ${esc(s.full_name)}</option>`).join('')}</select></div>
- <div class="field"><label>คะแนน (+ เพิ่ม / - ตัด)</label><input name="points" type="number" required min="-50" max="50" value="-5"></div><div class="field"><label>เหตุผล</label><textarea name="reason" maxlength="300" required placeholder="ระบุเหตุการณ์ที่บันทึก"></textarea></div><button class="button full" ${!state.students.length?'disabled':''}>บันทึกคะแนนพฤติกรรม</button></form></div>
- <div class="card"><div class="row between"><h3>ประวัติคะแนนนักเรียน</h3><span class="tag">ยอดรวม ${Number(state.behaviorTotal)} คะแนน</span></div>${state.behaviors.length?`<div class="table-wrap"><table class="table"><thead><tr><th>คะแนน</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลา</th></tr></thead><tbody>${state.behaviors.map(b=>`<tr><td>${b.points>0?'+':''}${b.points}</td><td>${esc(b.reason)}</td><td>${esc(b.teacher_name)}</td><td>${esc(b.created_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีประวัติ</div>'}</div></div>`);
+async function loadBehavior(){
+ if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}
+ const [students,rules]=await Promise.all([
+  api('/api/students?classroom_id='+state.roomId),
+  api('/api/affairs/behavior/rules')
+ ]);
+ state.students=students.items;state.behaviorRules=(rules.items||[]).filter(x=>x.active);
+ state.studentId=state.students.some(x=>x.id===state.studentId)?state.studentId:state.students[0]?.id||null;
+ if(state.studentId){
+  const history=await api('/api/behavior?student_id='+state.studentId);
+  state.behaviors=history.items;state.behaviorTotal=history.total;
+ }else{state.behaviors=[];state.behaviorTotal=0}
+ renderBehavior();
+}
+function renderBehavior(){
+ const choices=state.behaviorRules||[];
+ const categories={good:'การทำความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
+  serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก'};
+ mount(`<div class="stack"><div><h2>คะแนนพฤติกรรมนักเรียน</h2>
+  <p class="muted">เลือกพฤติกรรมตามเกณฑ์คะแนนกลางที่ฝ่ายกิจการนักเรียนกำหนด • ทุกการบันทึกมีประวัติผู้ดำเนินการ</p></div>
+  <div class="card stack">${filters({date:false})}
+   <form id="behaviorForm" class="stack"><div class="field"><label for="behaviorStudent">นักเรียน</label>
+    <select id="behaviorStudent" name="student_id">${state.students.map(st=>`
+      <option value="${st.id}" ${st.id===state.studentId?'selected':''}>${st.roll_no}. ${esc(st.full_name)}</option>`).join('')}</select></div>
+    <div class="field"><label for="behaviorRule">เลือกประเภทพฤติกรรม / เกณฑ์คะแนน</label>
+     <select id="behaviorRule" name="rule_id" required>
+      <option value="">เลือกเกณฑ์พฤติกรรม</option>
+      ${choices.map(rule=>`<option value="${rule.id}">${esc(categories[rule.category]||rule.category)}
+       • ${esc(rule.name)} (${rule.points>0?'+':''}${Number(rule.points)})</option>`).join('')}
+     </select></div>
+    <div class="field"><label>รายละเอียดของเหตุการณ์</label>
+     <textarea name="reason" maxlength="300" required placeholder="บันทึกเหตุการณ์ตามข้อเท็จจริง"></textarea></div>
+    <button class="button full" type="submit" ${!state.students.length||!choices.length?'disabled':''}>บันทึกตามเกณฑ์โรงเรียน</button>
+    ${!choices.length?'<p class="warn">ฝ่ายกิจการนักเรียนยังไม่ได้เปิดใช้เกณฑ์พฤติกรรม กรุณาติดต่อฝ่ายกิจการนักเรียนเพื่อกำหนดเกณฑ์ก่อนบันทึกคะแนน</p>':''}
+   </form></div>
+   <div class="card"><div class="row between"><h3>ประวัติคะแนนนักเรียน</h3>
+    <span class="tag">ยอดรวม ${Number(state.behaviorTotal)} คะแนน</span></div>
+    ${state.behaviors.length?`<div class="table-wrap"><table class="table"><thead><tr>
+      <th>คะแนน</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลา</th></tr></thead><tbody>
+      ${state.behaviors.map(row=>`<tr><td>${row.points>0?'+':''}${row.points}</td><td>${esc(row.reason)}</td>
+       <td>${esc(row.teacher_name)}</td><td>${esc(row.created_at)}</td></tr>`).join('')}
+      </tbody></table></div>`:'<div class="empty">ยังไม่มีประวัติ</div>'}
+   </div></div>`);
  bindFilters(loadBehavior);
- $('#behaviorStudent')?.addEventListener('change',e=>safeRun(async()=>{state.studentId=Number(e.target.value);await loadBehavior()}));
- $('#behaviorForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api('/api/behavior',{method:'POST',body:{student_id:Number(f.get('student_id')),points:Number(f.get('points')),reason:f.get('reason')}});toast('บันทึกคะแนนสำเร็จ');await loadBehavior()}));
+ $('#behaviorStudent')?.addEventListener('change',e=>safeRun(async()=>{
+  state.studentId=Number(e.target.value);await loadBehavior();
+ }));
+ $('#behaviorForm').addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const data=new FormData(e.currentTarget);
+  await api('/api/affairs/behavior/record',{method:'POST',body:{
+   student_id:Number(data.get('student_id')),rule_id:Number(data.get('rule_id')),
+   reason:String(data.get('reason'))}});
+  toast('บันทึกคะแนนตามเกณฑ์สำเร็จ');await loadBehavior();
+ }));
 }
 async function loadAdvisorCenter(){
  const focusIntent=['truancy','attendance_review'].includes(state.notice?.kind)?state.notice:null;
