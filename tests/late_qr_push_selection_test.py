@@ -5,7 +5,7 @@ import unittest
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 SCRIPT=(ROOT/'worker/src/late-qr-push.js').read_text(encoding='utf8')
-START=SCRIPT.index('SELECT e.id,e.student_id,c.advisor_user_id')
+START=SCRIPT.index('SELECT e.id,e.student_id,e.school_date,r.arrived_at,c.advisor_user_id')
 END=SCRIPT.index('ORDER BY e.id DESC LIMIT 25',START)+len('ORDER BY e.id DESC LIMIT 25')
 QUERY=SCRIPT[START:END]
 
@@ -13,7 +13,7 @@ def data():
  db=sqlite3.connect(':memory:')
  db.executescript("""
  CREATE TABLE late_qr_auto_events(id INTEGER PRIMARY KEY,request_id INTEGER,student_id INTEGER,school_date TEXT,active INTEGER,created_at TEXT);
- CREATE TABLE late_self_requests(id INTEGER PRIMARY KEY,state TEXT);
+ CREATE TABLE late_self_requests(id INTEGER PRIMARY KEY,state TEXT,arrived_at TEXT);
  CREATE TABLE student_enrollments(student_id INTEGER,classroom_id INTEGER,start_date TEXT,end_date TEXT);
  CREATE TABLE classrooms(id INTEGER PRIMARY KEY,advisor_user_id INTEGER);
  CREATE TABLE users(id INTEGER PRIMARY KEY,active INTEGER);
