@@ -8,9 +8,10 @@ export async function pushTarget(req,env,actor,audience){
   if(!['teacher','staff','admin'].includes(actor?.role))fail(403,'ไม่มีสิทธิ์');
  }else fail(403,'ไม่มีสิทธิ์');
  const q=new URL(req.url).searchParams,kind=q.get('kind'),raw=q.get('id');
- if(!['truancy','late'].includes(kind)||!/^\d{1,15}$/.test(raw||''))fail(400,'เลขอ้างอิงไม่ถูกต้อง');
+ if(!['truancy','late','attendance_review'].includes(kind)||!/^\d{1,15}$/.test(raw||''))fail(400,'เลขอ้างอิงไม่ถูกต้อง');
  const id=Number(raw);
  if(!Number.isSafeInteger(id)||id<1)fail(400,'เลขอ้างอิงไม่ถูกต้อง');
+ if(kind==='attendance_review'&&audience==='guardian')fail(403,'ไม่มีสิทธิ์');
  const scope=audience==='guardian'
   ?'EXISTS(SELECT 1 FROM guardian_student_links g WHERE g.guardian_account_id=? AND g.student_id=e.student_id)'
   :"(? IN ('staff','admin') OR c.advisor_user_id=?)";
@@ -25,6 +26,14 @@ export async function pushTarget(req,env,actor,audience){
    JOIN classrooms c ON c.id=t.classroom_id
    JOIN students s ON s.id=e.student_id AND s.active=1
    WHERE e.id=? AND e.active=1 AND ${scope}`:
+  kind==='attendance_review'?`SELECT e.id,e.school_date,e.student_id,s.full_name,
+   c.id AS classroom_id,c.label AS classroom_label,t.period,t.subject,
+   NULL AS arrived_at,NULL AS reason
+   FROM attendance_alerts e
+   JOIN timetable t ON t.id=e.timetable_id
+   JOIN classrooms c ON c.id=t.classroom_id
+   JOIN students s ON s.id=e.student_id AND s.active=1
+   WHERE e.id=? AND e.state='pending_review' AND ${scope}`:
   `SELECT e.id,e.school_date,e.student_id,s.full_name,
    c.id AS classroom_id,c.label AS classroom_label,NULL AS period,NULL AS subject,
    r.arrived_at,r.reason
