@@ -17,7 +17,7 @@ export function createLateGate({api,mount,toast,safeRun}){
   const statuses={pending:'รอครูเวรตรวจสอบ',verified:'ยืนยันแล้ว',rejected:'ไม่อนุมัติ'};
   mount(`<div class="stack late-qr-page">
    <header class="row between"><div><h2>📷 QR ลงชื่อมาสาย (ถาวร)</h2>
-    <p class="muted">QR แผ่นเดียวพิมพ์ติดไว้ได้ทุกวัน • นักเรียนลงชื่อได้หลัง 08.00 น. ตามเวลาโรงเรียน</p></div>
+    <p class="muted">QR แผ่นเดียวพิมพ์ติดไว้ได้ทุกวัน • หลัง 08.00 น. นักเรียนลงชื่อแล้วระบบอนุมัติและบันทึกเช็กชื่อรายวันเป็น สาย โดยอัตโนมัติ</p></div>
     <span class="tag">วันที่ ${esc(state.date||'-')}</span></header>
    <div class="late-qr-layout">
     <section class="card stack late-qr-station">
@@ -40,20 +40,22 @@ export function createLateGate({api,mount,toast,safeRun}){
        <button id="lateQrPrint" class="button" type="button" ${state.qr?'':'disabled'}>🖨️ พิมพ์ QR ติดที่จุดครูเวร</button>
        <button id="lateQrReload" class="button secondary" type="button">โหลด QR อีกครั้ง</button>
       </div>
-      <p class="muted">QR ถาวรเป็นลิงก์เปิดหน้าลงชื่อ ไม่ยืนยันว่าผู้สแกนอยู่ในโรงเรียน ครูเวรต้องตรวจสอบตัวนักเรียนก่อนอนุมัติ</p>
+      <p class="warn">QR ถาวรเป็นลิงก์สาธารณะ การลงชื่อจะได้รับการยืนยันอัตโนมัติ ครูเวรควรตรวจสอบรายชื่อกับผู้มาถึงจริง และลบรายการที่ผิดพลาด</p>
      </div>
     </section>
     <section class="card stack">
      <div class="row between"><h3>รายชื่อนักเรียนลงชื่อวันนี้</h3><button id="lateQrRefresh" type="button" class="button secondary">รีเฟรช</button></div>
-     <div class="grid two"><div class="summary"><strong>${pending.length}</strong><p class="muted">รอตรวจสอบ</p></div>
+     <div class="grid two"><div class="summary"><strong>${pending.length}</strong><p class="muted">คำขอจาก QR แบบเดิม</p></div>
        <div class="summary"><strong>${verified.length}</strong><p class="muted">ยืนยันแล้ว</p></div></div>
-     <p class="muted" role="status">อัปเดตประมาณทุก 6 วินาที • ใช้เวลาเข้าระบบจากเซิร์ฟเวอร์ • รายการต้องได้รับการยืนยันจากครูเวร</p>
+     <p class="muted" role="status">อัปเดตประมาณทุก 6 วินาที • เวลาเข้าระบบจากเซิร์ฟเวอร์ • QR ถาวรจะอนุมัติทันที • สามารถลบกรณีผิดพลาดได้</p>
      <div class="late-qr-list" aria-live="polite">
       ${state.queue.length?state.queue.map(item=>`<article class="late-qr-entry">
         <div class="row between"><strong>${esc(item.full_name)}</strong><span class="tag">${esc(item.arrived_at)} น.</span></div>
         <p class="muted">${esc(item.student_no)} • ${esc(item.classroom_label||'ไม่พบห้องเรียน')} • เลขที่ ${esc(item.roll_no||'-')}</p>
         ${item.reason?`<p>สาเหตุ: ${esc(item.reason)}</p>`:''}
         <p class="${item.state==='pending'?'warn':'muted'}">${esc(statuses[item.state]||item.state)}</p>
+        ${item.auto_id&&item.can_delete?`<div class="row"><button class="button secondary" type="button"
+          data-qr-delete="${Number(item.auto_id)}">🗑️ ลบรายการมาสาย</button></div>`:''}
         ${item.state==='pending'?`<div class="row">
          <button class="button" type="button" data-qr-review="${esc(item.id)}" data-status="verified">ยืนยันมาสาย</button>
          <button class="button secondary" type="button" data-qr-review="${esc(item.id)}" data-status="rejected">ไม่อนุมัติ</button>
@@ -65,6 +67,18 @@ export function createLateGate({api,mount,toast,safeRun}){
   document.querySelector('#lateQrPrint')?.addEventListener('click',()=>window.print());
   document.querySelector('#lateQrReload')?.addEventListener('click',()=>safeRun(loadQr));
   document.querySelector('#lateQrRefresh')?.addEventListener('click',()=>safeRun(()=>poll(true)));
+  document.querySelectorAll('[data-qr-delete]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+   const id=Number(button.dataset.qrDelete);
+   const item=state.queue.find(x=>Number(x.auto_id)===id);
+   if(!item||!item.can_delete)return;
+   if(!confirm('ต้องการลบรายการมาสายของ '+item.full_name+'? ระบบจะคืนค่าเช็กชื่อรายวันเดิมหากไม่มีครูแก้ไขใหม่ และบันทึกประวัติการลบ'))return;
+   button.disabled=true;
+   try{
+    const result=await api('/api/late/qr/auto-'+id+'/delete',{method:'POST',body:{}});
+    toast(result.restoredDaily?'ลบรายการแล้ว และคืนสถานะเช็กชื่อเดิม':'ลบรายการแล้ว (เช็กชื่อรายวันมีการแก้ไขใหม่ หรือไม่มีรายการที่ต้องคืนค่า)');
+    await poll(true);
+   }finally{if(button.isConnected)button.disabled=false}
+  })));
   document.querySelectorAll('[data-qr-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
    const id=button.dataset.qrReview,decision=button.dataset.status;
    const matched=state.queue.find(x=>String(x.id)===id);
