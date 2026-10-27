@@ -137,7 +137,8 @@ async function records(req,env,a){
  ]);
  const rows=behavior.results||[],scores=scoreSummary(total.results?.[0]);
  return reply({student:linked,from,to,daily:daily.results||[],period:period.results||[],
-  late:late.results||[],behavior:rows.filter(x=>x.score_type!=='good'),
+  late:late.results||[],truancy:(period.results||[]).filter(x=>x.status==='truancy'),
+  behavior:rows.filter(x=>x.score_type!=='good'),
   good:rows.filter(x=>x.score_type==='good'),
   behavior_total:-scores.behavior_remaining,...scores,
   note:'คะแนนความดีแยกจากคะแนนพฤติกรรม • ลดคะแนนพฤติกรรมได้เฉพาะเกณฑ์ปรับพฤติกรรม'});
