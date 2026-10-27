@@ -35,9 +35,14 @@ test('reference-inspired UI offers working authorized search and desktop collaps
  const app=readFileSync(new URL('../web/app.js',import.meta.url),'utf8');
  const css=readFileSync(new URL('../web/reference-ui.css',import.meta.url),'utf8');
  const sw=readFileSync(new URL('../web/sw.js',import.meta.url),'utf8');
- for(const token of ['rdGlobalSearch','rd-sidebar-nav','rd-workspace','rd-sidebar-link','sidebarToggle',
+ for(const token of ['rdGlobalSearch','rd-sidebar-nav','rd-workspace','sidebarToggle',
    'bindGlobalStudentSearch','/api/admin/student-search','showTab(\'adminStudents\')'])
   assert.ok(app.includes(token),token);
+ const navigation=readFileSync(new URL('../web/navigation-ui.js',import.meta.url),'utf8');
+ assert.match(app,/renderSidebarNavigation\(navs,state\.tab\)/);
+ assert.match(navigation,/rd-sidebar-link/);
+ assert.match(navigation,/groupNavigation/);
+ assert.match(app,/rdMenuSearch/);
  assert.match(app,/state\.user\?\.role==='admin'\?/);
  assert.match(app,/adminStudentState\.roomId=Number\(button\.dataset\.searchRoom\)/);
  assert.match(app,/adminStudentState\.editId=Number\(button\.dataset\.searchStudent\)/);
