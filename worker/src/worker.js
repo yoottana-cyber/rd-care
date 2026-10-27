@@ -101,11 +101,9 @@ async function login(req,env){
  const token=randomHex(32);
  await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)')
   .bind(await digest(token),user.id,now()+sessionSeconds).run();
- const studentAffairsGranted=user.role==='staff'?1:user.role==='teacher'?
-  Number(Boolean(await env.DB.prepare('SELECT 1 AS granted FROM student_affairs_assignments WHERE user_id=?')
-   .bind(user.id).first())):0;
- return json({token,user:{id:user.id,username:user.username,display_name:user.display_name,
-  role:user.role,student_affairs:studentAffairsGranted},expires_in:sessionSeconds});
+ // The authenticated /api/auth/me response always reloads the latest Student Affairs
+ // assignment from the database, including grants or revocations during a session.
+ return json({token,user:{id:user.id,username:user.username,display_name:user.display_name,role:user.role},expires_in:sessionSeconds});
 }
 async function setup(req,env){
  if(!env.SETUP_TOKEN||env.SETUP_TOKEN==='REPLACE_WITH_A_LONG_RANDOM_ONE_TIME_SECRET')throw error(503,'ยังไม่ได้ตั้งค่า SETUP_TOKEN');
