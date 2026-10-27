@@ -7,6 +7,7 @@ import {deliverLateQrPush} from './late-qr-push.js';
 import {pushTarget} from './push-target.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
 import {importPortalAccounts} from './portal-bulk-import.js';
+import {adminDeleteIdentity} from './admin-delete.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -184,6 +185,8 @@ async function audit(db,actor,action,id){
 }
 export async function portalAdminRoutes(req,env,actor,path){
  if(actor.role!=='admin')fail(403,'เฉพาะผู้ดูแลระบบ');
+ if(req.method==='POST'&&/^\/api\/admin\/portal\/accounts\/\d+\/delete$/.test(path))
+  return adminDeleteIdentity(req,env,actor,path);
  if(req.method==='POST'&&path==='/api/admin/portal/import')return importPortalAccounts(req,env,actor);
  // All account and relationship listings are strictly role-checked above.
  // Server-side paging removes the prior 3,000/4,000 record truncation; the

@@ -17,6 +17,7 @@ import {deliverTruancyPush,advisorTruancyItems,truancyPushReadiness} from './tru
 import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
+import {adminDeleteIdentity} from './admin-delete.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -603,6 +604,8 @@ async function adminRoutes(req,env,user,path){
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
  if(path==='/api/admin/advisors/preview'||path==='/api/admin/advisors/commit')return advisorImportEndpoint(req,env,user,path);
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
+ if(req.method==='POST'&&/^\/api\/admin\/(users|students)\/\d+\/delete$/.test(path))
+  return adminDeleteIdentity(req,env,user,path);
  if(path==='/api/admin/unified-import/preview'||path==='/api/admin/unified-import/commit')
   return unifiedRosterEndpoint(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/users'){
@@ -610,7 +613,7 @@ async function adminRoutes(req,env,user,path){
   CASE WHEN u.role IN ('admin','staff') OR (u.role='teacher' AND EXISTS
    (SELECT 1 FROM student_affairs_assignments a WHERE a.user_id=u.id))
   THEN 1 ELSE 0 END AS student_affairs
-  FROM users u ORDER BY u.display_name`).all();
+  FROM users u WHERE u.deleted_at IS NULL ORDER BY u.display_name`).all();
   return json({items:results});
  }
  if(req.method==='POST'&&path==='/api/admin/users'){
@@ -799,7 +802,7 @@ async function adminRoutes(req,env,user,path){
   if(!roomId)throw error(400,'กรุณาเลือกห้องเรียน');
   const room=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(roomId).first();
   if(!room)throw error(404,'ไม่พบห้องเรียน');
-  const {results}=await env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,full_name,active FROM students WHERE classroom_id=? ORDER BY active DESC,roll_no,id').bind(roomId).all();
+  const {results}=await env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,full_name,active FROM students WHERE classroom_id=? AND deleted_at IS NULL ORDER BY active DESC,roll_no,id').bind(roomId).all();
   return json({items:results});
  }
  if(req.method==='POST'&&path==='/api/admin/students'){
