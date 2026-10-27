@@ -199,6 +199,14 @@ export async function portalAdminRoutes(req,env,actor,path){
   return {limit:limitRaw,page:pageRaw,offset:(pageRaw-1)*limitRaw,
    pattern:'%'+escaped+'%'};
  };
+ if(req.method==='GET'&&path==='/api/admin/portal/room-status'){
+  const room=positiveInt(new URL(req.url).searchParams.get('classroom_id'));
+  if(!room)fail(400,'กรุณาเลือกห้องเรียน');
+  const {results}=await env.DB.prepare(`SELECT a.id,a.student_id,a.username,a.role,a.active
+   FROM portal_accounts a JOIN students s ON s.id=a.student_id
+   WHERE a.role='student' AND s.classroom_id=?`).bind(room).all();
+  return reply({items:results});
+ }
  if(req.method==='GET'&&path==='/api/admin/portal/summary'){
   const [students,guardians,links,unlinked]=await env.DB.batch([
    env.DB.prepare("SELECT COUNT(*) AS n FROM portal_accounts WHERE role='student'"),
