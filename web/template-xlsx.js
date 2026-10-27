@@ -58,8 +58,12 @@ function sheet(rows,widths,freeze=true){
   '<cols>'+columns+'</cols><sheetData>'+data+'</sheetData></worksheet>';
 }
 export function buildExampleXlsx(kind='students'){
- const isAdvisor=kind==='advisors';
- const students=isAdvisor?[
+ const isAdvisor=kind==='advisors',isPortal=kind==='portal';
+ const students=isPortal?[
+  ['student_no','full_name','student_username','student_password','guardian_name','guardian_username','guardian_password'],
+  ['000001','นักเรียนตัวอย่าง ก','000001','ReplaceStudentPassword1','ผู้ปกครองตัวอย่าง ก','guardian000001','ReplaceGuardianPassword1'],
+  ['000002','นักเรียนตัวอย่าง ข','000002','ReplaceStudentPassword2','ผู้ปกครองตัวอย่าง ข','guardian000002','ReplaceGuardianPassword2']
+ ]:isAdvisor?[
   ['classroom','full_name','username','password'],
   ['ม.1/1','ครูตัวอย่าง หนึ่ง','teacher001','Teacher#1234'],
   ['ม.2/3','ครูตัวอย่าง สอง','teacher002','Teacher#5678'],
@@ -70,7 +74,19 @@ export function buildExampleXlsx(kind='students'){
   ['ม.2/3',2,'STU9002','นักเรียนตัวอย่าง สอง','student002','Student#5678'],
   ['ม.3/2',3,'STU9003','นักเรียนตัวอย่าง สาม','student003','Student#9012']
  ];
- const instructions=isAdvisor?[
+ const instructions=isPortal?[
+  ['RD CONNECT — นำเข้าบัญชีนักเรียนและผู้ปกครอง','คำอธิบาย'],
+  ['student_no','เลขประจำตัวนักเรียนที่มีอยู่ในระบบ รักษาเลข 0 นำหน้า (Text)'],
+  ['full_name','ชื่อ–สกุลนักเรียน เว้นว่างเพื่อใช้ชื่อเดิม'],
+  ['student_username','Username นักเรียน เว้นว่างเพื่อใช้เลขประจำตัว/ชื่อบัญชีเดิม'],
+  ['student_password','บัญชีใหม่ต้องมี Password 4–128 ตัว บัญชีเดิมเว้นว่างเพื่อรักษารหัสเดิม'],
+  ['guardian_name','ชื่อ–สกุลผู้ปกครอง'],
+  ['guardian_username','Username ผู้ปกครอง 3–40 ตัว ซ้ำกันได้สำหรับพี่น้อง'],
+  ['guardian_password','รหัสผู้ปกครองใหม่ 4–128 ตัว บัญชีเดิมเว้นว่างเพื่อรักษารหัสเดิม'],
+  ['การเชื่อม','ใช้เลขประจำตัวนักเรียนเชื่อมความสัมพันธ์ ต้องตรวจสอบตัวตนก่อนกดนำเข้า'],
+  ['รหัสผ่าน','ห้ามใช้เลขบัตรประชาชน ไม่บังคับเปลี่ยนรหัสครั้งแรก'],
+  ['ความปลอดภัย','ใช้ตัวอย่างเท่านั้น เก็บไฟล์รหัสผ่านอย่างปลอดภัย ห้ามส่งกลุ่มสาธารณะ']
+ ]:isAdvisor?[
   ['RD Care — ตัวอย่างนำเข้าครูที่ปรึกษาทุกห้องในไฟล์เดียว','คำอธิบาย'],
   ['Advisors','4 คอลัมน์ในแถวแรก classroom,full_name,username,password'],
   ['classroom','ห้องเรียนตามรายการที่ตั้งค่าใน RD Care เช่น ม.1/1'],
@@ -107,7 +123,7 @@ export function buildExampleXlsx(kind='students'){
   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
  const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-  '<sheets><sheet name="'+(isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="Rooms" sheetId="3" r:id="rId3"/></sheets></workbook>';
+  '<sheets><sheet name="'+(isPortal?'Portal Accounts':isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="Rooms" sheetId="3" r:id="rId3"/></sheets></workbook>';
  const bookRelations='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
   [1,2,3].map(n=>'<Relationship Id="rId'+n+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+n+'.xml"/>').join('')+
@@ -126,7 +142,7 @@ export function buildExampleXlsx(kind='students'){
   '[Content_Types].xml':types,'_rels/.rels':relations,
   'xl/workbook.xml':workbook,'xl/_rels/workbook.xml.rels':bookRelations,
   'xl/styles.xml':styles,
-  'xl/worksheets/sheet1.xml':sheet(students,isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
+  'xl/worksheets/sheet1.xml':sheet(students,isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
   'xl/worksheets/sheet2.xml':sheet(instructions,[49,83]),
   'xl/worksheets/sheet3.xml':sheet(rooms,[32])
  });
@@ -146,6 +162,16 @@ export function downloadAdvisorExampleXlsx(){
  const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
  const link=document.createElement('a');
  link.href=url;link.download='RD_Care_Advisor_Import_All_Rooms.xlsx';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+
+export function buildPortalAccountExampleXlsx(){return buildExampleXlsx('portal')}
+export function downloadPortalAccountExampleXlsx(){
+ const bytes=buildPortalAccountExampleXlsx();
+ const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
+ const link=document.createElement('a');
+ link.href=url;link.download='RD_CONNECT_Student_Guardian_Accounts.xlsx';
  document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
