@@ -258,19 +258,19 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
     </div></div>
    <div class="rd-affairs-metrics">
     <div><span>นักเรียนในระดับที่เลือก</span><strong>${byGrade.length}</strong></div>
-    <div class="good"><span>คะแนนเพิ่มรวม</span><strong>+${sum('earned')}</strong></div>
-    <div class="warn-metric"><span>คะแนนที่ถูกหักรวม</span><strong>-${sum('deducted')}</strong></div>
+    <div class="good"><span>คะแนนความดีสะสม</span><strong>+${sum('good_total')}</strong></div>
+    <div class="warn-metric"><span>คะแนนความผิดคงเหลือ</span><strong>${sum('behavior_remaining')}</strong></div>
    </div>
-   <p class="muted">มีประวัติการบันทึก ${sum('events')} ครั้ง • คะแนนรวมเป็นผลตามรายการจริง ไม่ใช่การจัดกลุ่มผู้เรียนตามความเสี่ยง</p>
+   <p class="muted">บันทึก ${sum('events')} ครั้ง • ความผิดรวม ${sum('behavior_deducted')} คะแนน • ปรับพฤติกรรมแล้ว ${sum('behavior_adjusted')} คะแนน • ความดีไม่หักล้างความผิด</p>
   </section>
   <section class="card stack"><div class="row between"><h3>ทะเบียนคะแนนพฤติกรรม</h3>
    <span class="tag">พบ ${visible.length} คน</span></div>
    <div class="table-wrap"><table class="table"><thead><tr><th>ห้อง</th><th>นักเรียน</th>
-    <th>เพิ่ม</th><th>หัก</th><th>คะแนนสุทธิ</th><th>รายการ</th></tr></thead><tbody>
+    <th>ความดี</th><th>ความผิด</th><th>ปรับแล้ว</th><th>ความผิดคงเหลือ</th></tr></thead><tbody>
     ${visible.slice(0,150).map(row=>`<tr><td>${esc(row.classroom_label)}</td>
       <td>${esc(row.full_name)}<div class="muted">${esc(row.student_no)}</div></td>
-      <td>+${Number(row.earned)||0}</td><td>-${Number(row.deducted)||0}</td>
-      <td><strong>${formatScore(row.total)}</strong></td><td>${Number(row.events)||0}</td>
+      <td>+${Number(row.good_total)||0}</td><td>${Number(row.behavior_deducted)||0}</td>
+      <td>${Number(row.behavior_adjusted)||0}</td><td><strong>${Number(row.behavior_remaining)||0}</strong></td>
     </tr>`).join('')||'<tr><td colspan="6">ยังไม่มีนักเรียนที่ตรงกับตัวกรอง</td></tr>'}
    </tbody></table></div>
    ${visible.length>150?'<p class="muted">แสดง 150 คนแรก กรุณาเลือกระดับชั้นหรือใช้คำค้นหาให้แคบลง</p>':''}
@@ -293,9 +293,10 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  async function loadCasesData(){
   if(!state.selectedStudent){state.cases=[];state.score=null;return}
   const sid=state.selectedStudent.id;
-  const [cases,score]=await Promise.all([
-   api('/api/affairs/cases?student_id='+sid),api('/api/behavior?student_id='+sid)]);
-  state.cases=cases.items;state.score=score;
+  const [cases,score,adjustments]=await Promise.all([
+   api('/api/affairs/cases?student_id='+sid),api('/api/behavior?student_id='+sid),
+   api('/api/affairs/behavior/adjustment-rules')]);
+  state.cases=cases.items;state.score=score;state.adjustmentRules=adjustments.items||[];
  }
  async function cases(){
   await loadCasesData();
@@ -304,13 +305,19 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
     ${student?`<section class="card stack">
       <div class="row between"><div><h3>ข้อมูลพฤติกรรม: ${esc(student.full_name)}</h3>
        <p class="muted">${esc(student.student_no)} • ${esc(student.classroom_label)}</p></div>
-       <span class="tag">คะแนนสะสม ${formatScore(state.score?.total)}</span></div>
+       <div class="stack"><span class="tag">คะแนนความดี ${Number(state.score?.good_total)||0}</span>
+        <span class="tag">คะแนนความผิดคงเหลือ ${Number(state.score?.behavior_remaining)||0}</span></div></div>
       <div class="grid two"><form id="affairsAdjustment" class="stack">
-       <h3>ปรับคะแนนพฤติกรรม</h3>
-       <p class="muted">สำหรับฝ่ายกิจการนักเรียนเท่านั้น บันทึกประวัติและเหตุผลทุกครั้ง</p>
-       <div class="field"><label>คะแนนที่ปรับ (+/-)</label><input type="number" name="points" min="-50" max="50" required></div>
-       <div class="field"><label>เหตุผลที่ปรับคะแนน</label><textarea name="reason" maxlength="300" required></textarea></div>
-       <button type="submit" class="button secondary">บันทึกการปรับคะแนน</button>
+       <h3>ปรับพฤติกรรมตามเกณฑ์</h3>
+       <p class="muted">ลดเฉพาะคะแนนความผิดคงเหลือ • ความดีไม่ถูกนำมาหักลบ • ต้องเลือกเกณฑ์ที่กำหนดโดยฝ่ายกิจการนักเรียน</p>
+       <div class="field"><label>เกณฑ์ปรับพฤติกรรมที่เปิดใช้งาน</label>
+        <select name="adjustment_rule_id" required><option value="">เลือกเกณฑ์ปรับพฤติกรรม</option>
+         ${state.adjustmentRules.filter(r=>r.active).map(r=>`<option value="${r.id}"
+          ${Number(r.points)>Number(state.score?.behavior_remaining||0)?'disabled':''}>
+          ${esc(r.name)} (${Number(r.points)} คะแนน)</option>`).join('')}
+        </select></div>
+       <div class="field"><label>หลักฐานและรายละเอียดการปรับพฤติกรรม</label><textarea name="reason" maxlength="300" required></textarea></div>
+       <button type="submit" class="button secondary" ${!state.adjustmentRules.some(r=>r.active&&r.points<=Number(state.score?.behavior_remaining||0))?'disabled':''}>บันทึกการปรับพฤติกรรม</button>
       </form><form id="affairsNewCase" class="stack"><h3>บันทึกภาคทัณฑ์ / ทัณฑ์บน</h3>
        <div class="field"><label>มาตรการ</label><select name="measure">
         <option value="reprimand">ภาคทัณฑ์</option><option value="probation">ทัณฑ์บน</option></select></div>
@@ -340,9 +347,13 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
        </form>
       </article>`).join('')||'<div class="empty">ยังไม่มีการบันทึกภาคทัณฑ์หรือทัณฑ์บน</div>'}
      </section>
-     <section class="card stack"><h3>ประวัติคะแนนพฤติกรรม</h3>
-      ${(state.score?.items||[]).map(e=>`<div class="rd-affairs-score">
-       <strong>${formatScore(e.points)}</strong><span>${esc(e.reason)}</span><small>${esc(e.created_at)}</small></div>`).join('')||'<p class="empty">ยังไม่มีการบันทึกคะแนน</p>'}
+     <section class="card stack"><h3>ประวัติคะแนนพฤติกรรมและการปรับพฤติกรรม</h3>
+      ${(state.score?.items||[]).filter(e=>e.score_type!=='good').map(e=>`<div class="rd-affairs-score">
+       <strong>${formatScore(e.points)}</strong><span>${esc(e.score_type==='adjustment'?'ปรับพฤติกรรม':'ความผิด')} • ${esc(e.reason)}</span><small>${esc(e.created_at)}</small></div>`).join('')||'<p class="empty">ยังไม่มีรายการ</p>'}
+     </section>
+     <section class="card stack"><h3>ประวัติคะแนนความดี (แยกต่างหาก)</h3>
+      ${(state.score?.items||[]).filter(e=>e.score_type==='good').map(e=>`<div class="rd-affairs-score">
+       <strong>+${Number(e.points)}</strong><span>${esc(e.reason)}</span><small>${esc(e.created_at)}</small></div>`).join('')||'<p class="empty">ยังไม่มีรายการความดี</p>'}
      </section>`:''}`);
   bind('#affairsStudentSearch','submit',async e=>{
    e.preventDefault();const query=String(new FormData(e.currentTarget).get('query')).trim();
@@ -354,7 +365,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   bind('#affairsAdjustment','submit',async e=>{
    e.preventDefault();const f=new FormData(e.currentTarget);
    await api('/api/affairs/behavior/adjust',{method:'POST',body:{
-    student_id:student.id,points:Number(f.get('points')),reason:String(f.get('reason'))}});
+    student_id:student.id,adjustment_rule_id:Number(f.get('adjustment_rule_id')),reason:String(f.get('reason'))}});
    toast('บันทึกการปรับคะแนนพร้อมประวัติแล้ว');await cases();
   });
   bind('#affairsNewCase','submit',async e=>{
