@@ -1,10 +1,10 @@
 // Push delivery for verified late QR arrivals. Subscriptions are opt-in;
-// alerts have a generic category-only encrypted payload.
+// alerts carry an encrypted event reference, date and arrival time (no identity).
 import {sendLateArrivalPush} from './staff-push.js';
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
 export async function deliverLateQrPush(env){
  if(!env.DB||!ready(env))return {enabled:false,processed:0,delivered:0};
- const {results:events}=await env.DB.prepare(`SELECT e.id,e.student_id,c.advisor_user_id
+ const {results:events}=await env.DB.prepare(`SELECT e.id,e.student_id,e.school_date,r.arrived_at,c.advisor_user_id
  FROM late_qr_auto_events e
  JOIN late_self_requests r ON r.id=e.request_id AND r.state='verified'
  JOIN student_enrollments h ON h.student_id=e.student_id
@@ -66,7 +66,9 @@ export async function deliverLateQrPush(env){
    }
    let state='failed',httpStatus=null;
    try{
-    const response=await sendLateArrivalPush(device,env,type);
+    const response=await sendLateArrivalPush(device,env,type,{
+      eventId:event.id,date:event.school_date,arrival:event.arrived_at
+     });
     httpStatus=response.status;
     if(response.ok){state='delivered';delivered++}
     if(response.status===404||response.status===410){
