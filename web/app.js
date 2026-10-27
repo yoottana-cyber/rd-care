@@ -15,6 +15,7 @@ import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLas
 import {createPortalUi} from './portal-ui.js';
 import {loginHref,resolveLoginEntrance} from './login-route.js';
 import {createPortalAdmin} from './portal-admin.js';
+import {createStudentAffairs} from './student-affairs.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
 import {initTheme,bindThemeButtons} from './theme.js';
 initTheme();
@@ -33,6 +34,7 @@ const pwaTools=createPwaTools({api,toast});
 const lateGate=createLateGate({api,mount,toast,safeRun});
 const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,
  getAlerts:()=>state.stats?.alerts||0});
+const studentAffairs=createStudentAffairs({api,mount,safeRun,toast,rooms:()=>state.rooms});
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
@@ -200,6 +202,14 @@ async function boot(){
  state.notice=((['truancy','attendance_review'].includes(kind)&&requested==='advisorCenter')||(kind==='late'&&requested==='lateGate'))&&
   /^\d{1,15}$/.test(id||'')&&Number.isSafeInteger(Number(id))&&Number(id)>0?
   {kind,id:Number(id)}:null;
+ if(requested==='attendance'&&/^\d{1,8}$/.test(query.get('classroom_id')||'')&&
+   /^\d{4}-\d{2}-\d{2}$/.test(query.get('date')||'')&&
+   state.rooms.some(r=>Number(r.id)===Number(query.get('classroom_id')))&&
+   query.get('date')<=dateToday()){
+  state.roomId=Number(query.get('classroom_id'));state.date=query.get('date');
+  history.replaceState(null,'',location.pathname+'?login=staff'+location.hash);
+  await showTab('attendance');return;
+ }
  if(requested==='notifications'||requested==='advisorCenter'||requested==='lateGate'){
   history.replaceState(null,'',location.pathname+'?login=staff'+location.hash);
   await showTab(requested);
@@ -208,7 +218,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...(['admin','staff'].includes(state.user?.role)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
@@ -305,6 +315,7 @@ async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();state.tab=tab
  if(tab==='periodAttendance')return state.user?.role==='teacher'?periodCenter.load():loadAttendance();
  if(tab==='myTimetable')return myTimetable.load();
  if(tab==='advisorCenter')return loadAdvisorCenter();
+ if(tab==='studentAffairs')return studentAffairs.load();
  if(tab==='late')return loadLate();
  if(tab==='lateGate'){
   const noticeId=state.notice?.kind==='late'?state.notice.id:null;

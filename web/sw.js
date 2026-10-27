@@ -1,5 +1,5 @@
-const CACHE='rd-care-shell-v63';
-const ASSETS=['./','./index.html','./app.css','./theme.css','./login.css','./login-route.js','./smart-school-ui.css','./media/ratsada-crest.webp','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./my-timetable.js','./period-center.js','./period-center.css','./mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js','./pwa-client.js','./auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-date-range.js','./portal-mobile.css','./guardian-push.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./advisor-import.js','./admin-settings.js','./admin-settings.css','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./templates/advisor-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/rd-connect.svg'];
+const CACHE='rd-care-shell-v64';
+const ASSETS=['./','./index.html','./app.css','./theme.css','./login.css','./login-route.js','./smart-school-ui.css','./media/ratsada-crest.webp','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./my-timetable.js','./period-center.js','./period-center.css','./mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js','./pwa-client.js','./auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-date-range.js','./portal-mobile.css','./student-affairs.js','./student-affairs.css','./guardian-push.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./advisor-import.js','./admin-settings.js','./admin-settings.css','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./templates/advisor-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/rd-connect.svg'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });
@@ -28,6 +28,8 @@ self.addEventListener('push',event=>{
   (metadata.audience==='advisor'||metadata.audience==='guardian');
  const review=metadata?.kind==='attendance_review'&&metadata.audience==='advisor';
  const test=metadata?.kind==='push_test';
+ const dailyReminder=metadata?.kind==='daily_attendance_reminder'&&metadata.audience==='advisor';
+ const room=Number(metadata?.classroomId),validRoom=Number.isSafeInteger(room)&&room>0;
  const staff=metadata?.audience==='advisor';
  const id=Number(metadata?.eventId),hasId=Number.isSafeInteger(id)&&id>0;
  const date=/^\d{4}-\d{2}-\d{2}$/.test(String(metadata?.date||''))?metadata.date:'';
@@ -35,21 +37,25 @@ self.addEventListener('push',event=>{
  const subject=typeof metadata?.subject==='string'?metadata.subject.slice(0,55):'';
  const arrival=/^\d{2}:\d{2}$/.test(String(metadata?.arrival||''))?metadata.arrival:'';
  const type=late?'late':review?'attendance_review':'truancy';
- const link=hasId&&(late||urgent||review)
+ const link=dailyReminder&&validRoom&&date?
+   './?tab=attendance&classroom_id='+room+'&date='+date:
+  hasId&&(late||urgent||review)
   ?staff
    ?'./?tab='+(late?'lateGate':'advisorCenter')+'&notice_kind='+type+'&notice_id='+id
    :'./?portal_notice='+type+'&notice_id='+id
   :late&&staff?'./?tab=lateGate':(urgent||review)&&staff?'./?tab=advisorCenter':
    (late||urgent||review)?'./':test&&staff?'./?tab=notifications':
    test?'./':'./?tab=notifications';
- const title=late?'RD CONNECT • แจ้งเรื่องมาสาย':
+ const title=dailyReminder?'RD CONNECT • เตือนเช็กชื่อรายวัน':
+  late?'RD CONNECT • แจ้งเรื่องมาสาย':
   urgent?'RD CONNECT • แจ้งเรื่องหนีเรียน':
   review?'RD CONNECT • แจ้งขาดรายคาบรอตรวจสอบ':
   test?'RD CONNECT • ทดสอบการแจ้งเตือน':'RD CONNECT • โรงเรียนรัษฎา';
  const details=late?
   [date&&'วันที่ '+date,arrival&&'เวลา '+arrival+' น.'].filter(Boolean).join(' • '):
   [date&&'วันที่ '+date,validPeriod&&'คาบ '+period,subject&&'วิชา '+subject].filter(Boolean).join(' • ');
- const body=late?'มีการลงชื่อมาสาย'+(details?' • '+details:'')+' แตะเพื่อดูรายการ':
+ const body=dailyReminder?'ยังเช็กชื่อนักเรียนรายวันไม่ครบ • แตะเพื่อเปิดห้องเรียนและดำเนินการ':
+  late?'มีการลงชื่อมาสาย'+(details?' • '+details:'')+' แตะเพื่อดูรายการ':
   urgent?'มีการบันทึกหนีเรียน'+(details?' • '+details:'')+' แตะเพื่อดูรายละเอียด':
   review?'มีเรื่องขาดรายคาบรอตรวจสอบ'+(details?' • '+details:'')+' แตะเพื่อเปิดรายการ':
   test?'การแจ้งเตือนทดสอบจาก RD CONNECT (ไม่มีเหตุการณ์นักเรียน)':
@@ -57,7 +63,8 @@ self.addEventListener('push',event=>{
  event.waitUntil(self.registration.showNotification(title,{
   body,icon:'./icons/icon-192.png',badge:'./icons/icon-192.png',
   // Do not collapse separate students/events into one notification.
-  tag:late?'rd-care-late-arrival'+(hasId?'-'+id:''):
+  tag:dailyReminder?'rd-connect-daily-checkin-'+date+'-'+room:
+      late?'rd-care-late-arrival'+(hasId?'-'+id:''):
       urgent?'rd-care-priority-review'+(hasId?'-'+id:''):
       review?'rd-care-attendance-review'+(hasId?'-'+id:''):
       test?'rd-care-push-test':'rd-care-school-notices',
@@ -75,7 +82,9 @@ self.addEventListener('notificationclick',event=>{
   const q=value.searchParams;
   const tab=q.get('tab'),kind=q.get('notice_kind'),id=q.get('notice_id');
   const portalKind=q.get('portal_notice');
-  const safeStaff=tab==='notifications'||
+  const safeDaily=tab==='attendance'&&/^\d{1,8}$/.test(q.get('classroom_id')||'')&&
+   /^\d{4}-\d{2}-\d{2}$/.test(q.get('date')||'');
+  const safeStaff=safeDaily||tab==='notifications'||
    (tab==='advisorCenter'&&['truancy','attendance_review'].includes(kind)&&/^\d{1,15}$/.test(id||''))||
    (tab==='lateGate'&&kind==='late'&&/^\d{1,15}$/.test(id||''))||
    ((tab==='advisorCenter'||tab==='lateGate')&&!id&&!kind);
