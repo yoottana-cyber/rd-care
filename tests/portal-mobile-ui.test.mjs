@@ -70,7 +70,9 @@ test('mobile student/guardian login keeps role-specific password visibility and 
  assert.match(portal,/id="portalTogglePassword"/);
  assert.match(portal,/aria-pressed/);
  assert.match(portal,/api\/portal\/auth\/login/);
- assert.match(portal,/saveAuthSession\('rd_portal_token'/);
+ assert.match(portal,/saveAuthSession\(activeTokenKey/);
+ assert.match(portal,/rd_portal_guardian_token/);
+ assert.match(portal,/rd_portal_student_token/);
 });
 test('portal styles isolate changes from staff dashboard and respect mobile safe area',()=>{
  const css=source('web/portal-mobile.css');

@@ -113,6 +113,8 @@ test('all login/portal screens wire storage cleanup and explicit opt-in flags',(
  assert.match(app,/clearAuthSession\('rd_token'/);
  assert.match(app,/readAuthSession\('rd_token'\)/);
  assert.match(portal,/name="remember"/);
- assert.match(portal,/saveAuthSession\('rd_portal_token'/);
- assert.match(portal,/clearAuthSession\('rd_portal_token'/);
+ assert.match(portal,/saveAuthSession\(activeTokenKey/);
+ assert.match(portal,/rd_portal_guardian_token/);
+ assert.match(portal,/rd_portal_student_token/);
+ assert.match(portal,/clearAuthSession\(activeTokenKey/);
 });
