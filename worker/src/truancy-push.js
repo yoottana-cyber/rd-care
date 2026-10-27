@@ -1,5 +1,5 @@
 // Opt-in, relationship-verified truancy alerts for staff advisors and guardians.
-// Notification payloads are empty; never put students' identities or allegations on lock screens.
+// Push carries only an encrypted event reference and non-identifying lesson summary.
 import {validPushSubscription,sendPriorityPush,diagnoseVapid} from './staff-push.js';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{code:status})};
 const reply=(data)=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
@@ -126,8 +126,8 @@ export async function truancyPushReadiness(env,roomId,studentIds){
 // key off the recent EDIT timestamp, not today's lesson date.
 export async function deliverTruancyPush(env){
  if(!env.DB||!ready(env))return {enabled:false,processed:0,delivered:0};
- const {results:events}=await env.DB.prepare(`SELECT e.id,e.generation,e.student_id,
-  c.advisor_user_id FROM truancy_events e
+ const {results:events}=await env.DB.prepare(`SELECT e.id,e.generation,e.student_id,e.school_date,
+  c.advisor_user_id,t.period,t.subject FROM truancy_events e
  JOIN period_truancy tr ON tr.student_id=e.student_id
    AND tr.timetable_id=e.timetable_id AND tr.school_date=e.school_date
  JOIN attendance_period p ON p.student_id=e.student_id
@@ -196,7 +196,9 @@ export async function deliverTruancyPush(env){
    if(!active)return;
    let result='failed',httpStatus=null;
    try{
-    const response=await sendPriorityPush(device,env,type);
+    const response=await sendPriorityPush(device,env,type,{
+     eventId:event.id,date:event.school_date,period:event.period,subject:event.subject
+    });
     httpStatus=response.status;
     if(response.ok){result='delivered';delivered++}
     if(response.status===404||response.status===410){
