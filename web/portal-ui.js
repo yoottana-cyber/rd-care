@@ -21,7 +21,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   restoredToken=readAuthSession('rd_portal_token');
   if(restoredToken)activeTokenKey='rd_portal_token';
  }
- const state={token:restoredToken,account:null,role:startRole,children:[],studentId:null,records:null,truancy:[],from:today(),to:today(),filterMode:'today',view:'home',focus:null,focusUnavailable:false};
+ const state={token:restoredToken,account:null,role:startRole,children:[],studentId:null,records:null,truancy:[],from:startRole==='guardian'?minusDays(today(),29):today(),to:today(),filterMode:startRole==='guardian'?'range':'today',view:'home',focus:null,focusUnavailable:false};
  const pushParams=new URLSearchParams(location.search);
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
@@ -252,7 +252,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     <span class="rd-portal-kicker">เลือกข้อมูลที่ต้องการดู</span><h2>${esc(label)}</h2>
     </div><span class="rd-portal-section-symbol" aria-hidden="true">📅</span></div>
    <div class="rd-portal-date-modes" role="group" aria-label="รูปแบบการเลือกวันที่">
-    ${[['today','วันนี้'],['date','เลือกวันที่'],['range','ช่วงวันที่']].map(([mode,caption])=>`
+    ${[['today','วันนี้'],['last30','30 วันล่าสุด'],['date','เลือกวันที่'],['range','ช่วงวันที่']].map(([mode,caption])=>`
      <button type="button" data-portal-date-mode="${mode}"
       aria-pressed="${mode===current}" class="${mode===current?'active':''}">${caption}</button>`).join('')}
    </div>
@@ -297,6 +297,13 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   wrappers.forEach(wrapper=>{
    wrapper.querySelectorAll('[data-portal-date-mode]').forEach(button=>button.addEventListener('click',()=>{
     const mode=button.dataset.portalDateMode;
+    if(mode==='last30'){
+     const from=minusDays(today(),29),to=today();
+     const changed=from!==state.from||to!==state.to;
+     state.from=from;state.to=to;setMode('range');
+     if(changed)loadRecords();else renderDashboard();
+     return;
+    }
     if(mode==='today'){
      const next=checkedPortalPeriod('today',{},today());
      const changed=next.from!==state.from||next.to!==state.to;
