@@ -1,4 +1,4 @@
-name: Deploy RD Care Dev Worker
+name: Deploy RD CONNECT Dev Worker
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   deploy-dev:
-    name: Migrate and deploy RD Care Dev
+    name: Migrate and deploy RD CONNECT Dev
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -73,7 +73,7 @@ jobs:
         working-directory: worker
         run: npx --no-install wrangler d1 migrations apply rd-care-dev --remote
 
-      - name: Deploy RD Care Dev Worker
+      - name: Deploy RD CONNECT Dev Worker
         working-directory: worker
         run: npx --no-install wrangler deploy
 
@@ -83,6 +83,6 @@ jobs:
           node --input-type=module -e "
             const r=await fetch('https://rd-care-api-dev.yoottana.workers.dev/api/health');
             const body=await r.json();
-            if(!r.ok || body.ok!==true || body.service!=='RD Care API')process.exit(1);
-            process.stdout.write('RD Care Dev API health OK\\n');
+            if(!r.ok || body.ok!==true || body.service!=='RD CONNECT API')process.exit(1);
+            process.stdout.write('RD CONNECT Dev API health OK\\n');
           "
