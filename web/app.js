@@ -198,7 +198,7 @@ async function boot(){
   /^\d{1,15}$/.test(id||'')&&Number.isSafeInteger(Number(id))&&Number(id)>0?
   {kind,id:Number(id)}:null;
  if(requested==='notifications'||requested==='advisorCenter'||requested==='lateGate'){
-  history.replaceState(null,'',location.pathname);
+  history.replaceState(null,'',location.pathname+'?login=staff'+location.hash);
   await showTab(requested);
  }else await showTab('dashboard');
 }
