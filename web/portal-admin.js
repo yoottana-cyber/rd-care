@@ -139,7 +139,8 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,navigate=()=>{}
      <tbody>${accounts.map(a=>`<tr><td><strong>${esc(a.username)}</strong><div class="muted">${esc(a.display_name)}</div></td>
       <td>${mode==='student'?`${esc(a.student_no||'-')}<div class="muted">${esc(a.classroom_label||'')}</div>`:'ผู้ปกครอง'}</td><td>${a.active?'ใช้งาน':'ระงับ'}</td>
       <td><button type="button" class="button secondary" data-reset-portal="${a.id}">รีเซ็ต</button>
-       <button type="button" class="button ghost" data-status-portal="${a.id}" data-active="${a.active?0:1}">${a.active?'ระงับ':'เปิดใช้'}</button></td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีบัญชี</td></tr>'}</tbody></table></div>
+       <button type="button" class="button ghost" data-status-portal="${a.id}" data-active="${a.active?0:1}">${a.active?'ระงับ':'เปิดใช้'}</button>
+       <button type="button" class="button danger" data-delete-portal="${a.id}">ลบบัญชี</button></td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีบัญชี</td></tr>'}</tbody></table></div>
    `:`<div class="table-wrap"><table class="table"><thead><tr><th>ผู้ปกครอง</th><th>นักเรียน</th><th>จัดการ</th></tr></thead>
      <tbody>${links.map(l=>`<tr><td>${esc(l.guardian_name)}<div class="muted">${esc(l.guardian_username||'')}</div></td><td>${esc(l.full_name)} <span class="muted">${esc(l.student_no)} • ${esc(l.classroom_label||'')}</span></td>
       <td><button type="button" class="button ghost" data-unlink-guardian="${l.guardian_account_id}" data-unlink-student="${l.student_id}">เพิกถอนสิทธิ์</button></td></tr>`).join('')||'<tr><td colspan="3">ยังไม่มีการผูกบัญชี</td></tr>'}</tbody></table></div>`}
@@ -225,6 +226,18 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,navigate=()=>{}
    try{await api('/api/admin/portal/accounts/'+b.dataset.statusPortal+'/status',{
     method:'POST',body:{active:Number(b.dataset.active)}});toast('ปรับสถานะแล้ว');await load();
    }finally{if(b.isConnected)b.disabled=false}
+  })));
+  document.querySelectorAll('[data-delete-portal]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+    const account=accounts.find(x=>x.id===Number(button.dataset.deletePortal));
+    if(!account)return;
+    const entered=window.prompt('ลบบัญชี '+account.display_name+' พร้อมยกเลิกเซสชัน/สิทธิ์ที่เชื่อมโยง?\\nพิมพ์ Username เพื่อยืนยัน:','');
+    if(entered===null)return;
+    if(entered!==account.username)throw Error('Username ไม่ตรงกัน');
+    button.disabled=true;
+    try{
+     await api('/api/admin/portal/accounts/'+account.id+'/delete',{method:'POST',body:{confirm:entered}});
+     toast('ลบบัญชีแล้ว ข้อมูลการเช็กชื่อและคะแนนนักเรียนยังอยู่');await load();
+    }finally{if(button.isConnected)button.disabled=false}
   })));
   document.querySelectorAll('[data-unlink-guardian]').forEach(b=>b.addEventListener('click',()=>safeRun(async()=>{
    if(!confirm('เพิกถอนสิทธิ์ผู้ปกครองในการดูข้อมูลนักเรียนคนนี้?'))return;
