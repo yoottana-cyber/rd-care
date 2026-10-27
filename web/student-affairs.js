@@ -90,7 +90,8 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
        <div class="row between"><strong>${esc(row.label)}</strong>
         <span class="rd-affairs-state ${row.complete?'ready':'pending'}">${row.complete?'✓ ครบแล้ว':'◷ ยังไม่ครบ'}</span></div>
        <p>ครูที่ปรึกษา: <strong>${esc(row.advisor_name||'ยังไม่กำหนด')}</strong></p>
-       <div class="rd-affairs-progress"><div style="width:${Math.round(100*row.checked/row.students)}%"></div></div>
+       <progress class="rd-affairs-progress" value="${row.checked}" max="${row.students}"
+        aria-label="การเช็กชื่อห้อง ${esc(row.label)}"></progress>
        <p class="muted">เช็กชื่อแล้ว ${row.checked}/${row.students} คน • คงเหลือ ${row.missing} คน</p>
        ${reminder?`<p class="muted">การเตือนล่าสุด: ${esc(reminderLabel(reminder.state))} (${reminder.delivered||0} เครื่อง)</p>`:''}
        ${!row.complete&&row.advisor_user_id&&state.date===bangkokToday()?
@@ -248,7 +249,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  }
  const studentPicker=()=>`<section class="card stack"><h3>ค้นหานักเรียน</h3>
    <form id="affairsStudentSearch" class="row">
-    <div class="field" style="flex:1"><label for="affairsStudentQuery">รหัสหรือชื่อ–สกุล</label>
+    <div class="field rd-affairs-search-wide"><label for="affairsStudentQuery">รหัสหรือชื่อ–สกุล</label>
      <input id="affairsStudentQuery" name="query" minlength="2" maxlength="70"
       required value="${esc(state.search)}" placeholder="ค้นหาอย่างน้อย 2 ตัวอักษร"></div>
     <button type="submit" class="button">ค้นหา</button></form>
