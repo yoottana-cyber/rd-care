@@ -10,7 +10,8 @@ class StudentAffairsSchema(unittest.TestCase):
         self.db.execute('PRAGMA foreign_keys=ON')
         for filename in ['worker/migrations/0001_initial.sql',
                          'worker/migrations/0018_student_affairs.sql',
-                         'worker/migrations/0019_student_affairs_role_assignments.sql']:
+                         'worker/migrations/0019_student_affairs_role_assignments.sql',
+                         'worker/migrations/0020_separate_merit_conduct_adjustments.sql']:
             self.db.executescript((ROOT/filename).read_text(encoding='utf-8'))
         self.db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
             VALUES(1,'teacher1','ครูที่ปรึกษา','teacher','x','x'),
@@ -41,6 +42,74 @@ class StudentAffairsSchema(unittest.TestCase):
         self.db.execute("DELETE FROM users WHERE id=1")
         self.assertEqual(self.db.execute(
             "SELECT COUNT(*) FROM student_affairs_assignments WHERE user_id=1").fetchone(),(0,))
+
+    def test_merit_does_not_cancel_misconduct(self):
+        self.db.execute("""INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_category)
+            VALUES(1,20,'ช่วยงานโรงเรียน',1,'good')""")
+        self.db.execute("""INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_category)
+            VALUES(1,-10,'ความผิด',1,'moderate')""")
+        self.db.execute("""INSERT INTO affairs_adjustment_rules(name,points,updated_by)
+            VALUES('ปรับพฤติกรรม 5 คะแนน',5,2)""")
+        self.db.execute("""INSERT INTO affairs_adjustment_rules(name,points,updated_by)
+            VALUES('ปรับพฤติกรรม 10 คะแนน',10,2)""")
+        rows=self.db.execute("""SELECT
+           COALESCE(SUM(CASE WHEN points>0 AND (affairs_category IS NULL
+              OR affairs_category='good') THEN points ELSE 0 END),0),
+           COALESCE(SUM(CASE WHEN points<0 THEN -points ELSE 0 END),0),
+           COALESCE(SUM(CASE WHEN points>0 AND affairs_category='adjustment'
+              THEN points ELSE 0 END),0)
+            FROM behavior_records WHERE student_id=1""").fetchone()
+        self.assertEqual(rows,(20,10,0))
+        self.assertEqual(rows[1]-rows[2],10)
+
+    def test_improvement_is_only_from_approved_rule_and_cannot_overdraw(self):
+        self.db.execute("""INSERT INTO behavior_records(student_id,points,reason,recorded_by,
+            affairs_category) VALUES(1,-10,'ความผิด',1,'moderate')""")
+        self.db.execute("""INSERT INTO affairs_adjustment_rules(name,points,updated_by)
+            VALUES('ปรับพฤติกรรม 5 คะแนน',5,2)""")
+        self.db.execute("""INSERT INTO affairs_adjustment_rules(name,points,updated_by)
+            VALUES('ปรับพฤติกรรม 10 คะแนน',10,2)""")
+        row=self.db.execute("SELECT id,points FROM affairs_adjustment_rules WHERE points=5").fetchone()
+        result=self.db.execute("""INSERT INTO behavior_records(student_id,points,reason,recorded_by,
+             affairs_category,adjustment_rule_id)
+             SELECT 1,?,'ปรับพฤติกรรม',2,'adjustment',? WHERE ?>0 AND ?<=
+              (SELECT COALESCE(SUM(CASE WHEN points<0 THEN -points
+                  WHEN affairs_category='adjustment' AND points>0 THEN -points
+                  ELSE 0 END),0)
+               FROM behavior_records WHERE student_id=1)""",
+             (row[1],row[0],row[1],row[1]))
+        self.assertEqual(result.rowcount,1)
+        remaining=self.db.execute("""SELECT COALESCE(SUM(CASE WHEN points<0 THEN -points
+            WHEN affairs_category='adjustment' AND points>0 THEN -points ELSE 0 END),0)
+            FROM behavior_records WHERE student_id=1""").fetchone()[0]
+        self.assertEqual(remaining,5)
+        over=self.db.execute("""INSERT INTO behavior_records(student_id,points,reason,recorded_by,
+            affairs_category,adjustment_rule_id)
+            SELECT 1,10,'ปรับพฤติกรรม',2,'adjustment',2 WHERE 10<=
+              (SELECT COALESCE(SUM(CASE WHEN points<0 THEN -points
+               WHEN affairs_category='adjustment' AND points>0 THEN -points ELSE 0 END),0)
+               FROM behavior_records WHERE student_id=1)""")
+        self.assertEqual(over.rowcount,0)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("""INSERT INTO affairs_adjustment_rules(name,points)
+                VALUES('ค่าติดลบ',-5)""")
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("""INSERT INTO affairs_adjustment_rules(name,points)
+                VALUES('เกินขนาด',51)""")
+
+    def test_legacy_positive_without_category_is_merit_not_improvement(self):
+        self.db.execute("""INSERT INTO behavior_records(student_id,points,reason,recorded_by)
+         VALUES(1,30,'รายการความดีเดิม',1)""")
+        self.db.execute("""INSERT INTO behavior_records(student_id,points,reason,recorded_by)
+         VALUES(1,-8,'รายการความผิดเดิม',1)""")
+        self.assertEqual(self.db.execute("""SELECT COALESCE(SUM(CASE WHEN
+           points>0 AND (affairs_category IS NULL OR affairs_category='good')
+           THEN points ELSE 0 END),0) FROM behavior_records WHERE student_id=1""")
+           .fetchone()[0],30)
+        self.assertEqual(self.db.execute("""SELECT COALESCE(SUM(CASE WHEN
+           points<0 THEN -points WHEN affairs_category='adjustment' AND points>0
+           THEN -points ELSE 0 END),0) FROM behavior_records WHERE student_id=1""")
+           .fetchone()[0],8)
 
     def tearDown(self):
         self.db.close()
