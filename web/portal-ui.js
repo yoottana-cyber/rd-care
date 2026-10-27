@@ -388,9 +388,18 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   });
  }
  function table(rows,columns,formatStatus){
-  if(!rows?.length)return empty;
-  return `<div class="table-wrap"><table class="table"><thead><tr>${columns.map(([,name])=>`<th>${esc(name)}</th>`).join('')}</tr></thead>
-   <tbody>${rows.map(x=>`<tr>${columns.map(([key])=>`<td>${esc(key==='status'||key==='state'?formatStatus?.(x):x[key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  if(!rows?.length)return '<p class="rd-portal-empty">ยังไม่มีรายการในช่วงวันที่เลือก</p>';
+  return `<div class="rd-portal-record-list">${rows.map(x=>{
+   const date=x.school_date||x.record_date;
+   const status=x.status||x.state;
+   const detail=columns.filter(([key])=>key!=='school_date'&&key!=='record_date'&&key!=='status'&&key!=='state');
+   return `<article class="rd-portal-record"><div class="rd-portal-record-head">
+     <strong>${esc(date?portalDate(date):'รายละเอียดรายการ')}</strong>
+     ${status?`<span class="rd-portal-status rd-portal-status-${statusTone(status)}">${esc(formatStatus?formatStatus(x):statusLabel(status))}</span>`:''}
+    </div><div class="rd-portal-record-fields">${detail.map(([key,label])=>`
+      <div class="rd-portal-record-field"><small>${esc(label)}</small>
+      <span>${esc(x[key]??'—')}</span></div>`).join('')}</div></article>`;
+  }).join('')}</div>`;
  }
  async function resume(expectedRole=null){
   if(!state.token)return false;
