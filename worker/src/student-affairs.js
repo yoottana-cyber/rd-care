@@ -177,6 +177,13 @@ export async function studentAffairsRoutes(req,env,u,path){
   const {results}=await env.DB.prepare('SELECT school_date,label FROM affairs_non_school_days ORDER BY school_date DESC LIMIT 120').all();
   return reply({items:results});
  }
+ if(method==='POST'&&path==='/api/affairs/closed-days/remove'){
+  const date=b.date;
+  if(!validDate(date))fail(400,'วันที่ไม่ถูกต้อง');
+  await env.DB.prepare('DELETE FROM affairs_non_school_days WHERE school_date=?').bind(date).run();
+  await log(env.DB,u.id,'affairs_non_school_day_removed','affairs_non_school_days',date);
+  return reply({ok:true});
+ }
  if(method==='POST'&&path==='/api/affairs/closed-days'){
   const date=b.date;
   if(!validDate(date)||date<bangkokToday()&&Date.parse(date+'T00:00:00Z')<Date.now()-365*86400000)
@@ -225,6 +232,8 @@ export async function studentAffairsRoutes(req,env,u,path){
   const date=q.get('date')||bangkokToday();checkedDate(date);
   const {results}=await env.DB.prepare(`SELECT c.grade,c.label AS classroom_label,s.id AS student_id,
    s.student_no,s.full_name,COALESCE(SUM(b.points),0) AS total,
+   COALESCE(SUM(CASE WHEN b.points>0 THEN b.points ELSE 0 END),0) AS earned,
+   COALESCE(SUM(CASE WHEN b.points<0 THEN -b.points ELSE 0 END),0) AS deducted,
    COUNT(b.id) AS events FROM students s JOIN classrooms c ON c.id=s.classroom_id
    LEFT JOIN behavior_records b ON b.student_id=s.id AND substr(b.created_at,1,10)<=?
    WHERE s.active=1 GROUP BY s.id ORDER BY c.grade,c.room,s.roll_no LIMIT 1500`).bind(date).all();
@@ -260,7 +269,11 @@ export async function studentAffairsRoutes(req,env,u,path){
   const resolution=string(b.resolution,1000);
   const informed=b.guardian_informed_date?checkedDate(b.guardian_informed_date):null;
   const ack=b.guardian_ack_date?checkedDate(b.guardian_ack_date):null;
-  if(ack&&!informed)fail(400,'กรุณาระบุวันที่แจ้งผู้ปกครอง');
+  const previous=await env.DB.prepare('SELECT guardian_informed_date FROM affairs_disciplinary_cases WHERE id=?')
+   .bind(caseId).first();
+  if(!previous)fail(404,'ไม่พบการบันทึกมาตรการ');
+  if(ack&&!informed&&!previous.guardian_informed_date)fail(400,'กรุณาระบุวันที่แจ้งผู้ปกครอง');
+  if(ack&&ack<(informed||previous.guardian_informed_date))fail(400,'วันที่รับทราบต้องไม่ก่อนวันที่แจ้ง');
   const changed=await env.DB.prepare(`UPDATE affairs_disciplinary_cases SET state=?,resolution=?,
    guardian_informed_date=COALESCE(?,guardian_informed_date),
    guardian_ack_date=COALESCE(?,guardian_ack_date),
