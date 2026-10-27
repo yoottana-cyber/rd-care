@@ -31,6 +31,7 @@ jobs:
           node --check worker/src/period-reports.js
           node --check worker/src/staff-push.js
           node --check worker/src/student-affairs.js
+          node --check worker/src/admin-delete.js
           node --check worker/scripts/generate-vapid.mjs
           node --check worker/src/worker.js
           node --check worker/src/truancy-push.js
@@ -103,3 +104,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'student_affairs_migration_test.py' -v
       - name: Student and guardian full-roster import SQL and no forced password rotation
         run: python3 -m unittest discover -s tests -p 'portal_account_bulk_migration_test.py' -v
+      - name: Account deletion archive migration and FK safety
+        run: python3 -m unittest discover -s tests -p 'admin_identity_archive_migration_test.py' -v
