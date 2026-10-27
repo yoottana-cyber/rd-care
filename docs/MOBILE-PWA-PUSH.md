@@ -1,4 +1,4 @@
-# RD Care — Mobile App / PWA / Staff Web Push
+# RD CONNECT — Mobile App / PWA / Staff Web Push
 
 ## Mobile UI
 - 5-action bottom navigation: ภาพรวม, แจ้งเตือน, เช็กชื่อ (กลาง), งานตรวจสอบ, เมนู
@@ -6,9 +6,9 @@
 - Card-first dashboard, tap-friendly controls and iPhone safe-area support
 - The admin/teacher/student features and existing login APIs remain unchanged
 
-## Installing RD Care
+## Installing RD CONNECT
 - Android Chrome/Edge: open https://rd-care.pages.dev, choose **ติดตั้งแอป** from menu or use browser Install App.
-- iOS Safari: open the site, tap **แชร์ (Share)** → **เพิ่มไปยังหน้าจอโฮม (Add to Home Screen)**, then launch the RD Care icon.
+- iOS Safari: open the site, tap **แชร์ (Share)** → **เพิ่มไปยังหน้าจอโฮม (Add to Home Screen)**, then launch the RD CONNECT icon.
 - Installation requires HTTPS and a supported browser. The existing PWA manifest, 192/512 icons, and service worker provide offline app shell only; forms still require internet to save data.
 
 ## Push capabilities implemented
@@ -34,7 +34,7 @@ Cloudflare Dashboard ต่อไปหลัง Deploy และ workflow ต�
   ที่ตั้งผ่าน Dashboard
 - **ห้ามสร้างชุดกุญแจ VAPID ใหม่ทุกครั้งที่ Deploy** ใช้ Public/Private คู่เดิมต่อเนื่อง
   เพื่อไม่ให้มือถือครูและผู้ปกครองต้องสมัครรับ Push ใหม่
-- ปุ่มตรวจสอบและส่ง Push ทดสอบในหน้า RD Care จะตรวจว่าค่า VAPID ครบ ถูกต้อง
+- ปุ่มตรวจสอบและส่ง Push ทดสอบในหน้า RD CONNECT จะตรวจว่าค่า VAPID ครบ ถูกต้อง
   และอุปกรณ์สมัครรับแจ้งเตือนแล้วหรือยัง โดยไม่แสดงกุญแจลับ
 - Worker Deploy ไปที่ `rd-care-api-dev` เท่านั้น การตั้งค่าบน Cloudflare Pages
   `rd-care` ไม่ได้ตั้งค่าตัวแปรให้ Worker API
@@ -64,10 +64,10 @@ For the SUBJECT, use a real school-maintained administrative contact in `mailto:
 
 ## Testing delivery
 1. Confirm Cloudflare Worker API `/api/health` is healthy and all migrations completed.
-2. Sign in on the installed RD Care PWA with a teacher account assigned as an advisor.
+2. Sign in on the installed RD CONNECT PWA with a teacher account assigned as an advisor.
 3. Navigate to **แจ้งเตือน**, tap **เปิดรับ Push** and explicitly allow the browser permission.
 4. On a second staff account, mark a student absent in a taught lesson. The new pending advisor review should produce **one generic push** to the advisor's subscribed device.
-5. Tap the push to launch RD Care notifications. Open **ศูนย์ครูที่ปรึกษา** to inspect the actual review details after authentication.
+5. Tap the push to launch RD CONNECT notifications. Open **ศูนย์ครูที่ปรึกษา** to inspect the actual review details after authentication.
 6. Switch off push in the app and confirm no more messages are received. Test logout and re-login separately.
 
 ## Privacy and deployment boundaries

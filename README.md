@@ -1,4 +1,4 @@
-# RD Care — Cloudflare D1 + Workers + PWA
+# RD CONNECT — Cloudflare D1 + Workers + PWA
 
 ระบบต้นแบบสำหรับ **โรงเรียนรัษฎา** รองรับโครงสร้าง 48 ห้องเรียน (ม.1–ม.3 ระดับละ 9 ห้อง, ม.4–ม.6 ระดับละ 7 ห้อง) และเตรียมขยายถึงนักเรียนประมาณ 1,800 คน
 
@@ -52,7 +52,7 @@ Cloudflare Pages จะเผยแพร่หน้าเว็บทดลอ
 
 ## นักเรียนและผู้ปกครองเข้าสู่ระบบ
 
-หน้า Login ของ RD Care มีทางเข้า **นักเรียน** และ **ผู้ปกครอง** พร้อมบัญชีแยกจากครู/ผู้บริหาร ผู้ดูแลสร้างบัญชีและผูกเด็กที่มีสิทธิ์ให้ผู้ปกครองก่อน โดยต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าครั้งแรก อ่านวิธีใช้งานและข้อจำกัดได้ที่ [docs/STUDENT-GUARDIAN-PORTAL.md](docs/STUDENT-GUARDIAN-PORTAL.md). ใช้เฉพาะข้อมูลจำลองระหว่างพัฒนา
+หน้า Login ของ RD CONNECT มีทางเข้า **นักเรียน** และ **ผู้ปกครอง** พร้อมบัญชีแยกจากครู/ผู้บริหาร ผู้ดูแลสร้างบัญชีและผูกเด็กที่มีสิทธิ์ให้ผู้ปกครองก่อน โดยต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าครั้งแรก อ่านวิธีใช้งานและข้อจำกัดได้ที่ [docs/STUDENT-GUARDIAN-PORTAL.md](docs/STUDENT-GUARDIAN-PORTAL.md). ใช้เฉพาะข้อมูลจำลองระหว่างพัฒนา
 
 ## Deploy Worker Dev ผ่าน GitHub Actions
 
@@ -70,7 +70,7 @@ Cloudflare Pages จะเผยแพร่หน้าเว็บทดลอ
 git init
 git branch -M main
 git add .
-git commit -m "Initial RD Care D1/PWA starter"
+git commit -m "Initial RD CONNECT D1/PWA starter"
 git remote add origin https://github.com/yoottana-cyber/rd-care.git
 git push -u origin main
 ```

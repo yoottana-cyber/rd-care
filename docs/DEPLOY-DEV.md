@@ -1,4 +1,4 @@
-# Deploy RD Care Dev Worker ผ่าน GitHub Actions
+# Deploy RD CONNECT Dev Worker ผ่าน GitHub Actions
 
 ใช้เฉพาะ **Cloudflare Dev**:
 - Worker: `rd-care-api-dev`
@@ -10,7 +10,7 @@ Cloudflare Pages deploy frontend อัตโนมัติเมื่อ Merg
 ## ตั้งค่าครั้งเดียว (สำหรับเจ้าของบัญชี Cloudflare)
 
 1. เข้า Cloudflare Dashboard → Account API Tokens → Create Token
-2. สร้าง API Token ที่จำกัดเฉพาะบัญชี Dev ของ RD Care โดยอนุญาตอย่างน้อย **Workers Editor** สำหรับ `rd-care-api-dev` และ **D1 Edit** สำหรับฐาน `rd-care-dev` เพื่อให้รัน remote migrations ได้ อย่าให้สิทธิ์กว้างกว่าจำเป็น
+2. สร้าง API Token ที่จำกัดเฉพาะบัญชี Dev ของ RD CONNECT โดยอนุญาตอย่างน้อย **Workers Editor** สำหรับ `rd-care-api-dev` และ **D1 Edit** สำหรับฐาน `rd-care-dev` เพื่อให้รัน remote migrations ได้ อย่าให้สิทธิ์กว้างกว่าจำเป็น
 3. จด **Account ID** จากบัญชี Cloudflare
 4. ไป GitHub `yoottana-cyber/rd-care` → **Settings → Secrets and variables → Actions → New repository secret** เพิ่ม:
    - `CLOUDFLARE_ACCOUNT_ID` = Account ID ของ Cloudflare
@@ -19,7 +19,7 @@ Cloudflare Pages deploy frontend อัตโนมัติเมื่อ Merg
 
 ## วิธี Deploy
 
-1. ไป GitHub → Actions → **Deploy RD Care Dev Worker**
+1. ไป GitHub → Actions → **Deploy RD CONNECT Dev Worker**
 2. เลือก **Run workflow** → Branch `main` → Run workflow
 3. ขั้นตอนจะตรวจ Credentials, ตรวจ JS/tests, Apply D1 Migration และ Deploy Worker ตามลำดับ
 4. สำเร็จแล้วตรวจ `https://rd-care-api-dev.yoottana.workers.dev/api/health` และ Login ผ่านหน้าเว็บทดลอง
