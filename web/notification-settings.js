@@ -60,7 +60,7 @@ export function createNotificationSettings({api,pwaTools,mount,toast,safeRun,sho
     <div class="row">
      <button type="button" class="button" id="rdEnablePush" ${!st.canPush||!st.enabled||st.permission==='denied'||st.subscribed?'disabled':''}>เปิดรับ Push</button>
      <button type="button" class="button secondary" id="rdDisablePush" ${!st.subscribed?'disabled':''}>ปิด Push อุปกรณ์นี้</button></div>
-    <p class="muted">ผู้ปกครองเปิดรับ Push ได้จากบัญชีผู้ปกครองที่ยืนยันแล้ว เฉพาะเหตุหนีเรียน และไม่มีการสมัครรับแจ้งเตือนอัตโนมัติ</p>
+    <p class="muted">ผู้ปกครองที่ยืนยันบัญชีแล้วเปิดรับ Push สำหรับเหตุหนีเรียนและลงชื่อมาสายผ่าน QR ได้โดยสมัครรับด้วยตนเอง</p>
    </section>
    <section class="card stack" id="rdPushDiagnostics" aria-label="เครื่องมือตรวจสอบการส่ง Push">
     <h3>🩺 ตรวจสอบปัญหาการแจ้งเตือน</h3>
