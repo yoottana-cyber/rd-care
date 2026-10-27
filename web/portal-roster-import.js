@@ -145,7 +145,7 @@ export function createPortalRosterImport({api,toast,onComplete}){
    และอัปเดตบัญชีเดิมโดยจับคู่ <strong>เลขประจำตัวนักเรียน</strong></p>
    <div class="row" style="flex-wrap:wrap;gap:8px">
     <button type="button" id="portalDownloadXlsx" class="button secondary">ดาวน์โหลดตัวอย่าง Excel (.xlsx)</button>
-    <a class="button secondary" download href="./templates/portal-accounts-import.csv">ดาวน์โหลดตัวอย่าง CSV (.csv)</a>
+    <a class="button secondary" download href="./templates/portal-accounts-import.csv">ดาวน์โหลดตัวอย่าง CSV UTF-8 สำหรับ Excel (.csv)</a>
    </div>
    <form id="portalRosterForm" class="stack">
     <div class="field"><label>ไฟล์นำเข้า .xlsx หรือ .csv</label>
