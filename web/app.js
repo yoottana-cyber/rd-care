@@ -447,7 +447,7 @@ function renderAttendance(){
  $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
  $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));
  $$('[data-student]').forEach(btn=>btn.addEventListener('click',()=>{state.statuses[Number(btn.dataset.student)]=btn.dataset.status;updateAttendanceControls()}));
- $('#markAll')?.addEventListener('click',()=>{for(const student of state.students)state.statuses[student.id]='present';updateAttendanceControls()});
+ $('#markAll')?.addEventListener('click',()=>{for(const student of state.students){if(state.kind==='daily'&&state.statuses[student.id]==='late')continue;state.statuses[student.id]='present'}updateAttendanceControls()});
  $('#teachingNote')?.addEventListener('input',event=>{
   state.teachingNote=event.target.value;
   const count=$('#teachingNoteCount');if(count)count.textContent=state.teachingNote.length.toLocaleString('th-TH')+' / 2,000';
