@@ -147,6 +147,18 @@ export async function sendPriorityPush(device,env,audience){
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
  },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }
+// Category-only encrypted push for late arrivals. No child names, classroom,
+// or attendance identifiers are ever included in the notification payload.
+export async function sendLateArrivalPush(device,env,audience){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ if(audience!=='advisor'&&audience!=='guardian')throw Error('Invalid push audience');
+ const body=await encryptPriorityPush(device,{kind:'late_arrival',audience});
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'3600',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
 // Payload-free push: service worker displays only generic school notification.
 export async function sendGenericPush(endpoint,env){
  if(!allowedEndpoint(endpoint))throw Error('Push endpoint not permitted');
