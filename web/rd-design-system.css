@@ -378,3 +378,37 @@ label:has(>input[type="checkbox"]),label:has(>input[type="radio"]){cursor:pointe
 [data-theme="dark"] .rd-portal-mobile .rd-portal-card{background:#23384a;border-color:#3c5567}
 [data-theme="dark"] .rd-portal-mobile .rd-portal-bottom button.active{background:#2e5262;color:#d5f7ed}
 [data-theme="dark"] .login-wrap{background:radial-gradient(circle at 12% 18%,#1b5145 0,transparent 38%),#152a27}
+
+/* Categorized mobile menu: browse by task instead of scanning a flat wall of icons. */
+.rd-mobile-sheet-groups{display:grid;gap:17px;min-width:0}
+.rd-mobile-sheet-section{display:grid;gap:8px;min-width:0}
+.rd-mobile-sheet-section h3{
+ margin:0;padding:2px 3px;font-size:13px;font-weight:730;
+ color:#2a6b62;line-height:1.5
+}
+.rd-mobile-sheet-section .rd-mobile-sheet-grid{gap:9px}
+.rd-mobile-sheet-section .rd-mobile-sheet-grid button{
+ min-height:82px;background:#f5faf9;border-color:#deebe7;
+ border-radius:14px;font-size:11px;font-weight:640;overflow-wrap:anywhere;
+}
+.rd-mobile-sheet-section .rd-mobile-sheet-grid button span:first-child{
+ display:grid;place-items:center;width:36px;height:36px;border-radius:11px;
+ background:#e6f6f0;font-size:21px;
+}
+.rd-mobile-sheet-section:nth-child(2) .rd-mobile-sheet-grid button span:first-child{background:#e6f1ff}
+.rd-mobile-sheet-section:nth-child(3) .rd-mobile-sheet-grid button span:first-child{background:#f0eaff}
+.rd-mobile-sheet-section:nth-child(4) .rd-mobile-sheet-grid button span:first-child{background:#fff0dc}
+.rd-mobile-sheet-section .rd-mobile-sheet-grid button.active{
+ background:#e2f6ef;border-color:#9bd9c5;color:#086b50;box-shadow:inset 0 0 0 1px #b2e1d1
+}
+.rd-mobile-sheet-section .rd-mobile-sheet-grid button:active{transform:scale(.985)}
+[data-theme="dark"] .rd-mobile-sheet-section h3{color:#9de4cc}
+[data-theme="dark"] .rd-mobile-sheet-section .rd-mobile-sheet-grid button{
+ background:#294254;border-color:#426176;color:#edf7fb
+}
+[data-theme="dark"] .rd-mobile-sheet-section .rd-mobile-sheet-grid button.active{
+ background:#28604f;border-color:#4da88c;color:#e1fff0
+}
+[data-theme="dark"] .rd-mobile-sheet-section .rd-mobile-sheet-grid button span:first-child{
+ background:#355a63
+}
