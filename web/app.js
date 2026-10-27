@@ -68,6 +68,7 @@ const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'
 const periodNames={...names,truancy:'หนีเรียน'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
+let portalAdminUI=null;
 const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>showEntrySelection(),onLegacyLateReport:()=>renderStudentLate(),
  onInstallApp:()=>pwaTools.install(),isInstalledPwa});
 function dateToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
@@ -223,7 +224,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=renderSidebarNavigation(navs,state.tab);
  const page=pageLocation(navs,state.tab);
  const pageIcon=navs.find(x=>x[0]===(state.tab==='periodCheckin'?'periodAttendance':state.tab))?.[2]||'✦';
@@ -322,7 +323,7 @@ function roomOptions(advisorOnly=false){
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
-async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();state.tab=tab;
+async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();portalAdminUI?.cancel();state.tab=tab;
  if(tab==='attendance')state.kind='daily';
  if(tab==='periodAttendance'||tab==='periodCheckin')state.kind='period';
  if(tab!=='adminStudents')unifiedImport.clear();
@@ -350,7 +351,13 @@ async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();state.tab=tab
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
  if(tab==='adminStudents')return loadAdminStudents();
- if(tab==='portalAccounts')return createPortalAdmin({api,mount,toast,rooms:state.rooms,safeRun}).load();
+ if(['portalStudentAccounts','portalGuardianAccounts','portalGuardianLinks','portalAccounts'].includes(tab)){
+  if(state.user?.role!=='admin'){toast('เฉพาะผู้ดูแลระบบ',true);return loadDashboard()}
+  const view=tab==='portalGuardianAccounts'?'guardian':tab==='portalGuardianLinks'?'links':'student';
+  portalAdminUI=createPortalAdmin({api,mount,toast,rooms:state.rooms,safeRun,view,
+   navigate:next=>showTab(next==='guardian'?'portalGuardianAccounts':next==='links'?'portalGuardianLinks':'portalStudentAccounts')});
+  return portalAdminUI.load();
+ }
 }
 async function loadDashboard(){
  state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));
