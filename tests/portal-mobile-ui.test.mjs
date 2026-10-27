@@ -51,12 +51,19 @@ test('guardian portal retains verified guardian Push controls and focus on linke
  const html=renderFor('guardian',{guardianFocus:true});
  assert.match(html,/data-portal-panel="alerts"/);
  assert.match(html,/id="guardianAlerts"/);
+ assert.match(html,/ประวัติมาสาย/);
  for(const id of ['guardianPushStatus','guardianPushEnable','guardianPushDisable','guardianPushTest'])
   assert.ok(html.includes('id="'+id+'"'),id);
  assert.match(html,/id="pushNoticeFocus"/);
  assert.match(html,/รายละเอียดนี้แสดงสำหรับบัญชีที่ได้รับสิทธิ์เท่านั้น/);
  assert.doesNotMatch(html,/id="studentLateQrForm"/);
  assert.doesNotMatch(html,/data-portal-panel="late"/);
+});
+test('mobile student/guardian login keeps role-specific password visibility and original auth',()=>{
+ assert.match(portal,/id="portalTogglePassword"/);
+ assert.match(portal,/aria-pressed/);
+ assert.match(portal,/api\/portal\/auth\/login/);
+ assert.match(portal,/saveAuthSession\('rd_portal_token'/);
 });
 test('portal styles isolate changes from staff dashboard and respect mobile safe area',()=>{
  const css=source('web/portal-mobile.css');
