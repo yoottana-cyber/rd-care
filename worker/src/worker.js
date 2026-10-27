@@ -15,6 +15,7 @@ import {lateGateStaffRoutes} from './late-qr.js';
 import {deliverLateQrPush} from './late-qr-push.js';
 import {deliverTruancyPush,advisorTruancyItems,truancyPushReadiness} from './truancy-push.js';
 import {pushTarget} from './push-target.js';
+import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -857,6 +858,7 @@ async function route(req,env,ctx){
  if(req.method==='GET'&&path==='/api/auth/me')return json({user});
  if(req.method==='GET'&&path==='/api/push/target')return pushTarget(req,env,user,'advisor');
  if(path.startsWith('/api/push/'))return staffPushRoutes(req,env,user,path);
+ if(path.startsWith('/api/affairs/'))return studentAffairsRoutes(req,env,user,path);
  if(path.startsWith('/api/late/qr/'))return lateGateStaffRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
  if(req.method==='GET'&&path==='/api/classrooms/catalog'){
@@ -903,6 +905,7 @@ export default {
   ctx.waitUntil(Promise.all([
    deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
    deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
+   sendScheduledAttendanceReminders(env).catch(e=>console.warn('RD scheduled daily attendance reminder',e?.name)),
     deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name))
   ]));
  },
