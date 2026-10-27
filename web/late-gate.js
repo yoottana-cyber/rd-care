@@ -25,6 +25,8 @@ export function createLateGate({api,mount,toast,safeRun}){
     <p>ห้อง ${esc(state.focus.classroom_label)} • วันที่ ${esc(state.focus.school_date)}
       • เวลา ${esc(state.focus.arrived_at)} น.</p>
     ${state.focus.reason?`<p>สาเหตุ: ${esc(state.focus.reason)}</p>`:''}
+    ${state.queue.some(item=>Number(item.auto_id)===Number(state.focus.id)&&item.can_delete)?
+     `<button class="button secondary" type="button" data-qr-delete="${Number(state.focus.id)}">🗑️ ลบรายการมาสายนี้</button>`:''}
     <button id="lateQrToday" class="button secondary" type="button">กลับไปรายการวันนี้</button>
    </section>`:''}
    <div class="late-qr-layout">
@@ -90,6 +92,7 @@ export function createLateGate({api,mount,toast,safeRun}){
    try{
     const result=await api('/api/late/qr/auto-'+id+'/delete',{method:'POST',body:{}});
     toast(result.restoredDaily?'ลบรายการแล้ว และคืนสถานะเช็กชื่อเดิม':'ลบรายการแล้ว (เช็กชื่อรายวันมีการแก้ไขใหม่ หรือไม่มีรายการที่ต้องคืนค่า)');
+    if(state.focus&&Number(state.focus.id)===id)state.focus=null;
     await poll(true);
    }finally{if(button.isConnected)button.disabled=false}
   })));
