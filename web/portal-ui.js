@@ -210,71 +210,156 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
  }
  const empty='<p class="empty">ไม่พบรายการในช่วงวันที่เลือก</p>';
  function renderDashboard(){
+  const guardian=state.account.role==='guardian';
   const current=state.children.find(x=>x.id===state.studentId);
   const r=state.records;
-  frame(`<div class="row between"><div><h2>${esc(state.account.display_name)}</h2>
-   <p class="muted">${state.account.role==='guardian'?'ผู้ปกครอง':'นักเรียน'} • ดูข้อมูลเฉพาะที่ได้รับสิทธิ์</p></div>
-   <button type="button" id="portalLogout" class="button secondary">ออกจากระบบ</button></div>
-   ${state.account.role==='guardian'&&state.focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
-    <h3>🔔 รายละเอียดเรื่องที่แจ้งเตือน: ${state.focus.kind==='late'?'มาสาย':'หนีเรียน'}</h3>
-    <strong>${esc(state.focus.full_name)}</strong>
-    <p>ห้อง ${esc(state.focus.classroom_label)} • วันที่ ${esc(state.focus.school_date)}
-     ${state.focus.kind==='late'?'• เวลา '+esc(state.focus.arrived_at)+' น.':
-      '• คาบ '+esc(state.focus.period)+' • วิชา '+esc(state.focus.subject)}</p>
-    ${state.focus.kind==='late'&&state.focus.reason?`<p>สาเหตุที่แจ้ง: ${esc(state.focus.reason)}</p>`:''}
-    <p class="muted">ข้อมูลส่วนตัวนี้แสดงหลังเข้าสู่ระบบบัญชีที่ได้รับสิทธิ์เท่านั้น</p>
-   </section>`:''}
-   ${state.account.role==='guardian'&&state.focusUnavailable?
-     `<p class="warn">ไม่พบรายการแจ้งเตือนนี้ อาจถูกแก้ไข ยกเลิก หรือบัญชีไม่มีสิทธิ์ดู</p>`:''}
-   ${state.account.role==='guardian'&&state.truancy.some(e=>e.school_date===today())?`
-    <section class="rd-priority-card" aria-label="เหตุการณ์สำคัญวันนี้">
-     <div class="rd-priority-heading"><span aria-hidden="true">🚨</span><div>
-      <h3>มีรายการสำคัญให้ตรวจสอบ</h3>
-      <p>ข้อมูลการมาเรียนที่ควรตรวจสอบและประสานกับโรงเรียน</p></div></div>
-     <a class="button rd-priority-action" href="#guardianAlerts">ดูรายละเอียดและตั้งค่าแจ้งเตือน</a>
+  const dayRows=r?.daily||[];
+  const count=status=>dayRows.filter(x=>x.status===status).length;
+  const topic=state.focus?.kind==='late'?'มาสาย':'หนีเรียน';
+  const recent=state.truancy.filter(x=>x.school_date===today()).length;
+  frame(`<section class="rd-portal-hero" data-portal-panel="home">
+    <div class="rd-portal-hero-top"><span class="rd-portal-overline">RATSADA STUDENT CARE</span><span class="rd-portal-hero-mark" aria-hidden="true">✦</span></div>
+    <p class="rd-portal-eyebrow">ยินดีต้อนรับสู่ RD Care</p>
+    <h1>${esc(state.account.display_name)}</h1>
+    <p>${guardian?'พื้นที่ผู้ปกครอง • ติดตามการมาเรียนอย่างสะดวก':'พื้นที่นักเรียน • ดูแลทุกวันเรียนของคุณ'}</p>
+    <div class="rd-portal-hero-footer"><span>◉ ข้อมูลจากระบบโรงเรียน</span><span>${esc(portalDate(today()))}</span></div>
+   </section>
+   <section class="rd-portal-panel" data-portal-panel="home">
+    ${state.children.length?`<section class="rd-portal-card rd-portal-student-pick">
+     <div class="rd-portal-section-heading"><div><span class="rd-portal-kicker">${guardian?'นักเรียนในความดูแล':'ข้อมูลนักเรียน'}</span>
+      <h2>${guardian?'เลือกนักเรียน':'ข้อมูลของฉัน'}</h2></div><span class="rd-portal-section-symbol" aria-hidden="true">🎓</span></div>
+     <label class="rd-portal-label" for="portalStudent">${guardian?'นักเรียนในความดูแล':'นักเรียน'}</label>
+     <select id="portalStudent">${state.children.map(st=>`<option value="${st.id}" ${st.id===state.studentId?'selected':''}>${esc(st.full_name)} • ${esc(st.classroom_label)}</option>`).join('')}</select>
+     ${current?`<p class="rd-portal-help">ห้อง ${esc(current.classroom_label)} • รหัสนักเรียน ${esc(current.student_no)}</p>`:''}
+    </section>`:'<section class="rd-portal-card"><p class="rd-portal-empty">ยังไม่มีนักเรียนที่บัญชีนี้ได้รับสิทธิ์ กรุณาติดต่อผู้ดูแลระบบของโรงเรียน</p></section>'}
+    ${guardian&&state.focus?`<section class="rd-portal-card rd-portal-important" id="pushNoticeFocus" tabindex="-1">
+      <div class="rd-portal-kicker">🔔 เรื่องที่แจ้งเตือน</div>
+      <h2>${topic}</h2><strong>${esc(state.focus.full_name)}</strong>
+      <p>ห้อง ${esc(state.focus.classroom_label)} • ${esc(portalDate(state.focus.school_date))}</p>
+      <p>${state.focus.kind==='late'?'เวลา '+esc(state.focus.arrived_at)+' น.':
+       'คาบ '+esc(state.focus.period)+' • วิชา '+esc(state.focus.subject)}</p>
+      ${state.focus.kind==='late'&&state.focus.reason?`<p>สาเหตุ: ${esc(state.focus.reason)}</p>`:''}
+      <p class="rd-portal-help">รายละเอียดนี้แสดงสำหรับบัญชีที่ได้รับสิทธิ์เท่านั้น</p>
     </section>`:''}
-   ${state.account.role==='student'&&lateQrToken?`<section class="card stack late-qr-student-confirm">
-    <h3>⏰ ลงชื่อมาสายจาก QR ครูเวร</h3>
-    <p class="muted">เข้าสู่ระบบด้วยบัญชีนักเรียนของตนเอง ระบบบันทึกเวลาจากเซิร์ฟเวอร์และยืนยันสถานะมาสายอัตโนมัติเมื่อกดลงชื่อ</p>
-    <form id="studentLateQrForm" class="stack">
-     <div class="field"><label for="lateQrReason">สาเหตุที่มาสาย (ไม่บังคับ)</label>
-      <textarea id="lateQrReason" maxlength="300" name="reason" placeholder="ระบุสาเหตุ หากต้องการ"></textarea></div>
-     <button type="submit" class="button full">✅ ยืนยันลงชื่อมาสาย</button>
-    </form>
-    <button type="button" id="cancelStudentLateQr" class="button secondary full">ยกเลิกการลงชื่อมาสาย</button>
-    <p class="muted">QR ถาวรใช้ได้ทุกวัน หลัง 08.00 น. ข้อมูลจะถูกบันทึกทันที และครูเวรสามารถลบรายการที่ผิดพลาดโดยมีประวัติการแก้ไข</p>
-   </section>`:''}
-   ${state.account.role==='student'&&lateQrReceipt?`<section class="card stack"><h3>✅ ลงชื่อมาสายสำเร็จ</h3>
-    <p>${esc(lateQrReceipt.date)} เวลา ${esc(lateQrReceipt.arrivedAt)} น.</p>
-    <p class="ok">${lateQrReceipt.state==='verified'?'ระบบยืนยันมาสายอัตโนมัติแล้ว และบันทึกเช็กชื่อรายวันเป็น สาย':'ส่งรายการให้ครูเวรตรวจสอบแล้ว'}</p></section>`:''}
-   ${state.children.length?`<div class="grid two">
-     <div class="field"><label>นักเรียน${state.account.role==='guardian'?'ในความดูแล':''}</label>
-      <select id="portalStudent">${state.children.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${esc(s.full_name)} • ${esc(s.classroom_label)}</option>`).join('')}</select></div>
-     <div class="field"><label>ช่วงวันที่ (สูงสุด 90 วัน)</label><div class="row"><input aria-label="ตั้งแต่วันที่" id="portalFrom" type="date" value="${state.from}"><input aria-label="ถึงวันที่" id="portalTo" type="date" value="${state.to}"></div></div>
-     </div><button type="button" id="portalSearch" class="button secondary">แสดงข้อมูลช่วงวันที่เลือก</button>`:'<p class="empty">ยังไม่มีนักเรียนที่บัญชีนี้ได้รับสิทธิ์ กรุณาติดต่อผู้ดูแลระบบของโรงเรียน</p>'}
-   ${r&&current?`<div class="summary"><strong>${esc(r.student.full_name)}</strong>
-     <div class="muted">เลขประจำตัว ${esc(r.student.student_no)} • ห้อง ${esc(r.student.classroom_label)}</div></div>
-    <h3>การมาเรียนประจำวัน</h3>${table(r.daily,[['school_date','วันที่'],['status','สถานะ']],row=>thaiStatus[row.status]||row.status)}
-    <h3>การมาเรียนรายคาบ</h3>${table(r.period,[['school_date','วันที่'],['period','คาบ'],['subject','วิชา'],['status','สถานะ']],row=>thaiStatus[row.status]||row.status)}
-    <h3>ประวัติมาสาย</h3>${table(r.late,[['school_date','วันที่'],['arrived_at','เวลา'],['state','สถานะ']],row=>row.state==='verified'?'ยืนยันแล้ว':'รอตรวจสอบ')}
-    <h3>คะแนนพฤติกรรม</h3><p class="muted">รวมเฉพาะช่วงวันที่เลือก: ${r.behavior_total} คะแนน</p>
-    ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}`:''}
-   ${state.account.role==='guardian'?`<section class="card stack guardian-truancy-notices" id="guardianAlerts">
-    <h3>🔔 แจ้งเตือนการมาเรียน</h3>
-    <p class="muted">เฉพาะบัญชีผู้ปกครองที่โรงเรียนยืนยันความสัมพันธ์แล้ว สามารถเปิดรับ Push เมื่อมีการบันทึกหนีเรียนหรือ QR ลงชื่อมาสายอัตโนมัติ และดูรายละเอียดการมาเรียนของนักเรียนในความดูแลได้</p>
-    ${state.truancy.length?state.truancy.map(e=>`<div class="alert-item">
-     <strong>${esc(e.full_name)}</strong><p>${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
-     <span class="tag">ครูบันทึกสถานะหนีเรียน — โปรดตรวจสอบข้อเท็จจริง</span>
-    </div>`).join(''):'<p class="muted">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}
-    <div class="field"><label>การแจ้งเตือน Push อุปกรณ์นี้</label>
-     <p id="guardianPushStatus" class="muted" role="status">กำลังตรวจสอบความพร้อม</p></div>
-    <div class="row"><button type="button" class="button" id="guardianPushEnable">🔔 เปิดรับ Push</button>
-     <button type="button" class="button secondary" id="guardianPushDisable">ปิด Push อุปกรณ์นี้</button>
-     <button type="button" class="button secondary" id="guardianPushTest">ส่ง Push ทดสอบ</button></div>
-    <p id="guardianPushTestStatus" class="muted" role="status">การทดสอบไม่ส่งข้อมูลนักเรียนและไม่สร้างเหตุการณ์หนีเรียน</p>
-    <p class="muted">iPhone: เปิดด้วย Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิด RD Care จากไอคอน ก่อนกดเปิดรับ Push</p>
-    <p class="muted">Push หนีเรียนและมาสายจะแสดงข้อความทั่วไปบนหน้าจอล็อก ไม่แสดงชื่อหรือข้อมูลของนักเรียน</p>
-   </section>`:''}`);
+    ${guardian&&state.focusUnavailable?`<section class="rd-portal-card rd-portal-important" role="status">ไม่พบรายการแจ้งเตือนนี้ อาจถูกแก้ไข ยกเลิก หรือบัญชีนี้ไม่มีสิทธิ์ดู</section>`:''}
+    ${guardian&&recent?`<section class="rd-portal-urgent"><span aria-hidden="true">🔔</span><div>
+      <strong>มีรายการการมาเรียนที่ควรตรวจสอบวันนี้</strong>
+      <p>ดูข้อมูลและประสานกับโรงเรียนเมื่อมีข้อสงสัย</p>
+      <button type="button" data-portal-open="alerts">เปิดรายการแจ้งเตือน</button>
+     </div></section>`:''}
+    <div class="rd-portal-section-heading rd-portal-space-top"><div><span class="rd-portal-kicker">ภาพรวมการมาเรียน</span>
+     <h2>สรุปช่วงวันที่เลือก</h2></div><button class="rd-portal-text-action" type="button" data-portal-open="attendance">ดูประวัติทั้งหมด ›</button></div>
+    <div class="rd-portal-metrics">
+     ${[['present','มา','✓'],['late','สาย','◷'],['leave','ลา','⌁'],['absent','ขาด','!']].map(([key,label,icon])=>`
+      <div class="rd-portal-metric rd-portal-metric-${key}"><span class="rd-portal-metric-symbol">${icon}</span>
+       <strong>${r?count(key):'–'}</strong><span>${label}</span></div>`).join('')}
+    </div>
+    <p class="rd-portal-count-note">นับเฉพาะวันที่มีข้อมูลเช็กชื่อในช่วงที่เลือก (${dayRows.length} รายการ)</p>
+    <div class="rd-portal-quick-grid">
+     <button type="button" class="rd-portal-quick" data-portal-open="attendance">
+      <span class="rd-portal-quick-icon">▦</span><strong>ประวัติการมาเรียน</strong><small>รายวันและรายคาบ</small></button>
+     <button type="button" class="rd-portal-quick" data-portal-open="${guardian?'alerts':'late'}">
+      <span class="rd-portal-quick-icon">${guardian?'♧':'◷'}</span>
+      <strong>${guardian?'การแจ้งเตือน':'ลงชื่อมาสาย'}</strong>
+      <small>${guardian?'เหตุการณ์ที่ต้องติดตาม':'QR และประวัติมาสาย'}</small></button>
+    </div>
+    ${r?.daily?.length?`<section class="rd-portal-card rd-portal-space-top"><div class="rd-portal-section-heading">
+     <div><span class="rd-portal-kicker">ข้อมูลล่าสุด</span><h2>การมาเรียนรายวัน</h2></div></div>
+     ${table(r.daily.slice(0,3),[['school_date','วันที่'],['status','สถานะ']],x=>statusLabel(x.status))}
+     <button type="button" class="rd-portal-outline" data-portal-open="attendance">ดูข้อมูลทั้งหมด</button></section>`:''}
+   </section>
+   <section class="rd-portal-panel" data-portal-panel="attendance">
+    <div class="rd-portal-page-title"><span class="rd-portal-kicker">ATTENDANCE HISTORY</span><h1>การมาเรียน</h1>
+     <p>ตรวจสอบข้อมูลจากการเช็กชื่อรายวันและรายคาบ</p></div>
+    <section class="rd-portal-card rd-portal-filter">
+     <h2>เลือกช่วงวันที่</h2><div class="rd-portal-date-grid">
+      <div class="field"><label for="portalFrom">ตั้งแต่วันที่</label><input id="portalFrom" type="date" value="${state.from}" max="${today()}"></div>
+      <div class="field"><label for="portalTo">ถึงวันที่</label><input id="portalTo" type="date" value="${state.to}" max="${today()}"></div>
+     </div><button type="button" id="portalSearch" class="rd-portal-primary">แสดงข้อมูลช่วงวันที่เลือก</button>
+     <p class="rd-portal-help">เลือกดูข้อมูลย้อนหลังได้สูงสุด 90 วัน</p>
+    </section>
+    ${r&&current?`<section class="rd-portal-record-section"><div class="rd-portal-section-heading">
+      <div><span class="rd-portal-kicker">${esc(current.full_name)}</span><h2>เช็กชื่อรายวัน</h2></div>
+      <span class="rd-portal-count">${r.daily?.length||0} รายการ</span></div>
+      ${table(r.daily,[['school_date','วันที่'],['status','สถานะ']],x=>statusLabel(x.status))}
+     </section><section class="rd-portal-record-section"><div class="rd-portal-section-heading">
+      <div><span class="rd-portal-kicker">ตารางเรียน</span><h2>เช็กชื่อรายคาบ</h2></div>
+      <span class="rd-portal-count">${r.period?.length||0} รายการ</span></div>
+      ${table(r.period,[['school_date','วันที่'],['period','คาบ'],['subject','วิชา'],['status','สถานะ']],x=>statusLabel(x.status))}
+     </section>`:''}
+   </section>
+   ${!guardian?`<section class="rd-portal-panel" data-portal-panel="late">
+    <div class="rd-portal-page-title"><span class="rd-portal-kicker">LATE ARRIVAL</span><h1>ลงชื่อมาสาย</h1>
+     <p>สแกน QR ของครูเวร แล้วลงชื่อผ่านบัญชีนักเรียนของตนเอง</p></div>
+    ${lateQrToken?`<section class="rd-portal-card rd-portal-qr-card">
+     <span class="rd-portal-qr-icon" aria-hidden="true">◷</span><h2>ยืนยันลงชื่อมาสาย</h2>
+     <p>ระบบบันทึกเวลาจากเซิร์ฟเวอร์และอนุมัติอัตโนมัติเมื่อกดยืนยันหลัง 08.00 น.</p>
+     <form id="studentLateQrForm" class="stack">
+      <div class="field"><label for="lateQrReason">สาเหตุที่มาสาย (ไม่บังคับ)</label>
+       <textarea id="lateQrReason" maxlength="300" name="reason" placeholder="ระบุสาเหตุที่มาสาย"></textarea></div>
+      <button type="submit" class="rd-portal-primary">✓ ยืนยันลงชื่อมาสาย</button>
+     </form><button type="button" id="cancelStudentLateQr" class="rd-portal-outline">ยกเลิก</button>
+     <p class="rd-portal-help">ครูเวรสามารถแก้ไขรายการที่ผิดพลาดได้ โดยมีการบันทึกประวัติ</p>
+    </section>`:`<section class="rd-portal-card rd-portal-late-hint">
+     <span class="rd-portal-qr-icon" aria-hidden="true">▧</span>
+     <h2>พร้อมลงชื่อมาสาย</h2><p>สแกน QR ที่โรงเรียนจัดไว้เพื่อเปิดแบบลงชื่อมาสายโดยตรง</p>
+     <p class="rd-portal-help">ต้องสแกน QR ของโรงเรียนก่อน จึงจะแสดงปุ่มยืนยัน</p>
+    </section>`}
+    ${lateQrReceipt?`<section class="rd-portal-card rd-portal-success" role="status">
+     <h2>✓ ลงชื่อมาสายสำเร็จ</h2>
+     <p>${esc(portalDate(lateQrReceipt.date))} • เวลา ${esc(lateQrReceipt.arrivedAt)} น.</p>
+     <p>${lateQrReceipt.state==='verified'?'ยืนยันอัตโนมัติแล้ว และเช็กชื่อรายวันเป็น สาย':'ส่งให้ครูเวรตรวจสอบแล้ว'}</p>
+    </section>`:''}
+    <section class="rd-portal-record-section"><div class="rd-portal-section-heading">
+     <div><span class="rd-portal-kicker">ข้อมูลย้อนหลัง</span><h2>ประวัติมาสาย</h2></div></div>
+     ${table(r?.late,[['school_date','วันที่'],['arrived_at','เวลา'],['state','สถานะ']],x=>statusLabel(x.state))}
+    </section>
+   </section>`:`<section class="rd-portal-panel" data-portal-panel="alerts">
+    <div class="rd-portal-page-title"><span class="rd-portal-kicker">SCHOOL NOTICES</span><h1>การแจ้งเตือน</h1>
+     <p>ติดตามข้อมูลการมาเรียนของนักเรียนในความดูแล</p></div>
+    <section class="rd-portal-card guardian-truancy-notices" id="guardianAlerts">
+     <h2>🔔 แจ้งเตือนการมาเรียน</h2>
+     ${state.truancy.length?state.truancy.map(e=>`<article class="rd-portal-notice">
+      <span class="rd-portal-status rd-portal-status-critical">ข้อมูลที่ควรตรวจสอบ</span>
+      <h3>${esc(e.full_name)}</h3><p>${esc(portalDate(e.school_date))} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
+      <small>ครูบันทึกสถานะหนีเรียน กรุณาตรวจสอบข้อเท็จจริง</small>
+     </article>`).join(''):'<p class="rd-portal-empty">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}
+    </section>
+    <section class="rd-portal-card rd-portal-notice-guide"><h2>การแจ้งเตือน Push</h2>
+     <p>เปิดใช้งานและส่ง Push ทดสอบได้ในแท็บบัญชี หากมีเหตุการณ์ ระบบจะแจ้งประเภทและเปิดรายละเอียดที่เกี่ยวข้องหลังเข้าสู่ระบบ</p>
+     <button type="button" class="rd-portal-outline" data-portal-open="account">ตั้งค่าการแจ้งเตือน</button>
+    </section>
+   </section>`}
+   <section class="rd-portal-panel" data-portal-panel="account">
+    <div class="rd-portal-page-title"><span class="rd-portal-kicker">MY ACCOUNT</span><h1>บัญชีของฉัน</h1>
+     <p>ข้อมูลส่วนตัวและการตั้งค่าระบบ</p></div>
+    <section class="rd-portal-card rd-portal-profile"><span class="rd-portal-profile-avatar" aria-hidden="true">${guardian?'👨‍👩‍👧':'🎓'}</span>
+     <h2>${esc(state.account.display_name)}</h2><p>${guardian?'บัญชีผู้ปกครอง':'บัญชีนักเรียน'} • โรงเรียนรัษฎา</p></section>
+    ${guardian?`<section class="rd-portal-card rd-portal-push-settings">
+     <h2>🔔 การแจ้งเตือนบนมือถือ</h2>
+     <p>เปิดรับการแจ้งเตือนสำหรับนักเรียนที่โรงเรียนยืนยันความสัมพันธ์แล้ว</p>
+     <p id="guardianPushStatus" class="rd-portal-help" role="status">กำลังตรวจสอบความพร้อม</p>
+     <div class="rd-portal-settings-actions">
+      <button type="button" class="rd-portal-primary" id="guardianPushEnable">เปิดรับ Push</button>
+      <button type="button" class="rd-portal-outline" id="guardianPushDisable">ปิด Push อุปกรณ์นี้</button>
+      <button type="button" class="rd-portal-outline" id="guardianPushTest">ส่ง Push ทดสอบ</button>
+     </div>
+     <p id="guardianPushTestStatus" class="rd-portal-help" role="status">Push ทดสอบไม่สร้างรายการนักเรียน</p>
+     <p class="rd-portal-help">iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิดผ่านไอคอน RD Care</p>
+     <p class="rd-portal-help">หน้าจอล็อกแสดงเฉพาะประเภทและรายละเอียดทั่วไป ไม่แสดงชื่อหรือรหัสนักเรียน</p>
+    </section>`:''}
+    ${r?`<section class="rd-portal-card"><div class="rd-portal-section-heading"><div>
+     <span class="rd-portal-kicker">ข้อมูลช่วงวันที่เลือก</span><h2>คะแนนพฤติกรรม</h2></div>
+     <strong class="rd-portal-score">${Number(r.behavior_total)||0}</strong></div>
+     ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}
+    </section>`:''}
+    <section class="rd-portal-card rd-portal-account-actions">
+     <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
+     <button type="button" id="portalLogout" class="rd-portal-outline rd-portal-logout">ออกจากระบบ</button>
+     <p class="rd-portal-help">RD Care • ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+     <small>พัฒนาโดย ครูยุทธนา บุญจันทร์</small>
+    </section>
+   </section>`);
   select('#portalLogout').addEventListener('click',logout);
   select('#studentLateQrForm')?.addEventListener('submit',async event=>{
    event.preventDefault();
