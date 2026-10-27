@@ -126,6 +126,16 @@ export async function studentAffairsRoutes(req,env,u,path){
     pending:items.filter(x=>x.students>0&&!x.complete).length}});
  }
  if(method==='GET'&&path==='/api/affairs/people')return reply(await roster(env));
+ if(method==='GET'&&path==='/api/affairs/students'){
+  const query=string(q.get('query'),70);
+  if(query.length<2)fail(400,'ค้นหาชื่อหรือรหัสนักเรียนอย่างน้อย 2 ตัวอักษร');
+  const pattern='%'+query.replace(/[\\%_]/g,m=>'\\'+m)+'%';
+  const {results}=await env.DB.prepare(`SELECT s.id,s.student_no,s.full_name,c.label AS classroom_label,
+   c.grade FROM students s JOIN classrooms c ON c.id=s.classroom_id
+   WHERE s.active=1 AND (s.student_no LIKE ? ESCAPE '\\' OR s.full_name LIKE ? ESCAPE '\\')
+   ORDER BY c.grade,c.room,s.roll_no LIMIT 35`).bind(pattern,pattern).all();
+  return reply({items:results});
+ }
  if(method==='POST'&&path==='/api/affairs/advisor'){
   const room=id(b.classroom_id),teacher=b.teacher_user_id===null?null:id(b.teacher_user_id);
   if(!room||!(teacher||b.teacher_user_id===null))fail(400,'เลือกห้องเรียนและครูที่ปรึกษาให้ถูกต้อง');
@@ -168,7 +178,10 @@ export async function studentAffairsRoutes(req,env,u,path){
   return reply({items:results});
  }
  if(method==='POST'&&path==='/api/affairs/closed-days'){
-  const date=checkedDate(b.date),label=text(b.label,100);
+  const date=b.date;
+  if(!validDate(date)||date<bangkokToday()&&Date.parse(date+'T00:00:00Z')<Date.now()-365*86400000)
+   fail(400,'วันที่ปิดเรียนต้องถูกต้อง');
+  const label=text(b.label,100);
   await env.DB.prepare(`INSERT INTO affairs_non_school_days(school_date,label,created_by)
    VALUES(?,?,?) ON CONFLICT(school_date) DO UPDATE SET label=excluded.label,created_by=excluded.created_by`)
    .bind(date,label,u.id).run();
