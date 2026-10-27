@@ -16,6 +16,7 @@ import {deliverLateQrPush} from './late-qr-push.js';
 import {deliverTruancyPush,advisorTruancyItems,truancyPushReadiness} from './truancy-push.js';
 import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
+import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -488,10 +489,15 @@ async function addBehavior(req,env,user){
 async function listBehavior(req,env,user){
  const stId=positiveInt(new URL(req.url).searchParams.get('student_id'));
  await studentAccess(env,user,stId);
- const {results}=await env.DB.prepare(`SELECT b.id,b.points,b.reason,b.created_at,u.display_name AS teacher_name FROM behavior_records b
- JOIN users u ON u.id=b.recorded_by WHERE b.student_id=? ORDER BY b.id DESC LIMIT 40`).bind(stId).all();
- const summary=await env.DB.prepare('SELECT COALESCE(SUM(points),0) total FROM behavior_records WHERE student_id=?').bind(stId).first();
- return json({items:results,total:summary.total});
+ const {results}=await env.DB.prepare(`SELECT b.id,b.points,b.reason,b.created_at,
+  b.affairs_category,${caseTypeSql('b')} AS score_type,
+  u.display_name AS teacher_name FROM behavior_records b
+  JOIN users u ON u.id=b.recorded_by WHERE b.student_id=? ORDER BY b.id DESC LIMIT 100`)
+  .bind(stId).all();
+ const row=await env.DB.prepare(`SELECT ${scoreColumns('b')}
+  FROM behavior_records b WHERE b.student_id=?`).bind(stId).first();
+ const totals=scoreSummary(row);
+ return json({items:results,total:-totals.behavior_remaining,...totals});
 }
 async function listAlerts(req,env,user){
  const q=new URL(req.url).searchParams;
@@ -922,11 +928,9 @@ async function route(req,env,ctx){
  if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
  if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
  if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
- // Legacy free-form scoring is staff-only. Teachers use approved rules via /api/affairs/behavior/record.
- if(req.method==='POST'&&path==='/api/behavior'){
-  requireRole(user,['staff','admin']);
-  return addBehavior(req,env,user);
- }
+ // Never permit free-form points to bypass approved school scoring rules.
+ if(req.method==='POST'&&path==='/api/behavior')
+  throw error(403,'กรุณาบันทึกผ่านเกณฑ์ความดี ความผิด หรือปรับพฤติกรรมที่ฝ่ายกิจการนักเรียนกำหนด');
  if(req.method==='GET'&&path==='/api/alerts')return listAlerts(req,env,user);
  const m=/^\/api\/alerts\/(\d+)\/review$/.exec(path);
  if(req.method==='POST'&&m)return reviewAlert(req,env,user,Number(m[1]));
