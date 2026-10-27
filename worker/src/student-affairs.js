@@ -1,5 +1,6 @@
 import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
+import {scoreColumns,scoreSummary} from './score-ledger.js';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const staff=u=>['admin','staff'].includes(u?.role)||(u?.role==='teacher'&&Number(u?.student_affairs)===1);
@@ -45,22 +46,45 @@ async function eligibility(env,u,student){
   .bind(student,u.id,u.id).first();
 }
 async function recordBehavior(env,u,b,adjust=false){
- const student=id(b.student_id);if(!student||!await eligibility(env,u,student))fail(403,'ไม่มีสิทธิ์บันทึกนักเรียนคนนี้');
- let points,category,ruleId=null,ruleName='';
+ const student=id(b.student_id);
+ if(!student||!await eligibility(env,u,student))fail(403,'ไม่มีสิทธิ์บันทึกนักเรียนคนนี้');
+ let points,category,ruleId=null,adjustId=null,ruleName='';
  if(adjust){
   if(!staff(u))fail(403,'เฉพาะฝ่ายกิจการนักเรียน');
-  points=Number(b.points);category='adjustment';
-  if(!Number.isInteger(points)||points===0||Math.abs(points)>50)fail(400,'ปรับคะแนนได้ตั้งแต่ -50 ถึง 50 และไม่เท่ากับศูนย์');
+  if(b.points!==undefined||b.category!==undefined)fail(400,'ต้องเลือกเกณฑ์ปรับพฤติกรรมที่อนุมัติแล้ว ไม่สามารถกรอกคะแนนเอง');
+  adjustId=id(b.adjustment_rule_id);
+  const rule=adjustId?await env.DB.prepare(
+   'SELECT id,name,points,active FROM affairs_adjustment_rules WHERE id=?').bind(adjustId).first():null;
+  if(!rule?.active)fail(400,'เลือกเกณฑ์ปรับพฤติกรรมที่เปิดใช้งาน');
+  points=Number(rule.points);category='adjustment';ruleName=rule.name;
  }else{
   ruleId=id(b.rule_id);
-  const rule=ruleId?await env.DB.prepare('SELECT id,name,category,points,active FROM affairs_behavior_rules WHERE id=?').bind(ruleId).first():null;
-  if(!rule?.active)fail(400,'กรุณาเลือกเกณฑ์คะแนนที่กำหนดและเปิดใช้งาน');
+  const rule=ruleId?await env.DB.prepare(
+   'SELECT id,name,category,points,active FROM affairs_behavior_rules WHERE id=?')
+   .bind(ruleId).first():null;
+  if(!rule?.active)fail(400,'เลือกเกณฑ์คะแนนที่ฝ่ายกิจการนักเรียนเปิดใช้งาน');
   points=Number(rule.points);category=rule.category;ruleName=rule.name;
+  if(category==='good'&&points<=0||category!=='good'&&points>=0)
+   fail(400,'ประเภทคะแนนไม่ตรงเกณฑ์ที่กำหนด');
  }
- const reason=text(b.reason||(!adjust?ruleName:''),300);
- const insert=await env.DB.prepare(`INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category)
-  VALUES(?,?,?,?,?,?)`).bind(student,points,reason,u.id,ruleId,category).run();
- await log(env.DB,u.id,adjust?'affairs_behavior_adjusted':'affairs_behavior_recorded','behavior_records',insert.meta.last_row_id);
+ const reason=text(b.reason||ruleName,300);
+ let insert;
+ if(adjust){
+  // Atomic check against outstanding misconduct; merits never offset violations.
+  insert=await env.DB.prepare(`INSERT INTO behavior_records
+   (student_id,points,reason,recorded_by,affairs_rule_id,affairs_category,adjustment_rule_id)
+   SELECT ?,?,?,?,NULL,'adjustment',? WHERE ?>0 AND ?<=
+    (SELECT COALESCE(SUM(CASE WHEN points<0 THEN -points
+      WHEN affairs_category='adjustment' AND points>0 THEN -points ELSE 0 END),0)
+     FROM behavior_records WHERE student_id=?)`)
+   .bind(student,points,reason,u.id,adjustId,points,points,student).run();
+  if(!insert.meta.changes)fail(409,'คะแนนพฤติกรรมค้างสะสมไม่เพียงพอสำหรับเกณฑ์ปรับพฤติกรรมที่เลือก');
+ }else{
+  insert=await env.DB.prepare(`INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category)
+   VALUES(?,?,?,?,?,?)`).bind(student,points,reason,u.id,ruleId,category).run();
+ }
+ await log(env.DB,u.id,adjust?'affairs_behavior_adjusted':'affairs_behavior_recorded',
+  'behavior_records',insert.meta.last_row_id);
  return reply({ok:true,id:insert.meta.last_row_id,points,category,rule_name:ruleName},201);
 }
 async function notifyOne(env,room,date,kind,actorId=null){
@@ -228,18 +252,39 @@ export async function studentAffairsRoutes(req,env,u,path){
   await log(env.DB,u.id,'affairs_behavior_rule','affairs_behavior_rules',key);
   return reply({ok:true,id:key});
  }
+ if(method==='GET'&&path==='/api/affairs/behavior/adjustment-rules'){
+  const {results}=await env.DB.prepare(`SELECT id,name,points,active,updated_at
+   FROM affairs_adjustment_rules ORDER BY id`).all();
+  return reply({items:results});
+ }
+ if(method==='POST'&&path==='/api/affairs/behavior/adjustment-rules'){
+  const key=b.id===null||b.id===undefined?null:id(b.id);
+  const name=text(b.name,120),points=Number(b.points),active=b.active!==false;
+  if(!Number.isInteger(points)||points<1||points>50)fail(400,'คะแนนปรับพฤติกรรมต้องเป็นจำนวนเต็ม 1–50');
+  let updated=key;
+  if(key){
+   const x=await env.DB.prepare(`UPDATE affairs_adjustment_rules
+    SET name=?,points=?,active=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    .bind(name,points,active?1:0,u.id,key).run();
+   if(!x.meta.changes)fail(404,'ไม่พบเกณฑ์ปรับพฤติกรรม');
+  }else{
+   const x=await env.DB.prepare(`INSERT INTO affairs_adjustment_rules
+    (name,points,active,updated_by) VALUES(?,?,?,?)`)
+    .bind(name,points,active?1:0,u.id).run();updated=x.meta.last_row_id;
+  }
+  await log(env.DB,u.id,'affairs_adjustment_rule','affairs_adjustment_rules',updated);
+  return reply({ok:true,id:updated});
+ }
  if(method==='POST'&&path==='/api/affairs/behavior/record')return recordBehavior(env,u,b);
  if(method==='POST'&&path==='/api/affairs/behavior/adjust')return recordBehavior(env,u,b,true);
  if(method==='GET'&&path==='/api/affairs/behavior/summary'){
   const date=q.get('date')||bangkokToday();checkedDate(date);
   const {results}=await env.DB.prepare(`SELECT c.grade,c.label AS classroom_label,s.id AS student_id,
-   s.student_no,s.full_name,COALESCE(SUM(b.points),0) AS total,
-   COALESCE(SUM(CASE WHEN b.points>0 THEN b.points ELSE 0 END),0) AS earned,
-   COALESCE(SUM(CASE WHEN b.points<0 THEN -b.points ELSE 0 END),0) AS deducted,
+   s.student_no,s.full_name,${scoreColumns('b')},
    COUNT(b.id) AS events FROM students s JOIN classrooms c ON c.id=s.classroom_id
    LEFT JOIN behavior_records b ON b.student_id=s.id AND substr(b.created_at,1,10)<=?
    WHERE s.active=1 GROUP BY s.id ORDER BY c.grade,c.room,s.roll_no LIMIT 1500`).bind(date).all();
-  return reply({date,items:results});
+  return reply({date,items:results.map(r=>({...r,...scoreSummary(r)}))});
  }
  if(method==='GET'&&path==='/api/affairs/cases'){
   const student=id(q.get('student_id'));
