@@ -42,7 +42,7 @@ export function createLateGate({api,mount,toast,safeRun}){
       </div>
       <p class="late-qr-print-instruction">สแกนด้วยกล้องโทรศัพท์ → เข้าสู่ระบบบัญชีนักเรียน → กดยืนยันลงชื่อมาสาย</p>
       <p class="late-qr-print-link">${esc(state.qr?.url||'https://rd-care.pages.dev/')}</p>
-      <p class="late-qr-print-footer">ระบบการดูแลและช่วยเหลือนักเรียน • RD Care</p>
+      <p class="late-qr-print-footer">ระบบการดูแลและช่วยเหลือนักเรียน • RD CONNECT</p>
      </div>
      <div class="late-qr-controls">
       <span class="tag">QR ถาวร • ไม่หมดอายุ • ใช้ซ้ำได้ทุกวัน</span>

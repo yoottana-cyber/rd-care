@@ -31,7 +31,7 @@ export function createGuardianPush({call,select,message}){
  async function enable(){
   if(!supported())throw Error('เบราว์เซอร์นี้ไม่รองรับ Push');
   if(/iPad|iPhone|iPod/.test(navigator.userAgent)&&!standalone())
-   throw Error('iPhone ต้องเพิ่ม RD Care ไปหน้าจอโฮมใน Safari และเปิดจากไอคอนก่อน');
+   throw Error('iPhone ต้องเพิ่ม RD CONNECT ไปหน้าจอโฮมใน Safari และเปิดจากไอคอนก่อน');
   // Called before the first await from the click handler: preserves user gesture.
   const permitted=await Notification.requestPermission();
   if(permitted!=='granted')throw Error('ยังไม่ได้อนุญาตการแจ้งเตือน');

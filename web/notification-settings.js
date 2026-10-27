@@ -33,7 +33,7 @@ export function createNotificationSettings({api,pwaTools,mount,toast,safeRun,sho
   const deviceCount=Number(diagnostics?.registeredDevices||0);
   mount(`<section class="stack rd-notification-settings">
    <div class="rd-mobile-welcome"><h2>🔔 ศูนย์แจ้งเตือน</h2>
-   <p>เข้าถึงงานสำคัญและตั้งค่า RD Care บนโทรศัพท์ของคุณ</p></div>
+   <p>เข้าถึงงานสำคัญและตั้งค่า RD CONNECT บนโทรศัพท์ของคุณ</p></div>
    <section class="rd-priority-card" aria-label="เหตุการณ์การมาเรียนที่ควรตรวจสอบโดยเร็ว">
     <div class="rd-priority-heading"><span aria-hidden="true">🚨</span><div>
       <h3>รายการสำคัญวันนี้</h3><p>เหตุการณ์หนีเรียนที่ครูบันทึกและควรติดตามข้อเท็จจริง</p></div>
@@ -48,11 +48,11 @@ export function createNotificationSettings({api,pwaTools,mount,toast,safeRun,sho
     <button type="button" class="button secondary" data-tab="alerts">ตรวจสอบการขาดเรียน</button>
     <button type="button" class="button secondary" data-tab="advisorCenter">ศูนย์ครูที่ปรึกษา</button>
    </section>
-   <section class="card stack"><h3>📱 ติดตั้ง RD Care ลงมือถือ</h3>
+   <section class="card stack"><h3>📱 ติดตั้ง RD CONNECT ลงมือถือ</h3>
     <p class="muted">ใช้งานเหมือนแอปผ่านไอคอนบนหน้าจอหลัก พร้อมโหมดเต็มหน้าจอ</p>
     <div class="row between"><span class="tag">${st.installed?'ติดตั้งแอปแล้ว':'ยังไม่อยู่ในโหมดแอป'}</span>
      <button type="button" class="button" id="rdInstallApp" ${st.installed?'disabled':''}>⬇️ ติดตั้งแอป</button></div>
-    <p class="muted">iPhone/iPad: เปิดผ่าน Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม จากนั้นเปิดผ่านไอคอน RD Care</p>
+    <p class="muted">iPhone/iPad: เปิดผ่าน Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม จากนั้นเปิดผ่านไอคอน RD CONNECT</p>
    </section>
    <section class="card stack"><h3>🔔 Push Notification สำหรับครู</h3>
     <p class="muted">แจ้งเตือนเมื่อมีรายการขาดรายคาบที่ครูที่ปรึกษาต้องตรวจสอบ โดยใช้ข้อความทั่วไป ไม่มีข้อมูลส่วนตัวของนักเรียน และเปิดรับโดยสมัครใจเท่านั้น</p>

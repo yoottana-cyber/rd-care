@@ -230,3 +230,16 @@
  .login-choice-foot{padding:0 14px 18px}
 }
 @media(prefers-reduced-motion:reduce){.login-choice-card{transition:none}.login-choice-card:hover{transform:none}}
+
+/* RD CONNECT identity: large wordmark with an official school subtitle. */
+.login-wrap .login-brand h1{font-size:clamp(29px,5vw,36px);font-weight:900;letter-spacing:-.8px;line-height:1.2}
+.login-wrap .login-brand .brand-system-name{font-size:13px;font-weight:720;color:#e9fff3;line-height:1.65;margin:8px auto 0;max-width:380px}
+.login-choice-heading h1{font-size:clamp(32px,7vw,48px);font-weight:900;line-height:1.18;letter-spacing:-1.4px}
+.login-choice-heading .brand-system-name{font-size:13px;font-weight:650;margin:8px auto 0;color:#e8fff2;line-height:1.65}
+.login-choice-heading .brand-choice-prompt{font-size:13px;font-weight:700;color:#e2fff0;margin:10px auto 0}
+.login-choice-heading .brand-choice-prompt:last-child{display:inline-flex;align-items:center;justify-content:center;padding:7px 13px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);margin-top:16px}
+@media(max-width:570px){
+ .login-choice-heading h1{font-size:36px}
+ .login-wrap .login-brand h1{font-size:30px}
+ .login-wrap .login-brand .brand-system-name{font-size:12px}
+}

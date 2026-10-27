@@ -1,4 +1,4 @@
-// RD Care settings console. Reuses the existing school APIs and advisor-import workflow.
+// RD CONNECT settings console. Reuses the existing school APIs and advisor-import workflow.
 const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const adminTabs=[
  {id:'overview',label:'ภาพรวม',icon:'◫'},
@@ -148,7 +148,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
  const layout=()=>{const m=adminMetrics(users(),rooms());
   const statItems=[['◉','บัญชีทั้งหมด',m.users],['♙','ครูที่ใช้งาน',m.teachers],['▦','ห้องเรียน',m.rooms],['✓','มีครูที่ปรึกษา',m.advisors]];
   return `<section class="rd-settings">
-   <header class="rd-settings-hero"><div><span>RD CARE · ADMINISTRATION</span>
+   <header class="rd-settings-hero"><div><span>RD CONNECT · ADMINISTRATION</span>
     <h2>ศูนย์จัดการระบบ</h2><p>จัดการบัญชีครู ห้องเรียน ตารางสอน และการนำเข้าข้อมูลในที่เดียว</p></div>
     <div class="rd-settings-hero-icon" aria-hidden="true">⚙</div></header>
    <div class="rd-settings-stats">${statItems.map(([icon,label,value])=>`<div class="rd-settings-stat">

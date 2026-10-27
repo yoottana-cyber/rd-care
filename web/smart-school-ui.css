@@ -1,4 +1,4 @@
-/* RD Care | Smart School UI inspired by the supplied video.
+/* RD CONNECT | Smart School UI inspired by the supplied video.
    Prompt typography, navy navigation, lilac welcome banner, vivid app tiles.
    All selectors preserve the application's existing roles, actions and data. */
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap');
@@ -295,3 +295,7 @@ p{line-height:1.65}
 @media(prefers-reduced-motion:reduce){
  .rd-sidebar .rd-sidebar-link,.quick-action,.nav button{transition:none!important;transform:none!important}
 }
+
+/* The RD CONNECT wordmark remains readable in the staff sidebar. */
+.rd-side-brand strong{font-size:13px;letter-spacing:-.12px}
+.rd-shell>.top .brand h1{font-weight:800;letter-spacing:-.25px}

@@ -1,5 +1,5 @@
 
-/* RD Care: Mobile-first student/guardian portal, isolated from staff UI. */
+/* RD CONNECT: Mobile-first student/guardian portal, isolated from staff UI. */
 .rd-portal-mobile{
  --pm-green:#0d8858;--pm-ink:#173b2d;--pm-sub:#668074;--pm-border:#dcebe2;
  --pm-bg:#f3f9f5;--pm-surface:#fff;--pm-shadow:0 9px 26px rgba(18,84,55,.055);
@@ -237,3 +237,7 @@
  .rd-portal-date-modes button{font-size:11px;min-height:42px}
  .rd-portal-date-form input[type="date"]{font-size:13px;padding:8px 6px}
 }
+
+/* RD CONNECT portal brand wordmark on narrow phones. */
+.rd-portal-school strong{font-size:clamp(15px,4vw,18px);letter-spacing:-.45px;white-space:nowrap}
+@media(max-width:390px){.rd-portal-school{gap:7px}.rd-portal-role{padding:6px 8px;font-size:11px}}
