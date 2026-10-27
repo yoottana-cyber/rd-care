@@ -10,7 +10,7 @@ MIGRATIONS=ROOT/'worker'/'migrations'
 def database():
  db=sqlite3.connect(':memory:')
  db.execute('PRAGMA foreign_keys=ON')
- for name in ('0001_initial.sql','0003_student_transfer_plans.sql','0004_historical_enrollments.sql','0005_late_self_requests.sql','0015_late_qr_gate.sql','0016_permanent_late_qr.sql','0017_late_qr_auto_approval_push.sql'):
+ for name in ('0001_initial.sql','0003_student_transfer_plans.sql','0004_historical_enrollments.sql','0005_late_self_requests.sql','0015_late_qr_gate.sql','0016_permanent_late_qr.sql'):
   db.executescript((MIGRATIONS/name).read_text(encoding='utf8'))
  db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
  VALUES(1,'duty','Duty Teacher','teacher','salt','hash')""")
@@ -22,6 +22,8 @@ def database():
  VALUES(2,'R0002',1,2,'Student Two')""")
  db.execute("""INSERT INTO late_qr_tokens(id,issued_by,school_date,token_hash,expires_at)
  VALUES(1,1,'2026-10-26','hashed-token',9999999999)""")
+ # A running school's user roster exists before upgrade migration 0017.
+ db.executescript((MIGRATIONS/'0017_late_qr_auto_approval_push.sql').read_text(encoding='utf8'))
  return db
 
 class LateQrSchemaTests(unittest.TestCase):
