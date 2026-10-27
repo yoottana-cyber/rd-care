@@ -88,10 +88,10 @@ test('staff remember me issues 30-day server token; unchecked remains 8 hours',a
   assert.equal(insert.args[2]>=before+expected&&insert.args[2]<=before+expected+5,true);
  }
 });
-test('student and guardian remember only when requested, never before password change',async()=>{
+test('student and guardian remember is opt-in, first login does not force password change',async()=>{
  for(const [role,remember,firstChange,expected] of [
   ['student',true,false,30*86400],['guardian',true,false,30*86400],
-  ['student',false,false,8*3600],['guardian',true,true,8*3600]
+  ['student',false,false,8*3600],['guardian',true,true,30*86400]
  ]){
   const {env,calls,password}=await fakeLoginDb(role,{must_change_password:firstChange});
   const url='/api/portal/auth/login';
