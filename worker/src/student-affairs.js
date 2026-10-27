@@ -37,7 +37,7 @@ async function roster(env){
  return {teachers:teachers.results||[],rooms:rooms.results||[],heads:heads.results||[]};
 }
 async function eligibility(env,u,student){
- if(staff(u))return env.DB.prepare('SELECT id FROM students WHERE id=? AND active=1').bind(student).first();
+ if(staff(u)||u.role==='admin')return env.DB.prepare('SELECT id FROM students WHERE id=? AND active=1').bind(student).first();
  if(u.role!=='teacher')return null;
  return env.DB.prepare(`SELECT s.id FROM students s WHERE s.id=? AND s.active=1 AND
   (EXISTS(SELECT 1 FROM classrooms c WHERE c.id=s.classroom_id AND c.advisor_user_id=?)
@@ -110,8 +110,10 @@ export async function sendScheduledAttendanceReminders(env){
 }
 export async function studentAffairsRoutes(req,env,u,path){
  const method=req.method;const url=new URL(req.url),q=url.searchParams;
- if(!staff(u)&&!(u.role==='teacher'&&['/api/affairs/behavior/rules','/api/affairs/behavior/record'].includes(path)))
-  fail(403,'เฉพาะฝ่ายกิจการนักเรียนหรือผู้ดูแลระบบ');
+ const ordinaryBehavior=(method==='GET'&&path==='/api/affairs/behavior/rules')||
+  (method==='POST'&&path==='/api/affairs/behavior/record');
+ if(!staff(u)&&!(['teacher','admin'].includes(u.role)&&ordinaryBehavior))
+  fail(403,'เฉพาะครูที่ได้รับมอบหมายสิทธิ์ฝ่ายกิจการนักเรียน');
  let b=null;
  if(method==='POST'){
   const raw=await req.text();if(raw.length>10000)fail(413,'ข้อมูลมีขนาดใหญ่เกินไป');
