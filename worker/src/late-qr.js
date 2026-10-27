@@ -59,6 +59,11 @@ export async function lateGateStaffRoutes(req,env,user,path){
   return reply({ok:true,disabled:Number(result.meta?.changes||0)});
  }
  if(path==='/api/late/qr/queue'&&req.method==='GET'){
+  const requested=new URL(req.url).searchParams.get('date');
+  const viewDay=requested||day;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(viewDay)||!Number.isFinite(Date.parse(viewDay+'T00:00:00Z'))||
+   viewDay>day||Date.parse(day+'T00:00:00Z')-Date.parse(viewDay+'T00:00:00Z')>31*86400000)
+   fail(400,'แสดงประวัติ QR ได้ไม่เกิน 31 วันที่ผ่านมา');
   const {results}=await env.DB.prepare(`WITH scans AS (
     SELECT 'legacy-'||id AS id,request_id,student_id,school_date,issued_by,created_at
       FROM late_qr_submissions
@@ -79,14 +84,14 @@ export async function lateGateStaffRoutes(req,env,user,path){
    LEFT JOIN classrooms c ON c.id=h.classroom_id
    WHERE q.school_date=? AND (q.issued_by=? OR q.issued_by IS NULL OR ? IN('staff','admin'))
      AND (ae.id IS NULL OR ae.active=1)
-   ORDER BY q.created_at DESC,q.id DESC LIMIT 150`).bind(day,user.id,user.role).all();
+   ORDER BY q.created_at DESC,q.id DESC LIMIT 150`).bind(viewDay,user.id,user.role).all();
   const items=results.map(row=>({...row,
    can_delete:!!row.auto_id&&(
     user.role==='staff'||user.role==='admin'||row.advisor_user_id===user.id),
    can_delete_rejected:row.state==='rejected'&&!row.auto_id&&(
     user.role==='staff'||user.role==='admin'||row.advisor_user_id===user.id||
     (row.id.startsWith('legacy-')&&row.issued_by===user.id))}));
-  return reply({date:day,time:schoolTime(),items,
+  return reply({date:viewDay,time:schoolTime(),items,
     pending:items.filter(x=>x.state==='pending').length});
  }
  const deleteMatch=/^\/api\/late\/qr\/auto-(\d+)\/delete$/.exec(path);
