@@ -1,0 +1,30 @@
+{
+  "name": "RD CONNECT นักเรียน | โรงเรียนรัษฎา",
+  "short_name": "RD นักเรียน",
+  "id": "./?rd_connect_app=student",
+  "start_url": "./?login=student",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f0fbf4",
+  "theme_color": "#1766ae",
+  "description": "แอป RD CONNECT สำหรับนักเรียน โรงเรียนรัษฎา",
+  "lang": "th",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "./icons/student-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/student-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

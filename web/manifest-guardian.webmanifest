@@ -1,0 +1,30 @@
+{
+  "name": "RD CONNECT ผู้ปกครอง | โรงเรียนรัษฎา",
+  "short_name": "RD ผู้ปกครอง",
+  "id": "./?rd_connect_app=guardian",
+  "start_url": "./?login=guardian",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f0fbf4",
+  "theme_color": "#704f9e",
+  "description": "แอป RD CONNECT สำหรับผู้ปกครอง โรงเรียนรัษฎา",
+  "lang": "th",
+  "categories": [
+    "education",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "./icons/guardian-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icons/guardian-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
