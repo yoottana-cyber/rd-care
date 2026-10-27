@@ -182,15 +182,14 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   try{
    if(lateQrToken)state.view='late';
    const session=state.token;
-   const [data,notices,focused]=await Promise.all([
+   const [data,focused]=await Promise.all([
     call('/api/portal/children'),
-    state.account?.role==='guardian'?call('/api/portal/truancy'):Promise.resolve({items:[]}),
     noticeIntent&&state.account?.role==='guardian'?
      call('/api/portal/push/target?kind='+noticeIntent.kind+'&id='+noticeIntent.id)
       .then(item=>({item})).catch(()=>({missing:true})):Promise.resolve(null)
    ]);
    if(session!==state.token||!state.account)return;
-   state.children=data.items;state.truancy=notices.items||[];
+   state.children=data.items;state.truancy=[];
    if(focused){
     state.focus=focused.item||null;
     state.focusUnavailable=!!focused.missing;
@@ -212,9 +211,15 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   state.records=null;
   if(!studentId){renderDashboard();return}
   try{
-   const records=await call('/api/portal/records?student_id='+studentId+
-    '&from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to));
+   const [records,notices]=await Promise.all([
+    call('/api/portal/records?student_id='+studentId+
+     '&from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)),
+    state.account?.role==='guardian'?
+     call('/api/portal/truancy?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)):
+     Promise.resolve({items:[]})
+   ]);
    if(version!==requestVersion||studentId!==state.studentId||from!==state.from||to!==state.to)return;
+   state.truancy=(notices.items||[]).filter(e=>Number(e.student_id)===Number(studentId));
    state.records=records;renderDashboard();
   }catch(error){
    if(version!==requestVersion)return;
@@ -310,7 +315,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   const dayRows=r?.daily||[];
   const count=status=>dayRows.filter(x=>x.status===status).length;
   const topic=state.focus?.kind==='late'?'มาสาย':'หนีเรียน';
-  const recent=state.truancy.filter(x=>x.school_date===today()).length;
+  const recent=state.truancy.length;
   frame(`<section class="rd-portal-hero" data-portal-panel="home">
     <div class="rd-portal-hero-top"><span class="rd-portal-overline">RATSADA STUDENT CARE</span><span class="rd-portal-hero-mark" aria-hidden="true">✦</span></div>
     <p class="rd-portal-eyebrow">ยินดีต้อนรับสู่ RD Care</p>
@@ -338,7 +343,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     </section>`:''}
     ${guardian&&state.focusUnavailable?`<section class="rd-portal-card rd-portal-important" role="status">ไม่พบรายการแจ้งเตือนนี้ อาจถูกแก้ไข ยกเลิก หรือบัญชีนี้ไม่มีสิทธิ์ดู</section>`:''}
     ${guardian&&recent?`<section class="rd-portal-urgent"><span aria-hidden="true">🔔</span><div>
-      <strong>มีรายการการมาเรียนที่ควรตรวจสอบวันนี้</strong>
+      <strong>มีรายการการมาเรียนที่ควรตรวจสอบในช่วงวันที่เลือก</strong>
       <p>ดูข้อมูลและประสานกับโรงเรียนเมื่อมีข้อสงสัย</p>
       <button type="button" data-portal-open="alerts">เปิดรายการแจ้งเตือน</button>
      </div></section>`:''}
@@ -410,14 +415,14 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     </section>
    </section>`:`<section class="rd-portal-panel" data-portal-panel="alerts">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">SCHOOL NOTICES</span><h1>การแจ้งเตือน</h1>
-     <p>ติดตามข้อมูลการมาเรียนของนักเรียนในความดูแล</p></div>
+     <p>เหตุการณ์ของนักเรียนที่เลือก • ${esc(state.from===state.to?portalDate(state.from):portalDate(state.from)+' ถึง '+portalDate(state.to))}</p></div>
     <section class="rd-portal-card guardian-truancy-notices" id="guardianAlerts">
      <h2>🔔 แจ้งเตือนการมาเรียน</h2>
      ${state.truancy.length?state.truancy.map(e=>`<article class="rd-portal-notice">
       <span class="rd-portal-status rd-portal-status-critical">ข้อมูลที่ควรตรวจสอบ</span>
       <h3>${esc(e.full_name)}</h3><p>${esc(portalDate(e.school_date))} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
       <small>ครูบันทึกสถานะหนีเรียน กรุณาตรวจสอบข้อเท็จจริง</small>
-     </article>`).join(''):'<p class="rd-portal-empty">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}
+     </article>`).join(''):'<p class="rd-portal-empty">ไม่มีรายการหนีเรียนที่กำลังใช้งานในช่วงวันที่เลือก</p>'}
     </section>
     <section class="rd-portal-card rd-portal-notice-guide"><h2>การแจ้งเตือน Push</h2>
      <p>เปิดใช้งานและส่ง Push ทดสอบได้ในแท็บบัญชี หากมีเหตุการณ์ ระบบจะแจ้งประเภทและเปิดรายละเอียดที่เกี่ยวข้องหลังเข้าสู่ระบบ</p>

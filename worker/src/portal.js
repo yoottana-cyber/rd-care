@@ -157,7 +157,17 @@ export async function portalRoutes(req,env,path,ctx){
  }
  if(req.method==='GET'&&path==='/api/portal/push/target')return pushTarget(req,env,a,'guardian');
  if(path.startsWith('/api/portal/push/'))return guardianPushRoutes(req,env,a,path);
- if(req.method==='GET'&&path==='/api/portal/truancy')return reply({items:await guardianTruancyItems(env,a)});
+ if(req.method==='GET'&&path==='/api/portal/truancy'){
+   const q=new URL(req.url).searchParams,from=q.get('from'),to=q.get('to');
+   let range=null;
+   if(from!==null||to!==null){
+    if(!validDate(from)||!validDate(to)||from>to||
+      Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z')>89*86400000)
+     fail(400,'ช่วงวันที่ไม่ถูกต้อง (สูงสุด 90 วัน)');
+    range={from,to};
+   }
+   return reply({items:await guardianTruancyItems(env,a,range)});
+  }
  if(req.method==='GET'&&path==='/api/portal/children')return reply({items:await children(env,a)});
  if(req.method==='GET'&&path==='/api/portal/records')return records(req,env,a);
  fail(404,'ไม่พบ API');

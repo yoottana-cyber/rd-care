@@ -70,9 +70,9 @@ export async function guardianPushRoutes(req,env,account,path){
  }
  fail(404,'ไม่พบ API');
 }
-export async function guardianTruancyItems(env,account){
+export async function guardianTruancyItems(env,account,range=null){
  if(account.role!=='guardian')return [];
- const {results}=await env.DB.prepare(`SELECT e.id,e.school_date,t.period,t.subject,s.full_name,
+ const {results}=await env.DB.prepare(`SELECT e.id,e.student_id,e.school_date,t.period,t.subject,s.full_name,
   e.created_at FROM truancy_events e
   JOIN period_truancy tr ON tr.student_id=e.student_id AND tr.timetable_id=e.timetable_id
     AND tr.school_date=e.school_date
@@ -82,8 +82,9 @@ export async function guardianTruancyItems(env,account){
   JOIN students s ON s.id=e.student_id AND s.active=1
   JOIN guardian_student_links l ON l.student_id=e.student_id
   WHERE l.guardian_account_id=? AND e.active=1
-   AND e.school_date>=date('now','-30 days')
-  ORDER BY e.created_at DESC,e.id DESC LIMIT 40`).bind(account.id).all();
+   ${range?'AND e.school_date BETWEEN ? AND ?':"AND e.school_date>=date('now','-30 days')"}
+  ORDER BY e.created_at DESC,e.id DESC LIMIT 40`)
+  .bind(account.id,...(range?[range.from,range.to]:[])).all();
  return results;
 }
 export async function advisorTruancyItems(env,user){
