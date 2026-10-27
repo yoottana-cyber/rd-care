@@ -26,7 +26,7 @@ function renderFor(role,{qr=false,guardianFocus=false}={}){
  };
  const context={
   state,lateQrToken:qr?'gate':null,lateQrReceipt:null,
-  root:{querySelectorAll:()=>[]},portalPeriodMode,
+  root:{querySelectorAll:()=>[]},portalPeriodMode,isInstalledPwa:()=>false,
   frame:next=>{html=next},esc:escapeHtml,portalDate:x=>x,guardianPush:{bind(){}},
   table:()=>'<div class="rd-portal-record-list"></div>',
   statusLabel:x=>x,today:()=> '2026-10-27',
