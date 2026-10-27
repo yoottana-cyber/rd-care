@@ -43,6 +43,21 @@ export function pageLocation(navs,tab){
  return {title:entry?.[1]||'หน้าหลัก',description:PAGE_DESCRIPTIONS[tab]||PAGE_DESCRIPTIONS[normalized]||'จัดการข้อมูล RD CONNECT',
   group:groupNavigation(navs).find(group=>group.items.some(item=>item[0]===normalized))?.label||'RD CONNECT'};
 }
+// Navigation content is from role-filtered items, never user-supplied HTML.
+export function renderSidebarNavigation(navs,current){
+ return groupNavigation(navs).map(group=>{
+  const links=group.items.map(([id,label,icon])=>{
+   const active=current===id||(id==='periodAttendance'&&current==='periodCheckin');
+   return '<button type="button" class="rd-sidebar-link '+(active?'active':'')+
+    '" data-tab="'+id+'" title="'+label+'" '+(active?'aria-current="page"':'')+'>'+
+    '<span class="rd-sidebar-symbol" aria-hidden="true">'+icon+'</span>'+
+    '<span class="rd-sidebar-label">'+label+'</span></button>';
+  }).join('');
+  return '<section class="rd-sidebar-group" data-nav-group="'+group.id+'">'+
+   '<p class="rd-sidebar-group-heading"><span aria-hidden="true">'+group.icon+
+   '</span><span>'+group.label+'</span></p>'+links+'</section>';
+ }).join('');
+}
 export function searchNavItems(root,term){
  const query=String(term??'').trim().toLocaleLowerCase('th-TH');
  const links=[...root.querySelectorAll('.rd-sidebar-link')];
