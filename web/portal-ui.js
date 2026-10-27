@@ -4,7 +4,7 @@ import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea} from 
 import {createGuardianPush} from './guardian-push.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
 import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
-import {homeScreenRole} from './pwa-role.js';
+import {homeScreenRole,rememberHomeRole} from './pwa-role.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -158,7 +158,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      state.token=r.token;state.account=r.account;
      activeTokenKey=roleKey(state.role);
       saveAuthSession(activeTokenKey,r.token,r.expires_in,f.get('remember')==='on'&&!r.account.must_change_password);
-     setLastLoginArea('portal');
+     setLastLoginArea('portal');rememberHomeRole(state.role);
      if(state.account.must_change_password)showPasswordChange();
      else await showDashboard();
     }catch(error){message(error.message,true)}finally{if(button.isConnected)button.disabled=false}
@@ -529,6 +529,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     state.token='';clearAuthSession(activeTokenKey);showLogin('student');
     message('สแกน QR ลงชื่อมาสายต้องเข้าสู่ระบบด้วยบัญชีนักเรียน');return true;
    }
+   rememberHomeRole(state.account.role);
    if(state.account.must_change_password)showPasswordChange();else await showDashboard();
   }catch(error){
    if(!state.token){showLogin(expectedRole||state.role);return true}
