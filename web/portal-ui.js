@@ -10,7 +10,7 @@ const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'�
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
 export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
- const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today(),focus:null,focusUnavailable:false};
+ const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today(),view:'home',focus:null,focusUnavailable:false};
  const pushParams=new URLSearchParams(location.search);
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
@@ -29,6 +29,27 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
    history.replaceState(null,'',location.pathname+'?login=student'+location.hash);
  }
  const select=s=>root.querySelector(s);
+ const portalDate=value=>{
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return String(value||'');
+  const d=new Date(value+'T00:00:00Z');
+  return Number.isNaN(d.getTime())?value:new Intl.DateTimeFormat('th-TH',{
+   timeZone:'UTC',day:'numeric',month:'short',year:'numeric'}).format(d);
+ };
+ const statusTone=value=>['present','verified'].includes(value)?'positive':
+  ['late','pending'].includes(value)?'attention':['absent','truancy'].includes(value)?'critical':'neutral';
+ const statusLabel=value=>thaiStatus[value]||({verified:'ยืนยันแล้ว',pending:'รอตรวจสอบ',rejected:'ไม่อนุมัติ'}[value])||value||'—';
+ function setPortalView(view,scroll=false){
+  const allowed=state.account?.role==='guardian'?['home','attendance','alerts','account']:
+   ['home','attendance','late','account'];
+  state.view=allowed.includes(view)?view:'home';
+  root.querySelectorAll('[data-portal-panel]').forEach(el=>{el.hidden=el.dataset.portalPanel!==state.view});
+  root.querySelectorAll('[data-portal-view]').forEach(el=>{
+   const active=el.dataset.portalView===state.view;
+   el.classList.toggle('active',active);
+   if(active)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');
+  });
+  if(scroll)window.scrollTo(0,0);
+ }
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
  const guardianPush=createGuardianPush({call,select,message});
  async function call(path,{method='GET',body,auth=true}={}){
@@ -56,16 +77,34 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     </div>
     <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
     </section></div>`
-    :`<div class="login-wrap portal-wrap"><section class="card portal-card stack">
-    <div class="login-head"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><h1>RD Care</h1><p>พื้นที่นักเรียนและผู้ปกครอง</p></div>
-    ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div>
-    <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div></section></div>`;
+    :`<div class="rd-portal-mobile" data-role="${state.account?.role==='guardian'?'guardian':'student'}">
+     <header class="rd-portal-bar"><div class="rd-portal-school">
+      <img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="48" height="48" decoding="async">
+      <div><strong>RD Care</strong><small>โรงเรียนรัษฎา</small></div></div>
+      <span class="rd-portal-role">${state.account?.role==='guardian'?'ผู้ปกครอง':'นักเรียน'}</span>
+     </header>
+     <main class="rd-portal-content" id="portalMain" tabindex="-1">
+      ${inner}<div id="portalMessage" class="rd-portal-feedback" role="status" aria-live="polite"></div>
+     </main>
+     <nav class="rd-portal-bottom" aria-label="เมนูหลัก">
+      ${[['home','⌂','หน้าหลัก'],['attendance','▦','การมาเรียน'],
+        state.account?.role==='guardian'?['alerts','♧','แจ้งเตือน']:['late','◷','มาสาย'],
+        ['account','☷','บัญชี']].map(([id,icon,label])=>`<button type="button" data-portal-view="${id}" aria-label="${label}">
+         <span class="rd-portal-nav-icon" aria-hidden="true">${icon}</span><span>${label}</span>
+        </button>`).join('')}
+     </nav>
+    </div>`;
   bindThemeButtons();
+  if(!login){
+   root.querySelectorAll('[data-portal-view]').forEach(btn=>btn.addEventListener('click',()=>setPortalView(btn.dataset.portalView,true)));
+   root.querySelectorAll('[data-portal-open]').forEach(btn=>btn.addEventListener('click',()=>setPortalView(btn.dataset.portalOpen,true)));
+   setPortalView(state.view);
+  }
  }
  function showLogin(role=state.role){
   if(lateQrToken)role='student';
   if(noticeIntent)role='guardian';
-  state.role=role;requestVersion++;
+  state.role=role;state.view='home';requestVersion++;
   state.account=null;state.children=[];state.records=null;
   frame(`<h2 class="login-heading">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
     <p class="muted portal-login-intro">${role==='student'?'สำหรับนักเรียนโรงเรียนรัษฎา • ใช้บัญชีที่โรงเรียนออกให้':'สำหรับผู้ปกครอง • ติดตามข้อมูลเฉพาะนักเรียนในความดูแล'}</p>
@@ -123,11 +162,12 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   requestVersion++;
   if(state.account?.role==='guardian')try{await guardianPush.disable({silent:true})}catch{}
   try{if(state.token)await call('/api/portal/auth/logout',{method:'POST',body:{}})}catch{}
-  state.token='';state.account=null;state.records=null;state.children=[];state.focus=null;noticeIntent=null;
+  state.token='';state.account=null;state.records=null;state.children=[];state.focus=null;state.view='home';noticeIntent=null;
   clearAuthSession('rd_portal_token');showLogin();
  }
  async function showDashboard(){
   try{
+   if(lateQrToken)state.view='late';
    const session=state.token;
    const [data,notices,focused]=await Promise.all([
     call('/api/portal/children'),
@@ -145,7 +185,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
      state.studentId=Number(state.focus.student_id);
      state.from=state.focus.school_date;state.to=state.focus.school_date;
     }
-    noticeIntent=null;
+    noticeIntent=null;state.view='home';
     history.replaceState(null,'',location.pathname+'?login=guardian'+location.hash);
    }
    if(!state.children.some(s=>s.id===state.studentId))state.studentId=state.children[0]?.id||null;
