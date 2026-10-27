@@ -195,3 +195,21 @@
 [data-theme="dark"] .rd-portal-outline,[data-theme="dark"] .rd-portal-account-actions .theme-switch{background:#284534;border-color:#426c51;color:#d0f7de}
 [data-theme="dark"] .rd-portal-empty{background:#1a2e23;border-color:#42614e}
 @media(prefers-reduced-motion:reduce){.rd-portal-mobile *{scroll-behavior:auto!important;transition:none!important}}
+
+/* One-tap password visibility in the role-specific mobile login. */
+.portal-wrap .rd-portal-password-field{position:relative;display:flex;align-items:center;width:100%}
+.portal-wrap .rd-portal-password-field input{width:100%;padding-right:86px!important}
+.portal-wrap .rd-portal-password-field button{
+ position:absolute;right:7px;top:50%;transform:translateY(-50%);
+ border:1px solid #d0e5d7;border-radius:9px;background:#edf9f1;color:#147146;
+ height:35px;min-width:66px;font-size:12px;font-weight:800;cursor:pointer;
+}
+.portal-wrap .rd-portal-password-field button:focus-visible{outline:3px solid #e1b34e;outline-offset:2px}
+@media(max-width:570px){
+ .portal-wrap .portal-login-card .login-brand{padding:18px 18px 20px}
+ .portal-wrap .portal-login-card .login-crest{width:105px;height:100px;margin-bottom:10px}
+ .portal-wrap .portal-login-card .login-content{padding:20px 18px}
+}
+[data-theme="dark"] .portal-wrap .rd-portal-password-field button{
+ background:#28533c;border-color:#42684f;color:#d0f6dd
+}
