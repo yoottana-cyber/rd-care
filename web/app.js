@@ -590,7 +590,11 @@ async function loadAdvisorCenter(){
  const focusHtml=focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
   <h3>🔔 รายละเอียดแจ้งเตือน${focus.kind==='attendance_review'?'ขาดรายคาบรอตรวจสอบ':'หนีเรียน'}</h3><strong>${esc(focus.full_name)}</strong>
   <p>ห้อง ${esc(focus.classroom_label)} • วันที่ ${esc(focus.school_date)} • คาบ ${esc(focus.period)} • วิชา ${esc(focus.subject)}</p>
-  <p class="muted">${focus.kind==='attendance_review'?'รายการนี้รอครูที่ปรึกษาพิจารณาด้านล่าง':'โปรดตรวจสอบข้อเท็จจริงของเหตุการณ์กับนักเรียน'}</p></section>`:'';
+  <p class="muted">${focus.kind==='attendance_review'?'รายการนี้รอครูที่ปรึกษาพิจารณา':'โปรดตรวจสอบข้อเท็จจริงของเหตุการณ์กับนักเรียน'}</p>
+  ${focus.kind==='attendance_review'?`<div class="row">
+   <button class="button secondary" data-advisor-review="${Number(focus.id)}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต / บันทึกผิด</button>
+   <button class="button" data-advisor-review="${Number(focus.id)}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button>
+  </div>`:''}</section>`:'';
  mount(`<section class="stack"><div><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="muted">รับรายการไม่เข้าคาบจากครูผู้สอน และยืนยันผลก่อนบันทึกเหตุการณ์แจ้งผู้ปกครอง</p></div>
  ${focusHtml}
  <section class="card stack"><div class="row between"><div class="field smallbox"><label for="advisorRoom">ห้องที่รับผิดชอบ</label>
