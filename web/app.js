@@ -222,7 +222,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
@@ -332,7 +332,7 @@ async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();state.tab=tab
   state.notice=null;
   return lateGate.load({noticeId});
  }
- if(tab==='behavior')return loadBehavior();
+ if(tab==='behavior'||tab==='good')return loadBehavior();
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
  if(tab==='adminStudents')return loadAdminStudents();
@@ -360,7 +360,8 @@ function renderDashboard(){
   ...(state.user?.role==='teacher'?[['myTimetable','📚','ตารางสอนของฉัน','สร้างตารางสอนรายสัปดาห์','quick-blue']]:[]),
   ['advisorCenter','🧑‍🏫','ศูนย์ครูที่ปรึกษา','ตรวจสอบงานขาดเรียน','quick-purple'],
   ['late','⏰','มาสาย','ตรวจสอบรายการมาสาย','quick-teal'],
-  ['behavior','⭐','พฤติกรรม','บันทึกและตรวจสอบ','quick-orange'],
+  ['behavior','⚖️','คะแนนพฤติกรรม','ความผิดและการปรับพฤติกรรม','quick-orange'],
+   ['good','⭐','คะแนนความดี','บันทึกความดีแยกจากพฤติกรรม','quick-blue'],
   ['alerts','🔔','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
   ...(state.user?.role==='admin'?[['adminStudents','🎓','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue']]:[])
  ];
@@ -629,42 +630,52 @@ async function loadBehavior(){
   api('/api/students?classroom_id='+state.roomId),
   api('/api/affairs/behavior/rules')
  ]);
- state.students=students.items;state.behaviorRules=(rules.items||[]).filter(x=>x.active);
+ state.students=students.items;
+ state.behaviorRules=(rules.items||[]).filter(x=>x.active);
  state.studentId=state.students.some(x=>x.id===state.studentId)?state.studentId:state.students[0]?.id||null;
  if(state.studentId){
   const history=await api('/api/behavior?student_id='+state.studentId);
-  state.behaviors=history.items;state.behaviorTotal=history.total;
- }else{state.behaviors=[];state.behaviorTotal=0}
+  state.behaviors=history.items;state.behaviorScores=history;
+ }else{state.behaviors=[];state.behaviorScores={good_total:0,behavior_remaining:0}}
  renderBehavior();
 }
 function renderBehavior(){
- const choices=state.behaviorRules||[];
- const categories={good:'การทำความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
-  serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก'};
- mount(`<div class="stack"><div><h2>คะแนนพฤติกรรมนักเรียน</h2>
-  <p class="muted">เลือกพฤติกรรมตามเกณฑ์คะแนนกลางที่ฝ่ายกิจการนักเรียนกำหนด • ทุกการบันทึกมีประวัติผู้ดำเนินการ</p></div>
+ const isGood=state.tab==='good';
+ const choices=(state.behaviorRules||[]).filter(x=>isGood?x.category==='good':x.category!=='good');
+ const history=(state.behaviors||[]).filter(x=>isGood?x.score_type==='good':x.score_type!=='good');
+ const labels={good:'ทำความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
+  serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก',adjustment:'ปรับพฤติกรรม'};
+ const scores=state.behaviorScores||{};
+ mount(`<div class="stack"><div><h2>${isGood?'คะแนนความดี':'คะแนนพฤติกรรม'}</h2>
+  <p class="muted">${isGood?'คะแนนความดีสะสมแยกต่างหาก ไม่ใช้ลบล้างความผิด':
+    'บันทึกความผิดตามเกณฑ์โรงเรียน • ลดคะแนนความผิดสะสมได้เฉพาะการปรับพฤติกรรมที่ฝ่ายกิจการนักเรียนอนุมัติ'}</p></div>
   <div class="card stack">${filters({date:false})}
-   <form id="behaviorForm" class="stack"><div class="field"><label for="behaviorStudent">นักเรียน</label>
+   <form id="behaviorForm" class="stack">
+    <div class="field"><label for="behaviorStudent">นักเรียน</label>
     <select id="behaviorStudent" name="student_id">${state.students.map(st=>`
       <option value="${st.id}" ${st.id===state.studentId?'selected':''}>${st.roll_no}. ${esc(st.full_name)}</option>`).join('')}</select></div>
-    <div class="field"><label for="behaviorRule">เลือกประเภทพฤติกรรม / เกณฑ์คะแนน</label>
+    <div class="field"><label for="behaviorRule">${isGood?'เลือกการทำความดี':'เลือกความผิดตามเกณฑ์'}</label>
      <select id="behaviorRule" name="rule_id" required>
-      <option value="">เลือกเกณฑ์พฤติกรรม</option>
-      ${choices.map(rule=>`<option value="${rule.id}">${esc(categories[rule.category]||rule.category)}
+      <option value="">เลือกเกณฑ์</option>
+      ${choices.map(rule=>`<option value="${rule.id}">${esc(labels[rule.category]||rule.category)}
        • ${esc(rule.name)} (${rule.points>0?'+':''}${Number(rule.points)})</option>`).join('')}
      </select></div>
     <div class="field"><label>รายละเอียดของเหตุการณ์</label>
      <textarea name="reason" maxlength="300" required placeholder="บันทึกเหตุการณ์ตามข้อเท็จจริง"></textarea></div>
-    <button class="button full" type="submit" ${!state.students.length||!choices.length?'disabled':''}>บันทึกตามเกณฑ์โรงเรียน</button>
-    ${!choices.length?'<p class="warn">ฝ่ายกิจการนักเรียนยังไม่ได้เปิดใช้เกณฑ์พฤติกรรม กรุณาติดต่อฝ่ายกิจการนักเรียนเพื่อกำหนดเกณฑ์ก่อนบันทึกคะแนน</p>':''}
+    <button class="button full" type="submit" ${!state.students.length||!choices.length?'disabled':''}>
+      ${isGood?'บันทึกคะแนนความดี':'บันทึกคะแนนความผิด'}</button>
+    ${!choices.length?'<p class="warn">ฝ่ายกิจการนักเรียนยังไม่ได้เปิดเกณฑ์หมวดนี้</p>':''}
    </form></div>
-   <div class="card"><div class="row between"><h3>ประวัติคะแนนนักเรียน</h3>
-    <span class="tag">ยอดรวม ${Number(state.behaviorTotal)} คะแนน</span></div>
-    ${state.behaviors.length?`<div class="table-wrap"><table class="table"><thead><tr>
-      <th>คะแนน</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลา</th></tr></thead><tbody>
-      ${state.behaviors.map(row=>`<tr><td>${row.points>0?'+':''}${row.points}</td><td>${esc(row.reason)}</td>
+   <div class="card">
+    <div class="row between"><h3>${isGood?'ประวัติความดี':'ประวัติความผิดและการปรับพฤติกรรม'}</h3>
+     <span class="tag">${isGood?'คะแนนความดีสะสม '+Number(scores.good_total||0):
+      'คะแนนความผิดคงเหลือ '+Number(scores.behavior_remaining||0)}</span></div>
+    ${history.length?`<div class="table-wrap"><table class="table"><thead><tr>
+      <th>ประเภท</th><th>คะแนน</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลา</th></tr></thead><tbody>
+      ${history.map(row=>`<tr><td>${esc(row.score_type==='adjustment'?'ปรับพฤติกรรม':row.score_type==='good'?'ความดี':'ความผิด')}</td>
+       <td>${row.points>0?'+':''}${row.points}</td><td>${esc(row.reason)}</td>
        <td>${esc(row.teacher_name)}</td><td>${esc(row.created_at)}</td></tr>`).join('')}
-      </tbody></table></div>`:'<div class="empty">ยังไม่มีประวัติ</div>'}
+      </tbody></table></div>`:'<div class="empty">ยังไม่มีประวัติในหมวดนี้</div>'}
    </div></div>`);
  bindFilters(loadBehavior);
  $('#behaviorStudent')?.addEventListener('change',e=>safeRun(async()=>{
@@ -675,7 +686,7 @@ function renderBehavior(){
   await api('/api/affairs/behavior/record',{method:'POST',body:{
    student_id:Number(data.get('student_id')),rule_id:Number(data.get('rule_id')),
    reason:String(data.get('reason'))}});
-  toast('บันทึกคะแนนตามเกณฑ์สำเร็จ');await loadBehavior();
+  toast(isGood?'บันทึกคะแนนความดีสำเร็จ':'บันทึกคะแนนความผิดสำเร็จ');await loadBehavior();
  }));
 }
 async function loadAdvisorCenter(){
