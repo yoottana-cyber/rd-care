@@ -104,7 +104,17 @@ class LateQrSchemaTests(unittest.TestCase):
   worker=(ROOT/'worker'/'src'/'late-qr-auto.js').read_text(encoding='utf8')
   begin=worker.index('await env.DB.batch([')
   end=worker.index(']);',begin)
-  sql=re.findall(r'env\\.DB\\.prepare\\(\\\x60([\\s\\S]*?)\\\x60\\)',worker[begin:end])
+  chunk=worker[begin:end]
+  sql=[]
+  cursor=0
+  while True:
+   left=chunk.find('env.DB.prepare(`',cursor)
+   if left<0:break
+   left+=len('env.DB.prepare(`')
+   right=chunk.find('`)',left)
+   if right<0:raise AssertionError('Unclosed SQL template in auto-approval batch')
+   sql.append(chunk[left:right])
+   cursor=right+2
   self.assertEqual(len(sql),6)
   return sql
  def _approve_auto(self,day='2026-10-26'):
