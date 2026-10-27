@@ -26,7 +26,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0};
+const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0,notice:null};
 const referenceCache=createRequestCache();
 const pwaTools=createPwaTools({api,toast});
 const lateGate=createLateGate({api,mount,toast,safeRun});
@@ -146,7 +146,11 @@ function renderStudentLate(){
 async function boot(){
  const [me,rooms]=await Promise.all([api('/api/auth/me'),api('/api/classrooms')]);state.user=me.user;state.rooms=rooms.items;
  if(!state.rooms.some(r=>r.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
- const requested=new URLSearchParams(location.search).get('tab');
+ const query=new URLSearchParams(location.search),requested=query.get('tab');
+ const kind=query.get('notice_kind'),id=query.get('notice_id');
+ state.notice=((kind==='truancy'&&requested==='advisorCenter')||(kind==='late'&&requested==='lateGate'))&&
+  /^\d{1,15}$/.test(id||'')&&Number.isSafeInteger(Number(id))&&Number(id)>0?
+  {kind,id:Number(id)}:null;
  if(requested==='notifications'||requested==='advisorCenter'||requested==='lateGate'){
   history.replaceState(null,'',location.pathname);
   await showTab(requested);
@@ -253,7 +257,11 @@ async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();state.tab=tab
  if(tab==='myTimetable')return myTimetable.load();
  if(tab==='advisorCenter')return loadAdvisorCenter();
  if(tab==='late')return loadLate();
- if(tab==='lateGate')return lateGate.load();
+ if(tab==='lateGate'){
+  const noticeId=state.notice?.kind==='late'?state.notice.id:null;
+  state.notice=null;
+  return lateGate.load({noticeId});
+ }
  if(tab==='behavior')return loadBehavior();
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
@@ -556,6 +564,15 @@ function renderBehavior(){mount(`<div class="stack"><div><h2>คะแนนพ�
  $('#behaviorForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api('/api/behavior',{method:'POST',body:{student_id:Number(f.get('student_id')),points:Number(f.get('points')),reason:f.get('reason')}});toast('บันทึกคะแนนสำเร็จ');await loadBehavior()}));
 }
 async function loadAdvisorCenter(){
+ const noticeId=state.notice?.kind==='truancy'?state.notice.id:null;
+ state.notice=null;
+ let focus=null;
+ if(noticeId){
+  try{
+   focus=await api('/api/push/target?kind=truancy&id='+noticeId);
+   state.roomId=Number(focus.classroom_id);
+  }catch{toast('รายการแจ้งเตือนถูกแก้ไขหรือบัญชีนี้ไม่มีสิทธิ์ดู',true)}
+ }
  const advisory=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
  if(!advisory.length){
   mount('<section class="card stack"><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="warn">ยังไม่มีห้องที่ได้รับมอบหมายเป็นครูที่ปรึกษา สามารถติดต่อผู้ดูแลระบบเพื่อผูกห้องเรียนได้</p></section>');
@@ -570,7 +587,12 @@ async function loadAdvisorCenter(){
  if(state.tab!=='advisorCenter'||state.roomId!==selected)return;
  const items=data.items;
  const truancy=(urgent.items||[]).filter(e=>Number(e.classroom_id)===selected);
+ const focusHtml=focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
+  <h3>🔔 รายละเอียดแจ้งเตือนหนีเรียน</h3><strong>${esc(focus.full_name)}</strong>
+  <p>ห้อง ${esc(focus.classroom_label)} • วันที่ ${esc(focus.school_date)} • คาบ ${esc(focus.period)} • วิชา ${esc(focus.subject)}</p>
+  <p class="muted">โปรดตรวจสอบข้อเท็จจริงของเหตุการณ์กับนักเรียน</p></section>`:'';
  mount(`<section class="stack"><div><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="muted">รับรายการไม่เข้าคาบจากครูผู้สอน และยืนยันผลก่อนบันทึกเหตุการณ์แจ้งผู้ปกครอง</p></div>
+ ${focusHtml}
  <section class="card stack"><div class="row between"><div class="field smallbox"><label for="advisorRoom">ห้องที่รับผิดชอบ</label>
  <select id="advisorRoom">${advisory.map(r=>`<option value="${r.id}" ${r.id===selected?'selected':''}>${esc(r.label)}</option>`).join('')}</select></div>
  <strong>รอตรวจสอบ ${items.length} รายการ</strong></div>
@@ -586,6 +608,7 @@ async function loadAdvisorCenter(){
  <p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
  <p class="muted">แจ้งผู้ปกครองผ่าน Push สำหรับเหตุหนีเรียนและมาสายที่บันทึกผ่าน QR โดยส่งเฉพาะอุปกรณ์ที่สมัครรับแล้ว</p></section>`);
+ if(focus)$('#pushNoticeFocus')?.scrollIntoView({block:'start'});
  $('#advisorRoom')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);await loadAdvisorCenter()}));
  $$('[data-advisor-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
   if(!confirm(button.dataset.state==='confirmed'?'ยืนยันว่าไม่เข้าคาบเรียน?':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;
@@ -789,7 +812,15 @@ async function start(){
   if(portalUi.hasSession()){await portalUi.resume();return}
   portalUi.showLogin('student');return;
  }
- if(portalUi.hasSession()&&(!state.token||getLastLoginArea()==='portal')){await portalUi.resume();return}
+ const launchQuery=new URLSearchParams(location.search);
+ const guardianPushIntent=['late','truancy'].includes(launchQuery.get('portal_notice'))&&
+  /^\d{1,15}$/.test(launchQuery.get('notice_id')||'');
+ if(guardianPushIntent){
+  if(portalUi.hasSession()){await portalUi.resume();return}
+  portalUi.showLogin('guardian');return;
+ }
+ const staffPushIntent=['advisorCenter','lateGate','notifications'].includes(launchQuery.get('tab'));
+ if(portalUi.hasSession()&&(!state.token||getLastLoginArea()==='portal')&&!staffPushIntent){await portalUi.resume();return}
  if(!state.token){renderLogin();return}
  try{await boot()}catch(error){
   // A broken/offline network should not erase a remembered session. Only 401 does that
