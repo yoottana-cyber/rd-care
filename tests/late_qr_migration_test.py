@@ -1,6 +1,7 @@
 """Verify QR late gate D1 schema and constraints with real SQLite."""
 import pathlib
 import sqlite3
+import re
 import unittest
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -97,6 +98,66 @@ class LateQrSchemaTests(unittest.TestCase):
   self.assertEqual(rows[0][0],'static-1')
   self.assertEqual(rows[0][3],'08:30')
 
+ def _auto_sql(self):
+  worker=(ROOT/'worker'/'src'/'late-qr-auto.js').read_text(encoding='utf8')
+  begin=worker.index('await env.DB.batch([')
+  end=worker.index(']);',begin)
+  sql=re.findall(r'env\\.DB\\.prepare\\(\\\x60([\\s\\S]*?)\\\x60\\)',worker[begin:end])
+  self.assertEqual(len(sql),6)
+  return sql
+ def _approve_auto(self,day='2026-10-26'):
+  sysid=self.db.execute("SELECT id FROM users WHERE username='rd-care-late-system'").fetchone()[0]
+  values=[
+   (1,day,'08:24','รถติด',sysid),
+   (1,day,1,day),
+   (1,day),
+   (1,day,'08:24','รถติด',sysid,sysid),
+   (1,day,sysid),
+   ('1:'+day,)
+  ]
+  for sql,bind in zip(self._auto_sql(),values):
+   self.db.execute(sql,bind)
+  return sysid
+ def test_automatic_qr_creates_verified_late_record_and_daily_late(self):
+  sysid=self._approve_auto()
+  self.assertEqual(self.db.execute("SELECT state FROM late_self_requests").fetchone()[0],'verified')
+  self.assertEqual(self.db.execute("SELECT state FROM late_records").fetchone()[0],'verified')
+  self.assertEqual(self.db.execute("SELECT status,recorded_by FROM attendance_daily").fetchone(),('late',sysid))
+  self.assertEqual(self.db.execute("SELECT previous_daily_status FROM late_qr_auto_events").fetchone()[0],None)
+ def test_daily_previous_status_is_captured_and_can_be_restored(self):
+  self.db.execute("""INSERT INTO attendance_daily(student_id,school_date,status,recorded_by)
+   VALUES(1,'2026-10-26','present',1)""")
+  sysid=self._approve_auto()
+  self.assertEqual(self.db.execute("SELECT status FROM attendance_daily").fetchone()[0],'late')
+  prior=self.db.execute("SELECT previous_daily_status,previous_daily_recorded_by FROM late_qr_auto_events").fetchone()
+  self.assertEqual(prior,('present',1))
+  self.db.execute("""UPDATE attendance_daily SET status=?,recorded_by=?
+   WHERE student_id=1 AND school_date='2026-10-26' AND status='late' AND recorded_by=?""",
+   (prior[0],prior[1],sysid))
+  self.assertEqual(self.db.execute("SELECT status,recorded_by FROM attendance_daily").fetchone(),('present',1))
+ def test_correction_does_not_override_later_human_edit(self):
+  sysid=self._approve_auto()
+  self.db.execute("""UPDATE attendance_daily SET status='absent',recorded_by=1
+   WHERE student_id=1 AND school_date='2026-10-26'""")
+  self.db.execute("""DELETE FROM attendance_daily WHERE student_id=1
+   AND school_date='2026-10-26' AND status='late' AND recorded_by=?""",(sysid,))
+  self.assertEqual(self.db.execute("SELECT status FROM attendance_daily").fetchone()[0],'absent')
+ def test_failed_duplicate_cannot_create_two_auto_push_events(self):
+  self._approve_auto()
+  self.assertEqual(self.db.execute("SELECT COUNT(*) FROM late_qr_auto_events").fetchone()[0],1)
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("""INSERT INTO late_qr_auto_events(request_id,student_id,school_date)
+    VALUES(1,1,'2026-10-26')""")
+ def test_push_delivery_ledger_unique_per_event_and_device(self):
+  self._approve_auto()
+  self.db.execute("""INSERT INTO late_qr_push_deliveries(event_id,recipient_type,subscription_id)
+    VALUES(1,'advisor',11)""")
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("""INSERT INTO late_qr_push_deliveries(event_id,recipient_type,subscription_id)
+    VALUES(1,'advisor',11)""")
+  self.db.execute("""UPDATE late_qr_push_deliveries SET attempts=3 WHERE event_id=1""")
+  with self.assertRaises(sqlite3.IntegrityError):
+   self.db.execute("""UPDATE late_qr_push_deliveries SET attempts=4 WHERE event_id=1""")
  def test_permanent_qr_requires_real_request_record(self):
   with self.assertRaises(sqlite3.IntegrityError):
    self.db.execute("""INSERT INTO late_static_qr_submissions(request_id,student_id,school_date)
