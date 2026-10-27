@@ -66,7 +66,7 @@ export async function lateGateStaffRoutes(req,env,user,path){
     SELECT 'static-'||id AS id,request_id,student_id,school_date,
       NULL AS issued_by,created_at FROM late_static_qr_submissions
    )
-   SELECT q.id,q.school_date,q.created_at,
+   SELECT q.id,q.issued_by,q.school_date,q.created_at,
     r.arrived_at,r.reason,r.state,s.student_no,s.full_name,
     ae.id AS auto_id,ae.active AS auto_active,c.advisor_user_id,
     c.label AS classroom_label,h.roll_no
@@ -82,13 +82,51 @@ export async function lateGateStaffRoutes(req,env,user,path){
    ORDER BY q.created_at DESC,q.id DESC LIMIT 150`).bind(day,user.id,user.role).all();
   const items=results.map(row=>({...row,
    can_delete:!!row.auto_id&&(
-    user.role==='staff'||user.role==='admin'||row.advisor_user_id===user.id)}));
+    user.role==='staff'||user.role==='admin'||row.advisor_user_id===user.id),
+   can_delete_rejected:row.state==='rejected'&&!row.auto_id&&(
+    user.role==='staff'||user.role==='admin'||row.advisor_user_id===user.id||
+    (row.id.startsWith('legacy-')&&row.issued_by===user.id))}));
   return reply({date:day,time:schoolTime(),items,
     pending:items.filter(x=>x.state==='pending').length});
  }
  const deleteMatch=/^\/api\/late\/qr\/auto-(\d+)\/delete$/.exec(path);
  if(deleteMatch&&req.method==='POST')
   return reply(await revokeAutoLateQr(env,user,Number(deleteMatch[1])));
+ const rejectedDelete=/^\/api\/late\/qr\/(static-\d+|legacy-\d+)\/delete-rejected$/.exec(path);
+ if(rejectedDelete&&req.method==='POST'){
+  const isPermanent=rejectedDelete[1].startsWith('static-');
+  const id=Number(rejectedDelete[1].replace(/^(static-|legacy-)/,''));
+  if(!Number.isSafeInteger(id)||id<1)fail(400,'รายการไม่ถูกต้อง');
+  const source=isPermanent?'late_static_qr_submissions':'late_qr_submissions';
+  const item=await env.DB.prepare(`SELECT q.request_id,${isPermanent?'NULL':'q.issued_by'} AS issued_by,
+   r.state,r.school_date,ae.id AS auto_id,c.advisor_user_id
+   FROM ${source} q JOIN late_self_requests r ON r.id=q.request_id
+   LEFT JOIN late_qr_auto_events ae ON ae.request_id=r.id
+   LEFT JOIN student_enrollments h ON h.student_id=r.student_id
+    AND h.start_date<=r.school_date AND (h.end_date IS NULL OR h.end_date>r.school_date)
+   LEFT JOIN classrooms c ON c.id=h.classroom_id
+   WHERE q.id=?`).bind(id).first();
+  if(!item)fail(404,'ไม่พบรายการลงชื่อ');
+  if(!['staff','admin'].includes(user.role)&&item.advisor_user_id!==user.id&&
+     (isPermanent||item.issued_by!==user.id))
+   fail(403,'ลบได้เฉพาะรายการของครูเวรผู้รับผิดชอบหรือครูที่ปรึกษา');
+  if(item.state!=='rejected'||item.auto_id)fail(409,'ลบได้เฉพาะรายการที่ไม่อนุมัติและไม่มีประวัติอนุมัติอัตโนมัติ');
+  // Delete the rejected request, cascading only its QR submission. Keep the audit
+  // trail; never alter late_records or attendance_daily from this endpoint.
+  const results=await env.DB.batch([
+   env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
+    SELECT ?,'late_qr_rejected_deleted','late_self_requests',CAST(r.id AS TEXT)
+    FROM late_self_requests r WHERE r.id=? AND r.state='rejected'
+      AND NOT EXISTS(SELECT 1 FROM late_qr_auto_events e WHERE e.request_id=r.id)`)
+    .bind(user.id,item.request_id),
+   env.DB.prepare(`DELETE FROM late_self_requests WHERE id=? AND state='rejected'
+    AND NOT EXISTS(SELECT 1 FROM late_qr_auto_events e
+     WHERE e.request_id=late_self_requests.id)`).bind(item.request_id)
+  ]);
+  if(!results[0]?.meta?.changes||!results[1]?.meta?.changes)
+   fail(409,'รายการนี้ถูกลบหรือเปลี่ยนสถานะแล้ว');
+  return reply({ok:true,deleted:true,message:'ลบรายการที่ไม่อนุมัติแล้ว'});
+ }
  const match=/^\/api\/late\/qr\/(static-\d+|legacy-\d+|\d+)\/review$/.exec(path);
  if(match&&req.method==='POST'){
   const b=await read(req),isPermanent=match[1].startsWith('static-');

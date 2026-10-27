@@ -56,6 +56,8 @@ export function createLateGate({api,mount,toast,safeRun}){
         <p class="${item.state==='pending'?'warn':'muted'}">${esc(statuses[item.state]||item.state)}</p>
         ${item.auto_id&&item.can_delete?`<div class="row"><button class="button secondary" type="button"
           data-qr-delete="${Number(item.auto_id)}">🗑️ ลบรายการมาสาย</button></div>`:''}
+        ${item.state==='rejected'&&item.can_delete_rejected?`<div class="row"><button class="button secondary" type="button"
+          data-qr-delete-rejected="${esc(item.id)}">🗑️ ลบรายการนี้</button></div>`:''}
         ${item.state==='pending'?`<div class="row">
          <button class="button" type="button" data-qr-review="${esc(item.id)}" data-status="verified">ยืนยันมาสาย</button>
          <button class="button secondary" type="button" data-qr-review="${esc(item.id)}" data-status="rejected">ไม่อนุมัติ</button>
@@ -76,6 +78,18 @@ export function createLateGate({api,mount,toast,safeRun}){
    try{
     const result=await api('/api/late/qr/auto-'+id+'/delete',{method:'POST',body:{}});
     toast(result.restoredDaily?'ลบรายการแล้ว และคืนสถานะเช็กชื่อเดิม':'ลบรายการแล้ว (เช็กชื่อรายวันมีการแก้ไขใหม่ หรือไม่มีรายการที่ต้องคืนค่า)');
+    await poll(true);
+   }finally{if(button.isConnected)button.disabled=false}
+  })));
+  document.querySelectorAll('[data-qr-delete-rejected]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+   const id=button.dataset.qrDeleteRejected;
+   const item=state.queue.find(x=>String(x.id)===id);
+   if(!item||item.state!=='rejected'||!item.can_delete_rejected)return;
+   if(!confirm('ลบรายการที่ไม่อนุมัติของ '+item.full_name+' ออกจากระบบ? การลบนี้ไม่แก้ไขผลเช็กชื่อรายวัน และมีการบันทึกประวัติผู้ลบ'))return;
+   button.disabled=true;
+   try{
+    await api('/api/late/qr/'+encodeURIComponent(id)+'/delete-rejected',{method:'POST',body:{}});
+    toast('ลบรายการที่ไม่อนุมัติแล้ว');
     await poll(true);
    }finally{if(button.isConnected)button.disabled=false}
   })));
