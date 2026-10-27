@@ -4,7 +4,7 @@ export const NAV_GROUPS=[
  {id:'attendance',label:'การเช็กชื่อและติดตาม',icon:'◷',
   pages:['attendance','periodAttendance','myTimetable','advisorCenter','late','lateGate','alerts']},
  {id:'care',label:'ดูแลและส่งเสริม',icon:'✦',pages:['behavior','good','studentAffairs']},
- {id:'management',label:'งานบริหารระบบ',icon:'▦',pages:['adminStudents','portalAccounts','admin']}
+ {id:'management',label:'งานบริหารระบบ',icon:'▦',pages:['adminStudents','portalStudentAccounts','portalGuardianAccounts','portalGuardianLinks','portalAccounts','admin']}
 ];
 export const PAGE_DESCRIPTIONS={
  dashboard:'สรุปข้อมูลภาพรวมและทางลัดการทำงานประจำวัน',
@@ -21,6 +21,9 @@ export const PAGE_DESCRIPTIONS={
  alerts:'จัดการเหตุการณ์และรายการรอการตรวจสอบ',
  adminStudents:'ค้นหา นำเข้า และแก้ไขทะเบียนนักเรียน',
  portalAccounts:'นำเข้าและดูแลบัญชีนักเรียนกับผู้ปกครอง',
+ portalStudentAccounts:'สร้าง ค้นหา และนำเข้าบัญชีนักเรียน พร้อมกำหนดจำนวนแถว',
+ portalGuardianAccounts:'สร้าง ค้นหา และนำเข้าบัญชีผู้ปกครอง พร้อมกำหนดจำนวนแถว',
+ portalGuardianLinks:'จัดการความสัมพันธ์นักเรียนและผู้ปกครอง พร้อมค้นหาหรือดูทั้งหมด',
  admin:'บริหารบัญชีบุคลากร สิทธิ์ และตั้งค่าระบบ',
  notifications:'ตรวจสอบและตั้งค่าการแจ้งเตือน'
 };
