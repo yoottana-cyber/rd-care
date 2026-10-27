@@ -11,7 +11,7 @@ export function preparePortalRoster(raw){
  const headers=raw[0].map(x=>String(x??'').trim().toLowerCase().replace(/^\uFEFF/,''));
  if(headers.join(',')!==HEADERS.join(','))
   throw Error('หัวตารางต้องเป็น '+HEADERS.join(','));
- const seen=new Set(),names=new Map(),items=[],errors=[];
+ const seen=new Set(),names=new Map(),guardians=new Map(),items=[],errors=[];
  for(let i=1;i<raw.length;i++){
   const row=raw[i];if(!row||!row.some(x=>String(x??'').trim()))continue;
   const r=Object.fromEntries(HEADERS.map((key,k)=>[key,String(row[k]??'')]));
@@ -35,6 +35,11 @@ export function preparePortalRoster(raw){
    error='รหัสผ่านนักเรียน 4–128 ตัว ไม่ใช้เลขบัตรประชาชน';
   else if(r.guardian_password&&(r.guardian_password.length<4||r.guardian_password.length>128||/^\d{13}$/.test(r.guardian_password)))
    error='รหัสผ่านผู้ปกครอง 4–128 ตัว ไม่ใช้เลขบัตรประชาชน';
+  const registeredGuardian=guardians.get(r.guardian_username);
+  if(!error&&registeredGuardian&&
+   ((r.guardian_name&&registeredGuardian.name&&r.guardian_name!==registeredGuardian.name)||
+   (r.guardian_password&&registeredGuardian.password&&r.guardian_password!==registeredGuardian.password)))
+   error='ข้อมูลผู้ปกครอง Username เดียวกันไม่ตรงกันระหว่างแถว';
   const studentName=r.student_username||key;
   const prior=names.get(studentName);
   if(!error&&prior&&(prior.role!=='student'||prior.no!==key))error='Username นักเรียนซ้ำกับบัญชีอื่น';
@@ -43,7 +48,13 @@ export function preparePortalRoster(raw){
   if(!error){
    seen.add(key);
    names.set(studentName,{role:'student',no:key});
-   if(r.guardian_username)names.set(r.guardian_username,{role:'guardian'});
+   if(r.guardian_username){
+    names.set(r.guardian_username,{role:'guardian'});
+    if(!registeredGuardian)guardians.set(r.guardian_username,
+     {name:r.guardian_name,password:r.guardian_password});
+    else if(!registeredGuardian.password&&r.guardian_password)
+     registeredGuardian.password=r.guardian_password;
+   }
    items.push({...r,source_row:index});
   }else errors.push({source_row:index,student_no:r.student_no,message:error});
  }
