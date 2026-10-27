@@ -213,3 +213,27 @@
 [data-theme="dark"] .portal-wrap .rd-portal-password-field button{
  background:#28533c;border-color:#42684f;color:#d0f6dd
 }
+
+/* Today / single date / date-range picker used on both mobile portal tabs. */
+.rd-portal-date-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;
+ margin:12px 0;padding:5px;border:1px solid var(--pm-border);background:var(--pm-bg);border-radius:14px}
+.rd-portal-date-modes button{min-height:44px;border:0;border-radius:10px;padding:8px 4px;
+ color:var(--pm-sub);font-size:12px;font-weight:800;background:transparent}
+.rd-portal-date-modes button.active{color:#fff;background:#0b8c59;
+ box-shadow:0 3px 9px rgba(7,129,77,.17)}
+.rd-portal-date-form{display:grid;gap:10px}
+.rd-portal-date-form [data-portal-date-fields="date"]{display:grid;gap:6px}
+.rd-portal-date-form label{font-size:12px;font-weight:800;color:var(--pm-sub)}
+.rd-portal-date-form input[type="date"]{width:100%;min-width:0;min-height:48px;
+ border:1px solid #d4e4db;background:#f9fdfa;color:var(--pm-ink);border-radius:12px;
+ padding:8px 12px;font-size:15px}
+.rd-portal-date-form [hidden],.rd-portal-filter [hidden]{display:none!important}
+.rd-portal-date-error{background:#fff2e5;color:#8f4f16;border-radius:10px;
+ padding:10px 12px;font-size:12px;line-height:1.6;margin:0}
+[data-theme="dark"] .rd-portal-date-form input[type="date"]{
+ color:#f0fff5;background:#243f2f;border-color:#42614e}
+@media(max-width:390px){
+ .rd-portal-date-modes{gap:3px;padding:4px}
+ .rd-portal-date-modes button{font-size:11px;min-height:42px}
+ .rd-portal-date-form input[type="date"]{font-size:13px;padding:8px 6px}
+}
