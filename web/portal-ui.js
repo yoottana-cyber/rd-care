@@ -10,7 +10,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'
 const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา',truancy:'หนีเรียน'};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
-export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
+export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallApp=()=>{},isInstalledPwa=()=>false}){
  const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:today(),to:today(),filterMode:'today',view:'home',focus:null,focusUnavailable:false};
  const pushParams=new URLSearchParams(location.search);
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
@@ -97,6 +97,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
      </nav>
     </div>`;
   bindThemeButtons();
+  select('#portalInstallApp')?.addEventListener('click',onInstallApp);
   if(!login){
    root.querySelectorAll('[data-portal-view]').forEach(btn=>btn.addEventListener('click',()=>setPortalView(btn.dataset.portalView,true)));
    root.querySelectorAll('[data-portal-open]').forEach(btn=>btn.addEventListener('click',()=>setPortalView(btn.dataset.portalOpen,true)));
@@ -125,7 +126,8 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
      <button type="submit" class="button full">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</button></form>
     <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
     ${role==='student'&&!lateQrToken?'<button type="button" id="studentLateEntry" class="button secondary full">แจ้งมาสายด้วยรหัสจากครูเวร (แบบเดิม)</button>':''}
-    ${!lateQrToken&&!noticeIntent?'<button type="button" id="portalBack" class="button secondary full">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</button>':''}`,true);
+    ${!isInstalledPwa()?`<div class="login-install"><button type="button" id="portalInstallApp" class="button secondary full">⬇️ ติดตั้งแอป RD CONNECT ${role==='guardian'?'ผู้ปกครอง':'นักเรียน'}</button><small>iPhone: Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>`:''}
+     ${!lateQrToken&&!noticeIntent&&!isInstalledPwa()?'<button type="button" id="portalBack" class="button secondary full">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</button>':''}`,true);
    select('#portalBack')?.addEventListener('click',onStaffLogin);
    select('#studentLateEntry')?.addEventListener('click',onLegacyLateReport);
    select('#portalTogglePassword')?.addEventListener('click',()=>{
@@ -454,6 +456,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
      ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}
     </section>`:''}
     <section class="rd-portal-card rd-portal-account-actions">
+     ${!isInstalledPwa()?`<button type="button" class="rd-portal-primary" id="portalInstallApp">⬇️ ติดตั้งแอป RD CONNECT ${guardian?'ผู้ปกครอง':'นักเรียน'}</button>`:''}
      <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
      <button type="button" id="portalLogout" class="rd-portal-outline rd-portal-logout">ออกจากระบบ</button>
      <p class="rd-portal-help">RD CONNECT • ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
