@@ -4,6 +4,7 @@ import {studentUsername} from './student-username.js';
 import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
 import {submitStudentLateQr} from './late-qr.js';
 import {deliverLateQrPush} from './late-qr-push.js';
+import {pushTarget} from './push-target.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -154,6 +155,7 @@ export async function portalRoutes(req,env,path,ctx){
    ctx.waitUntil(deliverLateQrPush(env).catch(err=>console.warn('RD QR Push',err?.name||'failure')));
   return result;
  }
+ if(req.method==='GET'&&path==='/api/portal/push/target')return pushTarget(req,env,a,'guardian');
  if(path.startsWith('/api/portal/push/'))return guardianPushRoutes(req,env,a,path);
  if(req.method==='GET'&&path==='/api/portal/truancy')return reply({items:await guardianTruancyItems(env,a)});
  if(req.method==='GET'&&path==='/api/portal/children')return reply({items:await children(env,a)});
