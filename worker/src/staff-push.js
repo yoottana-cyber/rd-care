@@ -173,6 +173,21 @@ export async function sendLateArrivalPush(device,env,audience,eventInfo={}){
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
  },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }
+// Notify a class advisor to complete daily check-in. Contains no student names,
+// missing counts or personal data; classroom authorization is checked after login.
+export async function sendDailyAttendanceReminderPush(device,env,{classroomId,date}){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ const room=Number(classroomId);
+ if(!Number.isSafeInteger(room)||room<1||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date))
+  throw Error('Invalid daily reminder metadata');
+ const body=await encryptPriorityPush(device,{kind:'daily_attendance_reminder',audience:'advisor',
+  classroomId:room,date});
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'3600',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
 // No student identity is included in either category or test notifications.
 export async function sendAttendanceReviewPush(device,env,eventInfo){
  if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
