@@ -94,7 +94,13 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
       <div class="field"><label for="editStaffActive">สถานะบัญชี</label><select id="editStaffActive" name="active">
        <option value="1" ${person.active?'selected':''}>ใช้งาน</option>
        <option value="0" ${person.active?'':'selected'}>ระงับการใช้งาน</option></select></div></div>
-      <p class="rd-settings-field-hint">การระงับบัญชีจะยกเลิก Session ของบุคลากรทันที แต่ยังเก็บประวัติไว้</p>
+      ${person.role==='teacher'?`<div class="field rd-affairs-permission">
+         <label for="editStudentAffairs"><input id="editStudentAffairs" type="checkbox" name="student_affairs"
+          ${Number(person.student_affairs)===1?'checked':''}>
+          <strong>มอบหมายสิทธิ์ฝ่ายกิจการนักเรียน</strong></label>
+         <small>ครูจะเข้าหน้าและใช้งาน API ฝ่ายกิจการนักเรียนได้ โดยยังคงบทบาทครูผู้สอนและครูที่ปรึกษาเดิม</small>
+        </div>`:'<p class="rd-settings-field-hint">บัญชีฝ่ายกิจการนักเรียนได้รับสิทธิ์นี้ตามบทบาทที่กำหนด</p>'}
+       <p class="rd-settings-field-hint">การระงับบัญชีจะยกเลิก Session ของบุคลากรทันที แต่ยังเก็บประวัติไว้</p>
       <div class="rd-settings-actions"><button class="button" type="submit">บันทึกการเปลี่ยนแปลง</button>
        <button class="button ghost" type="button" id="cancelSettingsEdit">ยกเลิก</button></div>
      </form></section>`:''}
@@ -207,7 +213,10 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
    if(!u)throw Error('ไม่พบบัญชี');
    const active=Number(f.get('active'));
    if(!active&&!confirm('ระงับบัญชี '+u.display_name+' และยกเลิก Session ทุกอุปกรณ์?'))return false;
-   await api('/api/admin/users/'+u.id,{method:'POST',body:{display_name:String(f.get('display_name')).trim(),active}});
+   await api('/api/admin/users/'+u.id,{method:'POST',body:{
+     display_name:String(f.get('display_name')).trim(),active,
+     ...(u.role==='teacher'?{student_affairs:f.get('student_affairs')==='on'}:{})
+    }});
    editUserId=null;return true;
   },'บันทึกข้อมูลบุคลากรสำเร็จ');
   onSubmit('addUser',async f=>{
