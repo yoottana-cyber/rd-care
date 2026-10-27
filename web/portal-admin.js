@@ -1,19 +1,45 @@
 import {planStudentAccounts} from './portal-batch.js';
 import {createPortalRosterImport} from './portal-roster-import.js';
+import {fetchPortalRows,pageWindow,normalizePageSize,PORTAL_PAGE_SIZES} from './portal-table.js';
 // Staff portal provisioning is admin-only and never stores one-time credentials.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
- let roomId=rooms?.[0]?.id||null,accounts=[],links=[],students=[];
- let issuedCredentials=[];
+export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}){
+ let roomId=rooms?.[0]?.id||null,accounts=[],links=[],students=[],roomAccounts=[];
+ let mode=['student','guardian','links'].includes(view)?view:'student';
+ let total=0,summary={},page=1,pageSize='25',query='',loadId=0;
+ let guardianSearch='',guardianOptions=[],issuedCredentials=[];
+ const $=selector=>document.querySelector(selector);
  const rosterImporter=createPortalRosterImport({api,toast,onComplete:()=>load()});
- const $=s=>document.querySelector(s);
+ function cancel(){loadId++}
  async function load(notice=null){
+  const seq=++loadId;
   if(!rooms?.some(r=>r.id===roomId))roomId=rooms?.[0]?.id||null;
-  const data=await Promise.all([
-   api('/api/admin/portal/accounts'),api('/api/admin/portal/links'),
-   roomId?api('/api/admin/students?classroom_id='+roomId):Promise.resolve({items:[]})
+  const role=mode==='links'?'':mode,kind=mode==='links'?'links':'accounts';
+  if(pageSize==='all')mount('<section class="card stack" aria-live="polite"><h3>กำลังโหลดรายการทั้งหมด</h3><p id="portalAdminLoadProgress">เริ่มอ่านข้อมูล...</p></section>');
+  const [counts,result,roomStudents,existing,guardians]=await Promise.all([
+   api('/api/admin/portal/summary'),
+   fetchPortalRows(api,kind,{role,page,pageSize,query,isCurrent:()=>seq===loadId,
+    onProgress:(n,max)=>{
+     if(seq===loadId&&$('#portalAdminLoadProgress'))
+      $('#portalAdminLoadProgress').textContent='กำลังอ่านข้อมูล '+n.toLocaleString('th-TH')+
+       ' จาก '+max.toLocaleString('th-TH')+' รายการ';
+    }}),
+   (mode==='student'||mode==='links')&&roomId?
+    api('/api/admin/students?classroom_id='+roomId):Promise.resolve({items:[]}),
+   mode==='student'&&roomId?api('/api/admin/portal/room-status?classroom_id='+roomId):
+    Promise.resolve({items:[]}),
+   mode==='links'?api('/api/admin/portal/accounts?role=guardian&limit=100&page=1&q='+encodeURIComponent(guardianSearch)):
+    Promise.resolve({items:[]})
   ]);
-  accounts=data[0].items;links=data[1].items;students=data[2].items.filter(s=>s.active);
+  if(seq!==loadId||!result)return;
+  const window=pageWindow(result.total,page,pageSize);
+  if(pageSize!=='all'&&window.page!==page){page=window.page;return load(notice)}
+  summary=counts;total=result.total||0;
+  accounts=mode==='links'?[]:result.items;
+  links=mode==='links'?result.items:[];
+  students=(roomStudents.items||[]).filter(st=>st.active);
+  roomAccounts=existing.items||[];
+  guardianOptions=guardians.items||[];
   render(notice);
  }
  function render(notice){
