@@ -1,0 +1,85 @@
+/* RD CONNECT • Scoped student-affairs workspace for staff and administrators. */
+.rd-affairs{max-width:1300px;margin:0 auto;display:grid;gap:16px}
+.rd-affairs-hero{padding:25px 27px;display:flex;align-items:center;justify-content:space-between;gap:18px;
+ color:#fff;border-radius:23px;background:linear-gradient(117deg,#055c40 0%,#078d60 65%,#33b47f);
+ box-shadow:0 14px 30px rgba(5,111,72,.13)}
+.rd-affairs-hero h2{color:white;font-weight:850;font-size:clamp(21px,4vw,30px);margin:5px 0}
+.rd-affairs-hero span:not(.rd-affairs-hero-icon){font-size:10px;letter-spacing:.1em;font-weight:850;opacity:.9}
+.rd-affairs-hero p{margin:0;font-size:13px;line-height:1.65;opacity:.9}
+.rd-affairs-hero-icon{font-size:39px}
+.rd-affairs-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.rd-affairs-tabs button{min-height:52px;padding:10px;background:#fff;color:#416c59;border:1px solid #cfe8d9;
+ border-radius:13px;cursor:pointer;font-size:13px;font-weight:750}
+.rd-affairs-tabs button.active{background:#078657;color:#fff;border-color:#078657;box-shadow:0 6px 16px rgba(7,135,83,.16)}
+.rd-affairs-content{display:grid;gap:16px;min-width:0}
+.rd-affairs .card{border:1px solid #d7e7de;border-radius:19px;box-shadow:0 8px 23px rgba(18,84,55,.055)}
+.rd-affairs .card h3{margin:0;color:#165138;font-size:18px}
+.rd-affairs .card .muted{line-height:1.65}
+.rd-affairs-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.rd-affairs-metrics>div{display:grid;gap:5px;padding:16px 13px;border-radius:13px;
+ background:#eef7f1;border:1px solid #dceee2}
+.rd-affairs-metrics>div strong{font-size:27px;color:#164e37;line-height:1.1}
+.rd-affairs-metrics>div span{font-size:12px;color:#618270}
+.rd-affairs-metrics .good{background:#e7f9ef;border-color:#c9ead7}
+.rd-affairs-metrics .warn-metric{background:#fff5e8;border-color:#f1dfbc}
+.rd-affairs-metrics .warn-metric strong{color:#966222}
+.rd-affairs-weekdays{display:flex;flex-wrap:wrap;gap:8px}
+.rd-affairs-weekdays label{display:flex;gap:6px;align-items:center;padding:9px 12px;background:#f1f9f4;
+ border:1px solid #d4eadd;border-radius:11px;font-size:13px;font-weight:750;min-height:42px}
+.rd-affairs-attendance-grid,.rd-affairs-people-grid,.rd-affairs-rule-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0}
+.rd-affairs-attendance-item,.rd-affairs-person,.rd-affairs-rule{
+ display:grid;align-content:start;gap:10px;border:1px solid #d6e9df;padding:15px;
+ background:#fbfefc;border-radius:15px;min-width:0}
+.rd-affairs-attendance-item p{margin:0;font-size:12px;color:#536e61;line-height:1.7}
+.rd-affairs-attendance-item strong,.rd-affairs-person strong{color:#164c35}
+.rd-affairs-state{font-size:11px;font-weight:850;padding:5px 9px;border-radius:99px}
+.rd-affairs-state.ready{background:#e5f9eb;color:#08794d}
+.rd-affairs-state.pending{background:#fff0d8;color:#9a681a}
+.rd-affairs-progress{height:8px;background:#e4efe9;overflow:hidden;border-radius:99px}
+.rd-affairs-progress>div{background:#0a9861;height:100%;border-radius:99px}
+.rd-affairs-person select{height:43px;max-width:100%}
+.rd-affairs-rule b{font-size:21px;color:#168456}
+.rd-affairs-rule.inactive{opacity:.66}
+.rd-affairs-rule p{font-size:12px}
+.rd-affairs-search-results{display:grid;gap:7px;max-height:350px;overflow:auto}
+.rd-affairs-search-person{background:#f2faf5;text-align:left;border:1px solid #d6eade;
+ border-radius:12px;padding:11px 13px;display:grid;gap:3px;cursor:pointer}
+.rd-affairs-search-person strong{font-size:13px}
+.rd-affairs-search-person small{font-size:11px;color:#668273}
+.rd-affairs-case{padding:15px;border:1px solid #d9e9df;border-radius:15px;background:#fbfefc;display:grid;gap:8px}
+.rd-affairs-case p{margin:0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.rd-affairs-case form{border-top:1px solid #e1ece6;padding-top:12px}
+.rd-affairs-score{display:grid;grid-template-columns:65px 1fr auto;align-items:center;gap:9px;
+ border-bottom:1px solid #e1eee6;padding:10px 4px;font-size:12px}
+.rd-affairs-score strong{font-size:18px;color:#068957}
+.rd-affairs-score small{color:#789084}
+.rd-affairs :is(button,input,select,textarea):focus-visible{outline:3px solid #e5b440;outline-offset:2px}
+@media(min-width:1100px){
+ .rd-affairs-attendance-grid,.rd-affairs-people-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:700px){
+ .rd-affairs-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rd-affairs-hero{padding:20px 17px;border-radius:18px}
+ .rd-affairs-attendance-grid,.rd-affairs-people-grid,.rd-affairs-rule-grid{grid-template-columns:1fr}
+ .rd-affairs-score{grid-template-columns:55px 1fr}
+ .rd-affairs-score small{grid-column:2}
+ .rd-affairs .card{padding:14px}
+}
+@media(max-width:390px){
+ .rd-affairs-metrics>div{padding:12px 7px}
+ .rd-affairs-metrics>div strong{font-size:23px}
+ .rd-affairs-metrics>div span{font-size:11px}
+ .rd-affairs-tabs button{font-size:11px}
+}
+[data-theme="dark"] .rd-affairs .card{border-color:#426550}
+[data-theme="dark"] .rd-affairs .card h3,[data-theme="dark"] .rd-affairs-attendance-item strong,[data-theme="dark"] .rd-affairs-person strong{color:#d7f7e2}
+[data-theme="dark"] .rd-affairs-attendance-item,[data-theme="dark"] .rd-affairs-person,
+[data-theme="dark"] .rd-affairs-rule,[data-theme="dark"] .rd-affairs-case{
+ background:#223b2c;border-color:#446c55}
+[data-theme="dark"] .rd-affairs-attendance-item p{color:#b7d4c0}
+[data-theme="dark"] .rd-affairs-tabs button:not(.active){background:#253e2e;color:#cee8d7;border-color:#446c55}
+[data-theme="dark"] .rd-affairs-metrics>div{background:#254530;border-color:#426550}
+[data-theme="dark"] .rd-affairs-metrics>div strong{color:#daf9e3}
+[data-theme="dark"] .rd-affairs-metrics>div span{color:#bedbc8}
+[data-theme="dark"] .rd-affairs-weekdays label,[data-theme="dark"] .rd-affairs-search-person{background:#284633;border-color:#446c55;color:#def6e6}
