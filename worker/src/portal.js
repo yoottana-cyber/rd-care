@@ -3,6 +3,7 @@ import {validUsername,validDate,bangkokToday} from './core.js';
 import {studentUsername} from './student-username.js';
 import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
 import {submitStudentLateQr} from './late-qr.js';
+import {deliverLateQrPush} from './late-qr-push.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -135,7 +136,7 @@ async function records(req,env,a){
   late:late.results||[],behavior:rows,behavior_total:total.results?.[0]?.total||0,
   note:'คะแนนรวมเฉพาะรายการในช่วงวันที่เลือก'});
 }
-export async function portalRoutes(req,env,path){
+export async function portalRoutes(req,env,path,ctx){
  if(req.method==='POST'&&path==='/api/portal/auth/login')return login(req,env);
  const a=await signedIn(req,env);
  if(req.method==='POST'&&path==='/api/portal/auth/logout'){
@@ -146,7 +147,13 @@ export async function portalRoutes(req,env,path){
  if(req.method==='GET'&&path==='/api/portal/auth/me')return reply({account:publicAccount(a)});
  if(req.method==='POST'&&path==='/api/portal/auth/change-password')return changePassword(req,env,a);
  if(a.must_change_password)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนดูข้อมูลนักเรียน');
- if(req.method==='POST'&&path==='/api/portal/late/qr')return submitStudentLateQr(req,env,a);
+ if(req.method==='POST'&&path==='/api/portal/late/qr'){
+  const result=await submitStudentLateQr(req,env,a);
+  // Send only after a committed successful record; do not block the student's receipt.
+  if(result.ok&&ctx?.waitUntil)
+   ctx.waitUntil(deliverLateQrPush(env).catch(err=>console.warn('RD QR Push',err?.name||'failure')));
+  return result;
+ }
  if(path.startsWith('/api/portal/push/'))return guardianPushRoutes(req,env,a,path);
  if(req.method==='GET'&&path==='/api/portal/truancy')return reply({items:await guardianTruancyItems(env,a)});
  if(req.method==='GET'&&path==='/api/portal/children')return reply({items:await children(env,a)});
