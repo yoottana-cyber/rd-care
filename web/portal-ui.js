@@ -50,7 +50,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   ['late','pending'].includes(value)?'attention':['absent','truancy'].includes(value)?'critical':'neutral';
  const statusLabel=value=>thaiStatus[value]||({verified:'ยืนยันแล้ว',pending:'รอตรวจสอบ',rejected:'ไม่อนุมัติ'}[value])||value||'—';
  function setPortalView(view,scroll=false){
-  const allowed=state.account?.role==='guardian'?['home','attendance','alerts','account']:
+  const allowed=state.account?.role==='guardian'?['home','attendance','truancyHistory','behaviorHistory','alerts','account']:
    ['home','attendance','late','account'];
   state.view=allowed.includes(view)?view:'home';
   root.querySelectorAll('[data-portal-panel]').forEach(el=>{el.hidden=el.dataset.portalPanel!==state.view});
@@ -99,9 +99,10 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
       ${inner}<div id="portalMessage" class="rd-portal-feedback" role="status" aria-live="polite"></div>
      </main>
      <nav class="rd-portal-bottom" aria-label="เมนูหลัก">
-      ${[['home','⌂','หน้าหลัก'],['attendance','▦','การมาเรียน'],
-        state.account?.role==='guardian'?['alerts','♧','แจ้งเตือน']:['late','◷','มาสาย'],
-        ['account','☷','บัญชี']].map(([id,icon,label])=>`<button type="button" data-portal-view="${id}" aria-label="${label}">
+      ${(state.account?.role==='guardian'
+        ?[['home','⌂','หน้าหลัก'],['attendance','▦','มาเรียน'],['truancyHistory','!','หนีเรียน'],
+          ['behaviorHistory','⭐','คะแนน'],['account','☷','บัญชี']]
+        :[['home','⌂','หน้าหลัก'],['attendance','▦','การมาเรียน'],['late','◷','มาสาย'],['account','☷','บัญชี']]).map(([id,icon,label])=>`<button type="button" data-portal-view="${id}" aria-label="${label}">
          <span class="rd-portal-nav-icon" aria-hidden="true">${icon}</span><span>${label}</span>
         </button>`).join('')}
      </nav>
@@ -370,6 +371,10 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     </div>
     <p class="rd-portal-count-note">นับเฉพาะวันที่มีข้อมูลเช็กชื่อในช่วงที่เลือก (${dayRows.length} รายการ)</p>
     <div class="rd-portal-quick-grid">
+     ${guardian?`<button type="button" class="rd-portal-quick" data-portal-open="truancyHistory">
+      <span class="rd-portal-quick-icon">!</span><strong>ประวัติหนีเรียน</strong><small>รายคาบย้อนหลัง</small></button>
+     <button type="button" class="rd-portal-quick" data-portal-open="behaviorHistory">
+      <span class="rd-portal-quick-icon">⭐</span><strong>คะแนนพฤติกรรม</strong><small>ความดีและการปรับพฤติกรรม</small></button>`:''}
      <button type="button" class="rd-portal-quick" data-portal-open="attendance">
       <span class="rd-portal-quick-icon">▦</span><strong>ประวัติการมาเรียน</strong><small>รายวันและรายคาบ</small></button>
      <button type="button" class="rd-portal-quick" data-portal-open="${guardian?'alerts':'late'}">
@@ -401,6 +406,38 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
       ${table(r.late,[['school_date','วันที่'],['arrived_at','เวลา'],['state','สถานะ']],x=>statusLabel(x.state))}
      </section>`:''}`:''}
    </section>
+   ${guardian?`<section class="rd-portal-panel" data-portal-panel="truancyHistory">
+     <div class="rd-portal-page-title"><span class="rd-portal-kicker">TRUANCY HISTORY</span>
+      <h1>ประวัติหนีเรียน</h1><p>รายการเช็กชื่อรายคาบของนักเรียนที่เลือก ซึ่งครูบันทึกสถานะหนีเรียน</p></div>
+     ${dateFilterMarkup('truancyHistory')}
+     <section class="rd-portal-card">
+      <div class="rd-portal-section-heading"><h2>หนีเรียนในช่วงวันที่เลือก</h2>
+       <span class="rd-portal-count">${r?.truancy?.length||0} รายการ</span></div>
+      ${table(r?.truancy,[['school_date','วันที่'],['period','คาบ'],['subject','วิชา'],
+       ['status','สถานะ']],x=>statusLabel(x.status))}
+      <p class="rd-portal-help">ข้อมูลจากการบันทึกของโรงเรียน โปรดติดต่อครูที่ปรึกษาหากต้องการตรวจสอบข้อเท็จจริง</p>
+     </section>
+    </section>
+    <section class="rd-portal-panel" data-portal-panel="behaviorHistory">
+     <div class="rd-portal-page-title"><span class="rd-portal-kicker">BEHAVIOR HISTORY</span>
+      <h1>คะแนนพฤติกรรม</h1><p>คะแนนความดีแยกจากคะแนนพฤติกรรม ไม่ถูกนำไปหักลบความผิด</p></div>
+     ${dateFilterMarkup('behaviorHistory')}
+     <div class="rd-portal-score-cards">
+      <div><span>คะแนนความผิดสะสม</span><strong>${Number(r?.behavior_deducted)||0}</strong></div>
+      <div><span>ปรับพฤติกรรมแล้ว</span><strong>${Number(r?.behavior_adjusted)||0}</strong></div>
+      <div><span>ความผิดคงเหลือ</span><strong>${Number(r?.behavior_remaining)||0}</strong></div>
+      <div><span>คะแนนความดี</span><strong>${Number(r?.good_total)||0}</strong></div>
+     </div>
+     <section class="rd-portal-card"><h2>ประวัติความผิดและการปรับพฤติกรรม</h2>
+      ${table((r?.behavior||[]).map(e=>({...e,
+       score_label:e.score_type==='adjustment'?'ปรับพฤติกรรม':'ความผิด'})),
+        [['record_date','วันที่'],['score_label','ประเภท'],['points','คะแนน'],['reason','รายละเอียด']])}
+     </section>
+     <section class="rd-portal-card"><h2>ประวัติคะแนนความดี</h2>
+      ${table(r?.good,[['record_date','วันที่'],['points','คะแนน'],['reason','รายละเอียด']])}
+     </section>
+     <p class="rd-portal-help">ยอดคะแนนนี้เฉพาะช่วงวันที่เลือก เกณฑ์ปรับพฤติกรรมเป็นรายการต่างหากจากคะแนนความดี</p>
+    </section>`:''}
    ${!guardian?`<section class="rd-portal-panel" data-portal-panel="late">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">LATE ARRIVAL</span><h1>ลงชื่อมาสาย</h1>
      <p>สแกน QR ของครูเวร แล้วลงชื่อผ่านบัญชีนักเรียนของตนเอง</p></div>
