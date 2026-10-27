@@ -465,7 +465,8 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <span class="rd-portal-kicker">ข้อมูลช่วงวันที่เลือก</span><h2>คะแนนพฤติกรรม</h2></div>
      <strong class="rd-portal-score">${Number(r.behavior_remaining)||0} คะแนนคงเหลือ</strong></div>
      <p class="rd-portal-help">คะแนนความผิดสะสม ${Number(r.behavior_deducted)||0} • ปรับพฤติกรรมแล้ว ${Number(r.behavior_adjusted)||0} • คะแนนความดีไม่ถูกนำมาหักล้าง</p>
-     ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}
+     ${table((r.behavior||[]).map(x=>({...x,score_label:x.score_type==='adjustment'?'ปรับพฤติกรรม':'คะแนนความผิด'})),
+      [['record_date','วันที่'],['score_label','ประเภท'],['points','คะแนน'],['reason','เหตุผล']])}
     </section>
     <section class="rd-portal-card"><div class="rd-portal-section-heading"><div>
      <span class="rd-portal-kicker">ข้อมูลช่วงวันที่เลือก</span><h2>คะแนนความดี</h2></div>
