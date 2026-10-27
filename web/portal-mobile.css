@@ -241,3 +241,26 @@
 /* RD CONNECT portal brand wordmark on narrow phones. */
 .rd-portal-school strong{font-size:clamp(15px,4vw,18px);letter-spacing:-.45px;white-space:nowrap}
 @media(max-width:390px){.rd-portal-school{gap:7px}.rd-portal-role{padding:6px 8px;font-size:11px}}
+
+/* Guardian-specific safe history panels and separated behavior/merit metrics. */
+.rd-portal-mobile[data-role="guardian"] .rd-portal-bottom button{min-width:0;padding-inline:3px}
+.rd-portal-mobile[data-role="guardian"] .rd-portal-bottom .rd-portal-nav-icon{font-size:21px}
+.rd-portal-score-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.rd-portal-score-cards>div{display:grid;gap:5px;padding:15px;border-radius:16px;
+ background:#f1ecfa;border:1px solid #e1d5f3;min-height:93px}
+.rd-portal-score-cards>div:nth-child(2){background:#e9f7f1;border-color:#c5e9d6}
+.rd-portal-score-cards>div:nth-child(3){background:#fff3e7;border-color:#efd4b6}
+.rd-portal-score-cards>div:nth-child(4){background:#e9f3ff;border-color:#d0e1f4}
+.rd-portal-score-cards span{font-size:12px;color:#536b7b}
+.rd-portal-score-cards strong{font-size:27px;font-weight:830;color:#6346a2}
+.rd-portal-score-cards>div:nth-child(2) strong{color:#128563}
+.rd-portal-score-cards>div:nth-child(3) strong{color:#b06426}
+.rd-portal-score-cards>div:nth-child(4) strong{color:#246db0}
+[data-theme="dark"] .rd-portal-score-cards>div{background:#29445a!important;border-color:#486173!important}
+[data-theme="dark"] .rd-portal-score-cards span{color:#c4d7e3}
+[data-theme="dark"] .rd-portal-score-cards strong{color:#e8f4ff!important}
+@media(max-width:420px){
+ .rd-portal-mobile[data-role="guardian"] .rd-portal-bottom button{font-size:9px}
+ .rd-portal-score-cards>div{padding:12px}
+ .rd-portal-score-cards strong{font-size:25px}
+}
