@@ -184,19 +184,74 @@ async function audit(db,actor,action,id){
 export async function portalAdminRoutes(req,env,actor,path){
  if(actor.role!=='admin')fail(403,'เฉพาะผู้ดูแลระบบ');
  if(req.method==='POST'&&path==='/api/admin/portal/import')return importPortalAccounts(req,env,actor);
+ // All account and relationship listings are strictly role-checked above.
+ // Server-side paging removes the prior 3,000/4,000 record truncation; the
+ // client can stream every page only when the administrator selects "ทั้งหมด".
+ const paging=()=>{
+  const params=new URL(req.url).searchParams;
+  const limitRaw=Number(params.get('limit')||25),pageRaw=Number(params.get('page')||1);
+  if(!Number.isSafeInteger(limitRaw)||limitRaw<1||limitRaw>250||
+     !Number.isSafeInteger(pageRaw)||pageRaw<1||pageRaw>100000)
+   fail(400,'จำนวนแถวหรือหน้าที่ขอไม่ถูกต้อง');
+  const query=String(params.get('q')||'').trim();
+  if(query.length>100)fail(400,'คำค้นหายาวเกิน 100 ตัวอักษร');
+  const escaped=query.replace(/[\\%_]/g,c=>'\\'+c);
+  return {limit:limitRaw,page:pageRaw,offset:(pageRaw-1)*limitRaw,
+   pattern:'%'+escaped+'%'};
+ };
+ if(req.method==='GET'&&path==='/api/admin/portal/summary'){
+  const [students,guardians,links,unlinked]=await env.DB.batch([
+   env.DB.prepare("SELECT COUNT(*) AS n FROM portal_accounts WHERE role='student'"),
+   env.DB.prepare("SELECT COUNT(*) AS n FROM portal_accounts WHERE role='guardian'"),
+   env.DB.prepare('SELECT COUNT(*) AS n FROM guardian_student_links'),
+   env.DB.prepare(`SELECT COUNT(*) AS n FROM students s WHERE s.active=1 AND NOT EXISTS (
+    SELECT 1 FROM guardian_student_links l JOIN portal_accounts a
+    ON a.id=l.guardian_account_id AND a.role='guardian' AND a.active=1
+    WHERE l.student_id=s.id)`)
+  ]);
+  return reply({student_accounts:students.results?.[0]?.n||0,
+   guardian_accounts:guardians.results?.[0]?.n||0,
+   links:links.results?.[0]?.n||0,students_without_guardian:unlinked.results?.[0]?.n||0});
+ }
  if(req.method==='GET'&&path==='/api/admin/portal/accounts'){
-  const {results}=await env.DB.prepare(`SELECT a.id,a.username,a.display_name,a.role,a.student_id,a.active,a.must_change_password,
-  s.student_no FROM portal_accounts a LEFT JOIN students s ON s.id=a.student_id
-  ORDER BY a.role,a.id DESC LIMIT 3000`).all();
-  return reply({items:results});
+  const {limit,page,offset,pattern}=paging();
+  const params=new URL(req.url).searchParams;
+  const role=params.get('role');
+  if(role&&role!=='student'&&role!=='guardian')fail(400,'ประเภทบัญชีไม่ถูกต้อง');
+  const where=` WHERE (?='' OR a.role=?)
+   AND (a.username LIKE ? ESCAPE '\\' OR a.display_name LIKE ? ESCAPE '\\'
+   OR s.student_no LIKE ? ESCAPE '\\')`;
+  const values=[role||'',role||'',pattern,pattern,pattern];
+  const count=await env.DB.prepare(`SELECT COUNT(*) AS n FROM portal_accounts a
+   LEFT JOIN students s ON s.id=a.student_id${where}`).bind(...values).first();
+  const {results}=await env.DB.prepare(`SELECT a.id,a.username,a.display_name,
+   a.role,a.student_id,a.active,a.must_change_password,s.student_no,
+   c.label AS classroom_label
+   FROM portal_accounts a LEFT JOIN students s ON s.id=a.student_id
+   LEFT JOIN classrooms c ON c.id=s.classroom_id${where}
+   ORDER BY a.id DESC LIMIT ? OFFSET ?`).bind(...values,limit,offset).all();
+  const total=Number(count?.n)||0;
+  return reply({items:results,total,page,limit,has_more:offset+results.length<total});
  }
  if(req.method==='GET'&&path==='/api/admin/portal/links'){
+  const {limit,page,offset,pattern}=paging();
+  const where=` WHERE (a.username LIKE ? ESCAPE '\\' OR a.display_name LIKE ? ESCAPE '\\'
+   OR s.student_no LIKE ? ESCAPE '\\' OR s.full_name LIKE ? ESCAPE '\\')`;
+  const values=[pattern,pattern,pattern,pattern];
+  const count=await env.DB.prepare(`SELECT COUNT(*) AS n FROM guardian_student_links l
+   JOIN portal_accounts a ON a.id=l.guardian_account_id
+   JOIN students s ON s.id=l.student_id${where}`).bind(...values).first();
   const {results}=await env.DB.prepare(`SELECT l.guardian_account_id,l.student_id,
-    a.display_name AS guardian_name,s.student_no,s.full_name
-    FROM guardian_student_links l
-    JOIN portal_accounts a ON a.id=l.guardian_account_id JOIN students s ON s.id=l.student_id
-    ORDER BY l.guardian_account_id,l.student_id LIMIT 4000`).all();
-  return reply({items:results});
+   a.display_name AS guardian_name,a.username AS guardian_username,
+   s.student_no,s.full_name,c.label AS classroom_label
+   FROM guardian_student_links l
+   JOIN portal_accounts a ON a.id=l.guardian_account_id
+   JOIN students s ON s.id=l.student_id
+   LEFT JOIN classrooms c ON c.id=s.classroom_id${where}
+   ORDER BY l.guardian_account_id,l.student_id LIMIT ? OFFSET ?`)
+   .bind(...values,limit,offset).all();
+  const total=Number(count?.n)||0;
+  return reply({items:results,total,page,limit,has_more:offset+results.length<total});
  }
  if(req.method==='POST'&&path==='/api/admin/portal/accounts'){
   const b=await bodyJson(req),role=checkedRole(b.role);
