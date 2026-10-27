@@ -26,7 +26,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   lateQrToken=null;
   clearLateGateIntent();
   if(new URLSearchParams(location.search).get('late_qr')!==null)
-   history.replaceState(null,'',location.pathname+location.hash);
+   history.replaceState(null,'',location.pathname+'?login=student'+location.hash);
  }
  const select=s=>root.querySelector(s);
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
@@ -146,7 +146,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
      state.from=state.focus.school_date;state.to=state.focus.school_date;
     }
     noticeIntent=null;
-    history.replaceState(null,'',location.pathname+location.hash);
+    history.replaceState(null,'',location.pathname+'?login=guardian'+location.hash);
    }
    if(!state.children.some(s=>s.id===state.studentId))state.studentId=state.children[0]?.id||null;
    if(state.studentId)await loadRecords();else renderDashboard();
