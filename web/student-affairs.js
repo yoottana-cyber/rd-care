@@ -9,12 +9,13 @@ const types={good:'การทำความดี',minor:'ความผิ�
 const formatScore=n=>Number(n)>0?'+'+Number(n):String(Number(n)||0);
 export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
-  selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:''};
+  selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
+  grade:0,monitorQuery:'',scoreSummary:[]};
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
  const frame=(body)=>{
   const tabs=[['attendance','📋','ติดตามเช็กชื่อ'],['people','👥','หัวหน้าระดับ/ที่ปรึกษา'],
-   ['rules','⭐','เกณฑ์พฤติกรรม'],['cases','📑','ภาคทัณฑ์/ทัณฑ์บน']];
+   ['rules','⭐','เกณฑ์พฤติกรรม'],['monitor','📊','ติดตามคะแนน'],['cases','📑','ภาคทัณฑ์/ทัณฑ์บน']];
   mount(`<section class="rd-affairs">
    <header class="rd-affairs-hero"><div><span>RD CONNECT • STUDENT AFFAIRS</span>
     <h2>ฝ่ายกิจการนักเรียน</h2>
@@ -31,12 +32,17 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   if(tab==='attendance')return attendance();
   if(tab==='people')return people();
   if(tab==='rules')return rules();
+  if(tab==='monitor')return monitor();
   if(tab==='cases')return cases();
  }
  function reminderLabel(value){return ({sent:'ส่งถึงอุปกรณ์แล้ว',no_subscription:'ยังไม่ได้สมัครรับ Push',
   failed:'ส่งไม่สำเร็จ',queued:'รอส่ง',already_queued:'เคยแจ้งแล้ว',not_needed:'เช็กชื่อครบ/ยังไม่มีครูที่ปรึกษา'})[value]||value}
  async function attendance(){
-  const result=await api('/api/affairs/attendance?date='+encodeURIComponent(state.date));state.attendance=result;
+  const [result,daysOff]=await Promise.all([
+   api('/api/affairs/attendance?date='+encodeURIComponent(state.date)),
+   api('/api/affairs/closed-days')
+  ]);
+  state.attendance=result;
   const r=result.summary,settings=result.setting,days=String(settings.weekdays||'1,2,3,4,5').split(',').map(Number);
   const weekdays=['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
   const teachers=result.items.filter(x=>x.students>0);
@@ -67,6 +73,12 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
      <div class="field"><label>วันที่ไม่มีการเรียนการสอน</label><input type="date" name="date" required></div>
      <div class="field"><label>สาเหตุ/ชื่อวันหยุด</label><input name="label" maxlength="100" placeholder="เช่น กิจกรรมพิเศษ" required></div>
      <button type="submit" class="button secondary">บันทึกวันหยุด</button></form>
+    ${(daysOff.items||[]).length?`<div class="rd-affairs-holidays">
+     <h4>วันที่ยกเว้นการแจ้งเตือนอัตโนมัติ</h4>
+     ${daysOff.items.map(day=>`<div class="row between rd-affairs-holiday">
+      <span>${esc(thDate(day.school_date))} • ${esc(day.label)}</span>
+      <button type="button" class="button ghost" data-affairs-holiday-remove="${esc(day.school_date)}">ลบวันที่ยกเว้น</button>
+     </div>`).join('')}</div>`:''}
    </section>
    <section class="card stack"><div class="row between"><div><h3>ติดตามรายห้องเรียน</h3>
      <p class="muted">แสดงห้องที่มีนักเรียน • การส่งแจ้งเตือนด้วยตนเองจำกัด 1 ครั้งต่อห้องต่อวัน</p></div>
@@ -105,6 +117,12 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
     auto_enabled:f.get('auto_enabled')==='on',
     reminder_time:String(f.get('reminder_time')),weekdays}});
    toast('บันทึกกำหนดการแจ้งเตือนแล้ว');await attendance();
+  });
+  bind('[data-affairs-holiday-remove]','click',async(_,el)=>{
+   const date=el.dataset.affairsHolidayRemove;
+   if(!confirm('ยกเลิกการยกเว้นการแจ้งเตือนอัตโนมัติในวันที่ '+date+'?'))return;
+   await api('/api/affairs/closed-days/remove',{method:'POST',body:{date}});
+   toast('ยกเลิกวันที่ยกเว้นแล้ว');await attendance();
   });
   bind('#affairsHoliday','submit',async e=>{
    e.preventDefault();const f=new FormData(e.currentTarget);
@@ -181,6 +199,52 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
    await api('/api/affairs/behavior/rules',{method:'POST',body:b});
    state.ruleEdit=null;toast('บันทึกเกณฑ์คะแนนแล้ว');await rules();
   });
+ }
+ async function monitor(refresh=true){
+  if(refresh){
+   const data=await api('/api/affairs/behavior/summary?date='+encodeURIComponent(bangkokToday()));
+   state.scoreSummary=data.items||[];
+  }
+  const all=state.scoreSummary;
+  const byGrade=state.grade?all.filter(x=>Number(x.grade)===state.grade):all;
+  const query=state.monitorQuery.trim().toLocaleLowerCase('th-TH');
+  const visible=byGrade.filter(x=>!query||String(x.full_name||'').toLocaleLowerCase('th-TH').includes(query)||
+    String(x.student_no||'').toLocaleLowerCase('th-TH').includes(query)||
+    String(x.classroom_label||'').toLocaleLowerCase('th-TH').includes(query));
+  const sum=key=>byGrade.reduce((n,x)=>n+Number(x[key]||0),0);
+  frame(`<section class="card stack">
+   <div class="row between"><div><h3>ติดตามคะแนนพฤติกรรม</h3>
+    <p class="muted">ข้อมูลนักเรียนตามทะเบียนที่ใช้งาน • จัดเรียงตามห้องเรียน ไม่จัดอันดับหรือตัดสินโทษอัตโนมัติ</p></div>
+    <button class="button secondary" type="button" id="affairsMonitorRefresh">↻ อัปเดต</button></div>
+   <div class="row"><div class="field smallbox"><label for="affairsGradeSelect">เลือกระดับชั้น</label>
+    <select id="affairsGradeSelect"><option value="0">ทุกระดับชั้น</option>
+     ${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${state.grade===i?'selected':''}>ม.${i}</option>`).join('')}
+    </select></div>
+    <div class="field smallbox"><label for="affairsMonitorQuery">ค้นหานักเรียน / รหัส / ห้อง</label>
+     <input type="search" id="affairsMonitorQuery" value="${esc(state.monitorQuery)}" placeholder="พิมพ์เพื่อกรองข้อมูล">
+    </div></div>
+   <div class="rd-affairs-metrics">
+    <div><span>นักเรียนในระดับที่เลือก</span><strong>${byGrade.length}</strong></div>
+    <div class="good"><span>คะแนนเพิ่มรวม</span><strong>+${sum('earned')}</strong></div>
+    <div class="warn-metric"><span>คะแนนที่ถูกหักรวม</span><strong>-${sum('deducted')}</strong></div>
+   </div>
+   <p class="muted">มีประวัติการบันทึก ${sum('events')} ครั้ง • คะแนนรวมเป็นผลตามรายการจริง ไม่ใช่การจัดกลุ่มผู้เรียนตามความเสี่ยง</p>
+  </section>
+  <section class="card stack"><div class="row between"><h3>ทะเบียนคะแนนพฤติกรรม</h3>
+   <span class="tag">พบ ${visible.length} คน</span></div>
+   <div class="table-wrap"><table class="table"><thead><tr><th>ห้อง</th><th>นักเรียน</th>
+    <th>เพิ่ม</th><th>หัก</th><th>คะแนนสุทธิ</th><th>รายการ</th></tr></thead><tbody>
+    ${visible.slice(0,150).map(row=>`<tr><td>${esc(row.classroom_label)}</td>
+      <td>${esc(row.full_name)}<div class="muted">${esc(row.student_no)}</div></td>
+      <td>+${Number(row.earned)||0}</td><td>-${Number(row.deducted)||0}</td>
+      <td><strong>${formatScore(row.total)}</strong></td><td>${Number(row.events)||0}</td>
+    </tr>`).join('')||'<tr><td colspan="6">ยังไม่มีนักเรียนที่ตรงกับตัวกรอง</td></tr>'}
+   </tbody></table></div>
+   ${visible.length>150?'<p class="muted">แสดง 150 คนแรก กรุณาเลือกระดับชั้นหรือใช้คำค้นหาให้แคบลง</p>':''}
+  </section>`);
+  bind('#affairsGradeSelect','change',(_,el)=>{state.grade=Number(el.value);return monitor(false)});
+  bind('#affairsMonitorQuery','change',(_,el)=>{state.monitorQuery=el.value;return monitor(false)});
+  bind('#affairsMonitorRefresh','click',()=>monitor(true));
  }
  const studentPicker=()=>`<section class="card stack"><h3>ค้นหานักเรียน</h3>
    <form id="affairsStudentSearch" class="row">
