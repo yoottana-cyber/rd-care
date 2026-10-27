@@ -9,7 +9,8 @@ class StudentAffairsSchema(unittest.TestCase):
         self.db=sqlite3.connect(':memory:')
         self.db.execute('PRAGMA foreign_keys=ON')
         for filename in ['worker/migrations/0001_initial.sql',
-                         'worker/migrations/0018_student_affairs.sql']:
+                         'worker/migrations/0018_student_affairs.sql',
+                         'worker/migrations/0019_student_affairs_role_assignments.sql']:
             self.db.executescript((ROOT/filename).read_text(encoding='utf-8'))
         self.db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
             VALUES(1,'teacher1','ครูที่ปรึกษา','teacher','x','x'),
@@ -18,6 +19,28 @@ class StudentAffairsSchema(unittest.TestCase):
             VALUES(1,3,1,'ม.3/1',1)""")
         self.db.execute("""INSERT INTO students(id,student_no,classroom_id,roll_no,full_name)
             VALUES(1,'1234',1,1,'นักเรียนทดสอบ')""")
+
+    def test_teacher_assignment_preserves_teacher_role_and_is_revocable(self):
+        self.assertEqual(self.db.execute(
+            "SELECT COUNT(*) FROM student_affairs_assignments").fetchone()[0],0)
+        self.db.execute("""INSERT INTO student_affairs_assignments(user_id,assigned_by)
+            VALUES(1,2)""")
+        self.assertEqual(self.db.execute(
+            "SELECT role FROM users WHERE id=1").fetchone(),('teacher',))
+        self.assertEqual(self.db.execute(
+            "SELECT assigned_by FROM student_affairs_assignments WHERE user_id=1").fetchone(),(2,))
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute("INSERT INTO student_affairs_assignments(user_id,assigned_by) VALUES(1,2)")
+        self.db.execute("DELETE FROM student_affairs_assignments WHERE user_id=1")
+        self.assertEqual(self.db.execute(
+            "SELECT COUNT(*) FROM student_affairs_assignments WHERE user_id=1").fetchone(),(0,))
+
+    def test_assigned_permission_is_removed_when_teacher_account_deleted(self):
+        self.db.execute("INSERT INTO student_affairs_assignments(user_id,assigned_by) VALUES(1,2)")
+        self.db.execute("UPDATE classrooms SET advisor_user_id=NULL WHERE advisor_user_id=1")
+        self.db.execute("DELETE FROM users WHERE id=1")
+        self.assertEqual(self.db.execute(
+            "SELECT COUNT(*) FROM student_affairs_assignments WHERE user_id=1").fetchone(),(0,))
 
     def tearDown(self):
         self.db.close()
