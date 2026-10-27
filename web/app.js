@@ -6,6 +6,7 @@ import {createAdvisorImport} from './advisor-import.js';
 import {createAdminSettings} from './admin-settings.js';
 import {createMyTimetable,periodChoices} from './my-timetable.js';
 import {createLateGate} from './late-gate.js';
+import {readLateGateIntent} from './late-qr-intent.js';
 import {createPeriodCenter} from './period-center.js';
 import {createPwaTools} from './pwa-client.js';
 import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
@@ -779,9 +780,11 @@ function parseCsv(csv,columns=[3]){const rows=[];let row=[],col='',quoted=false;
 }
 async function start(){
  if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
- const scanned=new URLSearchParams(location.search).get('late_qr');
+ // A printed gate QR is a public link. Keep its intent through fresh login or
+ // a browser/PWA reload; erase only the historical expiring code from the URL.
+ const scanned=readLateGateIntent(location.search);
  if(scanned){
-  history.replaceState(null,'',location.pathname);
+  if(scanned!=='gate')history.replaceState(null,'',location.pathname);
   portalUi.acceptLateQr(scanned);
   if(portalUi.hasSession()){await portalUi.resume();return}
   portalUi.showLogin('student');return;
