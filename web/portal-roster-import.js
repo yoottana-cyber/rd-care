@@ -1,4 +1,5 @@
 import {readXlsxRows} from './xlsx-reader.js';
+import {downloadPortalAccountExampleXlsx} from './template-xlsx.js';
 import {readCsvFile} from './csv-encoding.js';
 import {csvRows} from './unified-import.js';
 
@@ -131,7 +132,10 @@ export function createPortalRosterImport({api,toast,onComplete}){
    <h3>นำเข้าบัญชีนักเรียนและผู้ปกครองทั้งโรงเรียน</h3>
    <p class="muted">เลือกไฟล์เดียวได้ทั้งโรงเรียน ไม่จำกัดจำนวนแถวที่ต้องกดนำเข้า • ระบบทยอยบันทึกชุดละ 5 แถว เพื่อความเสถียร
    และอัปเดตบัญชีเดิมโดยจับคู่ <strong>เลขประจำตัวนักเรียน</strong></p>
-   <p><a class="button secondary" download href="./templates/portal-accounts-import.csv">ดาวน์โหลดไฟล์ตัวอย่าง CSV (7 คอลัมน์)</a></p>
+   <div class="row" style="flex-wrap:wrap;gap:8px">
+    <button type="button" id="portalDownloadXlsx" class="button secondary">ดาวน์โหลดตัวอย่าง Excel (.xlsx)</button>
+    <a class="button secondary" download href="./templates/portal-accounts-import.csv">ดาวน์โหลดตัวอย่าง CSV (.csv)</a>
+   </div>
    <form id="portalRosterForm" class="stack">
     <div class="field"><label>ไฟล์นำเข้า .xlsx หรือ .csv</label>
      <input type="file" name="file" accept=".xlsx,.csv,text/csv" required></div>
@@ -155,6 +159,7 @@ export function createPortalRosterImport({api,toast,onComplete}){
    <p class="warn">ไฟล์มีรหัสผ่านและข้อมูลผู้เรียน โปรดเก็บไว้ในพื้นที่ปลอดภัย ไม่ส่งเข้ากลุ่มสาธารณะ
     นำเข้าโดยใช้การเชื่อมต่อ HTTPS และตรวจสอบสิทธิ์ Admin ทุกคำขอ</p>
    </section>`;
+  container.querySelector('#portalDownloadXlsx')?.addEventListener('click',downloadPortalAccountExampleXlsx);
   container.querySelector('#portalRosterForm')?.addEventListener('submit',preview);
   container.querySelector('#portalRosterCommit')?.addEventListener('click',()=>commit().catch(err=>toast(err.message)));
   container.querySelector('#portalRosterStop')?.addEventListener('click',()=>{stop=true});
