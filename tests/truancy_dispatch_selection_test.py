@@ -8,7 +8,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 SOURCE=(ROOT/"worker/src/truancy-push.js").read_text(encoding="utf8")
 
 def real_dispatch_query():
-    match=re.search(r"SELECT e\.id,e\.generation,e\.student_id,\s*c\.advisor_user_id FROM truancy_events e[\s\S]*?ORDER BY e\.id DESC LIMIT 25",SOURCE)
+    match=re.search(r"SELECT e\.id,e\.generation,e\.student_id,(?:e\.school_date,)?\s*c\.advisor_user_id(?:,t\.period,t\.subject)? FROM truancy_events e[\s\S]*?ORDER BY e\.id DESC LIMIT 25",SOURCE)
     if not match: raise AssertionError("Truancy dispatcher SQL not found")
     return match.group(0)
 
