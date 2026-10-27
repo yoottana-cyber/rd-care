@@ -66,10 +66,10 @@ export async function lateGateStaffRoutes(req,env,user,path){
     SELECT 'static-'||id AS id,request_id,student_id,school_date,
       NULL AS issued_by,created_at FROM late_static_qr_submissions
    )
-   SELECT q.id,q.issued_by,q.school_date,q.created_at,
+   SELECT q.id,q.school_date,q.created_at,
     r.arrived_at,r.reason,r.state,s.student_no,s.full_name,
     ae.id AS auto_id,ae.active AS auto_active,c.advisor_user_id,
-    c.label AS classroom_label,h.roll_no
+    c.label AS classroom_label,h.roll_no,q.issued_by
    FROM scans q
    JOIN late_self_requests r ON r.id=q.request_id
    LEFT JOIN late_qr_auto_events ae ON ae.request_id=q.request_id
