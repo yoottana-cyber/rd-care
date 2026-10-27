@@ -1,9 +1,11 @@
 import {planStudentAccounts} from './portal-batch.js';
+import {createPortalRosterImport} from './portal-roster-import.js';
 // Staff portal provisioning is admin-only and never stores one-time credentials.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
  let roomId=rooms?.[0]?.id||null,accounts=[],links=[],students=[];
  let issuedCredentials=[];
+ const rosterImporter=createPortalRosterImport({api,toast,onComplete:()=>load()});
  const $=s=>document.querySelector(s);
  async function load(notice=null){
   if(!rooms?.some(r=>r.id===roomId))roomId=rooms?.[0]?.id||null;
@@ -38,16 +40,18 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
      <form id="portalCreateGuardian" class="stack">
       <div class="field"><label>ชื่อ–สกุลผู้ปกครอง</label><input name="display_name" required maxlength="100" placeholder="ชื่อ–สกุลผู้ปกครอง"></div>
       <div class="field"><label>Username ใหม่</label><input name="username" required minlength="3" maxlength="40" placeholder="เช่น guardian001"></div>
+      <div class="field"><label>Password (ว่างไว้เพื่อให้ระบบสุ่ม)</label><input type="password" name="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="ตั้งรหัสผู้ปกครอง"></div>
       <button class="button full" type="submit">สร้างบัญชีผู้ปกครอง</button>
      </form></section></div>
-   <section class="card stack"><h3>สร้างบัญชีนักเรียนจากรายชื่อทั้งห้อง</h3>
+   <div id="portalRosterImporter"></div>
+    <section class="card stack"><h3>สร้างบัญชีนักเรียนจากรายชื่อทั้งห้อง</h3>
     <p class="muted">นำเข้ารายชื่อนักเรียนด้วย Excel/CSV ที่เมนู “นักเรียน” ก่อน แล้วกลับมาหน้านี้ ระบบจะใช้เลขประจำตัวนักเรียนเป็น Username โดยอัตโนมัติ</p>
-    <p class="muted">พร้อมสร้าง ${plan.items.filter(x=>x.status==='ready').length} บัญชี • มีบัญชีแล้ว/ข้อมูลไม่ถูกต้อง ${plan.skipped.length} รายการ • สร้างครั้งละไม่เกิน 10 บัญชีเพื่อลดภาระ Worker</p>
+    <p class="muted">พร้อมสร้าง ${plan.items.filter(x=>x.status==='ready').length} บัญชี • มีบัญชีแล้ว/ข้อมูลไม่ถูกต้อง ${plan.skipped.length} รายการ • กดครั้งเดียวสร้างทั้งห้อง (ระบบทยอยส่งเป็นชุดภายใน)</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>รหัสนักเรียน</th><th>ชื่อ–สกุล</th><th>สถานะ</th></tr></thead>
      <tbody>${plan.items.map(x=>`<tr><td>${esc(x.student_no)}</td><td>${esc(x.full_name)}</td><td>${esc(x.reason||'พร้อมสร้าง')}</td></tr>`).join('')||'<tr><td colspan="3">ไม่มีนักเรียนในห้องนี้</td></tr>'}</tbody></table></div>
     <div id="portalBulkProgress" class="muted" role="status" aria-live="polite"></div>
     <button type="button" id="portalBulkCreate" class="button full" ${plan.ready.length?'':'disabled'}>สร้างบัญชี ${plan.ready.length} คนที่ยังไม่มีบัญชี</button>
-    <div class="warn">ห้ามอัปโหลดเลขประจำตัวประชาชนเพื่อใช้เป็นรหัสผ่าน ระบบจะสุ่มรหัสชั่วคราวแยกรายคนและบังคับเปลี่ยนครั้งแรก</div>
+    <div class="warn">ห้ามอัปโหลดเลขประจำตัวประชาชนเพื่อใช้เป็นรหัสผ่าน ระบบจะสุ่มรหัสชั่วคราวแยกรายคนและไม่บังคับเปลี่ยนรหัสครั้งแรก</div>
    </section>
    ${issuedCredentials.length?`<section class="card stack"><h3>รหัสชั่วคราวจากการสร้างบัญชีครั้งล่าสุด (${issuedCredentials.length})</h3>
     <p class="warn">แสดงเฉพาะในหน้านี้ และจะหายเมื่อออกจากเมนูหรือโหลดหน้าใหม่ ควรแจ้งรหัสแต่ละคนเป็นการส่วนตัว อย่าถ่ายภาพหรือแชร์ในกลุ่ม</p>
@@ -75,7 +79,8 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
      <tbody>${links.map(l=>`<tr><td>${esc(l.guardian_name)}</td><td>${esc(l.full_name)} <span class="muted">${esc(l.student_no)}</span></td>
       <td><button type="button" class="button ghost" data-unlink-guardian="${l.guardian_account_id}" data-unlink-student="${l.student_id}">เพิกถอนสิทธิ์</button></td></tr>`).join('')||'<tr><td colspan="3">ยังไม่มีการผูกบัญชี</td></tr>'}</tbody></table></div></section>
   </section>`);
-  $('#portalAdminRoom')?.addEventListener('change',e=>safeRun(async()=>{roomId=Number(e.target.value);issuedCredentials=[];await load()}));
+  rosterImporter.render($('#portalRosterImporter'));
+   $('#portalAdminRoom')?.addEventListener('change',e=>safeRun(async()=>{roomId=Number(e.target.value);issuedCredentials=[];await load()}));
   $('#portalCreateStudent select[name="student_id"]')?.addEventListener('change',e=>{
    const student=students.find(s=>s.id===Number(e.target.value));
    if($('#selectedStudentNumber'))$('#selectedStudentNumber').value=student?.student_no||'';
@@ -108,8 +113,8 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun}){
   $('#portalClearCredentials')?.addEventListener('click',()=>{issuedCredentials=[];render()});
   $('#portalCreateGuardian')?.addEventListener('submit',e=>safeRun(async()=>{
    e.preventDefault();const f=new FormData(e.currentTarget),button=e.currentTarget.querySelector('button');button.disabled=true;
-   try{const r=await api('/api/admin/portal/accounts',{method:'POST',body:{role:'guardian',display_name:String(f.get('display_name')),username:String(f.get('username'))}});
-    toast('สร้างบัญชีผู้ปกครองแล้ว');await load({username:r.username,temporary_password:r.temporary_password});
+   try{const r=await api('/api/admin/portal/accounts',{method:'POST',body:{role:'guardian',display_name:String(f.get('display_name')),username:String(f.get('username')),...(f.get('password')?{password:String(f.get('password'))}:{})}});
+    toast('สร้างบัญชีผู้ปกครองแล้ว');await load(r.temporary_password?{username:r.username,temporary_password:r.temporary_password}:null);
    }finally{if(button.isConnected)button.disabled=false}
   }));
   $('#portalLink')?.addEventListener('submit',e=>safeRun(async()=>{

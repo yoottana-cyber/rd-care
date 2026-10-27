@@ -89,8 +89,8 @@ export async function unifiedRosterEndpoint(req,env,user,path){
     SELECT id,?,?,?,? FROM students WHERE student_no=?`)
     .bind(student.classroom_id,student.roll_no,bangkokToday(),user.id,student.student_no));
   const salt=hex(16),hash=await passwordHash(rows[i].password,salt);
-  stmts.push(env.DB.prepare(`INSERT INTO portal_accounts(username,display_name,role,student_id,password_salt,password_hash,created_by)
-    SELECT ?,full_name,'student',id,?,?,? FROM students WHERE student_no=?`)
+  stmts.push(env.DB.prepare(`INSERT INTO portal_accounts(username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
+    SELECT ?,full_name,'student',id,?,?,0,? FROM students WHERE student_no=?`)
     .bind(student.username,salt,hash,user.id,student.student_no));
  }
  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')

@@ -1,6 +1,6 @@
 // Preview roster account issuance in the browser; authoritative validation
 // and uniqueness checks remain on the Worker.
-export function planStudentAccounts(students,accounts,limit=10){
+export function planStudentAccounts(students,accounts,limit=Number.POSITIVE_INFINITY){
  const issued=new Set(accounts.filter(a=>a.role==='student').map(a=>Number(a.student_id)));
  const used=new Set(accounts.map(a=>String(a.username).toLowerCase()));
  const items=students.filter(s=>s.active).map(s=>{

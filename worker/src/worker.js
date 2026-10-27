@@ -694,8 +694,8 @@ async function adminRoutes(req,env,user,path){
    const salt=randomHex(16);
    const hash=await passwordHash(raw.password,salt);
    stmts.push(env.DB.prepare(`INSERT INTO portal_accounts
-    (username,display_name,role,student_id,password_salt,password_hash,created_by)
-    SELECT ?,full_name,'student',id,?,?,? FROM students WHERE student_no=?`)
+    (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
+    SELECT ?,full_name,'student',id,?,?,0,? FROM students WHERE student_no=?`)
     .bind(row.login_username,salt,hash,user.id,row.student.student_no));
   }
   stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
