@@ -113,7 +113,7 @@ export async function staffPushRoutes(req,env,user,path){
    .bind(user.id,b.endpoint).first();
   if(!device)return json({accepted:false,code:'device_not_registered'});
   try{
-   const result=await sendPriorityPush(device,env,'advisor');
+   const result=await sendPushTest(device,env,'advisor');
    if(result.status===404||result.status===410)
     await env.DB.prepare('DELETE FROM staff_push_subscriptions WHERE id=? AND user_id=?')
      .bind(device.id,user.id).run();
@@ -173,7 +173,27 @@ export async function sendLateArrivalPush(device,env,audience,eventInfo={}){
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
  },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }
-// Payload-free push: service worker displays only generic school notification.
+// No student identity is included in either category or test notifications.
+export async function sendAttendanceReviewPush(device,env,eventInfo){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ const body=await encryptPriorityPush(device,{kind:'attendance_review',audience:'advisor',...safePushEventInfo(eventInfo,'truancy')});
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'1200',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
+export async function sendPushTest(device,env,audience){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ if(!['advisor','guardian'].includes(audience))throw Error('Invalid push audience');
+ const body=await encryptPriorityPush(device,{kind:'push_test',audience});
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'300',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
+// Legacy payload-free push for older administrative notices.
 export async function sendGenericPush(endpoint,env){
  if(!allowedEndpoint(endpoint))throw Error('Push endpoint not permitted');
  const authorized=await makeVapidAuthorization(endpoint,env);
@@ -181,11 +201,8 @@ export async function sendGenericPush(endpoint,env){
   Authorization:authorized,TTL:'300',Urgency:'high'
  }});
 }
-async function deliverOne(env,entry,device,key){
- const authorized=await makeVapidAuthorization(device.endpoint,env);
- const response=await fetch(device.endpoint,{method:'POST',headers:{
-  Authorization:authorized,TTL:'300',Urgency:'normal'
- }});
+async function deliverOne(env,entry,device,eventInfo){
+ const response=await sendAttendanceReviewPush(device,env,eventInfo);
  if(response.ok)return {delivered:true};
  if(response.status===404||response.status===410){
   await env.DB.prepare('DELETE FROM staff_push_subscriptions WHERE id=? AND user_id=?')
@@ -207,7 +224,12 @@ export async function deliverAdvisorPush(env){
   GROUP BY c.advisor_user_id ORDER BY MIN(o.id) LIMIT 25`).all();
  let delivered=0;
  for(const event of events){
-  const {results:devices}=await env.DB.prepare('SELECT id,endpoint FROM staff_push_subscriptions WHERE user_id=? ORDER BY id LIMIT 5')
+  const detail=await env.DB.prepare(`SELECT a.id AS eventId,a.school_date AS date,t.period,t.subject
+   FROM notification_outbox o JOIN attendance_alerts a ON a.id=o.alert_id
+   JOIN timetable t ON t.id=a.timetable_id
+   WHERE o.id=? AND o.state='pending' AND a.state='pending_review'`).bind(event.outbox_id).first();
+  if(!detail)continue;
+  const {results:devices}=await env.DB.prepare('SELECT id,endpoint,p256dh,auth FROM staff_push_subscriptions WHERE user_id=? ORDER BY id LIMIT 5')
    .bind(event.recipient_id).all();
   for(const device of devices){
    await env.DB.prepare(`INSERT OR IGNORE INTO staff_push_deliveries(outbox_id,subscription_id,state)
@@ -218,7 +240,7 @@ export async function deliverAdvisorPush(env){
     .bind(event.outbox_id,device.id).run();
    if(!claim.meta?.changes)continue;
    let result;
-   try{result=await deliverOne(env,event,device)}catch(e){
+   try{result=await deliverOne(env,event,device,detail)}catch(e){
     console.warn('RD Care staff push send failed',String(e?.name||'network'));result={failed:true};
    }
    if(!result.expired){
