@@ -68,7 +68,7 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
     <div class="field"><label>Username</label><input readonly value="${esc(notice.username)}"></div>
     <div class="field"><label>รหัสผ่านชั่วคราว</label><input readonly value="${esc(notice.temporary_password)}"></div>
     <p class="muted">รหัสชั่วคราวไม่สามารถดูย้อนหลังได้ หากสูญหายให้รีเซ็ตรหัสผ่านใหม่จากปุ่มด้านล่าง</p></section>`:''}
-   <div class="grid two">
+   ${mode==='student'?`<div class="grid two">
     <section class="card stack"><h3>สร้างบัญชีนักเรียน</h3>
      <div class="field"><label>เลือกห้องเรียน</label><select id="portalAdminRoom">${roomOpts}</select></div>
      <form id="portalCreateStudent" class="stack">
@@ -76,16 +76,17 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
       <div class="field"><label>Username (ค่าเริ่มต้นคือเลขประจำตัวนักเรียน)</label><input id="selectedStudentNumber" name="username" maxlength="40" required value="${esc(students[0]?.student_no||'')}" autocomplete="off"></div>
       <div class="field"><label>รหัสผ่านเริ่มต้น (ไม่บังคับ: เว้นว่างเพื่อให้ระบบสุ่ม)</label><input name="password" type="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="อย่างน้อย 4 ตัวอักษร"></div>
       <button type="submit" class="button full" ${students.length?'':'disabled'}>สร้างบัญชีนักเรียน</button>
-     </form></section>
+     </form></section></div>`:''}
+    ${mode==='guardian'?`<div class="grid two">
     <section class="card stack"><h3>สร้างบัญชีผู้ปกครอง</h3>
      <form id="portalCreateGuardian" class="stack">
       <div class="field"><label>ชื่อ–สกุลผู้ปกครอง</label><input name="display_name" required maxlength="100" placeholder="ชื่อ–สกุลผู้ปกครอง"></div>
       <div class="field"><label>Username ใหม่</label><input name="username" required minlength="3" maxlength="40" placeholder="เช่น guardian001"></div>
       <div class="field"><label>Password (ว่างไว้เพื่อให้ระบบสุ่ม)</label><input type="password" name="password" minlength="4" maxlength="128" autocomplete="new-password" placeholder="ตั้งรหัสผู้ปกครอง"></div>
       <button class="button full" type="submit">สร้างบัญชีผู้ปกครอง</button>
-     </form></section></div>
-   <div id="portalRosterImporter"></div>
-    <section class="card stack"><h3>สร้างบัญชีนักเรียนจากรายชื่อทั้งห้อง</h3>
+     </form></section></div>`:''}
+   ${mode!=='links'?'<div id="portalRosterImporter"></div>':''}
+    ${mode==='student'?`<section class="card stack"><h3>สร้างบัญชีนักเรียนจากรายชื่อทั้งห้อง</h3>
     <p class="muted">นำเข้ารายชื่อนักเรียนด้วย Excel/CSV ที่เมนู “นักเรียน” ก่อน แล้วกลับมาหน้านี้ ระบบจะใช้เลขประจำตัวนักเรียนเป็น Username โดยอัตโนมัติ</p>
     <p class="muted">พร้อมสร้าง ${plan.items.filter(x=>x.status==='ready').length} บัญชี • มีบัญชีแล้ว/ข้อมูลไม่ถูกต้อง ${plan.skipped.length} รายการ • กดครั้งเดียวสร้างทั้งห้อง (ระบบทยอยส่งเป็นชุดภายใน)</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>รหัสนักเรียน</th><th>ชื่อ–สกุล</th><th>สถานะ</th></tr></thead>
@@ -93,32 +94,54 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
     <div id="portalBulkProgress" class="muted" role="status" aria-live="polite"></div>
     <button type="button" id="portalBulkCreate" class="button full" ${plan.ready.length?'':'disabled'}>สร้างบัญชี ${plan.ready.length} คนที่ยังไม่มีบัญชี</button>
     <div class="warn">ห้ามอัปโหลดเลขประจำตัวประชาชนเพื่อใช้เป็นรหัสผ่าน ระบบจะสุ่มรหัสชั่วคราวแยกรายคนและไม่บังคับเปลี่ยนรหัสครั้งแรก</div>
-   </section>
-   ${issuedCredentials.length?`<section class="card stack"><h3>รหัสชั่วคราวจากการสร้างบัญชีครั้งล่าสุด (${issuedCredentials.length})</h3>
+   </section>`:''}
+   ${mode==='student'&&issuedCredentials.length?`<section class="card stack"><h3>รหัสชั่วคราวจากการสร้างบัญชีครั้งล่าสุด (${issuedCredentials.length})</h3>
     <p class="warn">แสดงเฉพาะในหน้านี้ และจะหายเมื่อออกจากเมนูหรือโหลดหน้าใหม่ ควรแจ้งรหัสแต่ละคนเป็นการส่วนตัว อย่าถ่ายภาพหรือแชร์ในกลุ่ม</p>
     <div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>Username</th><th>รหัสชั่วคราว</th></tr></thead>
      <tbody>${issuedCredentials.map(x=>`<tr><td>${esc(x.full_name)}</td><td>${esc(x.username)}</td><td><input aria-label="รหัสชั่วคราวของ ${esc(x.username)}" type="text" readonly autocomplete="off" value="${esc(x.temporary_password)}"></td></tr>`).join('')}</tbody></table></div>
     <button type="button" class="button secondary" id="portalClearCredentials">ปิดการแสดงรหัสชั่วคราว</button>
    </section>`:''}
-   <section class="card stack"><h3>ผูกผู้ปกครองกับนักเรียน</h3>
+   ${mode==='links'?`<section class="card stack"><h3>ผูกผู้ปกครองกับนักเรียน</h3>
+    <form id="portalGuardianLookup" class="row">
+     <div class="field"><label>ค้นหาผู้ปกครองก่อนผูกสิทธิ์</label>
+      <input name="guardian_query" value="${esc(guardianSearch)}" maxlength="100" placeholder="ค้นหาชื่อหรือ Username"></div>
+     <button type="submit" class="button secondary">ค้นหาบัญชี</button>
+    </form>
+    <p class="muted">แสดงผู้ปกครองสูงสุด 100 บัญชีตามคำค้น โปรดค้นหา Username เพื่อเลือกผู้ปกครองให้ถูกต้อง</p>
     <div class="warn">ต้องตรวจสอบตัวตนและหลักฐานความสัมพันธ์จริงก่อนผูกสิทธิ์เมื่อใช้งานจริง ห้ามอนุญาตจากคำกล่าวอ้างเพียงอย่างเดียว</div>
     <form id="portalLink" class="stack"><div class="grid two">
      <div class="field"><label>บัญชีผู้ปกครอง</label><select name="guardian_account_id" required>${guardianOpts}</select></div>
      <div class="field"><label>นักเรียนในห้องที่เลือก</label><select name="student_id" required>${studentOpts}</select></div></div>
      <label><input name="verified" type="checkbox" required> ยืนยันว่าได้ตรวจสอบตัวตนและความสัมพันธ์ก่อนผูกบัญชี</label>
      <button type="submit" class="button full" ${guardians.length&&students.length?'':'disabled'}>ผูกบัญชีผู้ปกครองกับนักเรียน</button></form>
-   </section>
-   <section class="card stack"><h3>บัญชีที่ออกแล้ว (${accounts.length})</h3>
+   </section>`:''}
+   <section class="card stack portal-list-card">
+    <h3>${mode==='student'?'บัญชีนักเรียน':mode==='guardian'?'บัญชีผู้ปกครอง':'ความสัมพันธ์นักเรียน–ผู้ปกครอง'} (${total.toLocaleString('th-TH')})</h3>
+    <form id="portalListSearch" class="portal-list-controls">
+     <div class="field"><label for="portalSearchQuery">ค้นหา</label>
+      <input id="portalSearchQuery" name="q" value="${esc(query)}" maxlength="100" placeholder="${mode==='links'?'ชื่อหรือเลขประจำตัวนักเรียน / ผู้ปกครอง':'ชื่อ Username หรือเลขประจำตัวนักเรียน'}"></div>
+     <div class="field"><label for="portalPageSize">แสดงข้อมูล</label>
+      <select id="portalPageSize">${sizeOptions}</select></div>
+     <button type="submit" class="button secondary">ค้นหา</button>
+     <button type="button" class="button ghost" id="portalSearchClear">ล้างตัวกรอง</button>
+    </form>
+    <div class="portal-list-paging" role="status" aria-live="polite">
+     <span>แสดง ${window.first.toLocaleString('th-TH')}–${window.last.toLocaleString('th-TH')} จาก ${total.toLocaleString('th-TH')} รายการ
+      ${pageSize==='all'?'(ทั้งหมด)':`• หน้า ${window.page.toLocaleString('th-TH')}/${window.pages.toLocaleString('th-TH')}`}</span>
+     <div class="row"><button type="button" class="button secondary" id="portalPrevious" ${window.hasPrev?'':'disabled'}>← ก่อนหน้า</button>
+      <button type="button" class="button secondary" id="portalNext" ${window.hasNext?'':'disabled'}>ถัดไป →</button></div>
+    </div>
+   ${mode!=='links'?`<div class="table-wrap"><table class="table"><thead><tr>
+    <th>Username / ชื่อ</th><th>${mode==='student'?'เลขประจำตัว / ห้อง':'ประเภท'}</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
     <div class="table-wrap"><table class="table"><thead><tr><th>Username / ชื่อ</th><th>ประเภท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
      <tbody>${accounts.map(a=>`<tr><td><strong>${esc(a.username)}</strong><div class="muted">${esc(a.display_name)}</div></td>
-      <td>${a.role==='student'?'นักเรียน':'ผู้ปกครอง'}</td><td>${a.active?'ใช้งาน':'ระงับ'} ${a.must_change_password?'• ต้องเปลี่ยนรหัส':''}</td>
+      <td>${mode==='student'?`${esc(a.student_no||'-')}<div class="muted">${esc(a.classroom_label||'')}</div>`:'ผู้ปกครอง'}</td><td>${a.active?'ใช้งาน':'ระงับ'}</td>
       <td><button type="button" class="button secondary" data-reset-portal="${a.id}">รีเซ็ต</button>
        <button type="button" class="button ghost" data-status-portal="${a.id}" data-active="${a.active?0:1}">${a.active?'ระงับ':'เปิดใช้'}</button></td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีบัญชี</td></tr>'}</tbody></table></div>
+   `:`<div class="table-wrap"><table class="table"><thead><tr><th>ผู้ปกครอง</th><th>นักเรียน</th><th>จัดการ</th></tr></thead>
+     <tbody>${links.map(l=>`<tr><td>${esc(l.guardian_name)}<div class="muted">${esc(l.guardian_username||'')}</div></td><td>${esc(l.full_name)} <span class="muted">${esc(l.student_no)} • ${esc(l.classroom_label||'')}</span></td>
+      <td><button type="button" class="button ghost" data-unlink-guardian="${l.guardian_account_id}" data-unlink-student="${l.student_id}">เพิกถอนสิทธิ์</button></td></tr>`).join('')||'<tr><td colspan="3">ยังไม่มีการผูกบัญชี</td></tr>'}</tbody></table></div>`}
    </section>
-   <section class="card stack"><h3>ผู้ปกครองที่ผูกกับนักเรียน (${links.length})</h3>
-    <div class="table-wrap"><table class="table"><thead><tr><th>ผู้ปกครอง</th><th>นักเรียน</th><th>จัดการ</th></tr></thead>
-     <tbody>${links.map(l=>`<tr><td>${esc(l.guardian_name)}</td><td>${esc(l.full_name)} <span class="muted">${esc(l.student_no)}</span></td>
-      <td><button type="button" class="button ghost" data-unlink-guardian="${l.guardian_account_id}" data-unlink-student="${l.student_id}">เพิกถอนสิทธิ์</button></td></tr>`).join('')||'<tr><td colspan="3">ยังไม่มีการผูกบัญชี</td></tr>'}</tbody></table></div></section>
   </section>`);
   rosterImporter.render($('#portalRosterImporter'));
    $('#portalAdminRoom')?.addEventListener('change',e=>safeRun(async()=>{roomId=Number(e.target.value);issuedCredentials=[];await load()}));
