@@ -2,6 +2,7 @@ import {API_BASE_URL} from './config.js';
 import {bindThemeButtons} from './theme.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea} from './auth-session.js';
 import {createGuardianPush} from './guardian-push.js';
+import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -11,8 +12,18 @@ const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400
 export function createPortalUi({root,onStaffLogin}){
  const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today()};
  let requestVersion=0;
- let lateQrToken=null,lateQrReceipt=null;
- function acceptLateQr(value){lateQrToken=value==='gate'||/^[a-f0-9]{40}$/.test(value)?value:null;lateQrReceipt=null;}
+ let lateQrToken=readLateGateIntent(location.search),lateQrReceipt=null;
+ function acceptLateQr(value){
+  lateQrToken=value==='gate'||/^[a-f0-9]{40}$/.test(value)?value:null;
+  if(lateQrToken==='gate')rememberLateGateIntent('gate');
+  lateQrReceipt=null;
+ }
+ function endLateQrIntent(){
+  lateQrToken=null;
+  clearLateGateIntent();
+  if(new URLSearchParams(location.search).get('late_qr')!==null)
+   history.replaceState(null,'',location.pathname+location.hash);
+ }
  const select=s=>root.querySelector(s);
  const message=(str,bad=false)=>{const box=select('#portalMessage');if(box){box.textContent=str;box.className=bad?'warn':'ok';}};
  const guardianPush=createGuardianPush({call,select,message});
@@ -48,12 +59,14 @@ export function createPortalUi({root,onStaffLogin}){
   bindThemeButtons();
  }
  function showLogin(role=state.role){
+  if(lateQrToken)role='student';
   state.role=role;requestVersion++;
   state.account=null;state.children=[];state.records=null;
   frame(`<div class="login-role-tabs" role="group" aria-label="ประเภทผู้เข้าใช้งาน">
     <button type="button" class="active" aria-pressed="true">นักเรียน / ผู้ปกครอง</button>
     <button type="button" id="portalBackTop" aria-pressed="false">ครู / ผู้ดูแลระบบ</button></div>
     <h2 class="login-heading">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
+    ${lateQrToken?'<p class="summary" role="status">⏰ สแกน QR ลงชื่อมาสายแล้ว กรุณาเข้าสู่ระบบบัญชีนักเรียน จากนั้นระบบจะแสดงปุ่มยืนยันลงชื่อให้ทันที</p>':''}
    <div class="row portal-role-choice">
     <button type="button" class="button ${role==='student'?'':'secondary'}" data-role="student">นักเรียน</button>
     <button type="button" class="button ${role==='guardian'?'':'secondary'}" data-role="guardian">ผู้ปกครอง</button></div>
@@ -162,7 +175,9 @@ export function createPortalUi({root,onStaffLogin}){
      <div class="field"><label for="lateQrReason">สาเหตุที่มาสาย (ไม่บังคับ)</label>
       <textarea id="lateQrReason" maxlength="300" name="reason" placeholder="ระบุสาเหตุ หากต้องการ"></textarea></div>
      <button type="submit" class="button full">✅ ยืนยันลงชื่อมาสาย</button>
-    </form><p class="muted">QR ถาวรใช้ซ้ำได้ทุกวัน แต่ลงชื่อได้เฉพาะหลัง 08.00 น. และต้องรอครูเวรตรวจสอบ</p>
+    </form>
+    <button type="button" id="cancelStudentLateQr" class="button secondary full">ยกเลิกการลงชื่อมาสาย</button>
+    <p class="muted">QR ถาวรใช้ซ้ำได้ทุกวัน แต่ลงชื่อได้เฉพาะหลัง 08.00 น. และต้องรอครูเวรตรวจสอบ</p>
    </section>`:''}
    ${state.account.role==='student'&&lateQrReceipt?`<section class="card stack"><h3>✅ ลงชื่อมาสายสำเร็จ</h3>
     <p>${esc(lateQrReceipt.date)} เวลา ${esc(lateQrReceipt.arrivedAt)} น.</p>
@@ -204,10 +219,15 @@ export function createPortalUi({root,onStaffLogin}){
     const data=await call('/api/portal/late/qr',{method:'POST',body:{
      token:lateQrToken,reason:String(new FormData(event.currentTarget).get('reason')||'')
     }});
-    lateQrReceipt=data;lateQrToken=null;
+    lateQrReceipt=data;
+    endLateQrIntent();
     await showDashboard();
     message('ลงชื่อมาสายสำเร็จแล้ว รอครูเวรยืนยัน');
    }catch(error){message(error.message,true);if(button.isConnected)button.disabled=false}
+  });
+  select('#cancelStudentLateQr')?.addEventListener('click',()=>{
+   endLateQrIntent();
+   renderDashboard();
   });
   if(state.account.role==='guardian')guardianPush.bind();
   select('#portalStudent')?.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()});
