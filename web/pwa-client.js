@@ -23,7 +23,7 @@ export function createPwaTools({api,toast}){
    enabled:remote.enabled===true,publicKey:remote.publicKey||''};
  }
  async function install(){
-  if(isStandalone()){toast('แอป RD Care ติดตั้งไว้แล้ว');return}
+  if(isStandalone()){toast('แอป RD CONNECT ติดตั้งไว้แล้ว');return}
   if(installPrompt){const p=installPrompt;installPrompt=null;await p.prompt();await p.userChoice;return}
   if(/iPad|iPhone|iPod/i.test(navigator.userAgent))toast('บน iPhone: เปิดผ่าน Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม');
   else toast('บน Android: เปิดเมนูเบราว์เซอร์ แล้วเลือก ติดตั้งแอป หรือ เพิ่มไปยังหน้าจอหลัก');
@@ -32,7 +32,7 @@ export function createPwaTools({api,toast}){
   if(!supported()){toast('อุปกรณ์หรือเบราว์เซอร์นี้ยังไม่รองรับ Push',true);return false}
   // iOS requires a home-screen app and a requestPermission in a direct user gesture.
   if(/iPad|iPhone|iPod/i.test(navigator.userAgent)&&!isStandalone()){
-   toast('iPhone: โปรดเพิ่ม RD Care ไปหน้าจอโฮมและเปิดจากไอคอนก่อนเปิดการแจ้งเตือน',true);return false;
+   toast('iPhone: โปรดเพิ่ม RD CONNECT ไปหน้าจอโฮมและเปิดจากไอคอนก่อนเปิดการแจ้งเตือน',true);return false;
   }
   const permission=await Notification.requestPermission();
   if(permission!=='granted'){toast('ยังไม่ได้รับสิทธิ์การแจ้งเตือน สามารถเปิดได้จากตั้งค่าอุปกรณ์',true);return false}

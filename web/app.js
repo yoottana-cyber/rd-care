@@ -82,10 +82,12 @@ function safeRun(job){return runSafely(job,e=>toast(e?.message||String(e),true))
 function entrySelectionPage(){
  return `<div class="login-wrap login-choice-wrap"><main class="login-choice-layout">
   <header class="login-choice-heading">
-   <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
+   <span class="brand-code">RD CONNECT • RATSADA SCHOOL</span>
    <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="150" height="140" decoding="async" fetchpriority="high">
-   <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
-   <p>เลือกประเภทผู้เข้าใช้งาน</p>
+   <h1>RD CONNECT</h1>
+   <p class="brand-system-name">ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+   <p class="brand-choice-prompt">เชื่อมทุกความห่วงใย ดูแลทุกก้าวของนักเรียน</p>
+   <p class="brand-choice-prompt">เลือกประเภทผู้เข้าใช้งาน</p>
   </header>
   <nav class="login-choice-grid" aria-label="เลือกประเภทบัญชี">
    <a class="login-choice-card" href="${loginHref('staff')}" data-choice="staff">
@@ -105,7 +107,7 @@ function entrySelectionPage(){
    </a>
   </nav>
   <div class="login-choice-foot">
-   <button type="button" class="button secondary" id="entryInstallApp">⬇️ ติดตั้ง RD Care ลงมือถือ</button>
+   <button type="button" class="button secondary" id="entryInstallApp">⬇️ ติดตั้ง RD CONNECT ลงมือถือ</button>
    <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
    <p>พัฒนาโดย ครูยุทธนา บุญจันทร์</p>
   </div>
@@ -120,10 +122,11 @@ function showEntrySelection(){
 function loginPage(){
  return `<div class="login-wrap"><section class="card login-card" aria-label="เข้าสู่ระบบครูและบุคลากรโรงเรียนรัษฎา">
  <header class="login-brand">
-  <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
+  <span class="brand-code">RD CONNECT • RATSADA SCHOOL</span>
   <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
-  <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
-  <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
+  <h1>RD CONNECT</h1>
+  <p class="brand-system-name">ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+  <p class="brand-subtitle">เชื่อมทุกความห่วงใย ดูแลทุกก้าวของนักเรียน</p>
  </header>
  <div class="login-content">
   <h2 class="login-heading">เข้าสู่ระบบครูและบุคลากร</h2>
@@ -135,7 +138,7 @@ function loginPage(){
    <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
   </form>
   <div class="login-links"><a href="./" class="button secondary full" id="staffBackToChoice">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</a></div>
-  <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้ง RD Care ลงมือถือ</button>
+  <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้ง RD CONNECT ลงมือถือ</button>
    <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
   <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
   <p class="login-message">Push หนีเรียนและมาสายส่งเฉพาะบัญชีที่สมัครรับและได้รับสิทธิ์เท่านั้น</p>
@@ -209,12 +212,12 @@ function chrome(content){
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
- <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>ระบบการดูแลและช่วยเหลือนักเรียน</h1><p>RD Care • โรงเรียนรัษฎา</p></div></div>
+ <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>RD CONNECT</h1><p>ระบบการดูแลช่วยเหลือนักเรียน • โรงเรียนรัษฎา</p></div></div>
  <div class="rd-mobile-header-actions"><button type="button" data-tab="notifications" aria-label="ศูนย์แจ้งเตือน">♧</button>
  <button type="button" id="rdHeaderMenu" aria-label="เปิดเมนู">☰</button></div>
  <div class="user"><span class="rd-date-chip" aria-label="วันที่ปัจจุบัน">📅 ${esc(displayDate)}</span><span class="rd-user-avatar" aria-hidden="true">${esc((state.user.display_name||'ค').trim().charAt(0))}</span><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออกจากระบบ</button></div></header>
  <div class="rd-layout" id="rdLayout">
- <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><div class="rd-side-brand"><img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="38" height="38" decoding="async"><span><strong>RD CARE</strong><small>RATSADA SCHOOL</small></span></div><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><p class="rd-nav-caption">เมนูหลัก</p><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
+ <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><div class="rd-side-brand"><img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="38" height="38" decoding="async"><span><strong>RD CONNECT</strong><small>RATSADA SCHOOL</small></span></div><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><p class="rd-nav-caption">เมนูหลัก</p><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
  <div class="rd-workspace">
  ${state.user?.role==='admin'?`<section class="rd-global-search" aria-label="ค้นหานักเรียนทั้งโรงเรียน">
   <label for="rdGlobalSearch">🔎 ค้นหานักเรียนทั้งโรงเรียน</label>
@@ -226,7 +229,7 @@ function chrome(content){
  ${content}
  </div>
  </div>${mobileMarkup({navs,user:state.user,active:id=>state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'),pending:Number(state.stats?.alerts||0)})}
- <footer class="foot">RD Care • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • Push ผู้ปกครองต้องเปิดรับด้วยตนเอง</footer></main>`;
+ <footer class="foot">RD CONNECT • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • Push ผู้ปกครองต้องเปิดรับด้วยตนเอง</footer></main>`;
 }
 function mount(content){
  $('#app').innerHTML=chrome(content);
@@ -343,7 +346,7 @@ function renderDashboard(){
  mount(`<section class="stack">
   <div class="dashboard-hero">
    <div class="rd-hero-greeting"><span class="rd-hero-avatar" aria-hidden="true">👤</span>
-    <div><span class="hero-chip">✦ RD Care • Smart Student Care</span>
+    <div><span class="hero-chip">✦ RD CONNECT • Smart Student Care</span>
      <h2>ยินดีต้อนรับ ${esc(state.user.display_name)}</h2>
      <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(state.date)}</p></div></div>
    <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
@@ -556,7 +559,7 @@ function renderLate(){
   <button class="button secondary full" type="submit" ${!state.students.length||state.date!==dateToday()?'disabled':''}>สร้างรหัสยืนยันชั่วคราว</button></form>
   ${state.date!==dateToday()?'<p class="warn">การออกรหัสทำได้เฉพาะวันที่ปัจจุบัน กรุณาเปลี่ยนวันที่ก่อน</p>':''}
   <div id="lateIssuedCode" aria-live="polite" class="summary" hidden></div>
-  <p class="muted">นักเรียนเปิดหน้าเว็บ RD Care ก่อนเข้าสู่ระบบ → “นักเรียนแจ้งมาสาย” กรอกรหัสนักเรียนและรหัสยืนยัน</p>
+  <p class="muted">นักเรียนเปิดหน้าเว็บ RD CONNECT ก่อนเข้าสู่ระบบ → “นักเรียนแจ้งมาสาย” กรอกรหัสนักเรียนและรหัสยืนยัน</p>
  </section>
  <section class="card stack"><h3>รายการแจ้งมาสายรอตรวจสอบ (${pending.length})</h3>
   ${requests.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สาเหตุ</th><th>สถานะ</th><th>การตรวจสอบ</th></tr></thead>
@@ -873,7 +876,7 @@ async function start(){
   // A broken/offline network should not erase a remembered session. Only 401 does that
   // inside api(); after connectivity returns the user can continue without re-entering credentials.
   if(!state.token)return;
-  $('#app').innerHTML='<section class="login-wrap"><div class="card login-card stack"><h2>ยังไม่สามารถเชื่อมต่อ RD Care</h2><p>ระบบเก็บการเข้าสู่ระบบของอุปกรณ์นี้ไว้แล้ว ลองเชื่อมต่อใหม่ได้โดยไม่ต้องกรอกรหัสผ่าน</p><button type="button" id="retryRememberedLogin" class="button full">เชื่อมต่ออีกครั้ง</button><button type="button" id="forgetRememberedLogin" class="button secondary full">ออกจากระบบ</button></div></section>';
+  $('#app').innerHTML='<section class="login-wrap"><div class="card login-card stack"><h2>ยังไม่สามารถเชื่อมต่อ RD CONNECT</h2><p>ระบบเก็บการเข้าสู่ระบบของอุปกรณ์นี้ไว้แล้ว ลองเชื่อมต่อใหม่ได้โดยไม่ต้องกรอกรหัสผ่าน</p><button type="button" id="retryRememberedLogin" class="button full">เชื่อมต่ออีกครั้ง</button><button type="button" id="forgetRememberedLogin" class="button secondary full">ออกจากระบบ</button></div></section>';
   $('#retryRememberedLogin')?.addEventListener('click',()=>start());
   $('#forgetRememberedLogin')?.addEventListener('click',()=>{clearAuthSession('rd_token');state.token='';state.user=null;renderLogin()});
  }

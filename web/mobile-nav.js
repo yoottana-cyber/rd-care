@@ -17,13 +17,13 @@ export function mobileMarkup({navs,user,active,pending=0}){
  const all=[...navs,['notifications','แจ้งเตือน','🔔']];
  const sheet=`<div class="rd-mobile-shade" id="rdMobileShade" hidden></div>
  <section class="rd-mobile-sheet" id="rdMobileSheet" role="dialog" aria-modal="true" aria-labelledby="rdMobileSheetTitle" hidden>
-  <div class="rd-mobile-sheet-heading"><strong id="rdMobileSheetTitle">เมนู RD Care</strong>
+  <div class="rd-mobile-sheet-heading"><strong id="rdMobileSheetTitle">เมนู RD CONNECT</strong>
    <button type="button" id="rdCloseMobileMenu" aria-label="ปิดเมนู">✕</button></div>
   <div class="rd-mobile-account"><span class="rd-user-avatar" aria-hidden="true">${esc((user.display_name||'ค').trim().charAt(0))}</span>
-   <div><strong>${esc(user.display_name)}</strong><p>โรงเรียนรัษฎา • RD Care</p></div></div>
+   <div><strong>${esc(user.display_name)}</strong><p>โรงเรียนรัษฎา • RD CONNECT</p></div></div>
   <div class="rd-mobile-sheet-grid">${all.map(([id,label,icon])=>
    `<button type="button" data-tab="${id}"><span aria-hidden="true">${icon}</span><span>${esc(label)}</span></button>`).join('')}</div>
-  <p class="rd-mobile-sheet-note">ติดตั้ง RD Care ลงหน้าจอหลักและตั้งค่าการแจ้งเตือนที่เมนูนี้ได้</p>
+  <p class="rd-mobile-sheet-note">ติดตั้ง RD CONNECT ลงหน้าจอหลักและตั้งค่าการแจ้งเตือนที่เมนูนี้ได้</p>
   <div class="rd-mobile-sheet-actions">
    <button type="button" id="rdMenuInstall">⬇️ ติดตั้งแอป</button>
    <button type="button" data-tab="notifications">🔔 ตั้งค่าแจ้งเตือน</button>

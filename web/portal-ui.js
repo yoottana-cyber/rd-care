@@ -67,10 +67,11 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
  function frame(inner,login=false){
   root.innerHTML=login?`<div class="login-wrap portal-wrap"><section class="card login-card portal-login-card">
     <header class="login-brand">
-      <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
+      <span class="brand-code">RD CONNECT • RATSADA SCHOOL</span>
       <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
-      <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
-      <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
+      <h1>RD CONNECT</h1>
+      <p class="brand-system-name">ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+      <p class="brand-subtitle">เชื่อมทุกความห่วงใย ดูแลทุกก้าวของนักเรียน</p>
     </header>
     <div class="login-content">
     ${inner}<div id="portalMessage" class="muted" role="status" aria-live="polite"></div>
@@ -81,7 +82,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     :`<div class="rd-portal-mobile" data-role="${state.account?.role==='guardian'?'guardian':'student'}">
      <header class="rd-portal-bar"><div class="rd-portal-school">
       <img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="48" height="48" decoding="async">
-      <div><strong>RD Care</strong><small>โรงเรียนรัษฎา</small></div></div>
+      <div><strong>RD CONNECT</strong><small>โรงเรียนรัษฎา</small></div></div>
       <span class="rd-portal-role">${state.account?.role==='guardian'?'ผู้ปกครอง':'นักเรียน'}</span>
      </header>
      <main class="rd-portal-content" id="portalMain" tabindex="-1">
@@ -318,7 +319,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   const recent=state.truancy.length;
   frame(`<section class="rd-portal-hero" data-portal-panel="home">
     <div class="rd-portal-hero-top"><span class="rd-portal-overline">RATSADA STUDENT CARE</span><span class="rd-portal-hero-mark" aria-hidden="true">✦</span></div>
-    <p class="rd-portal-eyebrow">ยินดีต้อนรับสู่ RD Care</p>
+    <p class="rd-portal-eyebrow">ยินดีต้อนรับสู่ RD CONNECT</p>
     <h1>${esc(state.account.display_name)}</h1>
     <p>${guardian?'พื้นที่ผู้ปกครอง • ติดตามการมาเรียนอย่างสะดวก':'พื้นที่นักเรียน • ดูแลทุกวันเรียนของคุณ'}</p>
     <div class="rd-portal-hero-footer"><span>◉ ข้อมูลจากระบบโรงเรียน</span><span>${esc(portalDate(today()))}</span></div>
@@ -444,7 +445,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
       <button type="button" class="rd-portal-outline" id="guardianPushTest">ส่ง Push ทดสอบ</button>
      </div>
      <p id="guardianPushTestStatus" class="rd-portal-help" role="status">Push ทดสอบไม่สร้างรายการนักเรียน</p>
-     <p class="rd-portal-help">iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิดผ่านไอคอน RD Care</p>
+     <p class="rd-portal-help">iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม แล้วเปิดผ่านไอคอน RD CONNECT</p>
      <p class="rd-portal-help">หน้าจอล็อกแสดงเฉพาะประเภทและรายละเอียดทั่วไป ไม่แสดงชื่อหรือรหัสนักเรียน</p>
     </section>`:''}
     ${r?`<section class="rd-portal-card"><div class="rd-portal-section-heading"><div>
@@ -455,7 +456,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     <section class="rd-portal-card rd-portal-account-actions">
      <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
      <button type="button" id="portalLogout" class="rd-portal-outline rd-portal-logout">ออกจากระบบ</button>
-     <p class="rd-portal-help">RD Care • ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+     <p class="rd-portal-help">RD CONNECT • ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
      <small>พัฒนาโดย ครูยุทธนา บุญจันทร์</small>
     </section>
    </section>`);
@@ -517,7 +518,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
    if(state.account.must_change_password)showPasswordChange();else await showDashboard();
   }catch(error){
    if(!state.token){showLogin(expectedRole||state.role);return true}
-   frame('<h2>ยังไม่สามารถเชื่อมต่อ RD Care</h2><p class="muted">ระบบจดจำการเข้าสู่ระบบของอุปกรณ์นี้ไว้แล้ว กรุณาลองใหม่เมื่อมีอินเทอร์เน็ต</p><button class="button full" id="portalRetryRestore">เชื่อมต่ออีกครั้ง</button><button class="button secondary full" id="portalForgetRestore">ออกจากระบบ</button>');
+   frame('<h2>ยังไม่สามารถเชื่อมต่อ RD CONNECT</h2><p class="muted">ระบบจดจำการเข้าสู่ระบบของอุปกรณ์นี้ไว้แล้ว กรุณาลองใหม่เมื่อมีอินเทอร์เน็ต</p><button class="button full" id="portalRetryRestore">เชื่อมต่ออีกครั้ง</button><button class="button secondary full" id="portalForgetRestore">ออกจากระบบ</button>');
    select('#portalRetryRestore')?.addEventListener('click',()=>resume());
    select('#portalForgetRestore')?.addEventListener('click',logout);
   }

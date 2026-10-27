@@ -1,4 +1,4 @@
-const CACHE='rd-care-shell-v61';
+const CACHE='rd-care-shell-v62';
 const ASSETS=['./','./index.html','./app.css','./theme.css','./login.css','./login-route.js','./smart-school-ui.css','./media/ratsada-crest.webp','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./my-timetable.js','./period-center.js','./period-center.css','./mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js','./pwa-client.js','./auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-date-range.js','./portal-mobile.css','./guardian-push.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./advisor-import.js','./admin-settings.js','./admin-settings.css','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./templates/advisor-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -42,18 +42,18 @@ self.addEventListener('push',event=>{
   :late&&staff?'./?tab=lateGate':(urgent||review)&&staff?'./?tab=advisorCenter':
    (late||urgent||review)?'./':test&&staff?'./?tab=notifications':
    test?'./':'./?tab=notifications';
- const title=late?'RD Care • แจ้งเรื่องมาสาย':
-  urgent?'RD Care • แจ้งเรื่องหนีเรียน':
-  review?'RD Care • แจ้งขาดรายคาบรอตรวจสอบ':
-  test?'RD Care • ทดสอบการแจ้งเตือน':'RD Care • โรงเรียนรัษฎา';
+ const title=late?'RD CONNECT • แจ้งเรื่องมาสาย':
+  urgent?'RD CONNECT • แจ้งเรื่องหนีเรียน':
+  review?'RD CONNECT • แจ้งขาดรายคาบรอตรวจสอบ':
+  test?'RD CONNECT • ทดสอบการแจ้งเตือน':'RD CONNECT • โรงเรียนรัษฎา';
  const details=late?
   [date&&'วันที่ '+date,arrival&&'เวลา '+arrival+' น.'].filter(Boolean).join(' • '):
   [date&&'วันที่ '+date,validPeriod&&'คาบ '+period,subject&&'วิชา '+subject].filter(Boolean).join(' • ');
  const body=late?'มีการลงชื่อมาสาย'+(details?' • '+details:'')+' แตะเพื่อดูรายการ':
   urgent?'มีการบันทึกหนีเรียน'+(details?' • '+details:'')+' แตะเพื่อดูรายละเอียด':
   review?'มีเรื่องขาดรายคาบรอตรวจสอบ'+(details?' • '+details:'')+' แตะเพื่อเปิดรายการ':
-  test?'การแจ้งเตือนทดสอบจาก RD Care (ไม่มีเหตุการณ์นักเรียน)':
-  'มีรายการใหม่ให้ตรวจสอบในระบบ RD Care';
+  test?'การแจ้งเตือนทดสอบจาก RD CONNECT (ไม่มีเหตุการณ์นักเรียน)':
+  'มีรายการใหม่ให้ตรวจสอบในระบบ RD CONNECT';
  event.waitUntil(self.registration.showNotification(title,{
   body,icon:'./icons/icon-192.png',badge:'./icons/icon-192.png',
   // Do not collapse separate students/events into one notification.
