@@ -6,6 +6,7 @@ import {submitStudentLateQr} from './late-qr.js';
 import {deliverLateQrPush} from './late-qr-push.js';
 import {pushTarget} from './push-target.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
+import {importPortalAccounts} from './portal-bulk-import.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -31,7 +32,7 @@ function securePassword(value){
  return value;
 }
 function checkedRole(role){if(!['student','guardian'].includes(role))fail(400,'ประเภทบัญชีไม่ถูกต้อง');return role}
-const publicAccount=a=>({id:a.id,username:a.username,display_name:a.display_name,role:a.role,must_change_password:!!a.must_change_password});
+const publicAccount=a=>({id:a.id,username:a.username,display_name:a.display_name,role:a.role,must_change_password:false});
 async function signedIn(req,env){
  const bearer=req.headers.get('authorization')||'';
  if(!/^Bearer [0-9a-f]{64}$/.test(bearer))fail(401,'กรุณาเข้าสู่ระบบนักเรียนหรือผู้ปกครอง');
@@ -62,7 +63,7 @@ async function login(req,env){
  await env.DB.prepare('DELETE FROM portal_login_attempts WHERE username=?').bind(failureKey).run();
  // Student/guardian accounts are remembered only after choosing the option and
  // never while a first-login password change is required.
- const sessionSeconds=b.remember===true&&!a.must_change_password?30*86400:8*3600;
+ const sessionSeconds=b.remember===true?30*86400:8*3600;
  const token=randomHex(32);
  await env.DB.prepare('INSERT INTO portal_sessions(token_hash,account_id,expires_at) VALUES(?,?,?)')
   .bind(await digest(token),a.id,unixNow()+sessionSeconds).run();
@@ -151,7 +152,7 @@ export async function portalRoutes(req,env,path,ctx){
  }
  if(req.method==='GET'&&path==='/api/portal/auth/me')return reply({account:publicAccount(a)});
  if(req.method==='POST'&&path==='/api/portal/auth/change-password')return changePassword(req,env,a);
- if(a.must_change_password)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนดูข้อมูลนักเรียน');
+ // Provisioned student and guardian accounts no longer require password rotation.
  if(req.method==='POST'&&path==='/api/portal/late/qr'){
   const result=await submitStudentLateQr(req,env,a);
   // Send only after a committed successful record; do not block the student's receipt.
@@ -182,6 +183,7 @@ async function audit(db,actor,action,id){
 }
 export async function portalAdminRoutes(req,env,actor,path){
  if(actor.role!=='admin')fail(403,'เฉพาะผู้ดูแลระบบ');
+ if(req.method==='POST'&&path==='/api/admin/portal/import')return importPortalAccounts(req,env,actor);
  if(req.method==='GET'&&path==='/api/admin/portal/accounts'){
   const {results}=await env.DB.prepare(`SELECT a.id,a.username,a.display_name,a.role,a.student_id,a.active,a.must_change_password,
   s.student_no FROM portal_accounts a LEFT JOIN students s ON s.id=a.student_id
@@ -223,8 +225,8 @@ export async function portalAdminRoutes(req,env,actor,path){
   if(/^\d{13}$/.test(password))fail(400,'ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน');
   const salt=randomHex(16),hash=await passwordHash(password,salt);
   const result=await env.DB.prepare(`INSERT INTO portal_accounts
-   (username,display_name,role,student_id,password_salt,password_hash,created_by)
-   VALUES(?,?,?,?,?,?,?)`).bind(username,displayName,role,studentId,salt,hash,actor.id).run();
+   (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
+   VALUES(?,?,?,?,?,?,0,?)`).bind(username,displayName,role,studentId,salt,hash,actor.id).run();
   await audit(env.DB,actor.id,'portal_account_created',result.meta.last_row_id);
   return reply({ok:true,id:result.meta.last_row_id,username,role,temporary_password:chosen?null:password,
     message:'รหัสผ่านชั่วคราวแสดงเพียงครั้งเดียว โปรดแจ้งเจ้าของบัญชีที่ยืนยันตัวตนแล้วเป็นการส่วนตัว'},201);
@@ -271,14 +273,14 @@ export async function portalAdminRoutes(req,env,actor,path){
   }
   const password=randomHex(16),salt=randomHex(16),hash=await passwordHash(password,salt);
   await env.DB.batch([
-   env.DB.prepare('UPDATE portal_accounts SET password_salt=?,password_hash=?,must_change_password=1 WHERE id=?')
+   env.DB.prepare('UPDATE portal_accounts SET password_salt=?,password_hash=?,must_change_password=0 WHERE id=?')
     .bind(salt,hash,id),
    env.DB.prepare('DELETE FROM portal_sessions WHERE account_id=?').bind(id),
    env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
     .bind(actor.id,'portal_password_reset','portal_accounts',String(id))
   ]);
   return reply({ok:true,temporary_password:password,
-   message:'รหัสผ่านใหม่แสดงเพียงครั้งเดียวและต้องเปลี่ยนเมื่อเข้าสู่ระบบ'});
+   message:'รหัสผ่านใหม่แสดงเพียงครั้งเดียว ไม่บังคับเปลี่ยนในการเข้าสู่ระบบครั้งแรก'});
  }
  fail(404,'ไม่พบ API');
 }
