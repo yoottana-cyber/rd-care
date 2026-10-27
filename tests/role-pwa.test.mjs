@@ -78,7 +78,7 @@ test('login choice is browser-only; all installed app launches bypass selection'
  const app=read('web/app.js'),portal=read('web/portal-ui.js'),index=read('web/index.html');
  assert.doesNotMatch(index,/<link rel="manifest"/);
  assert.match(app,/configureRolePwa\(location\.search\)/);
- assert.match(app,/const entrance=resolveLoginEntrance\(location\.search\)/);
+ assert.match(app,/let entrance=resolveLoginEntrance\(location\.search\)/);
  assert.match(app,/if\(entrance==='student'\|\|entrance==='guardian'\)/);
  assert.match(app,/if\(!state\.token\)\{renderLogin\(\);return\}/);
  assert.match(app,/isInstalledPwa\(\)/);
@@ -96,4 +96,14 @@ test('student and guardian remembered login credentials are role-scoped, old tok
  assert.match(portal,/readAuthSession\('rd_portal_token'\)/);
  assert.match(portal,/saveAuthSession\(activeTokenKey/);
  assert.match(portal,/clearAuthSession\(activeTokenKey/);
+});
+
+test('old generic installed app resumes the last selected role without opening the chooser',()=>{
+ const app=read('web/app.js'),pwa=read('web/pwa-role.js'),portal=read('web/portal-ui.js');
+ assert.match(app,/if\(entrance===null&&isInstalledPwa\(\)\)/);
+ assert.match(app,/preferredHomeRole\(\)/);
+ assert.match(app,/configureRolePwa\('\?login='\+previous\)/);
+ assert.match(app,/getLastLoginArea\(\)==='portal'&&portalUi\.hasSession\(\)/);
+ assert.match(pwa,/rememberHomeRole\(role\)/);
+ assert.match(portal,/rememberHomeRole\(state\.account\.role\)/);
 });
