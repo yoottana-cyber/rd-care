@@ -29,6 +29,7 @@ jobs:
           node --check worker/src/teacher-timetable.js
           node --check worker/src/period-reports.js
           node --check worker/src/staff-push.js
+          node --check worker/src/student-affairs.js
           node --check worker/scripts/generate-vapid.mjs
           node --check worker/src/worker.js
           node --check worker/src/truancy-push.js
@@ -53,6 +54,7 @@ jobs:
           node --check web/template-xlsx.js
           node --check web/csv-encoding.js
           node --check web/portal-ui.js
+          node --check web/student-affairs.js
           node --check web/portal-admin.js
           node --check web/portal-batch.js
           node --check web/sw.js
@@ -94,3 +96,5 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'late_qr_migration_test.py' -v
       - name: Portal isolation and guardian relationships
         run: python3 -m unittest discover -s tests -p 'portal_privacy_test.py' -v
+      - name: Student affairs schema, reminders and behavior constraints
+        run: python3 -m unittest discover -s tests -p 'student_affairs_migration_test.py' -v
