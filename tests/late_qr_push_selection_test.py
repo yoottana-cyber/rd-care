@@ -29,7 +29,7 @@ def data():
  INSERT INTO portal_accounts VALUES(11,'guardian',1,0);
  INSERT INTO guardian_student_links VALUES(11,7);
  INSERT INTO guardian_push_subscriptions VALUES(5,11);
- INSERT INTO late_self_requests VALUES(10,'verified');
+ INSERT INTO late_self_requests VALUES(10,'verified','08:37');
  INSERT INTO late_qr_auto_events VALUES(
    15,10,7,date('now','+7 hours'),1,datetime('now')
  );
@@ -41,7 +41,7 @@ class LatePushSelectionTests(unittest.TestCase):
  def tearDown(self):self.db.close()
  def events(self):return self.db.execute(QUERY).fetchall()
  def test_current_verified_event_with_consent_has_recipients(self):
-  self.assertEqual(self.events(),[(15,7,9)])
+  self.assertEqual([(r[0],r[1],r[4]) for r in self.events()],[(15,7,9)])
  def test_revoked_or_disputed_case_cannot_send(self):
   self.db.execute("UPDATE late_qr_auto_events SET active=0 WHERE id=15")
   self.assertEqual(self.events(),[])
