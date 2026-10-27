@@ -12,6 +12,7 @@ import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
 import {lateGateStaffRoutes} from './late-qr.js';
+import {deliverLateQrPush} from './late-qr-push.js';
 import {deliverTruancyPush,advisorTruancyItems,truancyPushReadiness} from './truancy-push.js';
 
 const encoder = new TextEncoder();
@@ -844,7 +845,7 @@ async function route(req,env,ctx){
  if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
  if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
  if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
- if(path.startsWith('/api/portal/'))return portalRoutes(req,env,path);
+ if(path.startsWith('/api/portal/'))return portalRoutes(req,env,path,ctx);
  if(req.method==='POST'&&path==='/api/student/late/report')return submitLateSelf(req,env);
  const user=await currentUser(req,env);
  if(req.method==='POST'&&path==='/api/auth/logout'){
@@ -898,7 +899,8 @@ export default {
  async scheduled(event,env,ctx){
   ctx.waitUntil(Promise.all([
    deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
-   deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name))
+   deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
+    deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name))
   ]));
  },
  async fetch(req,env,ctx){
