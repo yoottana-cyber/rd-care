@@ -78,7 +78,8 @@ test('student affairs navigation requires an explicit assignment and teachers us
  const app=read('web/app.js'),worker=read('worker/src/worker.js'),ui=read('web/student-affairs.js');
  assert.match(app,/createStudentAffairs/);
  assert.match(app,/Number\(state\.user\?\.student_affairs\)===1/);
- assert.match(app,/if\(tab==='studentAffairs'\)return studentAffairs\.load\(\)/);
+ assert.match(app,/if\(tab==='studentAffairs'\)\{/);
+ assert.match(app,/return studentAffairs\.load\(\)/);
  assert.match(app,/\/api\/affairs\/behavior\/record/);
  assert.match(app,/behaviorRules/);
  assert.match(worker,/student_affairs_assignments/);
