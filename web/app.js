@@ -13,6 +13,7 @@ import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
 import {createNotificationSettings} from './notification-settings.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLastLoginArea} from './auth-session.js';
 import {createPortalUi} from './portal-ui.js';
+import {loginHref,resolveLoginEntrance} from './login-route.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
 import {initTheme,bindThemeButtons} from './theme.js';
@@ -62,7 +63,7 @@ const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'
 const periodNames={...names,truancy:'หนีเรียน'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
-const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>renderLogin()});
+const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>showEntrySelection(),onLegacyLateReport:()=>renderStudentLate()});
 function dateToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function timeNow(){return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}
 function toast(message,bad=false){const el=$('#toast');el.textContent=message;el.className='toast show'+(bad?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.className='toast',4200);}
@@ -78,8 +79,46 @@ async function api(path,{method='GET',body,auth=true}={}){
  finally{clearTimeout(timer)}
 }
 function safeRun(job){return runSafely(job,e=>toast(e?.message||String(e),true));}
+function entrySelectionPage(){
+ return `<div class="login-wrap login-choice-wrap"><main class="login-choice-layout">
+  <header class="login-choice-heading">
+   <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
+   <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="150" height="140" decoding="async" fetchpriority="high">
+   <h1>ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</h1>
+   <p>เลือกประเภทผู้เข้าใช้งาน</p>
+  </header>
+  <nav class="login-choice-grid" aria-label="เลือกประเภทบัญชี">
+   <a class="login-choice-card" href="${loginHref('staff')}" data-choice="staff">
+    <span class="login-choice-icon" aria-hidden="true">👩‍🏫</span>
+    <span class="login-choice-body"><strong>ครูและบุคลากร</strong><small>ครูที่ปรึกษา ครูผู้สอน ครูเวร และผู้ดูแลระบบ</small></span>
+    <span class="login-choice-arrow" aria-hidden="true">›</span>
+   </a>
+   <a class="login-choice-card" href="${loginHref('student')}" data-choice="student">
+    <span class="login-choice-icon" aria-hidden="true">🎒</span>
+    <span class="login-choice-body"><strong>นักเรียน</strong><small>ลงชื่อมาสาย ตรวจสอบการมาเรียนและข้อมูลของตนเอง</small></span>
+    <span class="login-choice-arrow" aria-hidden="true">›</span>
+   </a>
+   <a class="login-choice-card" href="${loginHref('guardian')}" data-choice="guardian">
+    <span class="login-choice-icon" aria-hidden="true">👨‍👩‍👧</span>
+    <span class="login-choice-body"><strong>ผู้ปกครอง</strong><small>ติดตามการมาเรียนและรับแจ้งเตือนของนักเรียนในความดูแล</small></span>
+    <span class="login-choice-arrow" aria-hidden="true">›</span>
+   </a>
+  </nav>
+  <div class="login-choice-foot">
+   <button type="button" class="button secondary" id="entryInstallApp">⬇️ ติดตั้ง RD Care ลงมือถือ</button>
+   <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
+   <p>พัฒนาโดย ครูยุทธนา บุญจันทร์</p>
+  </div>
+ </main></div>`;
+}
+function showEntrySelection(){
+ history.replaceState(null,'',location.pathname+location.hash);
+ $('#app').innerHTML=entrySelectionPage();
+ bindThemeButtons();
+ $('#entryInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install()));
+}
 function loginPage(){
- return `<div class="login-wrap"><section class="card login-card" aria-label="เข้าสู่ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา">
+ return `<div class="login-wrap"><section class="card login-card" aria-label="เข้าสู่ระบบครูและบุคลากรโรงเรียนรัษฎา">
  <header class="login-brand">
   <span class="brand-code">RD CARE • RATSADA SCHOOL</span>
   <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
@@ -87,10 +126,7 @@ function loginPage(){
   <p class="brand-subtitle">ดูแล เอาใจใส่ และส่งเสริมศักยภาพผู้เรียน</p>
  </header>
  <div class="login-content">
-  <div class="login-role-tabs" role="group" aria-label="ประเภทผู้เข้าใช้งาน">
-   <button type="button" class="active" id="staffLoginTab" aria-pressed="true">ครู / ผู้ดูแลระบบ</button>
-   <button type="button" id="portalStudentLogin" aria-pressed="false">นักเรียน / ผู้ปกครอง</button>
-  </div>
+  <h2 class="login-heading">เข้าสู่ระบบครูและบุคลากร</h2>
   <form id="loginForm">
    <div class="field"><label for="username">ชื่อผู้ใช้งาน (Username)</label><input id="username" name="username" required autocomplete="username" maxlength="40" placeholder="กรอกชื่อผู้ใช้งาน"></div>
    <div class="field"><label for="password">รหัสผ่าน (Password)</label><input id="password" name="password" type="password" required autocomplete="current-password" placeholder="กรอกรหัสผ่าน"></div>
@@ -98,19 +134,29 @@ function loginPage(){
     <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong><small>สูงสุด 30 วัน • ไม่แนะนำสำหรับคอมพิวเตอร์สาธารณะ</small></span></label>
    <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
   </form>
-  <div class="login-links">
-   <button id="portalGuardianLogin" type="button" class="button secondary">เข้าสู่ระบบผู้ปกครอง</button>
-   <button id="studentLateEntry" type="button" class="button secondary">นักเรียนแจ้งมาสาย</button>
-  </div>
+  <div class="login-links"><a href="./" class="button secondary full" id="staffBackToChoice">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</a></div>
   <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้ง RD Care ลงมือถือ</button>
    <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
   <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
-  <p class="login-message">Push หนีเรียนและมาสายจะส่งเฉพาะบัญชีครูที่ปรึกษาและผู้ปกครองที่สมัครรับแล้ว</p>
+  <p class="login-message">Push หนีเรียนและมาสายส่งเฉพาะบัญชีที่สมัครรับและได้รับสิทธิ์เท่านั้น</p>
  </div>
  <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
 }
-function renderLogin(){ $('#app').innerHTML=loginPage();bindThemeButtons();$('#loginForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;try{const remember=$('#rememberStaff').checked;const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value,remember}});state.token=data.token;state.user=data.user;saveAuthSession('rd_token',data.token,data.expires_in,remember);setLastLoginArea('staff');await boot();toast('เข้าสู่ระบบสำเร็จ');}finally{if(button.isConnected)button.disabled=false}}));$('#studentLateEntry').addEventListener('click',renderStudentLate);$('#portalStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));$('#portalGuardianLogin').addEventListener('click',()=>portalUi.showLogin('guardian'));$('#loginInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install())); }
+function renderLogin(){
+ $('#app').innerHTML=loginPage();bindThemeButtons();
+ $('#loginForm').addEventListener('submit',e=>safeRun(async()=>{
+  e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;
+  try{
+   const remember=$('#rememberStaff').checked;
+   const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value,remember}});
+   state.token=data.token;state.user=data.user;
+   saveAuthSession('rd_token',data.token,data.expires_in,remember);setLastLoginArea('staff');
+   await boot();toast('เข้าสู่ระบบสำเร็จ');
+  }finally{if(button.isConnected)button.disabled=false}
+ }));
+ $('#loginInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install()));
+}
 function renderStudentLate(){
  $('#app').innerHTML=`<div class="login-wrap"><section class="card login-card">
  <header class="login-brand">
@@ -126,12 +172,12 @@ function renderStudentLate(){
   <button type="submit" class="button full">ส่งคำขอให้ครูเวรตรวจสอบ</button>
  </form>
  <p id="lateSelfFeedback" class="muted" aria-live="polite">ระบบบันทึกเวลาเข้าถึงเซิร์ฟเวอร์อัตโนมัติ เมื่อครูเวรยืนยันจึงนับเป็นรายการมาสายที่ตรวจสอบแล้ว</p>
- <button type="button" class="button secondary full" id="backToStaffLogin">กลับหน้าเข้าสู่ระบบครู</button>
+ <button type="button" class="button secondary full" id="backToStudentLogin">กลับหน้าเข้าสู่ระบบนักเรียน</button>
  <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
  </div><footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
  bindThemeButtons();
- $('#backToStaffLogin').addEventListener('click',renderLogin);
+ $('#backToStudentLogin').addEventListener('click',()=>portalUi.showLogin('student'));
  $('#studentLateForm').addEventListener('submit',e=>safeRun(async()=>{
   e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');
   const body=Object.fromEntries(new FormData(form));
@@ -816,15 +862,12 @@ async function start(){
   if(portalUi.hasSession()){await portalUi.resume();return}
   portalUi.showLogin('student');return;
  }
- const launchQuery=new URLSearchParams(location.search);
- const guardianPushIntent=['late','truancy'].includes(launchQuery.get('portal_notice'))&&
-  /^\d{1,15}$/.test(launchQuery.get('notice_id')||'');
- if(guardianPushIntent){
-  if(portalUi.hasSession()){await portalUi.resume();return}
-  portalUi.showLogin('guardian');return;
+ const entrance=resolveLoginEntrance(location.search);
+ if(entrance==='student'||entrance==='guardian'){
+  if(portalUi.hasSession()){await portalUi.resume(entrance);return}
+  portalUi.showLogin(entrance);return;
  }
- const staffPushIntent=['advisorCenter','lateGate','notifications'].includes(launchQuery.get('tab'));
- if(portalUi.hasSession()&&(!state.token||getLastLoginArea()==='portal')&&!staffPushIntent){await portalUi.resume();return}
+ if(entrance===null){showEntrySelection();return}
  if(!state.token){renderLogin();return}
  try{await boot()}catch(error){
   // A broken/offline network should not erase a remembered session. Only 401 does that

@@ -21,21 +21,21 @@ test('staff login uses Ratsada identity, school crest with local fallback, and d
  assert.match(region,/src="https:\/\/www\.ratsada\.ac\.th\/images\/symbol\.png"/);
  assert.match(app,/ratsada-crest\.webp/);
  assert.match(region,/พัฒนาโดย ครูยุทธนา บุญจันทร์/);
- for(const id of ['loginForm','username','password','portalStudentLogin','portalGuardianLogin','studentLateEntry'])
+ for(const id of ['loginForm','username','password','staffBackToChoice'])
   assert.ok(region.includes(id),id);
  assert.match(app,/api\/auth\/login/);
- assert.match(app,/portalUi\.showLogin\('student'\)/);
- assert.match(app,/portalUi\.showLogin\('guardian'\)/);
+ assert.match(app,/data-choice="student"/);
+ assert.match(app,/data-choice="guardian"/);
 });
 test('student guardian login shares school design and retains separate token-scoped portal authentication',()=>{
  const portal=read('web/portal-ui.js');
  assert.match(portal,/function frame\(inner,login=false\)/);
  assert.match(portal,/login-brand/);
  assert.match(portal,/พัฒนาโดย ครูยุทธนา บุญจันทร์/);
- assert.match(portal,/portalBackTop/);
+ assert.match(portal,/portalBack/);
  assert.match(portal,/api\/portal\/auth\/login/);
- assert.match(portal,/data-role="student"/);
- assert.match(portal,/data-role="guardian"/);
+ assert.match(portal,/login-heading/);
+ assert.match(portal,/if\(noticeIntent\)role='guardian'/);
  assert.match(portal,/frame\(`[\s\S]*?`,true\)/);
  assert.match(portal,/rd_portal_token/);
 });

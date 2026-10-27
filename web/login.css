@@ -189,3 +189,44 @@
 }
 [data-theme="dark"] .remember-login strong{color:#d8f5e5!important}
 [data-theme="dark"] .remember-login small{color:#b5cfc0!important}
+
+/* Separate choice screen; keep staff and portal credential forms self-contained. */
+.login-choice-wrap{padding:30px 18px}
+.login-choice-layout{width:min(780px,100%);border-radius:28px;overflow:hidden;background:#fff;box-shadow:0 22px 74px rgba(8,70,43,.14);border:1px solid #d5eadd}
+.login-choice-heading{text-align:center;padding:32px 28px 25px;background:linear-gradient(142deg,#086942,#0d985d 62%,#22b87a);color:#fff}
+.login-choice-heading .brand-code{display:inline-block;font-size:11px;letter-spacing:.09em;font-weight:750;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:5px 12px;margin-bottom:12px}
+.login-choice-heading .login-crest{width:115px;height:108px;margin:0 auto 14px;padding:7px;border-radius:20px;background:#fff;object-fit:contain;box-shadow:0 9px 25px rgba(5,51,34,.2)}
+.login-choice-heading h1{color:#fff;font-size:clamp(19px,3.5vw,25px);line-height:1.5;max-width:600px;margin:0 auto}
+.login-choice-heading p{margin:10px 0 0;color:#e1ffed;font-size:14px;font-weight:650}
+.login-choice-grid{display:grid;gap:12px;padding:23px}
+.login-choice-card{display:flex;align-items:center;gap:16px;padding:20px 21px;text-decoration:none;background:#f9fdfa;border:1.5px solid #d4e8dc;border-radius:17px;color:#174b33;transition:background .18s,transform .18s,border-color .18s,box-shadow .18s}
+.login-choice-card:hover{background:#eaf8ef;transform:translateY(-2px);border-color:#42ad78;box-shadow:0 8px 20px rgba(5,110,64,.09)}
+.login-choice-card:focus-visible{outline:3px solid #d6a138;outline-offset:3px}
+.login-choice-icon{flex:0 0 58px;width:58px;height:58px;display:grid;place-items:center;background:#e5f5eb;border-radius:16px;font-size:29px}
+.login-choice-body{display:grid;gap:4px;min-width:0;flex:1}
+.login-choice-body strong{font-size:18px;color:#125435;line-height:1.5}
+.login-choice-body small{font-size:13px;line-height:1.65;color:#567967}
+.login-choice-arrow{font-size:31px;font-weight:550;color:#15945e}
+.login-choice-foot{padding:0 23px 24px;text-align:center;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
+.login-choice-foot .button{font-size:12px;border-radius:11px}
+.login-choice-foot p{flex:0 0 100%;font-size:12px;margin:6px 0 0;color:#628573}
+.portal-login-intro{text-align:center;font-size:12px;margin:-6px 0 15px}
+[data-theme="dark"] .login-choice-layout{background:#172b20;border-color:#345842}
+[data-theme="dark"] .login-choice-card{background:#1f3a2a;border-color:#365742;color:#e8f9ee}
+[data-theme="dark"] .login-choice-card:hover{background:#254c35}
+[data-theme="dark"] .login-choice-body strong{color:#dbffe6}
+[data-theme="dark"] .login-choice-body small,[data-theme="dark"] .login-choice-foot p{color:#bed9c8}
+[data-theme="dark"] .login-choice-icon{background:#30563e}
+@media(max-width:570px){
+ .login-choice-wrap{padding:12px 10px 18px}
+ .login-choice-layout{border-radius:21px}
+ .login-choice-heading{padding:23px 15px 21px}
+ .login-choice-heading .login-crest{width:100px;height:96px}
+ .login-choice-grid{padding:14px;gap:10px}
+ .login-choice-card{padding:13px 12px;gap:12px}
+ .login-choice-icon{flex-basis:48px;width:48px;height:48px;border-radius:13px;font-size:24px}
+ .login-choice-body strong{font-size:15px}
+ .login-choice-body small{font-size:11px}
+ .login-choice-foot{padding:0 14px 18px}
+}
+@media(prefers-reduced-motion:reduce){.login-choice-card{transition:none}.login-choice-card:hover{transform:none}}

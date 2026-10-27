@@ -9,7 +9,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'
 const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา',truancy:'หนีเรียน'};
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
-export function createPortalUi({root,onStaffLogin}){
+export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
  const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today(),focus:null,focusUnavailable:false};
  const pushParams=new URLSearchParams(location.search);
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
@@ -64,42 +64,39 @@ export function createPortalUi({root,onStaffLogin}){
  }
  function showLogin(role=state.role){
   if(lateQrToken)role='student';
+  if(noticeIntent)role='guardian';
   state.role=role;requestVersion++;
   state.account=null;state.children=[];state.records=null;
-  frame(`<div class="login-role-tabs" role="group" aria-label="ประเภทผู้เข้าใช้งาน">
-    <button type="button" class="active" aria-pressed="true">นักเรียน / ผู้ปกครอง</button>
-    <button type="button" id="portalBackTop" aria-pressed="false">ครู / ผู้ดูแลระบบ</button></div>
-    <h2 class="login-heading">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
+  frame(`<h2 class="login-heading">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
+    <p class="muted portal-login-intro">${role==='student'?'สำหรับนักเรียนโรงเรียนรัษฎา • ใช้บัญชีที่โรงเรียนออกให้':'สำหรับผู้ปกครอง • ติดตามข้อมูลเฉพาะนักเรียนในความดูแล'}</p>
     ${lateQrToken?'<p class="summary" role="status">⏰ สแกน QR ลงชื่อมาสายแล้ว กรุณาเข้าสู่ระบบบัญชีนักเรียน จากนั้นระบบจะแสดงปุ่มยืนยันลงชื่อให้ทันที</p>':''}
-   <div class="row portal-role-choice">
-    <button type="button" class="button ${role==='student'?'':'secondary'}" data-role="student">นักเรียน</button>
-    <button type="button" class="button ${role==='guardian'?'':'secondary'}" data-role="guardian">ผู้ปกครอง</button></div>
-   <form id="portalLoginForm" class="stack">
-    <div class="field"><label>${role==='student'?'เลขประจำตัวนักเรียน (Username)':'Username ผู้ปกครอง'}</label><input name="username" required autocomplete="username" maxlength="40" ${role==='student'?'inputmode="numeric"':''}></div>
-    <div class="field"><label>รหัสผ่าน</label><input name="password" type="password" required autocomplete="current-password"></div>
-    <label class="remember-login"><input type="checkbox" name="remember">
-     <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong>
-      <small>เลือกเฉพาะมือถือหรือคอมพิวเตอร์ส่วนตัว • สูงสุด 30 วัน</small></span></label>
-    <button type="submit" class="button full">เข้าสู่ระบบ</button></form>
-   <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
-   <button type="button" id="portalBack" class="button secondary full">กลับหน้าเข้าสู่ระบบครู</button>`,true);
-  select('#portalBackTop').addEventListener('click',onStaffLogin);
-  select('#portalBack').addEventListener('click',onStaffLogin);
-  root.querySelectorAll('[data-role]').forEach(b=>b.addEventListener('click',()=>showLogin(b.dataset.role)));
-  select('#portalLoginForm').addEventListener('submit',async e=>{
-   e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
-   try{
-    const f=new FormData(form);
-    const r=await call('/api/portal/auth/login',{method:'POST',auth:false,
-     body:{username:String(f.get('username')).trim(),password:String(f.get('password')),role:state.role,
-      remember:f.get('remember')==='on'}});
-    state.token=r.token;state.account=r.account;
-    saveAuthSession('rd_portal_token',r.token,r.expires_in,f.get('remember')==='on'&&!r.account.must_change_password);
-    setLastLoginArea('portal');
-    if(state.account.must_change_password)showPasswordChange();
-    else await showDashboard();
-   }catch(error){message(error.message,true)}finally{if(button.isConnected)button.disabled=false}
-  });
+    ${noticeIntent?'<p class="summary" role="status">🔔 เข้าสู่ระบบผู้ปกครองเพื่อเปิดรายละเอียดการแจ้งเตือน</p>':''}
+    <form id="portalLoginForm" class="stack">
+     <div class="field"><label>${role==='student'?'เลขประจำตัวนักเรียน (Username)':'Username ผู้ปกครอง'}</label><input name="username" required autocomplete="username" maxlength="40" ${role==='student'?'inputmode="numeric"':''}></div>
+     <div class="field"><label>รหัสผ่าน</label><input name="password" type="password" required autocomplete="current-password"></div>
+     <label class="remember-login"><input type="checkbox" name="remember">
+      <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong>
+       <small>เลือกเฉพาะมือถือหรือคอมพิวเตอร์ส่วนตัว • สูงสุด 30 วัน</small></span></label>
+     <button type="submit" class="button full">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</button></form>
+    <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
+    ${role==='student'&&!lateQrToken?'<button type="button" id="studentLateEntry" class="button secondary full">แจ้งมาสายด้วยรหัสจากครูเวร (แบบเดิม)</button>':''}
+    ${!lateQrToken&&!noticeIntent?'<button type="button" id="portalBack" class="button secondary full">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</button>':''}`,true);
+   select('#portalBack')?.addEventListener('click',onStaffLogin);
+   select('#studentLateEntry')?.addEventListener('click',onLegacyLateReport);
+   select('#portalLoginForm').addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
+    try{
+     const f=new FormData(form);
+     const r=await call('/api/portal/auth/login',{method:'POST',auth:false,
+      body:{username:String(f.get('username')).trim(),password:String(f.get('password')),role:state.role,
+       remember:f.get('remember')==='on'}});
+     state.token=r.token;state.account=r.account;
+     saveAuthSession('rd_portal_token',r.token,r.expires_in,f.get('remember')==='on'&&!r.account.must_change_password);
+     setLastLoginArea('portal');
+     if(state.account.must_change_password)showPasswordChange();
+     else await showDashboard();
+    }catch(error){message(error.message,true)}finally{if(button.isConnected)button.disabled=false}
+   });
  }
  function showPasswordChange(){
   frame(`<h2 class="login-heading">ตั้งรหัสผ่านส่วนตัว</h2><p class="warn">บัญชีนี้ยังใช้รหัสผ่านชั่วคราว กรุณาเปลี่ยนก่อนดูข้อมูล</p>
@@ -270,10 +267,15 @@ export function createPortalUi({root,onStaffLogin}){
   return `<div class="table-wrap"><table class="table"><thead><tr>${columns.map(([,name])=>`<th>${esc(name)}</th>`).join('')}</tr></thead>
    <tbody>${rows.map(x=>`<tr>${columns.map(([key])=>`<td>${esc(key==='status'||key==='state'?formatStatus?.(x):x[key])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
  }
- async function resume(){
+ async function resume(expectedRole=null){
   if(!state.token)return false;
   try{
    const me=await call('/api/portal/auth/me');state.account=me.account;state.role=me.account.role;
+    if(expectedRole&&state.account.role!==expectedRole){
+     showLogin(expectedRole);
+     message('บัญชีที่จดจำไว้เป็นคนละประเภท กรุณาเข้าสู่ระบบ'+(expectedRole==='guardian'?'ผู้ปกครอง':'นักเรียน'),true);
+     return true;
+    }
    if(noticeIntent&&state.account.role!=='guardian'){
     state.token='';clearAuthSession('rd_portal_token');showLogin('guardian');
     message('กรุณาเข้าสู่ระบบบัญชีผู้ปกครองเพื่อดูรายละเอียดการแจ้งเตือน');return true;
