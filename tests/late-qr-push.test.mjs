@@ -60,3 +60,8 @@ test('only approved QR check-ins have an authorized delete path and privacy-safe
  assert.match(sw,/\?tab=lateGate/);
  assert.doesNotMatch(sw,/full_name|student_no/);
 });
+
+test('teacher bulk mark-present cannot silently erase a preexisting QR late status',()=>{
+ const ui=content('web/app.js');
+ assert.ok(ui.includes("state.kind==='daily'&&state.statuses[student.id]==='late'"));
+});
