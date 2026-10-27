@@ -1,5 +1,5 @@
 // Modern period attendance hub: interactive weekly timetable + course-based reports.
-// No sample student data; all counts and events come from authenticated RD Care APIs.
+// No sample student data; all counts and events come from authenticated RD CONNECT APIs.
 const days=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
 const shortDays=['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -33,7 +33,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
  const activeLessons=()=>lessons.filter(x=>x.approval_status==='approved'&&x.active!==0);
  function header(){
   return `<section class="period-top"><div>
-   <span class="period-eyebrow">RD CARE · SMART CLASSROOM</span>
+   <span class="period-eyebrow">RD CONNECT · SMART CLASSROOM</span>
    <h2>📚 เช็กชื่อรายคาบ</h2>
    <p>ตารางสอนรายสัปดาห์และรายงานรายวิชาในหน้าจอเดียว</p></div>
    <button type="button" class="button secondary" id="periodManage">⚙️ จัดการตารางสอน</button>

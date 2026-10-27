@@ -332,7 +332,7 @@ async function writeAttendance(req,env,user){
   const marked=b.entries.filter(row=>row.status==='truancy').map(row=>row.student_id);
   if(marked.length){
    try{push=await truancyPushReadiness(env,roomId,marked)}
-   catch(e){console.warn('RD Care truancy readiness failed',e?.name||'database');
+   catch(e){console.warn('RD CONNECT truancy readiness failed',e?.name||'database');
     push={events:marked.length,ready:false,reason:'readiness_unknown'};}
   }
  }
@@ -843,7 +843,7 @@ async function adminRoutes(req,env,user,path){
 }
 async function route(req,env,ctx){
  const url=new URL(req.url),path=url.pathname;
- if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',time:bangkokToday()});
+ if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD CONNECT API',time:bangkokToday()});
  if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
  if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
  if(path.startsWith('/api/portal/'))return portalRoutes(req,env,path,ctx);
@@ -924,7 +924,7 @@ export default {
   try{response=await route(req,env,ctx);}
   catch(e){
    const code=/UNIQUE constraint failed/.test(e?.message||'')?409:httpErrorStatus(e);
-   if(code===500)console.error('RD Care API:',e);
+   if(code===500)console.error('RD CONNECT API:',e);
    response=json({error:code===500?'ระบบขัดข้อง กรุณาลองใหม่':e.message},code);
   }
   const headers=new Headers(response.headers);

@@ -57,7 +57,7 @@ export async function guardianPushRoutes(req,env,account,path){
    return reply({accepted:result.ok,code:result.ok?'accepted':'provider_rejected',
      providerStatus:result.status});
   }catch(e){
-   console.warn('RD Care guardian push self-test failed',e?.name||'network');
+   console.warn('RD CONNECT guardian push self-test failed',e?.name||'network');
    return reply({accepted:false,code:'network_or_crypto_error'});
   }
  }

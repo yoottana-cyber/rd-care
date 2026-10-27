@@ -119,7 +119,7 @@ export async function staffPushRoutes(req,env,user,path){
      .bind(device.id,user.id).run();
    return json({accepted:result.ok,code:result.ok?'accepted':'provider_rejected',providerStatus:result.status});
   }catch(e){
-   console.warn('RD Care staff push self-test failed',e?.name||'network');
+   console.warn('RD CONNECT staff push self-test failed',e?.name||'network');
    return json({accepted:false,code:'network_or_crypto_error'});
   }
  }
@@ -241,7 +241,7 @@ export async function deliverAdvisorPush(env){
    if(!claim.meta?.changes)continue;
    let result;
    try{result=await deliverOne(env,event,device,detail)}catch(e){
-    console.warn('RD Care staff push send failed',String(e?.name||'network'));result={failed:true};
+    console.warn('RD CONNECT staff push send failed',String(e?.name||'network'));result={failed:true};
    }
    if(!result.expired){
     await env.DB.prepare(`UPDATE staff_push_deliveries SET state=?,updated_at=CURRENT_TIMESTAMP
