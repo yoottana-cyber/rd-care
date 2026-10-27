@@ -825,9 +825,10 @@ function renderAdminStudents(){
  const rows=items.map(s=>`<tr data-admin-student-row><td>${s.roll_no}</td><td><strong>${esc(s.full_name)}</strong><div class="muted">${esc(s.student_no)}</div></td>
    <td><span class="tag">${s.active?'ใช้งาน':'พักข้อมูล'}</span></td>
    <td><button type="button" class="button secondary" data-edit-student="${s.id}">แก้ไข</button>
-   <button type="button" class="button ${s.active?'ghost':'secondary'}" data-toggle-student="${s.id}">${s.active?'พักข้อมูล':'เปิดใช้งาน'}</button></td></tr>`).join('');
+   <button type="button" class="button ${s.active?'ghost':'secondary'}" data-toggle-student="${s.id}">${s.active?'พักข้อมูล':'เปิดใช้งาน'}</button>
+   <button type="button" class="button danger" data-delete-student="${s.id}">ลบข้อมูล</button></td></tr>`).join('');
  mount(`<section class="stack">
-  <div><h2>จัดการข้อมูลนักเรียน</h2><p class="muted">เพิ่ม แก้ไข เปลี่ยนห้อง และพักข้อมูล โดยไม่ลบประวัติ</p></div>
+  <div><h2>จัดการข้อมูลนักเรียน</h2><p class="muted">เพิ่ม แก้ไข ย้ายห้อง พักหรือนำข้อมูลออกจากรายการ โดยรักษาประวัติเช็กชื่อย้อนหลังไว้</p></div>
   <div class="card stack"><div class="row between"><div class="field smallbox"><label for="adminStudentRoom">ห้องเรียน</label><select id="adminStudentRoom">${rooms(adminStudentState.roomId)}</select></div>
    <div><strong>${activeCount} คน</strong><p class="muted">พักข้อมูล ${items.length-activeCount} คน</p></div></div>
    <div class="field"><label for="adminStudentSearch">ค้นหารายชื่อหรือรหัสนักเรียน</label><input id="adminStudentSearch" placeholder="พิมพ์ชื่อหรือรหัสนักเรียน" type="search"></div>
@@ -892,6 +893,19 @@ function renderAdminStudents(){
    adminTransferState.items=plans.items;adminTransferState.history=history.items;
   }catch(error){toast('โหลดข้อมูลการย้ายห้องไม่สำเร็จ: '+error.message,true)}
   renderAdminStudents();
+ })));
+ document.querySelectorAll('[data-delete-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
+  const student=adminStudentState.items.find(s=>s.id===Number(btn.dataset.deleteStudent));
+  if(!student)return;
+  const entered=window.prompt('ลบข้อมูลนักเรียน '+student.full_name+'?\\nบัญชีและสิทธิ์ผู้ปกครองจะถูกยกเลิก แต่โรงเรียนจะเก็บประวัติเช็กชื่อและคะแนนเดิมไว้\\nพิมพ์เลขประจำตัวนักเรียนเพื่อยืนยัน:','');
+  if(entered===null)return;
+  if(entered!==student.student_no)throw Error('เลขประจำตัวนักเรียนไม่ตรงกัน');
+  btn.disabled=true;
+  try{
+   await api('/api/admin/students/'+student.id+'/delete',{method:'POST',body:{confirm:entered}});
+   adminStudentState.editId=null;referenceCache.clear();
+   toast('ถอนข้อมูลนักเรียนออกจากการใช้งานแล้ว เก็บประวัติเฉพาะที่จำเป็น');await loadAdminStudents();
+  }finally{if(btn.isConnected)btn.disabled=false}
  })));
  document.querySelectorAll('[data-toggle-student]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
   const st=adminStudentState.items.find(s=>s.id===Number(btn.dataset.toggleStudent));
