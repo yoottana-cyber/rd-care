@@ -83,7 +83,8 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
        <div><strong>${safe(u.display_name)}</strong><small>@${safe(u.username)}</small></div></div></td>
        <td>${safe(roleText[u.role]||u.role)}</td><td><span class="rd-settings-status ${u.active?'on':'off'}">${u.active?'ใช้งาน':'พักบัญชี'}</span></td>
        <td>${['teacher','staff'].includes(u.role)?`<button type="button" class="button secondary"
-        data-edit-user="${u.id}">แก้ไข</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีข้อมูล</td></tr>'}
+        data-edit-user="${u.id}">แก้ไข</button>
+        <button type="button" class="button danger" data-remove-user="${u.id}">ลบบัญชี</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="4">ยังไม่มีข้อมูล</td></tr>'}
      </tbody></table></div></section>
    </div>
    ${person?`<section class="rd-settings-panel rd-settings-person-edit" id="settingsPersonEdit">
@@ -208,6 +209,20 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
    document.querySelector('#settingsPersonEdit')?.scrollIntoView({behavior:'smooth',block:'center'});
   }));
   document.querySelector('#cancelSettingsEdit')?.addEventListener('click',()=>{editUserId=null;render()});
+  document.querySelectorAll('[data-remove-user]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+   const person=users().find(u=>u.id===Number(button.dataset.removeUser));
+   if(!person||person.role==='admin')return;
+   const entered=window.prompt('ลบบัญชี '+person.display_name+'?\\nระบบจะยกเลิกสิทธิ์และเก็บประวัติการสอนไว้\\nพิมพ์ Username เพื่อยืนยัน:','');
+   if(entered===null)return;
+   if(entered!==person.username)throw Error('Username ไม่ตรงกัน');
+   button.disabled=true;
+   try{
+    await api('/api/admin/users/'+person.id+'/delete',{method:'POST',body:{confirm:entered}});
+    toast('ลบบัญชีออกจากการใช้งานแล้ว โดยเก็บประวัติการสอนไว้');
+    editUserId=null;await reload();
+   }finally{if(button.isConnected)button.disabled=false}
+  })));
+
   onSubmit('adminPersonnelEdit',async f=>{
    const u=users().find(u=>u.id===editUserId);
    if(!u)throw Error('ไม่พบบัญชี');
