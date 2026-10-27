@@ -45,10 +45,25 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
  function render(notice){
   const roomOpts=rooms.map(r=>`<option value="${r.id}" ${r.id===roomId?'selected':''}>${esc(r.label)}</option>`).join('');
   const studentOpts=students.map(s=>`<option value="${s.id}">${s.roll_no}. ${esc(s.full_name)} (${esc(s.student_no)})</option>`).join('');
-  const plan=planStudentAccounts(students,accounts);
-  const guardians=accounts.filter(a=>a.role==='guardian'&&a.active);
+  const plan=planStudentAccounts(students,roomAccounts);
+  const guardians=guardianOptions.filter(a=>a.role==='guardian'&&a.active);
   const guardianOpts=guardians.map(a=>`<option value="${a.id}">${esc(a.display_name)} (${esc(a.username)})</option>`).join('');
-  mount(`<section class="stack"><div><h2>บัญชีนักเรียนและผู้ปกครอง</h2><p class="muted">จัดการบัญชีและสิทธิ์การเข้าถึงของนักเรียนและผู้ปกครอง แยกจากบัญชีครูและบุคลากร</p></div>
+  const titles={student:'บัญชีนักเรียน',guardian:'บัญชีผู้ปกครอง',links:'ความสัมพันธ์นักเรียน–ผู้ปกครอง'};
+   const description={student:'ค้นหา สร้าง และนำเข้าบัญชีนักเรียนด้วยเลขประจำตัว',
+     guardian:'สร้างและนำเข้าบัญชีผู้ปกครอง พร้อมจัดการบัญชีและสถานะ',
+     links:'ตรวจสอบและจัดการการเชื่อมโยงผู้ปกครองกับนักเรียน'};
+   const window=pageWindow(total,page,pageSize);
+   const sizeOptions=PORTAL_PAGE_SIZES.map(v=>`<option value="${v}" ${pageSize===v?'selected':''}>${v==='all'?'ทั้งหมด':v+' แถว'}</option>`).join('');
+   mount(`<section class="stack portal-accounts-workspace"><div><h2>${titles[mode]}</h2><p class="muted">${description[mode]}</p></div>
+    <nav class="portal-account-tabs" aria-label="งานบัญชีผู้เรียนและผู้ปกครอง">
+     ${[['student','🎓','บัญชีนักเรียน'],['guardian','👥','บัญชีผู้ปกครอง'],['links','🔗','ความสัมพันธ์']].map(([id,icon,label])=>`<button type="button" data-portal-section="${id}" class="button ${mode===id?'':'secondary'}" ${mode===id?'aria-current="page"':''}>${icon} ${label}</button>`).join('')}
+    </nav>
+    <div class="portal-account-metrics">
+     <div><span>บัญชีนักเรียน</span><strong>${Number(summary.student_accounts||0).toLocaleString('th-TH')}</strong></div>
+     <div><span>บัญชีผู้ปกครอง</span><strong>${Number(summary.guardian_accounts||0).toLocaleString('th-TH')}</strong></div>
+     <div><span>ความสัมพันธ์ทั้งหมด</span><strong>${Number(summary.links||0).toLocaleString('th-TH')}</strong></div>
+     <div><span>นักเรียนยังไม่มีผู้ปกครอง</span><strong>${Number(summary.students_without_guardian||0).toLocaleString('th-TH')}</strong></div>
+    </div>
    ${notice?`<section class="card stack"><h3>ข้อมูลรับบัญชี (แสดงครั้งเดียว)</h3><div class="warn">เก็บรหัสชั่วคราวอย่างปลอดภัย แจ้งเจ้าของบัญชีหลังยืนยันตัวตนเท่านั้น ห้ามส่งในกลุ่มสาธารณะหรือเผยแพร่ภาพหน้าจอ</div>
     <div class="field"><label>Username</label><input readonly value="${esc(notice.username)}"></div>
     <div class="field"><label>รหัสผ่านชั่วคราว</label><input readonly value="${esc(notice.temporary_password)}"></div>
