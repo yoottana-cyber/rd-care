@@ -105,7 +105,7 @@ function loginPage(){
   <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้ง RD Care ลงมือถือ</button>
    <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
   <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
-  <p class="login-message">Push ผู้ปกครองเปิดรับได้เฉพาะการแจ้งเหตุหนีเรียน ผ่านบัญชีที่ยืนยันและอนุญาตแล้ว</p>
+  <p class="login-message">Push หนีเรียนและมาสายจะส่งเฉพาะบัญชีครูที่ปรึกษาและผู้ปกครองที่สมัครรับแล้ว</p>
  </div>
  <footer class="login-credit">พัฒนาโดย ครูยุทธนา บุญจันทร์</footer>
  </section></div>`;
@@ -585,7 +585,7 @@ async function loadAdvisorCenter(){
  ${items.length?items.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong>
  <p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
- <p class="muted">แจ้งผู้ปกครองผ่าน Push เฉพาะเหตุหนีเรียนและอุปกรณ์ที่สมัครรับแล้ว</p></section>`);
+ <p class="muted">แจ้งผู้ปกครองผ่าน Push สำหรับเหตุหนีเรียนและมาสายที่บันทึกผ่าน QR โดยส่งเฉพาะอุปกรณ์ที่สมัครรับแล้ว</p></section>`);
  $('#advisorRoom')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);await loadAdvisorCenter()}));
  $$('[data-advisor-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
   if(!confirm(button.dataset.state==='confirmed'?'ยืนยันว่าไม่เข้าคาบเรียน?':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;
