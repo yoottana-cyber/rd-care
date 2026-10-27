@@ -6,7 +6,9 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'
 export function createPortalAdmin({api,mount,toast,rooms,safeRun,navigate=()=>{},view='student'}){
  let roomId=rooms?.[0]?.id||null,accounts=[],links=[],students=[],roomAccounts=[];
  let mode=['student','guardian','links'].includes(view)?view:'student';
- let total=0,summary={},page=1,pageSize='25',query='',loadId=0;
+ const sizeKey='rd_portal_accounts_page_size_'+mode;
+ const getSavedSize=()=>{try{return normalizePageSize(sessionStorage.getItem(sizeKey))}catch{return '25'}};
+ let total=0,summary={},page=1,pageSize=getSavedSize(),query='',loadId=0;
  let guardianSearch='',guardianOptions=[],issuedCredentials=[];
  const $=selector=>document.querySelector(selector);
  const rosterImporter=createPortalRosterImport({api,toast,onComplete:()=>load()});
@@ -147,7 +149,7 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,navigate=()=>{}
    if(el.dataset.portalSection!==mode)navigate(el.dataset.portalSection);
   }));
   $('#portalPageSize')?.addEventListener('change',e=>safeRun(async()=>{
-   pageSize=normalizePageSize(e.target.value);page=1;await load();
+   pageSize=normalizePageSize(e.target.value);try{sessionStorage.setItem(sizeKey,pageSize)}catch{}page=1;await load();
   }));
   $('#portalListSearch')?.addEventListener('submit',e=>safeRun(async()=>{
    e.preventDefault();query=String(new FormData(e.currentTarget).get('q')||'').trim();page=1;await load();
