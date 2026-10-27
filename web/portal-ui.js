@@ -196,7 +196,7 @@ export function createPortalUi({root,onStaffLogin}){
     ${table(r.behavior,[['record_date','วันที่'],['points','คะแนน'],['reason','เหตุผล']])}`:''}
    ${state.account.role==='guardian'?`<section class="card stack guardian-truancy-notices" id="guardianAlerts">
     <h3>🔔 แจ้งเตือนการมาเรียน</h3>
-    <p class="muted">ผู้ปกครองที่ผูกบัญชีกับนักเรียนแล้วสามารถรับ Push เมื่อมีการบันทึกหนีเรียนหรือ QR ลงชื่อมาสายอัตโนมัติ และดูรายละเอียดการมาเรียนของนักเรียนในความดูแลได้</p>
+    <p class="muted">เฉพาะบัญชีผู้ปกครองที่โรงเรียนยืนยันความสัมพันธ์แล้ว สามารถเปิดรับ Push เมื่อมีการบันทึกหนีเรียนหรือ QR ลงชื่อมาสายอัตโนมัติ และดูรายละเอียดการมาเรียนของนักเรียนในความดูแลได้</p>
     ${state.truancy.length?state.truancy.map(e=>`<div class="alert-item">
      <strong>${esc(e.full_name)}</strong><p>${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
      <span class="tag">ครูบันทึกสถานะหนีเรียน — โปรดตรวจสอบข้อเท็จจริง</span>
