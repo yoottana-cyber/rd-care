@@ -50,7 +50,7 @@ async function currentUser(req,env){
  if(!/^Bearer [0-9a-f]{64}$/.test(auth))throw error(401,'กรุณาเข้าสู่ระบบ');
  const tokenHash=await digest(auth.slice(7));
  const u=await env.DB.prepare(`SELECT u.id,u.username,u.display_name,u.role,u.active,
- CASE WHEN u.role='staff' OR (u.role='teacher' AND EXISTS
+ CASE WHEN u.role IN ('admin','staff') OR (u.role='teacher' AND EXISTS
   (SELECT 1 FROM student_affairs_assignments a WHERE a.user_id=u.id))
  THEN 1 ELSE 0 END AS student_affairs
  FROM sessions s JOIN users u ON u.id=s.user_id
@@ -601,7 +601,7 @@ async function adminRoutes(req,env,user,path){
   return unifiedRosterEndpoint(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/users'){
   const {results}=await env.DB.prepare(`SELECT u.id,u.username,u.display_name,u.role,u.active,
-  CASE WHEN u.role='staff' OR (u.role='teacher' AND EXISTS
+  CASE WHEN u.role IN ('admin','staff') OR (u.role='teacher' AND EXISTS
    (SELECT 1 FROM student_affairs_assignments a WHERE a.user_id=u.id))
   THEN 1 ELSE 0 END AS student_affairs
   FROM users u ORDER BY u.display_name`).all();

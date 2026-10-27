@@ -2,7 +2,7 @@ import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
-const staff=u=>u?.role==='staff'||(u?.role==='teacher'&&Number(u?.student_affairs)===1);
+const staff=u=>['admin','staff'].includes(u?.role)||(u?.role==='teacher'&&Number(u?.student_affairs)===1);
 const id=x=>Number.isSafeInteger(Number(x))&&Number(x)>0?Number(x):null;
 const string=(v,max)=>typeof v==='string'?v.trim().slice(0,max):'';
 const text=(v,max=300)=>{const s=string(v,max);if(!s)fail(400,'กรุณากรอกรายละเอียด');return s};

@@ -77,7 +77,7 @@ test('PWA reminders navigate only to authorized local attendance URL after staff
 test('student affairs navigation requires an explicit assignment and teachers use controlled conduct rules',()=>{
  const app=read('web/app.js'),worker=read('worker/src/worker.js'),ui=read('web/student-affairs.js');
  assert.match(app,/createStudentAffairs/);
- assert.match(app,/Number\(state\.user\?\.student_affairs\)===1/);
+ assert.match(app,/state\.user\?\.role==='admin'\|\|Number\(state\.user\?\.student_affairs\)===1/);
  assert.match(app,/if\(tab==='studentAffairs'\)\{/);
  assert.match(app,/return studentAffairs\.load\(\)/);
  assert.match(app,/\/api\/affairs\/behavior\/record/);
@@ -92,7 +92,7 @@ test('student affairs navigation requires an explicit assignment and teachers us
  assert.match(ui,/affairsNewCase/);
 });
 
-test('unassigned teachers and administrators are excluded from privileged affairs endpoints',async()=>{
+test('unassigned teachers are excluded from privileged affairs endpoints',async()=>{
  const env={DB:{prepare(){throw Error('Unauthorized DB access')}}};
  const managed=[
   ['/api/affairs/attendance','GET'],['/api/affairs/people','GET'],
@@ -100,8 +100,7 @@ test('unassigned teachers and administrators are excluded from privileged affair
   ['/api/affairs/cases','POST'],['/api/affairs/remind','POST'],
   ['/api/affairs/behavior/summary','GET']
  ];
- for(const actor of [{id:2,role:'teacher',student_affairs:0},
-  {id:3,role:'admin',student_affairs:0}]){
+ for(const actor of [{id:2,role:'teacher',student_affairs:0}]){
   for(const [path,method] of managed){
    await assert.rejects(()=>studentAffairsRoutes(
     req(path,method,method==='POST'?{name:'bad',category:'minor',points:-1}:undefined),env,actor,path),{code:403});
@@ -129,7 +128,53 @@ test('new permission works on the backend and menu; existing roles stay intact',
  assert.match(worker,/b\.student_affairs!==undefined/);
  assert.match(worker,/student_affairs_assigned/);
  assert.match(worker,/student_affairs_revoked/);
- assert.match(affairs,/u\?\.role==='staff'\|\|\(u\?\.role==='teacher'&&Number\(u\?\.student_affairs\)===1\)/);
+ assert.match(affairs,/\['admin','staff'\]\.includes\(u\?\.role\)\|\|\(u\?\.role==='teacher'&&Number\(u\?\.student_affairs\)===1\)/);
  assert.match(admin,/name="student_affairs"/);
  assert.match(admin,/f\.get\('student_affairs'\)==='on'/);
+});
+
+test('administrators may open all student affairs views and read inactive scoring rules',async()=>{
+ const statements=[];
+ const fakeDb={
+  prepare(sql){
+   statements.push(sql);
+   return {
+    all:async()=>({results:sql.includes('FROM affairs_behavior_rules')?
+     [{id:41,name:'ระเบียบที่ปิดใช้งาน',category:'minor',points:-2,active:0}]:[]}),
+    bind(){return {all:async()=>({results:[]})}}
+   };
+  }
+ };
+ const admin={id:99,role:'admin',student_affairs:0},env={DB:fakeDb};
+ const people=await studentAffairsRoutes(req('/api/affairs/people'),env,admin,'/api/affairs/people');
+ assert.equal(people.status,200);
+ assert.deepEqual(await people.json(),{teachers:[],rooms:[],heads:[]});
+ const rules=await studentAffairsRoutes(req('/api/affairs/behavior/rules'),env,admin,
+  '/api/affairs/behavior/rules');
+ assert.equal(rules.status,200);
+ const body=await rules.json();
+ assert.equal(body.items[0].active,0);
+ assert.ok(statements.some(sql=>sql.includes('FROM affairs_behavior_rules')&&!sql.includes('WHERE active=1')));
+});
+test('admins can maintain policy, ordinary teachers still need an explicit grant',async()=>{
+ const actor={id:99,role:'admin',student_affairs:0};
+ const path='/api/affairs/behavior/rules';
+ const p={name:'ช่วยเหลือกิจกรรมส่วนรวม',category:'good',points:4,active:true};
+ const calls=[],db={prepare(sql){
+  const call={sql,args:[]};calls.push(call);
+  return {bind(...args){call.args=args;return {run:async()=>({meta:{last_row_id:84,changes:1}})};}};
+ }};
+ const response=await studentAffairsRoutes(req(path,'POST',p),{DB:db},actor,path);
+ assert.equal(response.status,200);
+ assert.deepEqual(await response.json(),{ok:true,id:84});
+ assert.ok(calls.some(x=>x.sql.includes('INSERT INTO affairs_behavior_rules')));
+ assert.ok(calls.some(x=>x.sql.includes('INSERT INTO audit_logs')));
+ const teacher={id:11,role:'teacher',student_affairs:0};
+ await assert.rejects(()=>studentAffairsRoutes(req(path,'POST',p),{DB:db},teacher,path),{code:403});
+});
+test('admin session and roster explicitly advertise Student Affairs access',()=>{
+ const worker=read('worker/src/worker.js');
+ const matches=worker.match(/CASE WHEN u\.role IN \('admin','staff'\)/g)||[];
+ assert.equal(matches.length,2);
+ assert.match(worker,/student_affairs_assignments/);
 });
