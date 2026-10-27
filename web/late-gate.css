@@ -1,4 +1,4 @@
-/* RD Care • Safe, high-contrast QR gate / mobile responsive station */
+/* RD CONNECT • Safe, high-contrast QR gate / mobile responsive station */
 .late-qr-page{max-width:1180px;margin-inline:auto}
 .late-qr-layout{display:grid;grid-template-columns:minmax(280px,.9fr) minmax(380px,1.1fr);align-items:start;gap:16px}
 .late-qr-station{position:sticky;top:16px}

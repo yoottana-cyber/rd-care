@@ -1,4 +1,4 @@
-/* RD Care Period Hub — a clean, responsive reinterpretation of the legacy e-Teacher grids. */
+/* RD CONNECT Period Hub — a clean, responsive reinterpretation of the legacy e-Teacher grids. */
 .period-center{--pc-ink:#26384b;--pc-muted:#718196;--pc-stroke:#e4e9f1;--pc-card:#fff;--pc-soft:#f5f8fd;--pc-green:#169a6e;--pc-purple:#6578de;--pc-shadow:0 7px 25px rgba(31,52,91,.055);gap:15px}
 .period-top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:17px 21px 15px;background:linear-gradient(116deg,#28495d,#315a66 56%,#427d80);border-radius:15px;color:white;box-shadow:var(--pc-shadow)}
 .period-top h2,.rd-workspace .period-top h2{color:#fff;font-size:clamp(20px,2.2vw,25px);margin:2px 0 5px;font-weight:700;line-height:1.35}
