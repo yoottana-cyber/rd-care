@@ -148,7 +148,7 @@ async function boot(){
  if(!state.rooms.some(r=>r.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
  const query=new URLSearchParams(location.search),requested=query.get('tab');
  const kind=query.get('notice_kind'),id=query.get('notice_id');
- state.notice=((kind==='truancy'&&requested==='advisorCenter')||(kind==='late'&&requested==='lateGate'))&&
+ state.notice=((['truancy','attendance_review'].includes(kind)&&requested==='advisorCenter')||(kind==='late'&&requested==='lateGate'))&&
   /^\d{1,15}$/.test(id||'')&&Number.isSafeInteger(Number(id))&&Number(id)>0?
   {kind,id:Number(id)}:null;
  if(requested==='notifications'||requested==='advisorCenter'||requested==='lateGate'){
@@ -564,12 +564,12 @@ function renderBehavior(){mount(`<div class="stack"><div><h2>คะแนนพ�
  $('#behaviorForm').addEventListener('submit',e=>safeRun(async()=>{e.preventDefault();const f=new FormData(e.currentTarget);await api('/api/behavior',{method:'POST',body:{student_id:Number(f.get('student_id')),points:Number(f.get('points')),reason:f.get('reason')}});toast('บันทึกคะแนนสำเร็จ');await loadBehavior()}));
 }
 async function loadAdvisorCenter(){
- const noticeId=state.notice?.kind==='truancy'?state.notice.id:null;
+ const focusIntent=['truancy','attendance_review'].includes(state.notice?.kind)?state.notice:null;
  state.notice=null;
  let focus=null;
- if(noticeId){
+ if(focusIntent){
   try{
-   focus=await api('/api/push/target?kind=truancy&id='+noticeId);
+   focus=await api('/api/push/target?kind='+focusIntent.kind+'&id='+focusIntent.id);
    state.roomId=Number(focus.classroom_id);
   }catch{toast('รายการแจ้งเตือนถูกแก้ไขหรือบัญชีนี้ไม่มีสิทธิ์ดู',true)}
  }
@@ -588,9 +588,9 @@ async function loadAdvisorCenter(){
  const items=data.items;
  const truancy=(urgent.items||[]).filter(e=>Number(e.classroom_id)===selected);
  const focusHtml=focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
-  <h3>🔔 รายละเอียดแจ้งเตือนหนีเรียน</h3><strong>${esc(focus.full_name)}</strong>
+  <h3>🔔 รายละเอียดแจ้งเตือน${focus.kind==='attendance_review'?'ขาดรายคาบรอตรวจสอบ':'หนีเรียน'}</h3><strong>${esc(focus.full_name)}</strong>
   <p>ห้อง ${esc(focus.classroom_label)} • วันที่ ${esc(focus.school_date)} • คาบ ${esc(focus.period)} • วิชา ${esc(focus.subject)}</p>
-  <p class="muted">โปรดตรวจสอบข้อเท็จจริงของเหตุการณ์กับนักเรียน</p></section>`:'';
+  <p class="muted">${focus.kind==='attendance_review'?'รายการนี้รอครูที่ปรึกษาพิจารณาด้านล่าง':'โปรดตรวจสอบข้อเท็จจริงของเหตุการณ์กับนักเรียน'}</p></section>`:'';
  mount(`<section class="stack"><div><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="muted">รับรายการไม่เข้าคาบจากครูผู้สอน และยืนยันผลก่อนบันทึกเหตุการณ์แจ้งผู้ปกครอง</p></div>
  ${focusHtml}
  <section class="card stack"><div class="row between"><div class="field smallbox"><label for="advisorRoom">ห้องที่รับผิดชอบ</label>
