@@ -1,0 +1,261 @@
+import {bangkokToday,validDate,weekday} from './core.js';
+import {sendDailyAttendanceReminderPush} from './staff-push.js';
+const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
+const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+const staff=u=>['staff','admin'].includes(u?.role);
+const id=x=>Number.isSafeInteger(Number(x))&&Number(x)>0?Number(x):null;
+const string=(v,max)=>typeof v==='string'?v.trim().slice(0,max):'';
+const text=(v,max=300)=>{const s=string(v,max);if(!s)fail(400,'กรุณากรอกรายละเอียด');return s};
+const checkedDate=d=>{if(!validDate(d)||d>bangkokToday())fail(400,'วันที่ไม่ถูกต้องหรือเป็นอนาคต');return d};
+const categories=['good','minor','moderate','serious','very_serious'];
+const label={good:'ทำความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก',adjustment:'ปรับคะแนน'};
+const timeBangkok=()=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
+const log=(db,user,action,type,entity)=>db.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)').bind(user,action,type,String(entity)).run();
+const roomRows=async (env,date)=>{
+ const {results}=await env.DB.prepare(`SELECT c.id,c.grade,c.label,c.advisor_user_id,u.display_name AS advisor_name,
+  COUNT(s.id) AS students,COUNT(d.student_id) AS checked
+ FROM classrooms c LEFT JOIN users u ON u.id=c.advisor_user_id AND u.active=1
+ LEFT JOIN student_enrollments h ON h.classroom_id=c.id AND h.start_date<=?
+  AND (h.end_date IS NULL OR h.end_date>?)
+ LEFT JOIN students s ON s.id=h.student_id AND s.active=1
+ LEFT JOIN attendance_daily d ON d.student_id=s.id AND d.school_date=?
+ GROUP BY c.id,c.grade,c.label,c.advisor_user_id,u.display_name ORDER BY c.grade,c.room`)
+ .bind(date,date,date).all();
+ return results.map(r=>({...r,students:Number(r.students)||0,checked:Number(r.checked)||0,
+  complete:Number(r.students)>0&&Number(r.checked)>=Number(r.students),
+  missing:Number(r.students)>0?Math.max(0,Number(r.students)-Number(r.checked)):0}));
+};
+const settings=async env=>(await env.DB.prepare('SELECT * FROM affairs_settings WHERE id=1').first())||{auto_enabled:0,reminder_time:'08:30',weekdays:'1,2,3,4,5'};
+async function roster(env){
+ const [teachers,rooms,heads]=await Promise.all([
+  env.DB.prepare("SELECT id,display_name,active FROM users WHERE role='teacher' ORDER BY display_name").all(),
+  env.DB.prepare(`SELECT c.id,c.label,c.grade,c.advisor_user_id,u.display_name AS advisor_name
+   FROM classrooms c LEFT JOIN users u ON u.id=c.advisor_user_id ORDER BY c.grade,c.room`).all(),
+  env.DB.prepare(`SELECT h.grade,h.teacher_user_id,u.display_name AS teacher_name
+    FROM affairs_grade_heads h JOIN users u ON u.id=h.teacher_user_id ORDER BY h.grade`).all()
+ ]);
+ return {teachers:teachers.results||[],rooms:rooms.results||[],heads:heads.results||[]};
+}
+async function eligibility(env,u,student){
+ if(staff(u))return env.DB.prepare('SELECT id FROM students WHERE id=? AND active=1').bind(student).first();
+ if(u.role!=='teacher')return null;
+ return env.DB.prepare(`SELECT s.id FROM students s WHERE s.id=? AND s.active=1 AND
+  (EXISTS(SELECT 1 FROM classrooms c WHERE c.id=s.classroom_id AND c.advisor_user_id=?)
+   OR EXISTS(SELECT 1 FROM timetable t WHERE t.classroom_id=s.classroom_id AND t.teacher_user_id=? AND t.active=1))`)
+  .bind(student,u.id,u.id).first();
+}
+async function recordBehavior(env,u,b,adjust=false){
+ const student=id(b.student_id);if(!student||!await eligibility(env,u,student))fail(403,'ไม่มีสิทธิ์บันทึกนักเรียนคนนี้');
+ let points,category,ruleId=null,ruleName='';
+ if(adjust){
+  if(!staff(u))fail(403,'เฉพาะฝ่ายกิจการนักเรียน');
+  points=Number(b.points);category='adjustment';
+  if(!Number.isInteger(points)||points===0||Math.abs(points)>50)fail(400,'ปรับคะแนนได้ตั้งแต่ -50 ถึง 50 และไม่เท่ากับศูนย์');
+ }else{
+  ruleId=id(b.rule_id);
+  const rule=ruleId?await env.DB.prepare('SELECT id,name,category,points,active FROM affairs_behavior_rules WHERE id=?').bind(ruleId).first():null;
+  if(!rule?.active)fail(400,'กรุณาเลือกเกณฑ์คะแนนที่กำหนดและเปิดใช้งาน');
+  points=Number(rule.points);category=rule.category;ruleName=rule.name;
+ }
+ const reason=text(b.reason||(!adjust?ruleName:''),300);
+ const insert=await env.DB.prepare(`INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category)
+  VALUES(?,?,?,?,?,?)`).bind(student,points,reason,u.id,ruleId,category).run();
+ await log(env.DB,u.id,adjust?'affairs_behavior_adjusted':'affairs_behavior_recorded','behavior_records',insert.meta.last_row_id);
+ return reply({ok:true,id:insert.meta.last_row_id,points,category,rule_name:ruleName},201);
+}
+async function notifyOne(env,room,date,kind,actorId=null){
+ // Unique room/day/type makes both cron replay and repeated manual POST idempotent.
+ if(room.complete||room.students===0||!room.advisor_user_id)return {room:room.label,state:'not_needed'};
+ const claim=await env.DB.prepare(`INSERT OR IGNORE INTO affairs_attendance_reminders(classroom_id,school_date,kind,actor_id)
+  VALUES(?,?,?,?)`).bind(room.id,date,kind,actorId).run();
+ if(claim.meta.changes===0)return {room:room.label,state:'already_queued'};
+ const reminderId=claim.meta.last_row_id;
+ let delivered=0,attempted=0;
+ const d=await env.DB.prepare(`SELECT p.id,p.endpoint,p.p256dh,p.auth FROM staff_push_subscriptions p
+  JOIN users u ON u.id=p.user_id AND u.active=1 AND u.role='teacher'
+  WHERE p.user_id=? ORDER BY p.id LIMIT 5`).bind(room.advisor_user_id).all();
+ for(const device of d.results||[]){
+  attempted++;
+  try{
+   const response=await sendDailyAttendanceReminderPush(device,env,{classroomId:room.id,date});
+   if(response.ok)delivered++;
+   else if([404,410].includes(response.status))
+    await env.DB.prepare('DELETE FROM staff_push_subscriptions WHERE id=? AND user_id=?').bind(device.id,room.advisor_user_id).run();
+  }catch(e){console.warn('RD CONNECT attendance reminder push failed',e?.name||'network')}
+ }
+ const state=delivered?'sent':attempted?'failed':'no_subscription';
+ await env.DB.prepare(`UPDATE affairs_attendance_reminders SET attempted=?,delivered=?,state=?,updated_at=CURRENT_TIMESTAMP
+  WHERE id=?`).bind(attempted,delivered,state,reminderId).run();
+ return {room:room.label,state,attempted,delivered};
+}
+export async function sendScheduledAttendanceReminders(env){
+ if(!env.DB)return {state:'no_database'};
+ const setting=await settings(env),day=bangkokToday();
+ if(!setting.auto_enabled||!String(setting.weekdays||'').split(',').includes(String(weekday(day))))
+  return {state:'disabled_or_non_school_day'};
+ if(timeBangkok()<setting.reminder_time)return {state:'not_due'};
+ const skipped=await env.DB.prepare('SELECT school_date FROM affairs_non_school_days WHERE school_date=?').bind(day).first();
+ if(skipped)return {state:'closed_school_day'};
+ const rows=(await roomRows(env,day)).filter(x=>x.missing>0&&x.advisor_user_id);
+ // Each 5-min scheduled trigger processes a bounded group; remaining rooms continue on next trigger.
+ const pending=[];
+ for(const room of rows){
+  const prior=await env.DB.prepare(`SELECT id FROM affairs_attendance_reminders
+   WHERE classroom_id=? AND school_date=? AND kind='auto'`).bind(room.id,day).first();
+  if(!prior)pending.push(room);
+  if(pending.length>=8)break;
+ }
+ const outcomes=await Promise.all(pending.map(room=>notifyOne(env,room,day,'auto')));
+ return {state:'processed',count:outcomes.length,outcomes};
+}
+export async function studentAffairsRoutes(req,env,u,path){
+ const method=req.method;const url=new URL(req.url),q=url.searchParams;
+ if(!staff(u)&&!(u.role==='teacher'&&['/api/affairs/behavior/rules','/api/affairs/behavior/record'].includes(path)))
+  fail(403,'เฉพาะฝ่ายกิจการนักเรียนหรือผู้ดูแลระบบ');
+ let b=null;
+ if(method==='POST'){
+  const raw=await req.text();if(raw.length>10000)fail(413,'ข้อมูลมีขนาดใหญ่เกินไป');
+  try{b=JSON.parse(raw);if(!b||typeof b!=='object'||Array.isArray(b))throw Error()}catch{fail(400,'รูปแบบข้อมูลไม่ถูกต้อง')}
+ }
+ if(method==='GET'&&path==='/api/affairs/attendance'){
+  const date=checkedDate(q.get('date')||bangkokToday()),items=await roomRows(env,date);
+  const {results:reminders}=await env.DB.prepare(`SELECT r.classroom_id,r.kind,r.state,r.attempted,r.delivered,r.created_at
+   FROM affairs_attendance_reminders r WHERE r.school_date=? ORDER BY r.id DESC`).bind(date).all();
+  return reply({date,items,reminders,setting:await settings(env),
+   summary:{rooms:items.filter(x=>x.students>0).length,complete:items.filter(x=>x.complete).length,
+    pending:items.filter(x=>x.students>0&&!x.complete).length}});
+ }
+ if(method==='GET'&&path==='/api/affairs/people')return reply(await roster(env));
+ if(method==='POST'&&path==='/api/affairs/advisor'){
+  const room=id(b.classroom_id),teacher=b.teacher_user_id===null?null:id(b.teacher_user_id);
+  if(!room||!(teacher||b.teacher_user_id===null))fail(400,'เลือกห้องเรียนและครูที่ปรึกษาให้ถูกต้อง');
+  if(teacher){
+   const check=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='teacher' AND active=1").bind(teacher).first();
+   if(!check)fail(400,'ต้องเป็นบัญชีครูที่เปิดใช้งาน');
+  }
+  const change=await env.DB.prepare('UPDATE classrooms SET advisor_user_id=? WHERE id=?').bind(teacher,room).run();
+  if(!change.meta.changes)fail(404,'ไม่พบห้องเรียน');
+  await log(env.DB,u.id,'affairs_advisor_assigned','classrooms',room);return reply({ok:true});
+ }
+ if(method==='POST'&&path==='/api/affairs/heads'){
+  const grade=Number(b.grade),teacher=b.teacher_user_id===null?null:id(b.teacher_user_id);
+  if(!Number.isInteger(grade)||grade<1||grade>6||!(teacher||b.teacher_user_id===null))
+   fail(400,'ระดับชั้นหรือครูไม่ถูกต้อง');
+  if(teacher){
+   const check=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='teacher' AND active=1").bind(teacher).first();
+   if(!check)fail(400,'หัวหน้าระดับต้องเป็นครูที่เปิดใช้งาน');
+   await env.DB.prepare(`INSERT INTO affairs_grade_heads(grade,teacher_user_id,updated_by)
+    VALUES(?,?,?) ON CONFLICT(grade) DO UPDATE SET teacher_user_id=excluded.teacher_user_id,
+    updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP`).bind(grade,teacher,u.id).run();
+  }else await env.DB.prepare('DELETE FROM affairs_grade_heads WHERE grade=?').bind(grade).run();
+  await log(env.DB,u.id,'affairs_grade_head_assigned','affairs_grade_heads',grade);return reply({ok:true});
+ }
+ if(method==='POST'&&path==='/api/affairs/settings'){
+  const enabled=b.auto_enabled===true||b.auto_enabled===1;
+  const time=String(b.reminder_time||'');
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))fail(400,'เวลาต้องอยู่ในรูปแบบ HH:MM');
+  const weekdays=Array.isArray(b.weekdays)?[...new Set(b.weekdays.map(Number))].sort((a,b)=>a-b):[];
+  if(!weekdays.length||weekdays.some(d=>!Number.isInteger(d)||d<1||d>7))
+   fail(400,'เลือกวันที่อนุญาตให้แจ้งเตือนอย่างน้อยหนึ่งวัน');
+  await env.DB.prepare(`UPDATE affairs_settings SET auto_enabled=?,reminder_time=?,weekdays=?,
+   updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=1`)
+   .bind(enabled?1:0,time,weekdays.join(','),u.id).run();
+  await log(env.DB,u.id,'affairs_reminder_settings','affairs_settings',1);
+  return reply({ok:true,setting:await settings(env)});
+ }
+ if(method==='GET'&&path==='/api/affairs/closed-days'){
+  const {results}=await env.DB.prepare('SELECT school_date,label FROM affairs_non_school_days ORDER BY school_date DESC LIMIT 120').all();
+  return reply({items:results});
+ }
+ if(method==='POST'&&path==='/api/affairs/closed-days'){
+  const date=checkedDate(b.date),label=text(b.label,100);
+  await env.DB.prepare(`INSERT INTO affairs_non_school_days(school_date,label,created_by)
+   VALUES(?,?,?) ON CONFLICT(school_date) DO UPDATE SET label=excluded.label,created_by=excluded.created_by`)
+   .bind(date,label,u.id).run();
+  await log(env.DB,u.id,'affairs_non_school_day','affairs_non_school_days',date);return reply({ok:true});
+ }
+ if(method==='POST'&&path==='/api/affairs/remind'){
+  const date=bangkokToday(),roomId=id(b.classroom_id);
+  if(!roomId)fail(400,'กรุณาเลือกห้องเรียน');
+  const room=(await roomRows(env,date)).find(x=>x.id===roomId);
+  if(!room)fail(404,'ไม่พบห้องเรียน');
+  const outcome=await notifyOne(env,room,date,'manual',u.id);
+  await log(env.DB,u.id,'affairs_attendance_reminder','classrooms',roomId);
+  return reply({ok:true,...outcome});
+ }
+ if(method==='GET'&&path==='/api/affairs/behavior/rules'){
+  const {results}=await env.DB.prepare(`SELECT id,name,category,points,active,updated_at
+    FROM affairs_behavior_rules ${staff(u)?'':'WHERE active=1'} ORDER BY category,id`).all();
+  return reply({items:results,category_labels:label});
+ }
+ if(method==='POST'&&path==='/api/affairs/behavior/rules'){
+  const ruleId=b.id===null||b.id===undefined?null:id(b.id);
+  const name=text(b.name,120),category=String(b.category||''),points=Number(b.points),active=b.active!==false;
+  if(!categories.includes(category)||!Number.isInteger(points)||Math.abs(points)>50||points===0||
+    (category==='good'&&points<0)||(category!=='good'&&points>0))
+   fail(400,'ประเภทหรือค่าคะแนนไม่ถูกต้อง (1–50 คะแนนตามประเภท)');
+  let key=ruleId;
+  if(ruleId){
+   const result=await env.DB.prepare(`UPDATE affairs_behavior_rules SET name=?,category=?,points=?,active=?,
+    updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(name,category,points,active?1:0,u.id,ruleId).run();
+   if(!result.meta.changes)fail(404,'ไม่พบเกณฑ์คะแนน');
+  }else{
+   const res=await env.DB.prepare(`INSERT INTO affairs_behavior_rules(name,category,points,active,updated_by)
+    VALUES(?,?,?,?,?)`).bind(name,category,points,active?1:0,u.id).run();key=res.meta.last_row_id;
+  }
+  await log(env.DB,u.id,'affairs_behavior_rule','affairs_behavior_rules',key);
+  return reply({ok:true,id:key});
+ }
+ if(method==='POST'&&path==='/api/affairs/behavior/record')return recordBehavior(env,u,b);
+ if(method==='POST'&&path==='/api/affairs/behavior/adjust')return recordBehavior(env,u,b,true);
+ if(method==='GET'&&path==='/api/affairs/behavior/summary'){
+  const date=q.get('date')||bangkokToday();checkedDate(date);
+  const {results}=await env.DB.prepare(`SELECT c.grade,c.label AS classroom_label,s.id AS student_id,
+   s.student_no,s.full_name,COALESCE(SUM(b.points),0) AS total,
+   COUNT(b.id) AS events FROM students s JOIN classrooms c ON c.id=s.classroom_id
+   LEFT JOIN behavior_records b ON b.student_id=s.id AND substr(b.created_at,1,10)<=?
+   WHERE s.active=1 GROUP BY s.id ORDER BY c.grade,c.room,s.roll_no LIMIT 1500`).bind(date).all();
+  return reply({date,items:results});
+ }
+ if(method==='GET'&&path==='/api/affairs/cases'){
+  const student=id(q.get('student_id'));
+  if(!student)fail(400,'กรุณาเลือกนักเรียน');
+  const {results}=await env.DB.prepare(`SELECT d.*,u.display_name AS recorder_name FROM affairs_disciplinary_cases d
+   JOIN users u ON u.id=d.recorded_by WHERE d.student_id=? ORDER BY d.id DESC LIMIT 100`).bind(student).all();
+  return reply({items:results});
+ }
+ if(method==='POST'&&path==='/api/affairs/cases'){
+  const student=id(b.student_id),date=checkedDate(b.school_date);
+  if(!student||!['reprimand','probation'].includes(b.measure))fail(400,'นักเรียนหรือมาตรการไม่ถูกต้อง');
+  const found=await env.DB.prepare('SELECT id FROM students WHERE id=? AND active=1').bind(student).first();
+  if(!found)fail(404,'ไม่พบนักเรียน');
+  const details=text(b.details,2000),conditions=string(b.conditions,2000);
+  const informed=b.guardian_informed_date?checkedDate(b.guardian_informed_date):null;
+  const ack=b.guardian_ack_date?checkedDate(b.guardian_ack_date):null;
+  if(ack&&!informed)fail(400,'ต้องบันทึกวันที่แจ้งผู้ปกครองก่อนวันที่รับทราบ');
+  if(informed&&ack&&ack<informed)fail(400,'วันที่ผู้ปกครองรับทราบต้องไม่น้อยกว่าวันที่แจ้ง');
+  const res=await env.DB.prepare(`INSERT INTO affairs_disciplinary_cases
+   (student_id,measure,school_date,details,conditions,recorded_by,guardian_informed_date,guardian_ack_date)
+   VALUES(?,?,?,?,?,?,?,?)`).bind(student,b.measure,date,details,conditions,u.id,informed,ack).run();
+  await log(env.DB,u.id,'affairs_disciplinary_case','affairs_disciplinary_cases',res.meta.last_row_id);
+  return reply({ok:true,id:res.meta.last_row_id},201);
+ }
+ const caseMatch=/^\/api\/affairs\/cases\/(\d+)\/review$/.exec(path);
+ if(method==='POST'&&caseMatch){
+  const caseId=id(caseMatch[1]),state=b.state;
+  if(!['active','resolved','cancelled'].includes(state))fail(400,'สถานะไม่ถูกต้อง');
+  const resolution=string(b.resolution,1000);
+  const informed=b.guardian_informed_date?checkedDate(b.guardian_informed_date):null;
+  const ack=b.guardian_ack_date?checkedDate(b.guardian_ack_date):null;
+  if(ack&&!informed)fail(400,'กรุณาระบุวันที่แจ้งผู้ปกครอง');
+  const changed=await env.DB.prepare(`UPDATE affairs_disciplinary_cases SET state=?,resolution=?,
+   guardian_informed_date=COALESCE(?,guardian_informed_date),
+   guardian_ack_date=COALESCE(?,guardian_ack_date),
+   reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+   .bind(state,resolution,informed,ack,u.id,caseId).run();
+  if(!changed.meta.changes)fail(404,'ไม่พบการบันทึกมาตรการ');
+  await log(env.DB,u.id,'affairs_case_reviewed','affairs_disciplinary_cases',caseId);
+  return reply({ok:true});
+ }
+ fail(404,'ไม่พบ API');
+}
