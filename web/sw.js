@@ -1,4 +1,4 @@
-const CACHE='rd-care-shell-v53';
+const CACHE='rd-care-shell-v54';
 const ASSETS=['./','./index.html','./app.css','./theme.css','./login.css','./smart-school-ui.css','./media/ratsada-crest.webp','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./my-timetable.js','./period-center.js','./period-center.css','./mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js','./pwa-client.js','./auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./guardian-push.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./advisor-import.js','./admin-settings.js','./admin-settings.css','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./templates/advisor-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -26,16 +26,20 @@ self.addEventListener('push',event=>{
  try{if(event.data)metadata=event.data.json()}catch{}
  const urgent=metadata?.kind==='urgent_review'&&
    (metadata.audience==='advisor'||metadata.audience==='guardian');
- const staff=urgent&&metadata.audience==='advisor';
- const link=staff?'./?tab=advisorCenter':urgent?'./':'./?tab=notifications';
+ const late=metadata?.kind==='late_arrival'&&
+   (metadata.audience==='advisor'||metadata.audience==='guardian');
+ const staff=(urgent||late)&&metadata.audience==='advisor';
+ const link=late&&staff?'./?tab=lateGate':staff?'./?tab=advisorCenter':
+   (urgent||late)?'./':'./?tab=notifications';
  event.waitUntil(self.registration.showNotification(
-  urgent?'RD Care • มีเรื่องสำคัญต้องตรวจสอบ':'RD Care • โรงเรียนรัษฎา',{
-  body:urgent?'มีข้อมูลการมาเรียนที่ควรตรวจสอบโดยเร็ว กรุณาเปิดแอป RD Care':
+  late?'RD Care • แจ้งเตือนนักเรียนมาสาย':urgent?'RD Care • มีเรื่องสำคัญต้องตรวจสอบ':'RD Care • โรงเรียนรัษฎา',{
+  body:late?'มีรายการลงชื่อมาสายใหม่ กรุณาตรวจสอบรายละเอียดภายใน RD Care':
+    urgent?'มีข้อมูลการมาเรียนที่ควรตรวจสอบโดยเร็ว กรุณาเปิดแอป RD Care':
    'มีรายการใหม่ให้ตรวจสอบในระบบ RD Care',
   icon:'./icons/icon-192.png',
   badge:'./icons/icon-192.png',
   // Priority alerts cannot be replaced by ordinary notifications.
-  tag:urgent?'rd-care-priority-review':'rd-care-school-notices',
+  tag:late?'rd-care-late-arrival':urgent?'rd-care-priority-review':'rd-care-school-notices',
   renotify:false,
   requireInteraction:urgent,
   ...(urgent?{vibrate:[180,100,180]}:{}),
@@ -48,7 +52,9 @@ self.addEventListener('notificationclick',event=>{
  const candidate=event.notification.data?.url;
  const target=new URL(
   candidate===new URL('./?tab=advisorCenter',self.registration.scope).href
-   ?'./?tab=advisorCenter':candidate===home.href?'./':'./?tab=notifications',
+   ?'./?tab=advisorCenter':
+   candidate===new URL('./?tab=lateGate',self.registration.scope).href
+   ?'./?tab=lateGate':candidate===home.href?'./':'./?tab=notifications',
   self.registration.scope
  );
  event.waitUntil((async()=>{
