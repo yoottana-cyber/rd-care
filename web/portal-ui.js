@@ -112,7 +112,11 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     ${noticeIntent?'<p class="summary" role="status">🔔 เข้าสู่ระบบผู้ปกครองเพื่อเปิดรายละเอียดการแจ้งเตือน</p>':''}
     <form id="portalLoginForm" class="stack">
      <div class="field"><label>${role==='student'?'เลขประจำตัวนักเรียน (Username)':'Username ผู้ปกครอง'}</label><input name="username" required autocomplete="username" maxlength="40" ${role==='student'?'inputmode="numeric"':''}></div>
-     <div class="field"><label>รหัสผ่าน</label><input name="password" type="password" required autocomplete="current-password"></div>
+     <div class="field"><label for="portalPassword">รหัสผ่าน</label>
+      <div class="rd-portal-password-field">
+       <input id="portalPassword" name="password" type="password" required autocomplete="current-password">
+       <button type="button" id="portalTogglePassword" aria-label="แสดงรหัสผ่าน" aria-pressed="false">แสดง</button>
+      </div></div>
      <label class="remember-login"><input type="checkbox" name="remember">
       <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong>
        <small>เลือกเฉพาะมือถือหรือคอมพิวเตอร์ส่วนตัว • สูงสุด 30 วัน</small></span></label>
@@ -122,6 +126,14 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     ${!lateQrToken&&!noticeIntent?'<button type="button" id="portalBack" class="button secondary full">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</button>':''}`,true);
    select('#portalBack')?.addEventListener('click',onStaffLogin);
    select('#studentLateEntry')?.addEventListener('click',onLegacyLateReport);
+   select('#portalTogglePassword')?.addEventListener('click',()=>{
+    const field=select('#portalPassword'),button=select('#portalTogglePassword');
+    if(!field||!button)return;
+    const shown=field.type==='password';field.type=shown?'text':'password';
+    button.textContent=shown?'ซ่อน':'แสดง';
+    button.setAttribute('aria-pressed',String(shown));
+    button.setAttribute('aria-label',shown?'ซ่อนรหัสผ่าน':'แสดงรหัสผ่าน');
+   });
    select('#portalLoginForm').addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
     try{
@@ -286,7 +298,12 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
       <div><span class="rd-portal-kicker">ตารางเรียน</span><h2>เช็กชื่อรายคาบ</h2></div>
       <span class="rd-portal-count">${r.period?.length||0} รายการ</span></div>
       ${table(r.period,[['school_date','วันที่'],['period','คาบ'],['subject','วิชา'],['status','สถานะ']],x=>statusLabel(x.status))}
-     </section>`:''}
+     </section>
+     ${guardian?`<section class="rd-portal-record-section"><div class="rd-portal-section-heading">
+      <div><span class="rd-portal-kicker">บันทึกเวลาเข้าเรียน</span><h2>ประวัติมาสาย</h2></div>
+      <span class="rd-portal-count">${r.late?.length||0} รายการ</span></div>
+      ${table(r.late,[['school_date','วันที่'],['arrived_at','เวลา'],['state','สถานะ']],x=>statusLabel(x.state))}
+     </section>`:''}`:''}
    </section>
    ${!guardian?`<section class="rd-portal-panel" data-portal-panel="late">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">LATE ARRIVAL</span><h1>ลงชื่อมาสาย</h1>
