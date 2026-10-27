@@ -8,6 +8,18 @@ export const PWA_ROLES=Object.freeze({
  guardian:{label:'ผู้ปกครอง',name:'RD CONNECT ผู้ปกครอง',manifest:'./manifest-guardian.webmanifest',icon:'./icons/guardian-192.png'}
 });
 export const homeScreenRole=(search='')=>resolveLoginEntrance(search);
+const lastRoleKey='rd_connect_last_app_role';
+export function rememberHomeRole(role){
+ if(!PWA_ROLES[role])return;
+ try{localStorage.setItem(lastRoleKey,role)}catch{}
+}
+export function preferredHomeRole(){
+ try{
+  const saved=localStorage.getItem(lastRoleKey);
+  return PWA_ROLES[saved]?saved:null;
+ }catch{return null}
+}
+
 export const isInstalledPwa=()=>typeof window!=='undefined'&&
  (window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true);
 
