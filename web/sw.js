@@ -1,4 +1,4 @@
-const CACHE='rd-care-shell-v56';
+const CACHE='rd-care-shell-v57';
 const ASSETS=['./','./index.html','./app.css','./theme.css','./login.css','./smart-school-ui.css','./media/ratsada-crest.webp','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./my-timetable.js','./period-center.js','./period-center.css','./mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js','./pwa-client.js','./auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./guardian-push.js','./portal-admin.js','./portal-batch.js','./unified-import.js','./advisor-import.js','./admin-settings.js','./admin-settings.css','./csv-encoding.js','./template-xlsx.js','./templates/student-all-rooms-import.csv','./templates/advisor-all-rooms-import.csv','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 self.addEventListener('install',e=>{
  e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
@@ -26,32 +26,41 @@ self.addEventListener('push',event=>{
   (metadata.audience==='advisor'||metadata.audience==='guardian');
  const late=metadata?.kind==='late_arrival'&&
   (metadata.audience==='advisor'||metadata.audience==='guardian');
+ const review=metadata?.kind==='attendance_review'&&metadata.audience==='advisor';
+ const test=metadata?.kind==='push_test';
  const staff=metadata?.audience==='advisor';
  const id=Number(metadata?.eventId),hasId=Number.isSafeInteger(id)&&id>0;
  const date=/^\d{4}-\d{2}-\d{2}$/.test(String(metadata?.date||''))?metadata.date:'';
  const period=Number(metadata?.period),validPeriod=Number.isInteger(period)&&period>=1&&period<=12;
  const subject=typeof metadata?.subject==='string'?metadata.subject.slice(0,55):'';
  const arrival=/^\d{2}:\d{2}$/.test(String(metadata?.arrival||''))?metadata.arrival:'';
- const type=late?'late':'truancy';
- const link=hasId&&(late||urgent)
+ const type=late?'late':review?'attendance_review':'truancy';
+ const link=hasId&&(late||urgent||review)
   ?staff
    ?'./?tab='+(late?'lateGate':'advisorCenter')+'&notice_kind='+type+'&notice_id='+id
    :'./?portal_notice='+type+'&notice_id='+id
-  :late&&staff?'./?tab=lateGate':urgent&&staff?'./?tab=advisorCenter':
-   late||urgent?'./':'./?tab=notifications';
+  :late&&staff?'./?tab=lateGate':(urgent||review)&&staff?'./?tab=advisorCenter':
+   (late||urgent||review)?'./':test&&staff?'./?tab=notifications':
+   test?'./':'./?tab=notifications';
  const title=late?'RD Care • แจ้งเรื่องมาสาย':
-  urgent?'RD Care • แจ้งเรื่องหนีเรียน':'RD Care • โรงเรียนรัษฎา';
+  urgent?'RD Care • แจ้งเรื่องหนีเรียน':
+  review?'RD Care • แจ้งขาดรายคาบรอตรวจสอบ':
+  test?'RD Care • ทดสอบการแจ้งเตือน':'RD Care • โรงเรียนรัษฎา';
  const details=late?
   [date&&'วันที่ '+date,arrival&&'เวลา '+arrival+' น.'].filter(Boolean).join(' • '):
   [date&&'วันที่ '+date,validPeriod&&'คาบ '+period,subject&&'วิชา '+subject].filter(Boolean).join(' • ');
  const body=late?'มีการลงชื่อมาสาย'+(details?' • '+details:'')+' แตะเพื่อดูรายการ':
   urgent?'มีการบันทึกหนีเรียน'+(details?' • '+details:'')+' แตะเพื่อดูรายละเอียด':
+  review?'มีเรื่องขาดรายคาบรอตรวจสอบ'+(details?' • '+details:'')+' แตะเพื่อเปิดรายการ':
+  test?'การแจ้งเตือนทดสอบจาก RD Care (ไม่มีเหตุการณ์นักเรียน)':
   'มีรายการใหม่ให้ตรวจสอบในระบบ RD Care';
  event.waitUntil(self.registration.showNotification(title,{
   body,icon:'./icons/icon-192.png',badge:'./icons/icon-192.png',
   // Do not collapse separate students/events into one notification.
   tag:late?'rd-care-late-arrival'+(hasId?'-'+id:''):
-      urgent?'rd-care-priority-review'+(hasId?'-'+id:''):'rd-care-school-notices',
+      urgent?'rd-care-priority-review'+(hasId?'-'+id:''):
+      review?'rd-care-attendance-review'+(hasId?'-'+id:''):
+      test?'rd-care-push-test':'rd-care-school-notices',
   renotify:false,requireInteraction:urgent,
   ...(urgent?{vibrate:[180,100,180]}:{}),
   data:{url:new URL(link,self.registration.scope).href}
@@ -67,7 +76,7 @@ self.addEventListener('notificationclick',event=>{
   const tab=q.get('tab'),kind=q.get('notice_kind'),id=q.get('notice_id');
   const portalKind=q.get('portal_notice');
   const safeStaff=tab==='notifications'||
-   (tab==='advisorCenter'&&kind==='truancy'&&/^\d{1,15}$/.test(id||''))||
+   (tab==='advisorCenter'&&['truancy','attendance_review'].includes(kind)&&/^\d{1,15}$/.test(id||''))||
    (tab==='lateGate'&&kind==='late'&&/^\d{1,15}$/.test(id||''))||
    ((tab==='advisorCenter'||tab==='lateGate')&&!id&&!kind);
   const safeGuardian=['truancy','late'].includes(portalKind)&&/^\d{1,15}$/.test(id||'');
