@@ -52,9 +52,10 @@ test('teacher removal revokes sessions, classes and Student Affairs access while
  for(const term of ['UPDATE users SET active=0','DELETE FROM sessions',
   'DELETE FROM staff_push_subscriptions','DELETE FROM student_affairs_assignments',
   'DELETE FROM affairs_grade_heads','UPDATE classrooms SET advisor_user_id=NULL',
-  'UPDATE timetable SET active=0','personnel_archived'])
+  'UPDATE timetable SET active=0'])
    assert.ok(sql.includes(term),term);
  assert.doesNotMatch(sql,/DELETE FROM (attendance_daily|behavior_records|users)/);
+ assert.ok(env.calls.some(x=>x.values.includes('personnel_archived')));
 });
 test('student removal revokes login and guardian links but keeps school attendance/score records',async()=>{
  const env=fakeDb({student:{id:9,student_no:'000009',full_name:'นักเรียนเดิม',deleted_at:null}});
@@ -63,9 +64,10 @@ test('student removal revokes login and guardian links but keeps school attendan
  assert.equal((await result.json()).kind,'archived');
  const sql=env.calls.map(x=>x.sql).join('\n');
  for(const term of ['DELETE FROM guardian_student_links',
-  'DELETE FROM portal_accounts WHERE student_id','UPDATE students SET active=0','student_archived'])
+  'DELETE FROM portal_accounts WHERE student_id','UPDATE students SET active=0'])
   assert.ok(sql.includes(term),term);
  assert.doesNotMatch(sql,/DELETE FROM (attendance_daily|attendance_period|behavior_records|students)/);
+ assert.ok(env.calls.some(x=>x.values.includes('student_archived')));
 });
 test('portal guardian deletion removes logins and links without touching students',async()=>{
  const env=fakeDb({portal:{id:10,username:'parent10',role:'guardian'}});
@@ -85,7 +87,8 @@ test('guardian history shows separate attendance, truancy, misconduct and merit 
  for(const key of ['truancyHistory','behaviorHistory','คะแนนความผิดสะสม',
   'คะแนนความดี','30 วันล่าสุด','rd-portal-score-cards'])assert.ok(ui.includes(key),key);
  for(const term of ['guardian_student_links','truancy:(period.results||[]).filter',
-   'behavior_deducted','behavior_adjusted','behavior_remaining','good_total'])assert.ok(portal.includes(term),term);
+   '...scores','scoreSummary(total.results?.[0])'])assert.ok(portal.includes(term),term);
+ for(const term of ['behavior_deducted','behavior_adjusted','behavior_remaining','good_total'])assert.ok(ui.includes(term),term);
  assert.match(worker,/deleted_at IS NULL ORDER BY u.display_name/);
  assert.match(worker,/classroom_id=\? AND deleted_at IS NULL ORDER BY active DESC/);
 });

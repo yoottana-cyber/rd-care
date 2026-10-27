@@ -4,11 +4,11 @@ import {readFileSync} from 'node:fs';
 import {checkedPortalPeriod,portalPeriodMode,validPortalDate} from '../web/portal-date-range.js';
 
 const now='2026-10-27',read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
-test('student and guardian portal defaults to current Bangkok day, not last 30 days',()=>{
+test('students default to today while guardians can review 30-day history by default',()=>{
  const ui=read('web/portal-ui.js');
- assert.match(ui,/from:today\(\),to:today\(\),filterMode:'today'/);
+ assert.match(ui,/from:startRole==='guardian'\?minusDays\(today\(\),29\):today\(\),to:today\(\),filterMode:startRole==='guardian'\?'range':'today'/);
  assert.match(ui,/state\.from=today\(\);state\.to=state\.from;state\.filterMode='today'/);
- assert.doesNotMatch(ui,/from:minusDays\(today\(\),29\),to:today\(\)/);
+ assert.match(ui,/\['last30','30 วันล่าสุด'\]/);
  assert.match(ui,/\?student_id='\+studentId/);
  assert.match(ui,/&from='\+encodeURIComponent\(from\)/);
  assert.match(ui,/&to='\+encodeURIComponent\(to\)/);
