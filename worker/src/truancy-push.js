@@ -1,6 +1,6 @@
 // Opt-in, relationship-verified truancy alerts for staff advisors and guardians.
 // Push carries only an encrypted event reference and non-identifying lesson summary.
-import {validPushSubscription,sendPriorityPush,diagnoseVapid} from './staff-push.js';
+import {validPushSubscription,sendPriorityPush,sendPushTest,diagnoseVapid} from './staff-push.js';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{code:status})};
 const reply=(data)=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
@@ -50,7 +50,7 @@ export async function guardianPushRoutes(req,env,account,path){
     WHERE guardian_account_id=? AND endpoint=?`).bind(account.id,data.endpoint).first();
   if(!device)return reply({accepted:false,code:'device_not_registered'});
   try{
-   const result=await sendPriorityPush(device,env,'guardian');
+   const result=await sendPushTest(device,env,'guardian');
    if(result.status===404||result.status===410)
     await env.DB.prepare('DELETE FROM guardian_push_subscriptions WHERE id=? AND guardian_account_id=?')
      .bind(device.id,account.id).run();
