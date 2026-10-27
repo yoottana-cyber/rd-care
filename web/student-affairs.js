@@ -4,13 +4,13 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'
 const thDate=v=>v?new Intl.DateTimeFormat('th-TH',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'})
  .format(new Date(v+'T00:00:00Z')):'';
 const bangkokToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-const types={good:'การทำความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
- serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก',adjustment:'การปรับคะแนน'};
+const types={good:'คะแนนความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
+ serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก',adjustment:'ปรับพฤติกรรม'};
 const formatScore=n=>Number(n)>0?'+'+Number(n):String(Number(n)||0);
 export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
   selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
-  grade:0,monitorQuery:'',scoreSummary:[]};
+  grade:0,monitorQuery:'',scoreSummary:[],ruleKind:'behavior',adjustmentRules:[]};
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
  const frame=(body)=>{
@@ -165,40 +165,72 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   });
  }
  async function rules(){
-  const data=await api('/api/affairs/behavior/rules');state.rules=data.items;
-  const selected=data.items.find(x=>x.id===state.ruleEdit);
+  const [data,adjustments]=await Promise.all([
+   api('/api/affairs/behavior/rules'),
+   api('/api/affairs/behavior/adjustment-rules')
+  ]);
+  state.rules=data.items||[];state.adjustmentRules=adjustments.items||[];
+  const kind=state.ruleKind,isAdjustment=kind==='adjustment',isGood=kind==='good';
+  const items=isAdjustment?state.adjustmentRules:
+   state.rules.filter(rule=>isGood?rule.category==='good':rule.category!=='good');
+  const selected=items.find(x=>x.id===state.ruleEdit);
+  const title=isAdjustment?'เกณฑ์ปรับพฤติกรรม':isGood?'เกณฑ์คะแนนความดี':'เกณฑ์คะแนนความผิด';
   frame(`<section class="card stack">
-    <h3>เกณฑ์คะแนนพฤติกรรม</h3>
-    <p class="muted">กำหนดคะแนนตามระเบียบของโรงเรียนจริงก่อนเริ่มใช้งาน ไม่กำหนดคะแนนความผิดให้โดยอัตโนมัติ
-     การเปลี่ยนเกณฑ์มีผลกับการบันทึกใหม่เท่านั้น ไม่แก้คะแนนย้อนหลัง</p>
+    <h3>กำหนดเกณฑ์คะแนนโรงเรียน</h3>
+    <p class="muted">คะแนนความดีเป็นยอดสะสมอิสระจากคะแนนพฤติกรรม
+     และคะแนนความผิดที่บันทึกไว้จะลดลงได้เฉพาะผ่านเกณฑ์ปรับพฤติกรรมเท่านั้น
+     การเปลี่ยนเกณฑ์ไม่เปลี่ยนประวัติเดิม</p>
+    <div class="rd-affairs-rule-tabs" role="group" aria-label="หมวดเกณฑ์คะแนน">
+     ${[['behavior','ความผิด 4 ระดับ'],['good','คะแนนความดี'],['adjustment','ปรับพฤติกรรม']].map(([k,n])=>`
+      <button type="button" class="button ${kind===k?'':'secondary'}" data-affairs-rule-kind="${k}"
+       aria-pressed="${kind===k}">${n}</button>`).join('')}
+    </div>
+    <h3>${title}</h3>
+    <p class="muted">${isAdjustment?'ตัวอย่าง: ปรับพฤติกรรม 5 คะแนน หรือ 10 คะแนน กำหนดตามระเบียบที่ฝ่ายกิจการนักเรียนอนุมัติ':
+      isGood?'คะแนนความดีใช้สะสมและแสดงผลแยก ไม่สามารถล้างคะแนนความผิด':
+      'กรุณากำหนดคะแนนหักสำหรับความผิดเล็กน้อย ปานกลาง ร้ายแรง และร้ายแรงมาก'}</p>
     <form id="affairsRuleForm" class="stack">
-     <div class="field"><label>ชื่อพฤติกรรม / รายการคะแนน</label>
-      <input name="name" maxlength="120" required value="${esc(selected?.name||'')}" placeholder="เช่น ช่วยงานส่วนรวม"></div>
-     <div class="grid two"><div class="field"><label>ประเภท</label><select name="category">
-      ${Object.entries(types).filter(([key])=>key!=='adjustment').map(([k,v])=>
-        `<option value="${k}" ${selected?.category===k?'selected':''}>${v}</option>`).join('')}
-      </select></div><div class="field"><label>คะแนน (+/-)</label>
-       <input name="points" type="number" min="-50" max="50" required value="${selected?.points||''}" placeholder="+5 หรือ -5"></div></div>
+     <div class="field"><label>ชื่อรายการ / ชื่อเกณฑ์</label>
+      <input name="name" maxlength="120" required value="${esc(selected?.name||'')}"
+       placeholder="${isAdjustment?'เช่น ปรับพฤติกรรม 5 คะแนน':isGood?'เช่น จิตอาสาช่วยงานโรงเรียน':'ระบุพฤติกรรมที่ไม่พึงประสงค์'}"></div>
+     <div class="grid two">
+      ${!isAdjustment&&!isGood?`<div class="field"><label>ระดับความผิด</label><select name="category">
+      ${Object.entries(types).filter(([key])=>!['good','adjustment'].includes(key)).map(([k,v])=>
+       `<option value="${k}" ${selected?.category===k?'selected':''}>${v}</option>`).join('')}
+      </select></div>`:''}
+      <div class="field"><label>${isAdjustment?'คะแนนปรับพฤติกรรม (+)':isGood?'คะแนนความดี (+)':'คะแนนความผิดที่หัก (-)'}</label>
+       <input name="points" type="number" ${isAdjustment||isGood?'min="1" max="50"':'min="-50" max="-1"'} required
+        value="${selected?.points||''}" placeholder="${isAdjustment?'5 หรือ 10':isGood?'5':'-5'}"></div>
+     </div>
      <label class="row"><input name="active" type="checkbox" ${!selected||selected.active?'checked':''}> เปิดใช้งานเกณฑ์นี้</label>
      <div class="row"><button type="submit" class="button">${selected?'บันทึกแก้ไขเกณฑ์':'เพิ่มเกณฑ์คะแนน'}</button>
       ${selected?'<button type="button" class="button secondary" id="affairsRuleCancel">ยกเลิกการแก้ไข</button>':''}</div>
-    </form></section>
-    <section class="card stack"><h3>รายการเกณฑ์ที่กำหนด</h3>
-     <div class="rd-affairs-rule-grid">${data.items.map(rule=>`
-      <article class="rd-affairs-rule ${rule.active?'':'inactive'}">
-       <div class="row between"><strong>${esc(rule.name)}</strong><b>${formatScore(rule.points)}</b></div>
-       <p class="muted">${esc(types[rule.category])} • ${rule.active?'ใช้งาน':'ปิดใช้งาน'}</p>
-       <button type="button" class="button secondary" data-affairs-rule-edit="${rule.id}">แก้ไขเกณฑ์</button>
-      </article>`).join('')||'<p class="empty">ยังไม่กำหนดเกณฑ์คะแนนของโรงเรียน</p>'}</div>
-    </section>`);
+    </form>
+   </section>
+   <section class="card stack"><h3>รายการ${title}</h3>
+    <div class="rd-affairs-rule-grid">${items.map(rule=>`
+     <article class="rd-affairs-rule ${rule.active?'':'inactive'}">
+      <div class="row between"><strong>${esc(rule.name)}</strong><b>${formatScore(rule.points)}</b></div>
+      <p class="muted">${esc(isAdjustment?'ลดคะแนนความผิดคงเหลือ':types[rule.category])}
+       • ${rule.active?'ใช้งาน':'ปิดใช้งาน'}</p>
+      <button type="button" class="button secondary" data-affairs-rule-edit="${rule.id}">แก้ไขเกณฑ์</button>
+     </article>`).join('')||'<p class="empty">ยังไม่ได้ตั้งเกณฑ์ในหมวดนี้</p>'}</div>
+   </section>`);
+  bind('[data-affairs-rule-kind]','click',(_,el)=>{
+   state.ruleKind=el.dataset.affairsRuleKind;state.ruleEdit=null;return rules();
+  });
   bind('[data-affairs-rule-edit]','click',(_,el)=>{state.ruleEdit=Number(el.dataset.affairsRuleEdit);return rules()});
   bind('#affairsRuleCancel','click',()=>{state.ruleEdit=null;return rules()});
   bind('#affairsRuleForm','submit',async e=>{
    e.preventDefault();const f=new FormData(e.currentTarget);
-   const b={...(state.ruleEdit?{id:state.ruleEdit}:{}),name:String(f.get('name')),
-    category:String(f.get('category')),points:Number(f.get('points')),active:f.get('active')==='on'};
-   await api('/api/affairs/behavior/rules',{method:'POST',body:b});
-   state.ruleEdit=null;toast('บันทึกเกณฑ์คะแนนแล้ว');await rules();
+   const points=Number(f.get('points')),payload={
+    ...(state.ruleEdit?{id:state.ruleEdit}:{}),name:String(f.get('name')),
+    points,active:f.get('active')==='on'
+   };
+   if(!isAdjustment)payload.category=isGood?'good':String(f.get('category'));
+   await api(isAdjustment?'/api/affairs/behavior/adjustment-rules':'/api/affairs/behavior/rules',
+    {method:'POST',body:payload});
+   state.ruleEdit=null;toast('บันทึกเกณฑ์แล้ว');await rules();
   });
  }
  async function monitor(refresh=true){
