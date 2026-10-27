@@ -27,7 +27,7 @@ export async function importPortalAccounts(req,env,actor){
  const rows=body.rows;
  if(rows.some(r=>r?.guardian_username)&&body.relationships_verified!==true)
   fail(400,'ต้องยืนยันการตรวจสอบตัวตนและความสัมพันธ์ของผู้ปกครองก่อนนำเข้า');
- const seen=new Set(),plans=[];
+ const seen=new Set(),seenGuardians=new Map(),plans=[];
  for(let i=0;i<rows.length;i++){
   const row=rows[i];
   if(!row||typeof row!=='object'||Array.isArray(row))fail(400,'ข้อมูลแถวไม่ถูกต้อง');
@@ -53,7 +53,7 @@ export async function importPortalAccounts(req,env,actor){
    fail(400,'แถว '+(i+1)+': รหัสผ่านนักเรียนใหม่ต้องยาว 4–128 ตัว และไม่ใช่เลขบัตรประชาชน');
   const guardianUsername=clean(row.guardian_username,40).toLowerCase();
   const guardianName=clean(row.guardian_name,100);
-  const guardianPass=typeof row.guardian_password==='string'?row.guardian_password:'';
+  let guardianPass=typeof row.guardian_password==='string'?row.guardian_password:'';
   if(!guardianUsername&&(guardianName||guardianPass))
    fail(400,'แถว '+(i+1)+': กรุณาระบุ Username ผู้ปกครอง');
   let guardian=null;
@@ -65,8 +65,17 @@ export async function importPortalAccounts(req,env,actor){
    if(guardian&&guardian.role!=='guardian')fail(409,'แถว '+(i+1)+': Username นี้เป็นบัญชีนักเรียน');
    if((!guardian||guardianName)&&!validName(guardianName))
     fail(400,'แถว '+(i+1)+': ชื่อผู้ปกครองไม่ถูกต้อง');
+   const prev=seenGuardians.get(guardianUsername);
+   if(prev){
+    if(guardianName&&prev.name&&guardianName!==prev.name)
+     fail(400,'แถว '+(i+1)+': ข้อมูลชื่อผู้ปกครอง Username เดียวกันไม่ตรงกัน');
+    if(guardianPass&&prev.pass&&guardianPass!==prev.pass)
+     fail(400,'แถว '+(i+1)+': Password ผู้ปกครอง Username เดียวกันไม่ตรงกัน');
+    if(!guardianPass&&!guardian)guardianPass=prev.pass;
+   }
    if((!guardian||guardianPass)&&!passwordOk(guardianPass))
     fail(400,'แถว '+(i+1)+': รหัสผ่านผู้ปกครองใหม่ต้องยาว 4–128 ตัว');
+   if(!prev)seenGuardians.set(guardianUsername,{name:guardianName,pass:guardianPass});
   }
   plans.push({studentNo,studentId:student.id,student,old,username,fullName,stPass,
    guardianUsername,guardianName,guardianPass,guardian});
