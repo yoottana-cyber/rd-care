@@ -77,6 +77,27 @@ test('guardian QR push contains event time and routes into authenticated portal'
  assert.notEqual(a.options.tag,b.options.tag);
  assert.match(await click(s,a.options.data.url),/portal_notice=late&notice_id=82/);
 });
+test('period attendance review opens its own pending advisor task',async()=>{
+ const s=sw();
+ const n=await send(s,{kind:'attendance_review',audience:'advisor',
+  eventId:93,date:'2026-10-27',period:5,subject:'ภาษาไทย'});
+ assert.match(n.title,/ขาดรายคาบ/);
+ assert.match(n.options.body,/คาบ 5/);
+ assert.match(n.options.data.url,/notice_kind=attendance_review&notice_id=93/);
+ assert.match(await click(s,n.options.data.url),/notice_id=93/);
+});
+test('push testing never falsely labels an actual student incident',async()=>{
+ const s=sw();
+ const n=await send(s,{kind:'push_test',audience:'guardian'});
+ assert.match(n.title,/ทดสอบ/);
+ assert.doesNotMatch(n.title+n.options.body,/หนีเรียน|มาสาย/);
+});
+test('guardian cannot request private staff-only attendance review event',async()=>{
+ const db=mockDb({id:93,student_id:9});
+ await assert.rejects(()=>pushTarget(request('attendance_review',93),{DB:db},
+  {id:5,role:'guardian',active:1,must_change_password:0},'guardian'),{code:403});
+ assert.equal(db.calls.length,0);
+});
 test('forged external redirect is not followed from notification clicks',async()=>{
  const s=sw();
  assert.equal(await click(s,'https://not-school.example/phish'),'https://rd-care.pages.dev/');
