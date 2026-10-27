@@ -412,3 +412,50 @@ label:has(>input[type="checkbox"]),label:has(>input[type="radio"]){cursor:pointe
 [data-theme="dark"] .rd-mobile-sheet-section .rd-mobile-sheet-grid button span:first-child{
  background:#355a63
 }
+
+/* Student / guardian / verified relationship management with flexible row counts. */
+.portal-accounts-workspace{min-width:0}
+.portal-account-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.portal-account-tabs .button{min-height:50px;padding:10px 8px;white-space:normal;line-height:1.45}
+.portal-account-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.portal-account-metrics>div{display:grid;align-content:center;gap:5px;min-height:94px;padding:15px;border-radius:16px;
+ background:#eaf7f1;border:1px solid #cfe9dd}
+.portal-account-metrics>div:nth-child(2){background:#f2edfc;border-color:#e5d9f9}
+.portal-account-metrics>div:nth-child(3){background:#e9f4ff;border-color:#d8e6fa}
+.portal-account-metrics>div:nth-child(4){background:#fff3e6;border-color:#f4debf}
+.portal-account-metrics>div span{color:#476a63;font-size:12px;line-height:1.5}
+.portal-account-metrics>div strong{font-size:clamp(22px,2.2vw,31px);line-height:1.2;color:#136e50;font-variant-numeric:tabular-nums}
+.portal-account-metrics>div:nth-child(2) strong{color:#7650b8}
+.portal-account-metrics>div:nth-child(3) strong{color:#2676b5}
+.portal-account-metrics>div:nth-child(4) strong{color:#a27022}
+.portal-list-card{gap:14px}
+.portal-list-controls{display:flex;align-items:end;flex-wrap:wrap;gap:10px}
+.portal-list-controls .field:first-child{flex:1 1 220px}
+.portal-list-controls .field:nth-child(2){flex:0 0 145px}
+.portal-list-controls .field select{width:100%}
+.portal-list-controls>.button{min-height:44px}
+.portal-list-paging{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+ border-top:1px solid #e2eee9;padding-top:12px;color:#526f68;font-size:12px}
+.portal-list-paging .button{min-height:37px;font-size:12px;padding:7px 13px}
+.portal-list-card .table-wrap{width:100%;max-width:100%;overflow-x:auto}
+.portal-list-card table{min-width:570px}
+.portal-list-card td .button{min-height:38px;font-size:12px;padding:7px 11px;margin:2px}
+.portal-accounts-workspace #portalGuardianLookup{flex-wrap:wrap;align-items:end;gap:12px}
+.portal-accounts-workspace #portalGuardianLookup .field{flex:1 1 220px}
+.portal-accounts-workspace #portalGuardianLookup .button{min-height:44px}
+@media(max-width:780px){
+ .portal-account-tabs{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+ .portal-account-tabs .button{min-height:65px;padding:9px 5px;font-size:11px}
+ .portal-account-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .portal-account-metrics>div{min-height:84px;padding:12px}
+ .portal-list-controls .field:first-child{flex-basis:100%}
+ .portal-list-controls .field:nth-child(2){flex:1 1 120px}
+ .portal-list-paging{align-items:stretch}
+ .portal-list-paging>span{width:100%}
+ .portal-list-paging .row{width:100%}
+ .portal-list-paging .button{flex:1}
+}
+[data-theme="dark"] .portal-account-metrics>div{background:#274b47!important;border-color:#456864!important}
+[data-theme="dark"] .portal-account-metrics>div span{color:#b8d8d2}
+[data-theme="dark"] .portal-account-metrics>div strong{color:#c7ffe2!important}
+[data-theme="dark"] .portal-list-paging{border-color:#42605f;color:#bdcfd4}
