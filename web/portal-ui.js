@@ -286,7 +286,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
    }
    if(state.account.must_change_password)showPasswordChange();else await showDashboard();
   }catch(error){
-   if(!state.token){showLogin(state.role);return true}
+   if(!state.token){showLogin(expectedRole||state.role);return true}
    frame('<h2>ยังไม่สามารถเชื่อมต่อ RD Care</h2><p class="muted">ระบบจดจำการเข้าสู่ระบบของอุปกรณ์นี้ไว้แล้ว กรุณาลองใหม่เมื่อมีอินเทอร์เน็ต</p><button class="button full" id="portalRetryRestore">เชื่อมต่ออีกครั้ง</button><button class="button secondary full" id="portalForgetRestore">ออกจากระบบ</button>');
    select('#portalRetryRestore')?.addEventListener('click',()=>resume());
    select('#portalForgetRestore')?.addEventListener('click',logout);
