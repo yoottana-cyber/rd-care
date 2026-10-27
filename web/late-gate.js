@@ -4,7 +4,7 @@
 const esc=value=>String(value??'').replace(/[&<>"']/g,
  ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 export function createLateGate({api,mount,toast,safeRun}){
- const state={qr:null,queue:[],date:'',timer:null,alive:false,busy:false};
+ const state={qr:null,queue:[],date:'',timer:null,alive:false,busy:false,focus:null};
  function destroy(){
   state.alive=false;
   if(state.timer)clearInterval(state.timer);
@@ -19,6 +19,14 @@ export function createLateGate({api,mount,toast,safeRun}){
    <header class="row between"><div><h2>📷 QR ลงชื่อมาสาย (ถาวร)</h2>
     <p class="muted">QR แผ่นเดียวพิมพ์ติดไว้ได้ทุกวัน • หลัง 08.00 น. นักเรียนลงชื่อแล้วระบบอนุมัติและบันทึกเช็กชื่อรายวันเป็น สาย โดยอัตโนมัติ</p></div>
     <span class="tag">วันที่ ${esc(state.date||'-')}</span></header>
+   ${state.focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
+    <h3>🔔 รายละเอียดแจ้งเตือนมาสาย</h3>
+    <strong>${esc(state.focus.full_name)}</strong>
+    <p>ห้อง ${esc(state.focus.classroom_label)} • วันที่ ${esc(state.focus.school_date)}
+      • เวลา ${esc(state.focus.arrived_at)} น.</p>
+    ${state.focus.reason?`<p>สาเหตุ: ${esc(state.focus.reason)}</p>`:''}
+    <button id="lateQrToday" class="button secondary" type="button">กลับไปรายการวันนี้</button>
+   </section>`:''}
    <div class="late-qr-layout">
     <section class="card stack late-qr-station">
      <div class="late-qr-print" id="lateQrPrintable">
@@ -66,6 +74,10 @@ export function createLateGate({api,mount,toast,safeRun}){
      </div>
     </section>
    </div></div>`);
+  if(state.focus)document.querySelector('#pushNoticeFocus')?.scrollIntoView({block:'start'});
+  document.querySelector('#lateQrToday')?.addEventListener('click',()=>safeRun(async()=>{
+   state.focus=null;await poll(true);
+  }));
   document.querySelector('#lateQrPrint')?.addEventListener('click',()=>window.print());
   document.querySelector('#lateQrReload')?.addEventListener('click',()=>safeRun(loadQr));
   document.querySelector('#lateQrRefresh')?.addEventListener('click',()=>safeRun(()=>poll(true)));
@@ -109,7 +121,8 @@ export function createLateGate({api,mount,toast,safeRun}){
   if(!state.alive||state.busy)return;
   state.busy=true;
   try{
-   const response=await api('/api/late/qr/queue');
+   const response=await api('/api/late/qr/queue'+
+    (state.focus?'?date='+encodeURIComponent(state.focus.school_date):''));
    if(!state.alive)return;
    const next=response.items||[];
    const changed=JSON.stringify(next)!==JSON.stringify(state.queue);
@@ -122,8 +135,12 @@ export function createLateGate({api,mount,toast,safeRun}){
   if(!state.alive)return;
   state.qr=result;render();
  }
- async function load(){
-  destroy();state.alive=true;state.queue=[];state.date='';state.qr=null;
+ async function load({noticeId=null}={}){
+  destroy();state.alive=true;state.queue=[];state.date='';state.qr=null;state.focus=null;
+  if(Number.isSafeInteger(noticeId)&&noticeId>0){
+   try{state.focus=await api('/api/push/target?kind=late&id='+noticeId)}
+   catch{toast('รายการมาสายถูกแก้ไขหรือตอนนี้ไม่มีสิทธิ์เข้าถึง',true)}
+  }
   render();
   await Promise.all([loadQr(),poll(true)]);
   if(!state.alive)return;
