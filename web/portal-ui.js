@@ -3,6 +3,7 @@ import {bindThemeButtons} from './theme.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea} from './auth-session.js';
 import {createGuardianPush} from './guardian-push.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
+import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -10,7 +11,7 @@ const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'�
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
 export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
- const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today(),view:'home',focus:null,focusUnavailable:false};
+ const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:today(),to:today(),filterMode:'today',view:'home',focus:null,focusUnavailable:false};
  const pushParams=new URLSearchParams(location.search);
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
@@ -104,7 +105,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
  function showLogin(role=state.role){
   if(lateQrToken)role='student';
   if(noticeIntent)role='guardian';
-  state.role=role;state.view='home';requestVersion++;
+  state.role=role;state.view='home';state.from=today();state.to=state.from;state.filterMode='today';requestVersion++;
   state.account=null;state.children=[];state.records=null;
   frame(`<h2 class="login-heading">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
     <p class="muted portal-login-intro">${role==='student'?'สำหรับนักเรียนโรงเรียนรัษฎา • ใช้บัญชีที่โรงเรียนออกให้':'สำหรับผู้ปกครอง • ติดตามข้อมูลเฉพาะนักเรียนในความดูแล'}</p>
@@ -196,6 +197,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     if(state.focus){
      state.studentId=Number(state.focus.student_id);
      state.from=state.focus.school_date;state.to=state.focus.school_date;
+     state.filterMode=portalPeriodMode(state.from,state.to,today());
     }
     noticeIntent=null;state.view='home';
     history.replaceState(null,'',location.pathname+'?login=guardian'+location.hash);
@@ -221,6 +223,86 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   }
  }
  const empty='<p class="empty">ไม่พบรายการในช่วงวันที่เลือก</p>';
+ function dateFilterMarkup(scope){
+  const label=state.from===state.to?'วันที่ '+portalDate(state.from):
+   'ตั้งแต่ '+portalDate(state.from)+' ถึง '+portalDate(state.to);
+  const current=state.filterMode||portalPeriodMode(state.from,state.to,today());
+  return `<section class="rd-portal-card rd-portal-filter rd-portal-date-selector" data-portal-date-selector="${scope}">
+   <div class="rd-portal-section-heading"><div>
+    <span class="rd-portal-kicker">เลือกข้อมูลที่ต้องการดู</span><h2>${esc(label)}</h2>
+    </div><span class="rd-portal-section-symbol" aria-hidden="true">📅</span></div>
+   <div class="rd-portal-date-modes" role="group" aria-label="รูปแบบการเลือกวันที่">
+    ${[['today','วันนี้'],['date','เลือกวันที่'],['range','ช่วงวันที่']].map(([mode,caption])=>`
+     <button type="button" data-portal-date-mode="${mode}"
+      aria-pressed="${mode===current}" class="${mode===current?'active':''}">${caption}</button>`).join('')}
+   </div>
+   <form data-portal-date-form class="rd-portal-date-form">
+    <div data-portal-date-fields="date" ${current==='date'?'':'hidden'}>
+     <label for="portalDate-${scope}">วันที่ต้องการดู</label>
+     <input id="portalDate-${scope}" name="date" type="date" value="${state.to}" max="${today()}" required>
+    </div>
+    <div data-portal-date-fields="range" class="rd-portal-date-grid" ${current==='range'?'':'hidden'}>
+     <div class="field"><label for="portalFrom-${scope}">ตั้งแต่วันที่</label>
+      <input id="portalFrom-${scope}" name="from" type="date" value="${state.from}" max="${today()}" required></div>
+     <div class="field"><label for="portalTo-${scope}">ถึงวันที่</label>
+      <input id="portalTo-${scope}" name="to" type="date" value="${state.to}" max="${today()}" required></div>
+    </div>
+    <button type="submit" class="rd-portal-primary" data-portal-date-apply ${current==='today'?'hidden':''}>
+     แสดงข้อมูลตามวันที่เลือก</button>
+    <p class="rd-portal-date-error" data-portal-date-error role="alert" hidden></p>
+   </form>
+   <p class="rd-portal-help">เลือกช่วงวันที่ได้สูงสุด 90 วัน • ข้อมูลอัปเดตจากระบบโรงเรียน</p>
+  </section>`;
+ }
+ function bindDateFilters(){
+  const wrappers=[...root.querySelectorAll('[data-portal-date-selector]')];
+  const setMode=mode=>{
+   state.filterMode=mode;
+   wrappers.forEach(wrapper=>{
+    wrapper.querySelectorAll('[data-portal-date-mode]').forEach(button=>{
+     const active=button.dataset.portalDateMode===mode;
+     button.classList.toggle('active',active);
+     button.setAttribute('aria-pressed',String(active));
+    });
+    wrapper.querySelectorAll('[data-portal-date-fields]').forEach(fields=>{
+     fields.hidden=fields.dataset.portalDateFields!==mode;
+     fields.querySelectorAll('input').forEach(input=>input.disabled=fields.hidden);
+    });
+    const apply=wrapper.querySelector('[data-portal-date-apply]');
+    if(apply)apply.hidden=mode==='today';
+    const error=wrapper.querySelector('[data-portal-date-error]');
+    if(error){error.hidden=true;error.textContent=''}
+   });
+  };
+  wrappers.forEach(wrapper=>{
+   wrapper.querySelectorAll('[data-portal-date-mode]').forEach(button=>button.addEventListener('click',()=>{
+    const mode=button.dataset.portalDateMode;
+    if(mode==='today'){
+     const next=checkedPortalPeriod('today',{},today());
+     const changed=next.from!==state.from||next.to!==state.to;
+     state.from=next.from;state.to=next.to;
+     setMode('today');
+     if(changed)loadRecords();else renderDashboard();
+     return;
+    }
+    setMode(mode);
+   }));
+   wrapper.querySelector('[data-portal-date-form]')?.addEventListener('submit',event=>{
+    event.preventDefault();
+    const form=event.currentTarget,error=wrapper.querySelector('[data-portal-date-error]');
+    const values=Object.fromEntries(new FormData(form));
+    try{
+     const next=checkedPortalPeriod(state.filterMode,values,today());
+     const changed=next.from!==state.from||next.to!==state.to;
+     state.from=next.from;state.to=next.to;state.filterMode=next.mode;
+     if(changed)loadRecords();else renderDashboard();
+    }catch(e){
+     if(error){error.hidden=false;error.textContent=e.message||'ช่วงวันที่ไม่ถูกต้อง'}
+    }
+   });
+  });
+  setMode(state.filterMode);
+ }
  function renderDashboard(){
   const guardian=state.account.role==='guardian';
   const current=state.children.find(x=>x.id===state.studentId);
@@ -237,6 +319,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
     <div class="rd-portal-hero-footer"><span>◉ ข้อมูลจากระบบโรงเรียน</span><span>${esc(portalDate(today()))}</span></div>
    </section>
    <section class="rd-portal-panel" data-portal-panel="home">
+    ${dateFilterMarkup('home')}
     ${state.children.length?`<section class="rd-portal-card rd-portal-student-pick">
      <div class="rd-portal-section-heading"><div><span class="rd-portal-kicker">${guardian?'นักเรียนในความดูแล':'ข้อมูลนักเรียน'}</span>
       <h2>${guardian?'เลือกนักเรียน':'ข้อมูลของฉัน'}</h2></div><span class="rd-portal-section-symbol" aria-hidden="true">🎓</span></div>
@@ -260,7 +343,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
       <button type="button" data-portal-open="alerts">เปิดรายการแจ้งเตือน</button>
      </div></section>`:''}
     <div class="rd-portal-section-heading rd-portal-space-top"><div><span class="rd-portal-kicker">ภาพรวมการมาเรียน</span>
-     <h2>สรุปช่วงวันที่เลือก</h2></div><button class="rd-portal-text-action" type="button" data-portal-open="attendance">ดูประวัติทั้งหมด ›</button></div>
+     <h2>${state.from===state.to?'สรุปวันที่เลือก':'สรุปช่วงวันที่เลือก'}</h2></div><button class="rd-portal-text-action" type="button" data-portal-open="attendance">ดูประวัติทั้งหมด ›</button></div>
     <div class="rd-portal-metrics">
      ${[['present','มา','✓'],['late','สาย','◷'],['leave','ลา','⌁'],['absent','ขาด','!']].map(([key,label,icon])=>`
       <div class="rd-portal-metric rd-portal-metric-${key}"><span class="rd-portal-metric-symbol">${icon}</span>
@@ -283,13 +366,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
    <section class="rd-portal-panel" data-portal-panel="attendance">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">ATTENDANCE HISTORY</span><h1>การมาเรียน</h1>
      <p>ตรวจสอบข้อมูลจากการเช็กชื่อรายวันและรายคาบ</p></div>
-    <section class="rd-portal-card rd-portal-filter">
-     <h2>เลือกช่วงวันที่</h2><div class="rd-portal-date-grid">
-      <div class="field"><label for="portalFrom">ตั้งแต่วันที่</label><input id="portalFrom" type="date" value="${state.from}" max="${today()}"></div>
-      <div class="field"><label for="portalTo">ถึงวันที่</label><input id="portalTo" type="date" value="${state.to}" max="${today()}"></div>
-     </div><button type="button" id="portalSearch" class="rd-portal-primary">แสดงข้อมูลช่วงวันที่เลือก</button>
-     <p class="rd-portal-help">เลือกดูข้อมูลย้อนหลังได้สูงสุด 90 วัน</p>
-    </section>
+    ${dateFilterMarkup('history')}
     ${r&&current?`<section class="rd-portal-record-section"><div class="rd-portal-section-heading">
       <div><span class="rd-portal-kicker">${esc(current.full_name)}</span><h2>เช็กชื่อรายวัน</h2></div>
       <span class="rd-portal-count">${r.daily?.length||0} รายการ</span></div>
@@ -398,11 +475,8 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport}){
   });
   if(state.account.role==='guardian')guardianPush.bind();
   if(state.focus)select('#pushNoticeFocus')?.scrollIntoView({block:'start'});
+  bindDateFilters();
   select('#portalStudent')?.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()});
-  select('#portalSearch')?.addEventListener('click',()=>{
-   state.from=select('#portalFrom').value;state.to=select('#portalTo').value;
-   loadRecords();
-  });
  }
  function table(rows,columns,formatStatus){
   if(!rows?.length)return '<p class="rd-portal-empty">ยังไม่มีรายการในช่วงวันที่เลือก</p>';
