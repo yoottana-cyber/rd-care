@@ -3,7 +3,7 @@ import {createPortalRosterImport} from './portal-roster-import.js';
 import {fetchPortalRows,pageWindow,normalizePageSize,PORTAL_PAGE_SIZES} from './portal-table.js';
 // Staff portal provisioning is admin-only and never stores one-time credentials.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}){
+export function createPortalAdmin({api,mount,toast,rooms,safeRun,navigate=()=>{},view='student'}){
  let roomId=rooms?.[0]?.id||null,accounts=[],links=[],students=[],roomAccounts=[];
  let mode=['student','guardian','links'].includes(view)?view:'student';
  let total=0,summary={},page=1,pageSize='25',query='',loadId=0;
@@ -102,6 +102,7 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
     <button type="button" class="button secondary" id="portalClearCredentials">ปิดการแสดงรหัสชั่วคราว</button>
    </section>`:''}
    ${mode==='links'?`<section class="card stack"><h3>ผูกผู้ปกครองกับนักเรียน</h3>
+    <div class="field"><label for="portalAdminRoom">เลือกห้องเรียนสำหรับเชื่อมบัญชี</label><select id="portalAdminRoom">${roomOpts}</select></div>
     <form id="portalGuardianLookup" class="row">
      <div class="field"><label>ค้นหาผู้ปกครองก่อนผูกสิทธิ์</label>
       <input name="guardian_query" value="${esc(guardianSearch)}" maxlength="100" placeholder="ค้นหาชื่อหรือ Username"></div>
@@ -133,7 +134,6 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
     </div>
    ${mode!=='links'?`<div class="table-wrap"><table class="table"><thead><tr>
     <th>Username / ชื่อ</th><th>${mode==='student'?'เลขประจำตัว / ห้อง':'ประเภท'}</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-    <div class="table-wrap"><table class="table"><thead><tr><th>Username / ชื่อ</th><th>ประเภท</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
      <tbody>${accounts.map(a=>`<tr><td><strong>${esc(a.username)}</strong><div class="muted">${esc(a.display_name)}</div></td>
       <td>${mode==='student'?`${esc(a.student_no||'-')}<div class="muted">${esc(a.classroom_label||'')}</div>`:'ผู้ปกครอง'}</td><td>${a.active?'ใช้งาน':'ระงับ'}</td>
       <td><button type="button" class="button secondary" data-reset-portal="${a.id}">รีเซ็ต</button>
@@ -143,6 +143,23 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
       <td><button type="button" class="button ghost" data-unlink-guardian="${l.guardian_account_id}" data-unlink-student="${l.student_id}">เพิกถอนสิทธิ์</button></td></tr>`).join('')||'<tr><td colspan="3">ยังไม่มีการผูกบัญชี</td></tr>'}</tbody></table></div>`}
    </section>
   </section>`);
+  document.querySelectorAll('[data-portal-section]').forEach(el=>el.addEventListener('click',()=>{
+   if(el.dataset.portalSection!==mode)navigate(el.dataset.portalSection);
+  }));
+  $('#portalPageSize')?.addEventListener('change',e=>safeRun(async()=>{
+   pageSize=normalizePageSize(e.target.value);page=1;await load();
+  }));
+  $('#portalListSearch')?.addEventListener('submit',e=>safeRun(async()=>{
+   e.preventDefault();query=String(new FormData(e.currentTarget).get('q')||'').trim();page=1;await load();
+  }));
+  $('#portalSearchClear')?.addEventListener('click',()=>safeRun(async()=>{query='';page=1;await load()}));
+  $('#portalPrevious')?.addEventListener('click',()=>safeRun(async()=>{if(page>1){page--;await load()}}));
+  $('#portalNext')?.addEventListener('click',()=>safeRun(async()=>{
+   if(page<pageWindow(total,page,pageSize).pages){page++;await load()}
+  }));
+  $('#portalGuardianLookup')?.addEventListener('submit',e=>safeRun(async()=>{
+   e.preventDefault();guardianSearch=String(new FormData(e.currentTarget).get('guardian_query')||'').trim();await load();
+  }));
   rosterImporter.render($('#portalRosterImporter'));
    $('#portalAdminRoom')?.addEventListener('change',e=>safeRun(async()=>{roomId=Number(e.target.value);issuedCredentials=[];await load()}));
   $('#portalCreateStudent select[name="student_id"]')?.addEventListener('change',e=>{
@@ -215,5 +232,5 @@ export function createPortalAdmin({api,mount,toast,rooms,safeRun,view='student'}
    }finally{if(b.isConnected)b.disabled=false}
   })));
  }
- return {load};
+ return {load,cancel};
 }
