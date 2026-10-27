@@ -213,7 +213,7 @@ async function deliverOne(env,entry,device,eventInfo){
 }
 export async function deliverAdvisorPush(env){
  if(!env.DB||!vapidReady(env))return {processed:0,enabled:false};
- const {results:events}=await env.DB.prepare(`SELECT MIN(o.id) AS outbox_id,c.advisor_user_id AS recipient_id
+ const {results:events}=await env.DB.prepare(`SELECT o.id AS outbox_id,c.advisor_user_id AS recipient_id
   FROM notification_outbox o JOIN attendance_alerts a ON a.id=o.alert_id
   JOIN timetable t ON t.id=a.timetable_id JOIN classrooms c ON c.id=t.classroom_id
   JOIN users u ON u.id=c.advisor_user_id AND u.active=1
@@ -221,7 +221,7 @@ export async function deliverAdvisorPush(env){
     AND o.created_at>=datetime('now','-1 day') AND a.state='pending_review'
     AND NOT EXISTS(SELECT 1 FROM attendance_daily d
       WHERE d.student_id=a.student_id AND d.school_date=a.school_date AND d.status='absent')
-  GROUP BY c.advisor_user_id ORDER BY MIN(o.id) LIMIT 25`).all();
+  ORDER BY o.id LIMIT 25`).all();
  let delivered=0;
  for(const event of events){
   const detail=await env.DB.prepare(`SELECT a.id AS eventId,a.school_date AS date,t.period,t.subject
@@ -250,17 +250,11 @@ export async function deliverAdvisorPush(env){
    }
    if(result.delivered)delivered++;
   }
-  // One generic alert per advisor covers all pending review tasks in this batch.
+  // Each event is an individual notification with its own link and delivery ledger.
   await env.DB.prepare(`UPDATE notification_outbox SET state='delivered',updated_at=CURRENT_TIMESTAMP
-    WHERE state='pending' AND audience='advisor' AND event_type='attendance_review_requested'
-      AND alert_id IN (
-        SELECT a.id FROM attendance_alerts a JOIN timetable t ON t.id=a.timetable_id
-        JOIN classrooms c ON c.id=t.classroom_id
-        WHERE c.advisor_user_id=? AND a.state='pending_review'
-          AND NOT EXISTS(SELECT 1 FROM attendance_daily d
-            WHERE d.student_id=a.student_id AND d.school_date=a.school_date AND d.status='absent')
-      ) AND EXISTS(SELECT 1 FROM staff_push_deliveries
-        WHERE outbox_id=? AND state='delivered')`).bind(event.recipient_id,event.outbox_id).run();
+    WHERE id=? AND state='pending' AND audience='advisor'
+      AND EXISTS(SELECT 1 FROM staff_push_deliveries
+        WHERE outbox_id=? AND state='delivered')`).bind(event.outbox_id,event.outbox_id).run();
  }
  return {processed:events.length,delivered,enabled:true};
 }
