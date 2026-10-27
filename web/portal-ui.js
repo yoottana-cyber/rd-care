@@ -338,6 +338,11 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   const count=status=>dayRows.filter(x=>x.status===status).length;
   const topic=state.focus?.kind==='late'?'มาสาย':'หนีเรียน';
   const recent=state.truancy.length;
+  const childPicker=guardian&&state.children.length>1?`<section class="rd-portal-card rd-portal-student-pick">
+   <label class="rd-portal-label">เลือกนักเรียนในความดูแล</label>
+   <select data-portal-child-picker aria-label="เลือกบุตรหลาน">
+    ${state.children.map(st=>`<option value="${st.id}" ${st.id===state.studentId?'selected':''}>${esc(st.full_name)} • ${esc(st.classroom_label)}</option>`).join('')}
+   </select></section>`:'';
   frame(`<section class="rd-portal-hero" data-portal-panel="home">
     <div class="rd-portal-hero-top"><span class="rd-portal-overline">RATSADA STUDENT CARE</span><span class="rd-portal-hero-mark" aria-hidden="true">✦</span></div>
     <p class="rd-portal-eyebrow">ยินดีต้อนรับสู่ RD CONNECT</p>
@@ -351,7 +356,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <div class="rd-portal-section-heading"><div><span class="rd-portal-kicker">${guardian?'นักเรียนในความดูแล':'ข้อมูลนักเรียน'}</span>
       <h2>${guardian?'เลือกนักเรียน':'ข้อมูลของฉัน'}</h2></div><span class="rd-portal-section-symbol" aria-hidden="true">🎓</span></div>
      <label class="rd-portal-label" for="portalStudent">${guardian?'นักเรียนในความดูแล':'นักเรียน'}</label>
-     <select id="portalStudent">${state.children.map(st=>`<option value="${st.id}" ${st.id===state.studentId?'selected':''}>${esc(st.full_name)} • ${esc(st.classroom_label)}</option>`).join('')}</select>
+     <select id="portalStudent" data-portal-child-picker>${state.children.map(st=>`<option value="${st.id}" ${st.id===state.studentId?'selected':''}>${esc(st.full_name)} • ${esc(st.classroom_label)}</option>`).join('')}</select>
      ${current?`<p class="rd-portal-help">ห้อง ${esc(current.classroom_label)} • รหัสนักเรียน ${esc(current.student_no)}</p>`:''}
     </section>`:'<section class="rd-portal-card"><p class="rd-portal-empty">ยังไม่มีนักเรียนที่บัญชีนี้ได้รับสิทธิ์ กรุณาติดต่อผู้ดูแลระบบของโรงเรียน</p></section>'}
     ${guardian&&state.focus?`<section class="rd-portal-card rd-portal-important" id="pushNoticeFocus" tabindex="-1">
@@ -397,7 +402,8 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
    <section class="rd-portal-panel" data-portal-panel="attendance">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">ATTENDANCE HISTORY</span><h1>การมาเรียน</h1>
      <p>ตรวจสอบข้อมูลจากการเช็กชื่อรายวันและรายคาบ</p></div>
-    ${dateFilterMarkup('history')}
+    ${childPicker}
+     ${dateFilterMarkup('history')}
     ${r&&current?`<section class="rd-portal-record-section"><div class="rd-portal-section-heading">
       <div><span class="rd-portal-kicker">${esc(current.full_name)}</span><h2>เช็กชื่อรายวัน</h2></div>
       <span class="rd-portal-count">${r.daily?.length||0} รายการ</span></div>
@@ -416,6 +422,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
    ${guardian?`<section class="rd-portal-panel" data-portal-panel="truancyHistory">
      <div class="rd-portal-page-title"><span class="rd-portal-kicker">TRUANCY HISTORY</span>
       <h1>ประวัติหนีเรียน</h1><p>รายการเช็กชื่อรายคาบของนักเรียนที่เลือก ซึ่งครูบันทึกสถานะหนีเรียน</p></div>
+     ${childPicker}
      ${dateFilterMarkup('truancyHistory')}
      <section class="rd-portal-card">
       <div class="rd-portal-section-heading"><h2>หนีเรียนในช่วงวันที่เลือก</h2>
@@ -428,6 +435,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     <section class="rd-portal-panel" data-portal-panel="behaviorHistory">
      <div class="rd-portal-page-title"><span class="rd-portal-kicker">BEHAVIOR HISTORY</span>
       <h1>คะแนนพฤติกรรม</h1><p>คะแนนความดีแยกจากคะแนนพฤติกรรม ไม่ถูกนำไปหักลบความผิด</p></div>
+     ${childPicker}
      ${dateFilterMarkup('behaviorHistory')}
      <div class="rd-portal-score-cards">
       <div><span>คะแนนความผิดสะสม</span><strong>${Number(r?.behavior_deducted)||0}</strong></div>
@@ -548,7 +556,8 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   if(state.account.role==='guardian')guardianPush.bind();
   if(state.focus)select('#pushNoticeFocus')?.scrollIntoView({block:'start'});
   bindDateFilters();
-  select('#portalStudent')?.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()});
+  root.querySelectorAll('[data-portal-child-picker]').forEach(control=>
+   control.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()}));
  }
  function table(rows,columns,formatStatus){
   if(!rows?.length)return '<p class="rd-portal-empty">ยังไม่มีรายการในช่วงวันที่เลือก</p>';
