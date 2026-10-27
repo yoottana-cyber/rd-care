@@ -74,14 +74,14 @@ test('PWA reminders navigate only to authorized local attendance URL after staff
  assert.match(app,/query\.get\('classroom_id'\)/);
  assert.match(app,/state\.rooms\.some\(r=>Number\(r\.id\)===Number\(query\.get\('classroom_id'\)\)\)/);
 });
-test('student affairs navigation is staff/admin only and teachers use controlled conduct rules',()=>{
+test('student affairs navigation requires an explicit assignment and teachers use controlled conduct rules',()=>{
  const app=read('web/app.js'),worker=read('worker/src/worker.js'),ui=read('web/student-affairs.js');
  assert.match(app,/createStudentAffairs/);
- assert.match(app,/\['admin','staff'\]\.includes\(state\.user\?\.role\)/);
+ assert.match(app,/Number\(state\.user\?\.student_affairs\)===1/);
  assert.match(app,/if\(tab==='studentAffairs'\)return studentAffairs\.load\(\)/);
  assert.match(app,/\/api\/affairs\/behavior\/record/);
  assert.match(app,/behaviorRules/);
- assert.match(worker,/requireRole\(user,\['staff','admin'\]\)/);
+ assert.match(worker,/student_affairs_assignments/);
  assert.match(worker,/sendScheduledAttendanceReminders\(env\)/);
  for(const name of ['attendance','people','rules','cases'])
   assert.ok(ui.includes("['"+name+"'"),name);
@@ -89,4 +89,46 @@ test('student affairs navigation is staff/admin only and teachers use controlled
  assert.match(ui,/data-affairs-head/);
  assert.match(ui,/data-affairs-advisor/);
  assert.match(ui,/affairsNewCase/);
+});
+
+test('unassigned teachers and administrators are excluded from privileged affairs endpoints',async()=>{
+ const env={DB:{prepare(){throw Error('Unauthorized DB access')}}};
+ const managed=[
+  ['/api/affairs/attendance','GET'],['/api/affairs/people','GET'],
+  ['/api/affairs/settings','POST'],['/api/affairs/behavior/rules','POST'],
+  ['/api/affairs/cases','POST'],['/api/affairs/remind','POST'],
+  ['/api/affairs/behavior/summary','GET']
+ ];
+ for(const actor of [{id:2,role:'teacher',student_affairs:0},
+  {id:3,role:'admin',student_affairs:0}]){
+  for(const [path,method] of managed){
+   await assert.rejects(()=>studentAffairsRoutes(
+    req(path,method,{name:'bad',category:'minor',points:-1}),env,actor,path),{code:403});
+  }
+ }
+});
+test('explicitly assigned teacher keeps own role and is authorized to load affairs data',async()=>{
+ let count=0;
+ const env={DB:{prepare(sql){
+  assert.match(sql,/affairs_settings/);count++;
+  return{first:async()=>({auto_enabled:0,reminder_time:'08:30',weekdays:'1,2,3,4,5'})};
+ }}};
+ const actor={id:19,role:'teacher',student_affairs:1};
+ // Calls an authorized configuration-read endpoint with a mock response.
+ // A missing route still needs to pass authorization before touching the DB.
+ const url='/api/affairs/attendance';
+ await assert.rejects(()=>studentAffairsRoutes(req(url),env,actor,url),
+  err=>err.message!=='เฉพาะครูที่ได้รับมอบหมายสิทธิ์ฝ่ายกิจการนักเรียน');
+ assert.equal(actor.role,'teacher');
+});
+test('new permission works on the backend and menu; existing roles stay intact',()=>{
+ const worker=read('worker/src/worker.js'),affairs=read('worker/src/student-affairs.js');
+ const admin=read('web/admin-settings.js');
+ assert.match(worker,/FROM student_affairs_assignments a WHERE a\.user_id=u\.id/);
+ assert.match(worker,/b\.student_affairs!==undefined/);
+ assert.match(worker,/student_affairs_assigned/);
+ assert.match(worker,/student_affairs_revoked/);
+ assert.match(affairs,/u\?\.role==='staff'\|\|\(u\?\.role==='teacher'&&Number\(u\?\.student_affairs\)===1\)/);
+ assert.match(admin,/name="student_affairs"/);
+ assert.match(admin,/f\.get\('student_affairs'\)==='on'/);
 });
