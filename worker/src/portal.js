@@ -125,7 +125,7 @@ async function records(req,env,a){
     LEFT JOIN period_truancy tr ON tr.student_id=p.student_id
      AND tr.timetable_id=p.timetable_id AND tr.school_date=p.school_date
     WHERE p.student_id=? AND p.school_date BETWEEN ? AND ?
-    ORDER BY p.school_date DESC,t.period LIMIT 500`).bind(id,from,to),
+    ORDER BY p.school_date DESC,t.period LIMIT 1500`).bind(id,from,to),
   env.DB.prepare(`SELECT school_date,arrived_at,state FROM late_records
     WHERE student_id=? AND school_date BETWEEN ? AND ?
     ORDER BY school_date DESC LIMIT 90`).bind(id,from,to),
