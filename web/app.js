@@ -18,6 +18,7 @@ import {configureRolePwa,isInstalledPwa,preferredHomeRole,rememberHomeRole} from
 import {createPortalAdmin} from './portal-admin.js';
 import {createStudentAffairs} from './student-affairs.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
+import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-ui.js';
 import {initTheme,bindThemeButtons} from './theme.js';
 configureRolePwa(location.search);
 initTheme();
@@ -223,7 +224,14 @@ function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
  const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
- const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
+ const sidebar=renderSidebarNavigation(navs,state.tab);
+ const page=pageLocation(navs,state.tab);
+ const pageIcon=navs.find(x=>x[0]===(state.tab==='periodCheckin'?'periodAttendance':state.tab))?.[2]||'✦';
+ const contentHeader=state.tab==='dashboard'?'':'<header class="rd-content-head">'+
+  '<div class="rd-content-heading"><div class="rd-breadcrumb">'+
+  '<span>RD CONNECT</span><span aria-hidden="true">›</span><span>'+esc(page.group)+'</span></div>'+
+  '<h2>'+esc(page.title)+'</h2><p>'+esc(page.description)+'</p></div>'+
+  '<div class="rd-page-mark" aria-hidden="true">'+pageIcon+'</div></header>';
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
  <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>RD CONNECT</h1><p>ระบบการดูแลช่วยเหลือนักเรียน • โรงเรียนรัษฎา</p></div></div>
@@ -231,7 +239,7 @@ function chrome(content){
  <button type="button" id="rdHeaderMenu" aria-label="เปิดเมนู">☰</button></div>
  <div class="user"><span class="rd-date-chip" aria-label="วันที่ปัจจุบัน">📅 ${esc(displayDate)}</span><span class="rd-user-avatar" aria-hidden="true">${esc((state.user.display_name||'ค').trim().charAt(0))}</span><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออกจากระบบ</button></div></header>
  <div class="rd-layout" id="rdLayout">
- <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><div class="rd-side-brand"><img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="38" height="38" decoding="async"><span><strong>RD CONNECT</strong><small>RATSADA SCHOOL</small></span></div><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><p class="rd-nav-caption">เมนูหลัก</p><nav class="rd-sidebar-nav" aria-label="เมนูหลัก">${sidebar}</nav></aside>
+ <aside class="rd-sidebar" aria-label="เมนูด้านข้าง"><div class="rd-sidebar-title"><div class="rd-side-brand"><img class="rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="" width="38" height="38" decoding="async"><span><strong>RD CONNECT</strong><small>RATSADA SCHOOL</small></span></div><button id="sidebarToggle" class="button ghost" type="button" aria-label="ย่อหรือขยายเมนูด้านข้าง" title="ย่อหรือขยายเมนูด้านข้าง">☰</button></div><label class="rd-sidebar-search"><span class="rd-sidebar-search-symbol" aria-hidden="true">⌕</span><input id="rdMenuSearch" type="search" maxlength="40" autocomplete="off" placeholder="ค้นหาเมนู..." aria-label="ค้นหาเมนูในระบบ"></label><nav class="rd-sidebar-nav" id="rdSidebarNav" aria-label="เมนูหลักแบบจัดหมวดหมู่">${sidebar}<p class="rd-nav-empty" id="rdNavEmpty" hidden>ไม่พบเมนูที่ค้นหา</p></nav></aside>
  <div class="rd-workspace">
  ${state.user?.role==='admin'?`<section class="rd-global-search" aria-label="ค้นหานักเรียนทั้งโรงเรียน">
   <label for="rdGlobalSearch">🔎 ค้นหานักเรียนทั้งโรงเรียน</label>
@@ -240,6 +248,7 @@ function chrome(content){
   <div id="rdSearchResults" class="rd-search-results" role="list" hidden></div>
  </section>`:''}
  <nav class="nav" aria-label="เมนูหลักบนมือถือ">${bottom}</nav>
+ ${contentHeader}
  ${content}
  </div>
  </div>${mobileMarkup({navs,user:state.user,active:id=>state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'),pending:Number(state.stats?.alerts||0)})}
@@ -260,6 +269,11 @@ function mount(content){
   try{sessionStorage.setItem('rd_sidebar_collapsed',closed?'1':'0')}catch{}
  });
  bindGlobalStudentSearch();
+ const sidebarSearch=$('#rdMenuSearch'),sidebarNav=$('#rdSidebarNav');
+ sidebarSearch?.addEventListener('input',()=>searchNavItems(sidebarNav,sidebarSearch.value));
+ sidebarSearch?.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){sidebarSearch.value='';searchNavItems(sidebarNav,'');sidebarSearch.blur()}
+ });
 }
 function bindGlobalStudentSearch(){
  const input=$('#rdGlobalSearch'),results=$('#rdSearchResults'),feedback=$('#rdSearchFeedback');
