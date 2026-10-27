@@ -14,7 +14,7 @@ import {createNotificationSettings} from './notification-settings.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLastLoginArea} from './auth-session.js';
 import {createPortalUi} from './portal-ui.js';
 import {loginHref,resolveLoginEntrance} from './login-route.js';
-import {configureRolePwa,isInstalledPwa} from './pwa-role.js';
+import {configureRolePwa,isInstalledPwa,preferredHomeRole,rememberHomeRole} from './pwa-role.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {createStudentAffairs} from './student-affairs.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
@@ -159,7 +159,7 @@ function renderLogin(){
    const remember=$('#rememberStaff').checked;
    const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value,remember}});
    state.token=data.token;state.user=data.user;
-   saveAuthSession('rd_token',data.token,data.expires_in,remember);setLastLoginArea('staff');
+   saveAuthSession('rd_token',data.token,data.expires_in,remember);setLastLoginArea('staff');rememberHomeRole('staff');
    await boot();toast('เข้าสู่ระบบสำเร็จ');
   }finally{if(button.isConnected)button.disabled=false}
  }));
@@ -199,6 +199,7 @@ function renderStudentLate(){
 }
 async function boot(){
  const [me,rooms]=await Promise.all([api('/api/auth/me'),api('/api/classrooms')]);state.user=me.user;state.rooms=rooms.items;
+ rememberHomeRole('staff');
  if(!state.rooms.some(r=>r.id===state.roomId))state.roomId=state.rooms[0]?.id||null;
  const query=new URLSearchParams(location.search),requested=query.get('tab');
  const kind=query.get('notice_kind'),id=query.get('notice_id');
@@ -930,7 +931,19 @@ async function start(){
   if(portalUi.hasSession()){await portalUi.resume();return}
   portalUi.showLogin('student');return;
  }
- const entrance=resolveLoginEntrance(location.search);
+ let entrance=resolveLoginEntrance(location.search);
+ // Existing single-icon installs launched from the old root start URL still
+ // open the last used role instead of asking to choose on every launch.
+ if(entrance===null&&isInstalledPwa()){
+  const saved=preferredHomeRole(),previous=saved||(getLastLoginArea()==='staff'?'staff':null);
+  if(previous){
+   entrance=previous;
+   history.replaceState(null,'',location.pathname+'?login='+previous+location.hash);
+   configureRolePwa('?login='+previous);
+  }else if(getLastLoginArea()==='portal'&&portalUi.hasSession()){
+   await portalUi.resume();return;
+  }
+ }
  if(entrance==='student'||entrance==='guardian'){
   if(portalUi.hasSession()){await portalUi.resume(entrance);return}
   portalUi.showLogin(entrance);return;
