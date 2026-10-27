@@ -218,7 +218,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...(['admin','staff'].includes(state.user?.role)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...(Number(state.user?.student_affairs)===1?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','พฤติกรรม','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalAccounts','บัญชีผู้เรียน/ผู้ปกครอง','👥'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=navs.map(([id,label,ico])=>`<button type="button" class="rd-sidebar-link ${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" title="${label}" ${state.tab===id?'aria-current="page"':''}><span class="rd-sidebar-symbol" aria-hidden="true">${ico}</span><span class="rd-sidebar-label">${label}</span></button>`).join('');
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
@@ -315,7 +315,13 @@ async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();state.tab=tab
  if(tab==='periodAttendance')return state.user?.role==='teacher'?periodCenter.load():loadAttendance();
  if(tab==='myTimetable')return myTimetable.load();
  if(tab==='advisorCenter')return loadAdvisorCenter();
- if(tab==='studentAffairs')return studentAffairs.load();
+ if(tab==='studentAffairs'){
+  if(Number(state.user?.student_affairs)!==1){
+   state.tab='dashboard';toast('บัญชีนี้ไม่ได้รับสิทธิ์ฝ่ายกิจการนักเรียน',true);
+   return loadDashboard();
+  }
+  return studentAffairs.load();
+ }
  if(tab==='late')return loadLate();
  if(tab==='lateGate'){
   const noticeId=state.notice?.kind==='late'?state.notice.id:null;
