@@ -5,6 +5,7 @@ import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
 import {submitStudentLateQr} from './late-qr.js';
 import {deliverLateQrPush} from './late-qr-push.js';
 import {pushTarget} from './push-target.js';
+import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
 
 const encoder=new TextEncoder();
 const unixNow=()=>Math.floor(Date.now()/1000);
@@ -126,16 +127,19 @@ async function records(req,env,a){
   env.DB.prepare(`SELECT school_date,arrived_at,state FROM late_records
     WHERE student_id=? AND school_date BETWEEN ? AND ?
     ORDER BY school_date DESC LIMIT 90`).bind(id,from,to),
-  env.DB.prepare(`SELECT substr(created_at,1,10) AS record_date,points,reason FROM behavior_records
-    WHERE student_id=? AND substr(created_at,1,10) BETWEEN ? AND ?
-    ORDER BY id DESC LIMIT 100`).bind(id,from,to),
-  env.DB.prepare(`SELECT COALESCE(SUM(points),0) AS total FROM behavior_records
-    WHERE student_id=? AND substr(created_at,1,10) BETWEEN ? AND ?`).bind(id,from,to)
+  env.DB.prepare(`SELECT substr(b.created_at,1,10) AS record_date,b.points,b.reason,
+    b.affairs_category,${caseTypeSql('b')} AS score_type FROM behavior_records b
+    WHERE b.student_id=? AND substr(b.created_at,1,10) BETWEEN ? AND ?
+    ORDER BY b.id DESC LIMIT 100`).bind(id,from,to),
+  env.DB.prepare(`SELECT ${scoreColumns('b')} FROM behavior_records b
+    WHERE b.student_id=? AND substr(b.created_at,1,10) BETWEEN ? AND ?`).bind(id,from,to)
  ]);
- const rows=behavior.results||[];
+ const rows=behavior.results||[],scores=scoreSummary(total.results?.[0]);
  return reply({student:linked,from,to,daily:daily.results||[],period:period.results||[],
-  late:late.results||[],behavior:rows,behavior_total:total.results?.[0]?.total||0,
-  note:'คะแนนรวมเฉพาะรายการในช่วงวันที่เลือก'});
+  late:late.results||[],behavior:rows.filter(x=>x.score_type!=='good'),
+  good:rows.filter(x=>x.score_type==='good'),
+  behavior_total:-scores.behavior_remaining,...scores,
+  note:'คะแนนความดีแยกจากคะแนนพฤติกรรม • ลดคะแนนพฤติกรรมได้เฉพาะเกณฑ์ปรับพฤติกรรม'});
 }
 export async function portalRoutes(req,env,path,ctx){
  if(req.method==='POST'&&path==='/api/portal/auth/login')return login(req,env);
