@@ -4,6 +4,7 @@ import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea} from 
 import {createGuardianPush} from './guardian-push.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
 import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
+import {homeScreenRole} from './pwa-role.js';
 // Standalone student / guardian portal. It never uses staff authentication.
 // Data stays memory-only, bearer token remains scoped to the current browser tab.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -11,7 +12,16 @@ const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'�
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
 export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallApp=()=>{},isInstalledPwa=()=>false}){
- const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:today(),to:today(),filterMode:'today',view:'home',focus:null,focusUnavailable:false};
+ // Existing student/guardian remembered sessions continue using the legacy key.
+ const roleKey=role=>role==='guardian'?'rd_portal_guardian_token':'rd_portal_student_token';
+ const startRole=homeScreenRole(location.search)||'student';
+ let activeTokenKey=roleKey(startRole);
+ let restoredToken=readAuthSession(activeTokenKey);
+ if(!restoredToken){
+  restoredToken=readAuthSession('rd_portal_token');
+  if(restoredToken)activeTokenKey='rd_portal_token';
+ }
+ const state={token:restoredToken,account:null,role:startRole,children:[],studentId:null,records:null,truancy:[],from:today(),to:today(),filterMode:'today',view:'home',focus:null,focusUnavailable:false};
  const pushParams=new URLSearchParams(location.search);
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
@@ -59,7 +69,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   const response=await fetch(API_BASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});
   const data=await response.json().catch(()=>({}));
   if(!response.ok){
-   if(response.status===401&&auth){state.token='';clearAuthSession('rd_portal_token');}
+   if(response.status===401&&auth){state.token='';clearAuthSession(activeTokenKey);}
    throw Error(data.error||'ไม่สามารถติดต่อระบบได้');
   }
   return data;
@@ -146,7 +156,8 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
       body:{username:String(f.get('username')).trim(),password:String(f.get('password')),role:state.role,
        remember:f.get('remember')==='on'}});
      state.token=r.token;state.account=r.account;
-     saveAuthSession('rd_portal_token',r.token,r.expires_in,f.get('remember')==='on'&&!r.account.must_change_password);
+     activeTokenKey=roleKey(state.role);
+      saveAuthSession(activeTokenKey,r.token,r.expires_in,f.get('remember')==='on'&&!r.account.must_change_password);
      setLastLoginArea('portal');
      if(state.account.must_change_password)showPasswordChange();
      else await showDashboard();
@@ -169,7 +180,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
    try{
     await call('/api/portal/auth/change-password',{method:'POST',body:{
       current_password:String(f.get('current_password')),new_password:String(f.get('new_password'))}});
-    state.token='';clearAuthSession('rd_portal_token');showLogin(state.role);
+    state.token='';clearAuthSession(activeTokenKey);showLogin(state.role);
     message('ตั้งรหัสผ่านส่วนตัวสำเร็จ กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่');
    }catch(error){message(error.message,true)}finally{if(button.isConnected)button.disabled=false}
   });
@@ -179,7 +190,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   if(state.account?.role==='guardian')try{await guardianPush.disable({silent:true})}catch{}
   try{if(state.token)await call('/api/portal/auth/logout',{method:'POST',body:{}})}catch{}
   state.token='';state.account=null;state.records=null;state.children=[];state.focus=null;state.view='home';noticeIntent=null;
-  clearAuthSession('rd_portal_token');showLogin();
+  clearAuthSession(activeTokenKey);showLogin();
  }
  async function showDashboard(){
   try{
@@ -511,11 +522,11 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      return true;
     }
    if(noticeIntent&&state.account.role!=='guardian'){
-    state.token='';clearAuthSession('rd_portal_token');showLogin('guardian');
+    state.token='';clearAuthSession(activeTokenKey);showLogin('guardian');
     message('กรุณาเข้าสู่ระบบบัญชีผู้ปกครองเพื่อดูรายละเอียดการแจ้งเตือน');return true;
    }
    if(lateQrToken&&state.account.role!=='student'){
-    state.token='';clearAuthSession('rd_portal_token');showLogin('student');
+    state.token='';clearAuthSession(activeTokenKey);showLogin('student');
     message('สแกน QR ลงชื่อมาสายต้องเข้าสู่ระบบด้วยบัญชีนักเรียน');return true;
    }
    if(state.account.must_change_password)showPasswordChange();else await showDashboard();
