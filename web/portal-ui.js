@@ -170,18 +170,18 @@ export function createPortalUi({root,onStaffLogin}){
     </section>`:''}
    ${state.account.role==='student'&&lateQrToken?`<section class="card stack late-qr-student-confirm">
     <h3>⏰ ลงชื่อมาสายจาก QR ครูเวร</h3>
-    <p class="muted">กรุณาตรวจสอบว่าอยู่ที่จุดครูเวรในโรงเรียน และยืนยันด้วยบัญชีนักเรียนของตนเอง • ระบบบันทึกเวลาจากเซิร์ฟเวอร์</p>
+    <p class="muted">เข้าสู่ระบบด้วยบัญชีนักเรียนของตนเอง ระบบบันทึกเวลาจากเซิร์ฟเวอร์และยืนยันสถานะมาสายอัตโนมัติเมื่อกดลงชื่อ</p>
     <form id="studentLateQrForm" class="stack">
      <div class="field"><label for="lateQrReason">สาเหตุที่มาสาย (ไม่บังคับ)</label>
       <textarea id="lateQrReason" maxlength="300" name="reason" placeholder="ระบุสาเหตุ หากต้องการ"></textarea></div>
      <button type="submit" class="button full">✅ ยืนยันลงชื่อมาสาย</button>
     </form>
     <button type="button" id="cancelStudentLateQr" class="button secondary full">ยกเลิกการลงชื่อมาสาย</button>
-    <p class="muted">QR ถาวรใช้ซ้ำได้ทุกวัน แต่ลงชื่อได้เฉพาะหลัง 08.00 น. และต้องรอครูเวรตรวจสอบ</p>
+    <p class="muted">QR ถาวรใช้ได้ทุกวัน หลัง 08.00 น. ข้อมูลจะถูกบันทึกทันที และครูเวรสามารถลบรายการที่ผิดพลาดโดยมีประวัติการแก้ไข</p>
    </section>`:''}
    ${state.account.role==='student'&&lateQrReceipt?`<section class="card stack"><h3>✅ ลงชื่อมาสายสำเร็จ</h3>
     <p>${esc(lateQrReceipt.date)} เวลา ${esc(lateQrReceipt.arrivedAt)} น.</p>
-    <p class="warn">ส่งรายการให้ครูเวรแล้ว รอครูเวรตรวจสอบและยืนยัน</p></section>`:''}
+    <p class="ok">${lateQrReceipt.state==='verified'?'ระบบยืนยันมาสายอัตโนมัติแล้ว และบันทึกเช็กชื่อรายวันเป็น สาย':'ส่งรายการให้ครูเวรตรวจสอบแล้ว'}</p></section>`:''}
    ${state.children.length?`<div class="grid two">
      <div class="field"><label>นักเรียน${state.account.role==='guardian'?'ในความดูแล':''}</label>
       <select id="portalStudent">${state.children.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${esc(s.full_name)} • ${esc(s.classroom_label)}</option>`).join('')}</select></div>
@@ -222,7 +222,7 @@ export function createPortalUi({root,onStaffLogin}){
     lateQrReceipt=data;
     endLateQrIntent();
     await showDashboard();
-    message('ลงชื่อมาสายสำเร็จแล้ว รอครูเวรยืนยัน');
+    message(data.state==='verified'?'ลงชื่อมาสายสำเร็จ ยืนยันอัตโนมัติแล้ว':'ลงชื่อสำเร็จ รอตรวจสอบ');
    }catch(error){message(error.message,true);if(button.isConnected)button.disabled=false}
   });
   select('#cancelStudentLateQr')?.addEventListener('click',()=>{
