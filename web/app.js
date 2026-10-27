@@ -14,10 +14,12 @@ import {createNotificationSettings} from './notification-settings.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLastLoginArea} from './auth-session.js';
 import {createPortalUi} from './portal-ui.js';
 import {loginHref,resolveLoginEntrance} from './login-route.js';
+import {configureRolePwa,isInstalledPwa} from './pwa-role.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {createStudentAffairs} from './student-affairs.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
 import {initTheme,bindThemeButtons} from './theme.js';
+configureRolePwa(location.search);
 initTheme();
 // Always show the emblem; retain the bundled small crest for offline/error fallback.
 document.addEventListener('error',event=>{
@@ -65,7 +67,8 @@ const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'
 const periodNames={...names,truancy:'หนีเรียน'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
 let toastTimer;
-const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>showEntrySelection(),onLegacyLateReport:()=>renderStudentLate()});
+const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>showEntrySelection(),onLegacyLateReport:()=>renderStudentLate(),
+ onInstallApp:()=>pwaTools.install(),isInstalledPwa});
 function dateToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function timeNow(){return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}
 function toast(message,bad=false){const el=$('#toast');el.textContent=message;el.className='toast show'+(bad?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.className='toast',4200);}
@@ -109,7 +112,7 @@ function entrySelectionPage(){
    </a>
   </nav>
   <div class="login-choice-foot">
-   <button type="button" class="button secondary" id="entryInstallApp">⬇️ ติดตั้ง RD CONNECT ลงมือถือ</button>
+   <p class="rd-role-install-hint">📲 ต้องการติดตั้งแอปแยก? เลือกครู นักเรียน หรือผู้ปกครองก่อน แล้วกดติดตั้งจากหน้าของบทบาทนั้น</p>
    <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
    <p>พัฒนาโดย ครูยุทธนา บุญจันทร์</p>
   </div>
@@ -119,7 +122,7 @@ function showEntrySelection(){
  history.replaceState(null,'',location.pathname+location.hash);
  $('#app').innerHTML=entrySelectionPage();
  bindThemeButtons();
- $('#entryInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install()));
+ configureRolePwa('');
 }
 function loginPage(){
  return `<div class="login-wrap"><section class="card login-card" aria-label="เข้าสู่ระบบครูและบุคลากรโรงเรียนรัษฎา">
@@ -139,8 +142,8 @@ function loginPage(){
     <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong><small>สูงสุด 30 วัน • ไม่แนะนำสำหรับคอมพิวเตอร์สาธารณะ</small></span></label>
    <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
   </form>
-  <div class="login-links"><a href="./" class="button secondary full" id="staffBackToChoice">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</a></div>
-  <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้ง RD CONNECT ลงมือถือ</button>
+  ${!isInstalledPwa()?'<div class="login-links"><a href="./" class="button secondary full" id="staffBackToChoice">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</a></div>':''}
+  <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้งแอป RD CONNECT ครู</button>
    <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
   <div class="theme-switch-login"><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button></div>
   <p class="login-message">Push หนีเรียนและมาสายส่งเฉพาะบัญชีที่สมัครรับและได้รับสิทธิ์เท่านั้น</p>
