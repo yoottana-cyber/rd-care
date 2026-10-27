@@ -10,7 +10,11 @@ const thaiStatus={present:'มา',absent:'ขาด',late:'สาย',leave:'�
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const minusDays=(value,days)=>new Date(Date.parse(value+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
 export function createPortalUi({root,onStaffLogin}){
- const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today()};
+ const state={token:readAuthSession('rd_portal_token'),account:null,role:'student',children:[],studentId:null,records:null,truancy:[],from:minusDays(today(),29),to:today(),focus:null,focusUnavailable:false};
+ const pushParams=new URLSearchParams(location.search);
+ let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
+  /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
+  {kind:pushParams.get('portal_notice'),id:Number(pushParams.get('notice_id'))}:null;
  let requestVersion=0;
  let lateQrToken=readLateGateIntent(location.search),lateQrReceipt=null;
  function acceptLateQr(value){
@@ -122,18 +126,31 @@ export function createPortalUi({root,onStaffLogin}){
   requestVersion++;
   if(state.account?.role==='guardian')try{await guardianPush.disable({silent:true})}catch{}
   try{if(state.token)await call('/api/portal/auth/logout',{method:'POST',body:{}})}catch{}
-  state.token='';state.account=null;state.records=null;state.children=[];
+  state.token='';state.account=null;state.records=null;state.children=[];state.focus=null;noticeIntent=null;
   clearAuthSession('rd_portal_token');showLogin();
  }
  async function showDashboard(){
   try{
    const session=state.token;
-   const [data,notices]=await Promise.all([
+   const [data,notices,focused]=await Promise.all([
     call('/api/portal/children'),
-    state.account?.role==='guardian'?call('/api/portal/truancy'):Promise.resolve({items:[]})
+    state.account?.role==='guardian'?call('/api/portal/truancy'):Promise.resolve({items:[]}),
+    noticeIntent&&state.account?.role==='guardian'?
+     call('/api/portal/push/target?kind='+noticeIntent.kind+'&id='+noticeIntent.id)
+      .then(item=>({item})).catch(()=>({missing:true})):Promise.resolve(null)
    ]);
    if(session!==state.token||!state.account)return;
    state.children=data.items;state.truancy=notices.items||[];
+   if(focused){
+    state.focus=focused.item||null;
+    state.focusUnavailable=!!focused.missing;
+    if(state.focus){
+     state.studentId=Number(state.focus.student_id);
+     state.from=state.focus.school_date;state.to=state.focus.school_date;
+    }
+    noticeIntent=null;
+    history.replaceState(null,'',location.pathname+location.hash);
+   }
    if(!state.children.some(s=>s.id===state.studentId))state.studentId=state.children[0]?.id||null;
    if(state.studentId)await loadRecords();else renderDashboard();
   }catch(error){if(!state.token){showLogin(state.role);return}frame('<p class="warn">ไม่สามารถโหลดข้อมูลที่ได้รับสิทธิ์</p><button class="button secondary full" id="portalRetry">ลองอีกครั้ง</button>');message(error.message,true);select('#portalRetry').addEventListener('click',showDashboard)}
@@ -161,6 +178,17 @@ export function createPortalUi({root,onStaffLogin}){
   frame(`<div class="row between"><div><h2>${esc(state.account.display_name)}</h2>
    <p class="muted">${state.account.role==='guardian'?'ผู้ปกครอง':'นักเรียน'} • ดูข้อมูลเฉพาะที่ได้รับสิทธิ์</p></div>
    <button type="button" id="portalLogout" class="button secondary">ออกจากระบบ</button></div>
+   ${state.account.role==='guardian'&&state.focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
+    <h3>🔔 รายละเอียดเรื่องที่แจ้งเตือน: ${state.focus.kind==='late'?'มาสาย':'หนีเรียน'}</h3>
+    <strong>${esc(state.focus.full_name)}</strong>
+    <p>ห้อง ${esc(state.focus.classroom_label)} • วันที่ ${esc(state.focus.school_date)}
+     ${state.focus.kind==='late'?'• เวลา '+esc(state.focus.arrived_at)+' น.':
+      '• คาบ '+esc(state.focus.period)+' • วิชา '+esc(state.focus.subject)}</p>
+    ${state.focus.kind==='late'&&state.focus.reason?`<p>สาเหตุที่แจ้ง: ${esc(state.focus.reason)}</p>`:''}
+    <p class="muted">ข้อมูลส่วนตัวนี้แสดงหลังเข้าสู่ระบบบัญชีที่ได้รับสิทธิ์เท่านั้น</p>
+   </section>`:''}
+   ${state.account.role==='guardian'&&state.focusUnavailable?
+     `<p class="warn">ไม่พบรายการแจ้งเตือนนี้ อาจถูกแก้ไข ยกเลิก หรือบัญชีไม่มีสิทธิ์ดู</p>`:''}
    ${state.account.role==='guardian'&&state.truancy.some(e=>e.school_date===today())?`
     <section class="rd-priority-card" aria-label="เหตุการณ์สำคัญวันนี้">
      <div class="rd-priority-heading"><span aria-hidden="true">🚨</span><div>
@@ -230,6 +258,7 @@ export function createPortalUi({root,onStaffLogin}){
    renderDashboard();
   });
   if(state.account.role==='guardian')guardianPush.bind();
+  if(state.focus)select('#pushNoticeFocus')?.scrollIntoView({block:'start'});
   select('#portalStudent')?.addEventListener('change',e=>{state.studentId=Number(e.target.value);loadRecords()});
   select('#portalSearch')?.addEventListener('click',()=>{
    state.from=select('#portalFrom').value;state.to=select('#portalTo').value;
@@ -245,6 +274,10 @@ export function createPortalUi({root,onStaffLogin}){
   if(!state.token)return false;
   try{
    const me=await call('/api/portal/auth/me');state.account=me.account;state.role=me.account.role;
+   if(noticeIntent&&state.account.role!=='guardian'){
+    state.token='';clearAuthSession('rd_portal_token');showLogin('guardian');
+    message('กรุณาเข้าสู่ระบบบัญชีผู้ปกครองเพื่อดูรายละเอียดการแจ้งเตือน');return true;
+   }
    if(lateQrToken&&state.account.role!=='student'){
     state.token='';clearAuthSession('rd_portal_token');showLogin('student');
     message('สแกน QR ลงชื่อมาสายต้องเข้าสู่ระบบด้วยบัญชีนักเรียน');return true;
