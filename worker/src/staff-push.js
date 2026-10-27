@@ -1,6 +1,5 @@
-// Standards-based payload-free Web Push to opted-in STAFF devices.
-// Sending no encrypted payload means notifications deliberately reveal no student names,
-// classes, absence status or other personal data on a locked phone.
+// Encrypted Web Push: event topics, dates and lesson/arrival times only.
+// Names, student IDs and reasons are never sent to the device lock screen.
 const err=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const enc=new TextEncoder();
@@ -134,13 +133,28 @@ export async function staffPushRoutes(req,env,user,path){
  throw err(404,'ไม่พบ API แจ้งเตือน');
 }
 import {encryptPriorityPush} from './web-push-crypto.js';
+// Explicit whitelist blocks student identity and reason from entering Web Push.
+export function safePushEventInfo(info,kind){
+ const eventId=Number(info?.eventId);
+ if(!Number.isSafeInteger(eventId)||eventId<1)return {};
+ const data={eventId};
+ if(/^\d{4}-\d{2}-\d{2}$/.test(String(info?.date||'')))data.date=info.date;
+ if(kind==='truancy'){
+  const period=Number(info?.period);
+  if(Number.isInteger(period)&&period>0&&period<=12)data.period=period;
+  if(typeof info?.subject==='string')data.subject=info.subject.replace(/[\u0000-\u001f\u007f]/g,'').slice(0,55);
+ }else if(kind==='late'&&/^\d{2}:\d{2}$/.test(String(info?.arrival||''))){
+  data.arrival=info.arrival;
+ }
+ return data;
+}
 
 // Distinct encrypted category for an urgent review; no student/room/incident
 // details are transmitted in notification payload or device lock screen.
-export async function sendPriorityPush(device,env,audience){
+export async function sendPriorityPush(device,env,audience,eventInfo={}){
  if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
  if(audience!=='advisor'&&audience!=='guardian')throw Error('Invalid push audience');
- const body=await encryptPriorityPush(device,{kind:'urgent_review',audience});
+ const body=await encryptPriorityPush(device,{kind:'urgent_review',audience,...safePushEventInfo(eventInfo,'truancy')});
  const authorized=await makeVapidAuthorization(device.endpoint,env);
  return fetch(device.endpoint,{method:'POST',headers:{
   Authorization:authorized,TTL:'3600',Urgency:'high',
@@ -149,10 +163,10 @@ export async function sendPriorityPush(device,env,audience){
 }
 // Category-only encrypted push for late arrivals. No child names, classroom,
 // or attendance identifiers are ever included in the notification payload.
-export async function sendLateArrivalPush(device,env,audience){
+export async function sendLateArrivalPush(device,env,audience,eventInfo={}){
  if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
  if(audience!=='advisor'&&audience!=='guardian')throw Error('Invalid push audience');
- const body=await encryptPriorityPush(device,{kind:'late_arrival',audience});
+ const body=await encryptPriorityPush(device,{kind:'late_arrival',audience,...safePushEventInfo(eventInfo,'late')});
  const authorized=await makeVapidAuthorization(device.endpoint,env);
  return fetch(device.endpoint,{method:'POST',headers:{
   Authorization:authorized,TTL:'3600',Urgency:'normal',
