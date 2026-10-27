@@ -83,6 +83,6 @@ jobs:
           node --input-type=module -e "
             const r=await fetch('https://rd-care-api-dev.yoottana.workers.dev/api/health');
             const body=await r.json();
-            if(!r.ok || body.ok!==true || body.service!=='RD CONNECT API')process.exit(1);
+            if(!r.ok || body.ok!==true || body.service!=='RD Care API' || body.brand!=='RD CONNECT')process.exit(1);
             process.stdout.write('RD CONNECT Dev API health OK\\n');
           "

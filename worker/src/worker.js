@@ -843,7 +843,8 @@ async function adminRoutes(req,env,user,path){
 }
 async function route(req,env,ctx){
  const url=new URL(req.url),path=url.pathname;
- if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD CONNECT API',time:bangkokToday()});
+ // Keep the historical service identifier for existing uptime monitors. Expose the new public brand separately.
+  if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',brand:'RD CONNECT',display_name:'RD CONNECT API',time:bangkokToday()});
  if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
  if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
  if(path.startsWith('/api/portal/'))return portalRoutes(req,env,path,ctx);

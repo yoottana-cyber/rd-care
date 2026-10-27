@@ -73,6 +73,6 @@ test('Push shows the RD CONNECT brand while keeping event-specific destinations 
  assert.match(sw,/portal_notice/);
  assert.match(sw,/rd-care-priority-review/); // Existing tags are internal stable keys
  assert.match(sw,/rd-care-late-arrival/);
- assert.match(worker,/RD CONNECT API/);
+ assert.match(worker,/service:'RD Care API',brand:'RD CONNECT',display_name:'RD CONNECT API'/);
  assert.doesNotMatch(sw,/RD Care|RD CARE/);
 });
