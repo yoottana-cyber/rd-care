@@ -7,6 +7,7 @@ const CHUNK_SIZE=5;
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const clean=(v,max)=>typeof v==='string'?v.trim().slice(0,max+1):'';
 const validName=v=>!!v&&v.length<=100&&!/[\u0000-\u001f\u007f]/.test(v);
+const validStudentName=v=>!!v&&v.length<=120&&!/[\u0000-\u001f\u007f]/.test(v);
 const passwordOk=v=>typeof v==='string'&&v.length>=4&&v.length<=128&&
  !/^\d{13}$/.test(v)&&!/[\u0000-\u001f\u007f]/.test(v);
 const salt=()=>[...crypto.getRandomValues(new Uint8Array(16))].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -39,7 +40,7 @@ export async function importPortalAccounts(req,env,actor){
    .bind(studentNo).first();
   if(!student?.active)fail(404,'ไม่พบเลขประจำตัวนักเรียน '+studentNo+' ในทะเบียน โปรดนำเข้าทะเบียนนักเรียนก่อน');
   const fullName=clean(row.full_name,120);
-  if(fullName&&!validName(fullName))fail(400,'แถว '+(i+1)+': ชื่อนักเรียนไม่ถูกต้อง');
+  if(fullName&&!validStudentName(fullName))fail(400,'แถว '+(i+1)+': ชื่อนักเรียนไม่ถูกต้อง');
   const old=await env.DB.prepare("SELECT id,username FROM portal_accounts WHERE student_id=? AND role='student'")
    .bind(student.id).first();
   const username=clean(row.student_username,40).toLowerCase()||old?.username||studentNo.toLowerCase();
@@ -96,6 +97,8 @@ export async function importPortalAccounts(req,env,actor){
       p.username,displayName,newHash.salt,newHash.hash,p.old.id):
     statement(env.DB,`UPDATE portal_accounts SET username=?,display_name=?,active=1,
       must_change_password=0 WHERE id=?`,p.username,displayName,p.old.id));
+   if(newHash)statements.push(statement(env.DB,
+    'DELETE FROM portal_sessions WHERE account_id=?',p.old.id));
   }else{
    const stSalt=salt(),hash=await passwordHash(p.stPass,stSalt);
    statements.push(statement(env.DB,`INSERT INTO portal_accounts
@@ -110,6 +113,7 @@ export async function importPortalAccounts(req,env,actor){
      statements.push(statement(env.DB,`UPDATE portal_accounts SET display_name=?,
       password_salt=?,password_hash=?,active=1,must_change_password=0 WHERE id=?`,
       p.guardianName||p.guardian.display_name,gSalt,hash,p.guardian.id));
+     statements.push(statement(env.DB,'DELETE FROM portal_sessions WHERE account_id=?',p.guardian.id));
     }else statements.push(statement(env.DB,`UPDATE portal_accounts SET display_name=?,
       active=1,must_change_password=0 WHERE id=?`,p.guardianName||p.guardian.display_name,p.guardian.id));
    }else{
