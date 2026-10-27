@@ -18,9 +18,11 @@ test('teacher cannot manage reminders, heads, rules or disciplinary cases',async
 });
 test('daily attendance reminder schedule defaults disabled and does not deliver on cold start',async()=>{
  let reads=0;
- const env={DB:{prepare(sql){reads++;assert.match(sql,/affairs_settings/);
-  return{first:async()=>({auto_enabled:0,reminder_time:'08:30',weekdays:'1,2,3,4,5'})};
- }} }};
+ const db={prepare(sql){
+  reads++;assert.match(sql,/affairs_settings/);
+  return {first:async()=>({auto_enabled:0,reminder_time:'08:30',weekdays:'1,2,3,4,5'})};
+ }};
+ const env={DB:db};
  const result=await sendScheduledAttendanceReminders(env);
  assert.equal(result.state,'disabled_or_non_school_day');
  assert.equal(reads,1);
@@ -40,14 +42,18 @@ test('staff rules reject unsupported categories and inconsistent positive/negati
 });
 test('signed rule values are applied server-side rather than client submitted points',async()=>{
  const calls=[],actor={id:11,role:'teacher'},path='/api/affairs/behavior/record';
- const env={DB:{prepare(sql){
+ const db={prepare(sql){
   const statement={sql,args:[]};calls.push(statement);
-  return{bind(...args){statement.args=args;return{
-   first:async()=>sql.includes('FROM students s')?{id:47}:sql.includes('FROM affairs_behavior_rules')?
-    {id:9,name:'มาตรฐานโรงเรียน',category:'minor',points:-4,active:1}:null,
-   run:async()=>({meta:{last_row_id:78,changes:1}})
-  }}};
- }} }};
+  return {bind(...args){
+   statement.args=args;
+   return {
+    first:async()=>sql.includes('FROM students s')?{id:47}:sql.includes('FROM affairs_behavior_rules')?
+     {id:9,name:'มาตรฐานโรงเรียน',category:'minor',points:-4,active:1}:null,
+    run:async()=>({meta:{last_row_id:78,changes:1}})
+   };
+  }};
+ }};
+ const env={DB:db};
  const res=await studentAffairsRoutes(req(path,'POST',{student_id:47,rule_id:9,
   points:10000,category:'good',reason:'บันทึกตามระเบียบ'}),env,actor,path);
  assert.equal(res.status,201);
