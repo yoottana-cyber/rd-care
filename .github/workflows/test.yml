@@ -39,6 +39,7 @@ jobs:
           node --check web/my-timetable.js
           node --check web/period-center.js
           node --check web/mobile-nav.js
+          node --check web/navigation-ui.js
           node --check web/notification-settings.js
           node --check web/pwa-client.js
           node --check web/auth-session.js
