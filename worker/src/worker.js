@@ -49,8 +49,12 @@ async function currentUser(req,env){
  const auth=req.headers.get('authorization')||'';
  if(!/^Bearer [0-9a-f]{64}$/.test(auth))throw error(401,'กรุณาเข้าสู่ระบบ');
  const tokenHash=await digest(auth.slice(7));
- const u=await env.DB.prepare(`SELECT u.id,u.username,u.display_name,u.role,u.active FROM sessions s
- JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?`).bind(tokenHash,now()).first();
+ const u=await env.DB.prepare(`SELECT u.id,u.username,u.display_name,u.role,u.active,
+ CASE WHEN u.role='staff' OR (u.role='teacher' AND EXISTS
+  (SELECT 1 FROM student_affairs_assignments a WHERE a.user_id=u.id))
+ THEN 1 ELSE 0 END AS student_affairs
+ FROM sessions s JOIN users u ON u.id=s.user_id
+ WHERE s.token_hash=? AND s.expires_at>?`).bind(tokenHash,now()).first();
  if(!u?.active)throw error(401,'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
  return u;
 }
@@ -594,7 +598,11 @@ async function adminRoutes(req,env,user,path){
  if(path==='/api/admin/unified-import/preview'||path==='/api/admin/unified-import/commit')
   return unifiedRosterEndpoint(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/users'){
-  const {results}=await env.DB.prepare("SELECT id,username,display_name,role,active FROM users ORDER BY display_name").all();
+  const {results}=await env.DB.prepare(`SELECT u.id,u.username,u.display_name,u.role,u.active,
+  CASE WHEN u.role='staff' OR (u.role='teacher' AND EXISTS
+   (SELECT 1 FROM student_affairs_assignments a WHERE a.user_id=u.id))
+  THEN 1 ELSE 0 END AS student_affairs
+  FROM users u ORDER BY u.display_name`).all();
   return json({items:results});
  }
  if(req.method==='POST'&&path==='/api/admin/users'){
@@ -832,12 +840,31 @@ async function adminRoutes(req,env,user,path){
   if(!['teacher','staff'].includes(old.role))throw error(403,'ไม่อนุญาตให้แก้ไขบัญชีผู้ดูแลระบบผ่านหน้านี้');
   let update;
   try{update=validatePersonnelInput(b)}catch(e){throw error(400,e.message)}
-  await env.DB.batch([
-   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?').bind(update.display_name,update.active,id),
-   env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
-    .bind(user.id,'personnel_updated','users',String(id))
-  ]);
-  if(!update.active)await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  // Only an administrator may grant or revoke Student Affairs permission.
+  // Teacher accounts keep their teaching and advisor rights. Existing staff-role
+  // accounts are explicitly Student Affairs by role and do not require a grant.
+  if(b.student_affairs!==undefined&&typeof b.student_affairs!=='boolean')
+   throw error(400,'การมอบหมายสิทธิ์ฝ่ายกิจการนักเรียนต้องเป็น true หรือ false');
+  const statements=[
+   env.DB.prepare('UPDATE users SET display_name=?,active=? WHERE id=?')
+    .bind(update.display_name,update.active,id)
+  ];
+  if(old.role==='teacher'&&b.student_affairs!==undefined){
+   statements.push(b.student_affairs
+    ?env.DB.prepare(`INSERT INTO student_affairs_assignments(user_id,assigned_by)
+      VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET assigned_by=excluded.assigned_by,
+      assigned_at=CURRENT_TIMESTAMP`).bind(id,user.id)
+    :env.DB.prepare('DELETE FROM student_affairs_assignments WHERE user_id=?').bind(id));
+   statements.push(env.DB.prepare(
+    'INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+    .bind(user.id,b.student_affairs?'student_affairs_assigned':'student_affairs_revoked',
+     'users',String(id)));
+  }
+  statements.push(env.DB.prepare(
+   'INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
+   .bind(user.id,'personnel_updated','users',String(id)));
+  if(!update.active)statements.push(env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id));
+  await env.DB.batch(statements);
   return json({ok:true,id});
  }
  throw error(404,'ไม่พบ API');
