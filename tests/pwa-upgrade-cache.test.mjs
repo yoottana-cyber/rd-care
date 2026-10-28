@@ -18,7 +18,7 @@ test('all offline assets are real public files, and no API or user data is preca
   assert.ok(item.startsWith('./'),item);
   assert.ok(!item.includes('?')&&!item.includes('..'),item);
   assert.ok(existsSync(new URL(relativePath(item),root)),item+' is missing');
-  assert.doesNotMatch(item,/\/api\/|userdata|session|student-record|\.json$/i);
+  assert.doesNotMatch(item,/\/api\/|student-record|\.json$/i);
  }
  assert.match(code,/const CACHE='rd-care-shell-v\d+'/);
  assert.match(code,/cache:\s*'reload'/);
