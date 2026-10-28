@@ -94,6 +94,8 @@ jobs:
           assert c.execute('SELECT count(*) FROM students').fetchone()[0] == 15
           print('D1/SQLite structure and dummy data verified')
           PY
+      - name: Direct D1 roster import CLI safety and 1750-row CSV validation
+        run: python3 -m unittest discover -s tests -p 'direct_d1_roster_import_test.py' -v
       - name: Large student import casefold lookup index and FK safety
         run: python3 -m unittest discover -s tests -p 'large_roster_lookup_migration_test.py' -v
       - name: School period length migration and attendance history invariants
