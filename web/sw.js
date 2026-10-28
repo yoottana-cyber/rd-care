@@ -1,22 +1,86 @@
-const CACHE='rd-care-shell-v76';
-const ASSETS=['./','./index.html','./app.css','./theme.css','./login.css','./login-route.js','./pwa-role.js','./smart-school-ui.css','./rd-design-system.css','./media/ratsada-crest.webp','./reference-ui.css','./charts.css','./dashboard-charts.js','./theme.js','./app.js','./navigation-ui.js','./my-timetable.js','./period-center.js','./period-center.css','./mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js','./pwa-client.js','./auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js','./run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js','./portal-date-range.js','./portal-mobile.css','./student-affairs.js','./student-affairs.css','./guardian-push.js','./portal-admin.js','./portal-table.js','./portal-batch.js','./portal-roster-import.js','./unified-import.js','./advisor-import.js','./admin-settings.js','./admin-settings.css','./csv-encoding.js','./template-xlsx.js','./templates/portal-accounts-import.csv','./templates/student-all-rooms-import.csv','./templates/advisor-all-rooms-import.csv','./manifest.webmanifest','./manifest-staff.webmanifest','./manifest-student.webmanifest','./manifest-guardian.webmanifest','./icons/staff-192.png','./icons/staff-512.png','./icons/student-192.png','./icons/student-512.png','./icons/guardian-192.png','./icons/guardian-512.png','./icons/icon-192.png','./icons/icon-512.png','./icons/rd-connect.svg'];
-self.addEventListener('install',e=>{
- e.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
+// RD CONNECT offline app shell. This cache contains only public static assets,
+// never authenticated responses, student records, or arbitrary same-origin URLs.
+const CACHE='rd-care-shell-v77';
+const CACHE_PREFIX='rd-care-shell-';
+const ASSETS=[
+ './','./index.html','./app.css','./theme.css','./login.css','./login-route.js',
+ './pwa-role.js','./pwa-updates.js','./pwa-client.js','./smart-school-ui.css',
+ './rd-design-system.css','./media/ratsada-crest.webp','./reference-ui.css',
+ './charts.css','./dashboard-charts.js','./theme.js','./app.js',
+ './navigation-ui.js','./my-timetable.js','./period-center.js','./period-center.css',
+ './mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js',
+ './auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js',
+ './run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js',
+ './portal-date-range.js','./portal-mobile.css','./student-affairs.js',
+ './student-affairs.css','./guardian-push.js','./portal-admin.js',
+ './portal-table.js','./portal-batch.js','./portal-roster-import.js',
+ './unified-import.js','./advisor-import.js','./admin-settings.js',
+ './admin-settings.css','./csv-encoding.js','./template-xlsx.js',
+ './score-recording.js','./score-recording.css','./score-history.js',
+ './score-history-popup.js','./behavior-adjustment.js',
+ './teacher-score-monitor.js','./teacher-score-monitor.css',
+ './templates/portal-accounts-import.csv','./templates/student-all-rooms-import.csv',
+ './templates/advisor-all-rooms-import.csv',
+ './manifest.webmanifest','./manifest-staff.webmanifest',
+ './manifest-student.webmanifest','./manifest-guardian.webmanifest',
+ './icons/staff-192.png','./icons/staff-512.png','./icons/student-192.png',
+ './icons/student-512.png','./icons/guardian-192.png','./icons/guardian-512.png',
+ './icons/icon-192.png','./icons/icon-512.png','./icons/rd-connect.svg'
+];
+const SHELL=new URL('./index.html',self.registration.scope).href;
+const SCOPE=new URL('./',self.registration.scope);
+const STATIC_PATHS=new Set(ASSETS.map(path=>new URL(path,SCOPE).pathname));
+function isApiPath(pathname){
+ return /(^|\/)api(?:\/|$)/.test(pathname);
+}
+function isAppNavigation(url){
+ return url.pathname===SCOPE.pathname||url.pathname===new URL(SHELL).pathname;
+}
+// A new worker preloads one consistent set of scripts before taking control.
+// Requests bypass the browser HTTP cache so a release cannot precache old files.
+self.addEventListener('install',event=>{
+ event.waitUntil(caches.open(CACHE)
+  .then(cache=>cache.addAll(ASSETS.map(path=>new Request(new URL(path,SCOPE),{cache:'reload'}))))
+  .then(()=>self.skipWaiting()));
 });
-self.addEventListener('activate',e=>{
- e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+self.addEventListener('activate',event=>{
+ event.waitUntil((async()=>{
+  const names=await caches.keys();
+  await Promise.all(names.filter(name=>name.startsWith(CACHE_PREFIX)&&name!==CACHE)
+   .map(name=>caches.delete(name)));
+  await self.clients.claim();
+ })());
 });
-self.addEventListener('fetch',e=>{
- const url=new URL(e.request.url);
- if(e.request.method!=='GET'||url.origin!==self.location.origin)return;
- // API responses contain private school data: always bypass the PWA cache.
- if(url.pathname.startsWith('/api/'))return;
- if(url.pathname.endsWith('/config.js')){e.respondWith(fetch(e.request,{cache:'no-store'}).catch(()=>caches.match(e.request)));return;}
- if(e.request.mode==='navigate'){
-  e.respondWith(fetch(e.request).catch(()=>caches.match('./index.html')));return;
+async function networkFirst(request,key){
+ const cache=await caches.open(CACHE);
+ try{
+  const response=await fetch(request,{cache:'no-store'});
+  // Never cache redirects, failures, opaque responses or server-rendered errors.
+  if(response.ok&&response.type==='basic'&&!response.redirected){
+   try{await cache.put(key,response.clone())}catch{}
+  }
+  return response;
+ }catch{
+  return (await cache.match(key))||Response.error();
  }
- e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request)));
+}
+self.addEventListener('fetch',event=>{
+ const request=event.request;
+ if(request.method!=='GET')return;
+ const url=new URL(request.url);
+ if(url.origin!==SCOPE.origin||isApiPath(url.pathname))return;
+ // Navigation is always network-first, including role-specific login URLs.
+ // Only the static app shell may be used as an offline navigation fallback.
+ if(request.mode==='navigate'){
+  if(isAppNavigation(url))event.respondWith(networkFirst(request,SHELL));
+  return;
+ }
+ if(!STATIC_PATHS.has(url.pathname))return;
+ // Only known public build assets can enter the Cache Storage allowlist.
+ const cacheKey=url.origin+url.pathname;
+ event.respondWith(networkFirst(request,cacheKey));
 });
+
 // Push includes only a school event category, date/time, optional lesson and an
 // opaque event ID. Student details are fetched after authenticated click-through.
 self.addEventListener('push',event=>{
