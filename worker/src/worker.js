@@ -18,6 +18,7 @@ import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
 import {adminDeleteIdentity} from './admin-delete.js';
+import {adminTimetableAudit} from './timetable-audit.js';
 import {schoolTermRoutes} from './school-terms.js';
 import {schoolSettingsRoutes} from './school-settings.js';
 
@@ -645,6 +646,7 @@ async function dashboard(req,env,user){
 }
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
+ if(path==='/api/admin/timetable/audit')return adminTimetableAudit(req,env,user);
  if(path==='/api/admin/school-settings')return schoolSettingsRoutes(req,env,user,path);
  if(path==='/api/admin/term-snapshots')return schoolTermRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
