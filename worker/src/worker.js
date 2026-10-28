@@ -7,7 +7,7 @@ import {portalRoutes,portalAdminRoutes} from './portal.js';
 import {searchStudents} from './student-search.js';
 import {advisorImportEndpoint} from './advisor-import.js';
 import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
-import {unifiedRosterEndpoint} from './unified-roster.js';
+import {unifiedRosterEndpoint,unifiedRosterReadiness} from './unified-roster.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
@@ -659,6 +659,7 @@ async function adminRoutes(req,env,user,path){
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
  if(req.method==='POST'&&/^\/api\/admin\/(users|students)\/\d+\/delete$/.test(path))
   return adminDeleteIdentity(req,env,user,path);
+ if(req.method==='GET'&&path==='/api/admin/unified-import/health')return unifiedRosterReadiness(env,user);
  if(path==='/api/admin/unified-import/preview'||path==='/api/admin/unified-import/commit')
   return unifiedRosterEndpoint(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/users'){
