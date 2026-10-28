@@ -9,6 +9,7 @@ import {advisorImportEndpoint} from './advisor-import.js';
 import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint,unifiedRosterReadiness} from './unified-roster.js';
 import {studentStatisticsEndpoint} from './student-statistics.js';
+import {releaseUnusedArchivedStudent} from './archived-roll-release.js';
 import {studentFileJobRoutes,cleanupStudentFileJobs} from './student-file-jobs.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
@@ -658,6 +659,8 @@ async function adminRoutes(req,env,user,path){
  if(path==='/api/admin/term-snapshots')return schoolTermRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
  if(req.method==='GET'&&path==='/api/admin/student-statistics')return studentStatisticsEndpoint(env);
+ const archivedRelease=/^\/api\/admin\/archived-students\/(\d+)\/release-roll$/.exec(path);
+ if(archivedRelease)return releaseUnusedArchivedStudent(req,env,user,archivedRelease[1]);
  if(path==='/api/admin/advisors/preview'||path==='/api/admin/advisors/commit')return advisorImportEndpoint(req,env,user,path);
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
  if(req.method==='POST'&&/^\/api\/admin\/(users|students)\/\d+\/delete$/.test(path))

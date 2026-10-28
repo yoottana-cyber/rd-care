@@ -66,7 +66,9 @@ export function createUnifiedImport({api,rooms,onSuccess,onOpenConflict}){
   const label=student.archived?'เก็บเป็นประวัติ':student.active?'ใช้งาน':'พักข้อมูล';
   return '<div class="rd-import-conflict-detail">ข้อมูลที่ครองเลขที่นี้: <strong>'+esc(student.full_name||'(ไม่ระบุชื่อ)')+
     '</strong> • รหัส '+esc(student.student_no)+' • '+label+
-    (!student.archived&&onOpenConflict?
+    (student.archived?
+      ' <button type="button" class="button secondary" data-release-archived="'+Number(student.id)+'">ตรวจสอบและปลดเลขที่</button>':
+     onOpenConflict?
       ' <button type="button" class="button secondary" data-conflict-student="'+Number(student.id)+
       '" data-conflict-room="'+Number(student.classroom_id)+'">ตรวจข้อมูลเดิมในทะเบียน</button>':'')+'</div>';
  };
@@ -95,6 +97,33 @@ export function createUnifiedImport({api,rooms,onSuccess,onOpenConflict}){
       <td>${esc(x.full_name)}</td><td>${esc(x.username)}</td>
       <td class="${['error','skipped','uncertain'].includes(x.status)?'import-error':['imported','updated'].includes(x.status)?'import-success':''}">
       ${esc(x.message||(x.status==='update'?'พบข้อมูลเดิม • เตรียมอัปเดต':'พร้อมเพิ่ม'))}${conflictHtml(x)}</td></tr>`).join('')}</tbody></table></div>`:'';
+  place.querySelectorAll('[data-release-archived]').forEach(button=>button.addEventListener('click',async()=>{
+   if(busy)return;
+   const studentId=Number(button.dataset.releaseArchived);
+   const identity='archived-student-'+studentId;
+   const entered=window.prompt(
+    'ตรวจสอบก่อนปลดเลขที่ของ '+identity+'\\nระบบจะปฏิเสธหากมีประวัติการมาเรียน คะแนน การย้ายห้อง หรือข้อมูลเชื่อมโยงอื่น\\nหากเป็นรายการที่ถอนออกแล้วและไม่มีประวัติ พิมพ์ '+identity+' เพื่อยืนยัน:',
+    ''
+   );
+   if(entered===null)return;
+   if(entered!==identity){phase='ยกเลิกการปลดเลขที่: ข้อความยืนยันไม่ตรง';showPreview(container);return}
+   busy=true;button.disabled=true;
+   try{
+    await api('/api/admin/archived-students/'+studentId+'/release-roll',{
+     method:'POST',body:{confirm:identity},timeoutMs:20000
+    });
+    // Keep the original chosen file and run authoritative preflight again.
+    // This prevents committing a stale validation result after freeing the roll.
+    busy=false;
+    phase='ปลดเลขที่สำเร็จ กำลังตรวจสอบไฟล์ซ้ำจากฐานข้อมูลจริง...';
+    showPreview(container);
+    await preflight(container);
+   }catch(e){
+    busy=false;
+    phase='ยังไม่ปลดเลขที่: '+e.message+' • หากมีประวัติเก่าระบบจะป้องกันการลบไว้';
+    showPreview(container);
+   }
+  }));
   place.querySelectorAll('[data-conflict-student]').forEach(button=>button.addEventListener('click',()=>{
    if(!onOpenConflict)return;
    if(!confirm('เปิดทะเบียนเพื่อเทียบข้อมูลเดิม? หน้า Preview ที่ยังไม่บันทึกจะถูกปิด และต้องเลือกไฟล์ตรวจสอบใหม่ภายหลัง'))return;

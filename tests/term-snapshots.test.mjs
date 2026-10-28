@@ -107,6 +107,6 @@ test('term viewer and school settings link remain restricted to admin navigation
  assert.match(ui,/\/api\/admin\/term-snapshots/);
  assert.match(ui,/data-term-room/);
  assert.match(ui,/!window\.confirm/);
- assert.match(shell,/rd-care-shell-v94/);
+ assert.match(shell,/rd-care-shell-v95/);
  assert.match(shell,/term-snapshots\.js/);
 });

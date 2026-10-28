@@ -18,6 +18,7 @@ jobs:
           node --check worker/src/student-import.js
           node --check worker/src/unified-roster.js
           node --check worker/src/student-statistics.js
+          node --check worker/src/archived-roll-release.js
           node --check worker/src/late-self.js
           node --check worker/src/late-qr.js
           node --check worker/src/late-qr-auto.js
