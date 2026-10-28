@@ -14,8 +14,10 @@ test('roster readiness verifies schema without returning student or account reco
  assert.deepEqual(result.issues,[]);
  assert.equal(result.commit_limit,1);
  assert.equal(result.preview_limit,25);
- assert.equal(queries.length,5);
- assert(queries.every(sql=>/LIMIT 0$/.test(sql)));
+ assert.equal(queries.length,6);
+ assert(queries.slice(0,5).every(sql=>/LIMIT 0$/.test(sql)));
+ assert.match(queries[5],/uq_students_current_room_roll/);
+ assert.equal(result.archived_roll_reuse_ready,false);
  assert.equal('students' in result,false);
 });
 test('roster readiness rejects teachers and gives admins only schema category names',async()=>{
