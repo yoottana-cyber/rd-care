@@ -40,15 +40,69 @@ test('administrator settings and teacher screens use the same period clock modul
  assert.match(admin,/name="period_duration_minutes"/);
  assert.match(admin,/first_period_start_time/);
  assert.match(admin,/rdPeriodClockPreview/);
+ assert.match(admin,/lunch_after_period/);
+ assert.match(admin,/between_period_break_minutes/);
  assert.match(timetable,/\/api\/school\/period-clock/);
  assert.match(center,/\/api\/school\/period-clock/);
  assert.match(api,/if\(req\.method==='GET'&&path==='\/api\/school\/period-clock'\)/);
  assert.match(api,/requireRole\(user,\['teacher','staff','admin'\]\)/);
  assert.match(api,/SELECT first_period_start_time,period_duration_minutes/);
+ assert.match(api,/lunch_after_period,lunch_break_minutes,between_period_break_minutes/);
  assert.doesNotMatch(api,/path==='\/api\/school\/period-clock'[\s\S]{0,400}UPDATE school_settings/);
+});
+test('lunch break after period four replaces recess at the same boundary',()=>{
+ const options={lunch_after_period:4,lunch_break_minutes:60,between_period_break_minutes:5};
+ const rows=periodClockRows('08:30',50,10,options);
+ assert.equal(rows[0].start,'08:30');
+ assert.equal(rows[1].start,'09:25');
+ assert.equal(rows[3].end,'12:05');
+ assert.deepEqual(rows[4].breakBefore,{
+  kind:'lunch',after_period:4,minutes:60,start:'12:05',end:'13:05'
+ });
+ assert.equal(rows[4].start,'13:05');
+ assert.equal(rows[4].end,'13:55');
+ assert.equal(rows[9].end,'18:25');
+ assert.match(lessonClockLabel(4,5,rows),/มีช่วงพัก/);
+ assert.doesNotMatch(lessonClockLabel(5,5,rows),/มีช่วงพัก/);
+});
+test('shortened school day and lunch after period five compute properly',()=>{
+ for(const minutes of [40,45,50]){
+  const options={lunch_after_period:5,lunch_break_minutes:45,between_period_break_minutes:0};
+  const rows=periodClockRows('08:00',minutes,10,options);
+  assert.equal(rows[5].breakBefore.kind,'lunch');
+  assert.equal(rows[5].breakBefore.minutes,45);
+  assert.equal(rows.at(-1).end,
+   minutes===40?'15:25':minutes===45?'16:15':'17:05');
+ }
+});
+test('no configured lunch/recess keeps the previous continuous schedule',()=>{
+ const old=periodClockRows('08:30',50);
+ const explicit=periodClockRows('08:30',50,10,{
+  lunch_after_period:0,lunch_break_minutes:0,between_period_break_minutes:0
+ });
+ assert.deepEqual(explicit,old);
+ assert.equal(old.at(-1).end,'16:50');
+ assert.equal(old.some(x=>'breakBefore' in x),false);
+});
+test('reject invalid break positions, inconsistent lunch settings and overnight times',()=>{
+ const base={lunch_after_period:4,lunch_break_minutes:60,between_period_break_minutes:5};
+ for(const broken of [
+  {lunch_after_period:-1},{lunch_after_period:10},{lunch_break_minutes:0},
+  {lunch_break_minutes:200},{lunch_break_minutes:'60'},
+  {between_period_break_minutes:31},{between_period_break_minutes:-1},
+  {lunch_after_period:0,lunch_break_minutes:60}
+ ])assert.throws(()=>periodClockRows('08:30',50,10,{...base,...broken}),RangeError);
+ assert.throws(()=>periodClockRows('18:00',50,10,{
+  lunch_after_period:5,lunch_break_minutes:180,between_period_break_minutes:30
+ }),RangeError);
 });
 test('migration does not modify attendance, timetable, late QR or session permissions',()=>{
  const sql=read('worker/migrations/0028_school_period_clock.sql');
+ const extra=read('worker/migrations/0029_school_lunch_and_recess.sql');
+ assert.match(extra,/ADD COLUMN lunch_after_period/);
+ assert.match(extra,/ADD COLUMN lunch_break_minutes/);
+ assert.match(extra,/ADD COLUMN between_period_break_minutes/);
+ assert.doesNotMatch(extra,/DROP TABLE|DELETE FROM|UPDATE attendance|UPDATE timetable/);
  assert.match(sql,/ALTER TABLE school_settings ADD COLUMN first_period_start_time/);
  assert.match(sql,/ALTER TABLE school_settings ADD COLUMN period_duration_minutes/);
  assert.match(sql,/CHECK\(period_duration_minutes IN \(40,45,50\)\)/);
