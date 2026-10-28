@@ -2,7 +2,7 @@
 import {scoreHistoryTables} from './score-history.js';
 export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,escapeHtml}){
  const modes={
-  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''},
+  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],adjustmentRules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''},
   good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''}
  };
  const esc=escapeHtml;
@@ -19,9 +19,11 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
   if(rule)u.ruleId=rule.value;
   if(reason)u.reason=reason.value;
   if(query)u.query=query.value;
+  const adjustmentReason=document.querySelector('#scoreAdjustmentReason');
+  if(adjustmentReason)u.adjustmentReason=adjustmentReason.value;
  }
  function setFocus(u,item){
-  u.focusId=item.id;u.focusName=item.full_name;
+  u.focusId=item.id;u.focusName=item.full_name;u.focusStudent=item;
  }
  function addPicked(u,item){
   if(u.picked.has(item.id))return true;
@@ -33,6 +35,10 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  function draw(){
   const key=mode(),u=modes[key],isGood=key==='good',count=u.picked.size;
   const filtered=u.rules.filter(r=>isGood?r.category==='good':r.category!=='good');
+  const adjustmentCandidates=[...new Map([u.focusStudent,...u.students,...u.results,...u.picked.values()]
+   .filter(Boolean).map(student=>[Number(student.id),student])).values()];
+  const outstanding=Number(u.scores.behavior_remaining||0);
+  const adjustmentRules=(u.adjustmentRules||[]).filter(rule=>Number(rule.points)>0&&Number(rule.points)<=outstanding);
   const fromRoom=u.students.length>0&&u.students.every(x=>u.picked.has(x.id));
   const selected=[...u.picked.values()];
   const groupCount=new Set(selected.map(x=>x.classroom_id)).size;
@@ -93,12 +99,56 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
      ${!filtered.length?'<p class="warn">ยังไม่มีเกณฑ์คะแนนหมวดนี้ที่เปิดใช้งาน</p>':''}
     </form>
    </section>
+   ${!isGood?`<section class="card stack" aria-label="บันทึกการปรับพฤติกรรม">
+    <div><h3>3. บันทึกการปรับพฤติกรรม</h3>
+     <p class="muted">ใช้เกณฑ์ปรับพฤติกรรมที่ฝ่ายกิจการนักเรียนเปิดใช้งานเท่านั้น และปรับได้ไม่เกินคะแนนความผิดคงเหลือของนักเรียนแต่ละคน</p></div>
+    <form id="scoreAdjustmentForm" class="stack">
+     <div class="field"><label for="scoreAdjustmentStudent">นักเรียนที่ต้องการปรับพฤติกรรม (ทีละคน)</label>
+      <select id="scoreAdjustmentStudent" required>
+       ${adjustmentCandidates.map(st=>`<option value="${st.id}" ${st.id===u.focusId?'selected':''}>
+        ${esc(st.full_name)} · ${esc(st.student_no)} · ${esc(st.classroom_label)}
+       </option>`).join('')}
+      </select></div>
+     <p class="tag">คะแนนความผิดคงเหลือ: ${outstanding} คะแนน</p>
+     <div class="field"><label for="scoreAdjustmentRule">เกณฑ์ปรับพฤติกรรมที่เปิดใช้งาน</label>
+      <select id="scoreAdjustmentRule" name="adjustment_rule_id" required>
+       <option value="">เลือกเกณฑ์การปรับพฤติกรรม</option>
+       ${adjustmentRules.map(rule=>`<option value="${rule.id}">${esc(rule.name)} (+${Number(rule.points)} คะแนน)</option>`).join('')}
+      </select></div>
+     <div class="field"><label for="scoreAdjustmentReason">รายละเอียดการปรับพฤติกรรม <span class="muted">(ไม่บังคับ)</span></label>
+      <textarea id="scoreAdjustmentReason" name="reason" maxlength="300" placeholder="เว้นว่างได้ ระบบใช้ชื่อเกณฑ์เป็นเหตุผล">${esc(u.adjustmentReason||'')}</textarea></div>
+     <button type="submit" class="button" ${!u.focusId||!adjustmentRules.length?'disabled':''}>บันทึกการปรับพฤติกรรม</button>
+     ${!u.adjustmentRules.length?'<p class="muted">ฝ่ายกิจการนักเรียนยังไม่เปิดเกณฑ์ปรับพฤติกรรม</p>':
+       !adjustmentRules.length?'<p class="muted">คะแนนความผิดคงเหลือไม่เพียงพอสำหรับเกณฑ์ที่เปิดใช้งาน</p>':''}
+    </form>
+   </section>`:''}
    <section class="card stack" aria-label="ประวัติคะแนนนักเรียน">
     <div class="row between"><h3>ประวัติของ ${esc(u.focusName||'นักเรียนที่เลือกดู')}</h3><span class="tag">${points}</span></div>
     ${scoreHistoryTables({items:u.history,mode:key,esc})}
     ${u.hasMore?'<button class="button secondary" type="button" id="scoreLoadMore">ดูประวัติเพิ่มเติม</button>':''}
    </section>
   </div>`);
+  document.querySelector('#scoreAdjustmentStudent')?.addEventListener('change',event=>safeRun(async()=>{
+   rememberDraft();const studentId=Number(event.target.value);
+   const student=adjustmentCandidates.find(st=>Number(st.id)===studentId);
+   if(!student)return;
+   setFocus(u,student);await loadHistory(key);
+  }));
+  document.querySelector('#scoreAdjustmentForm')?.addEventListener('submit',event=>safeRun(async()=>{
+   event.preventDefault();rememberDraft();
+   const studentId=u.focusId,form=new FormData(event.currentTarget),ruleId=Number(form.get('adjustment_rule_id'));
+   if(!studentId||!ruleId){toast('กรุณาเลือกนักเรียนและเกณฑ์การปรับพฤติกรรม',true);return}
+   if(!adjustmentRules.some(x=>Number(x.id)===ruleId)){toast('คะแนนคงเหลือไม่เพียงพอสำหรับเกณฑ์นี้',true);return}
+   const button=event.currentTarget.querySelector('button[type="submit"]');
+   if(button)button.disabled=true;
+   try{
+    await api('/api/affairs/behavior/adjust',{method:'POST',body:{
+     student_id:studentId,adjustment_rule_id:ruleId,reason:String(form.get('reason')||'')}});
+    u.adjustmentReason='';
+    toast('บันทึกปรับพฤติกรรมสำเร็จ');
+    await loadHistory(key);
+   }finally{if(button?.isConnected)button.disabled=false}
+  }));
   document.querySelectorAll('[data-score-delete]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
    rememberDraft();
    const id=Number(btn.dataset.scoreDelete);
@@ -185,14 +235,16 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  async function load(){
   const key=mode(),u=modes[key],roomId=getRoomId();
   if(!roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}
-  const [students,rules]=await Promise.all([
+  const [students,rules,adjustments]=await Promise.all([
    api('/api/students?classroom_id='+roomId),
-   api('/api/affairs/behavior/rules')
+   api('/api/affairs/behavior/rules'),
+   key==='behavior'?api('/api/affairs/behavior/approved-adjustments'):Promise.resolve({items:[]})
   ]);
   if(mode()!==key||getRoomId()!==roomId)return;
   const label=roomLabel();
   u.students=(students.items||[]).map(st=>({...st,classroom_id:roomId,classroom_label:label}));
   u.rules=(rules.items||[]).filter(x=>x.active);
+  if(key==='behavior')u.adjustmentRules=adjustments.items||[];
   if(!u.focusId&&u.students.length)setFocus(u,u.students[0]);
   if(u.focusId)await loadHistory(key);
   else draw();

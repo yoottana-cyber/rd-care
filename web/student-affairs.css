@@ -105,3 +105,33 @@
 #affairsMonitorDetail h4{font-size:15px;color:#116041;margin:6px 0 0}
 #affairsMonitorDetail .score-history-group{display:grid;gap:10px}
 [data-theme="dark"] .rd-monitor-student-link{color:#87e4b9}
+
+
+/* Accessible student-score popup used by conduct monitoring and adjustment tracking. */
+body.rd-affairs-modal-open{overflow:hidden}
+.rd-affairs-modal-overlay{
+ position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;
+ padding:clamp(12px,3vw,32px);background:rgba(9,25,18,.66);backdrop-filter:blur(3px);
+}
+.rd-affairs-modal-dialog{
+ position:relative;display:flex;flex-direction:column;gap:16px;
+ width:min(980px,100%);max-height:calc(100dvh - 40px);overflow:auto;overscroll-behavior:contain;
+ box-shadow:0 25px 80px rgba(0,20,10,.32)!important;padding:25px!important;
+ border-radius:22px!important;background:#fff;
+}
+.rd-affairs-modal-dialog .row.between:first-child{align-items:flex-start;padding-right:42px}
+.rd-affairs-modal-x{
+ position:sticky;top:0;align-self:flex-start;z-index:2;border:1px solid #d9e9df;
+ background:#f4faf6;color:#255e42;border-radius:50%;height:40px;width:40px;
+ display:grid;place-items:center;font-size:28px;font-weight:500;cursor:pointer;flex:0 0 40px;
+}
+.rd-affairs-modal-x:hover{background:#e1f3e7}
+.rd-affairs-modal-x:focus-visible{outline:3px solid #d5a62a}
+@media(max-width:700px){
+ .rd-affairs-modal-overlay{padding:8px;align-items:center}
+ .rd-affairs-modal-dialog{width:100%;max-height:calc(100dvh - 16px);padding:17px!important;border-radius:17px!important}
+ .rd-affairs-modal-dialog .rd-affairs-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .rd-affairs-modal-x{height:38px;width:38px;flex-basis:38px;font-size:26px}
+}
+[data-theme="dark"] .rd-affairs-modal-dialog{background:#193429;color:#e5f6e9}
+[data-theme="dark"] .rd-affairs-modal-x{background:#254838;border-color:#426550;color:#e6f8ed}
