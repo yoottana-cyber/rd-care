@@ -32,6 +32,7 @@ jobs:
           node --check worker/src/staff-push.js
           node --check worker/src/student-affairs.js
           node --check worker/src/behavior-bulk.js
+          node --check worker/src/adjustment-bulk.js
           node --check worker/src/admin-delete.js
           node --check worker/scripts/generate-vapid.mjs
           node --check worker/src/worker.js
@@ -62,6 +63,7 @@ jobs:
           node --check web/score-recording.js
           node --check web/behavior-adjustment.js
           node --check web/score-history.js
+          node --check web/score-history-popup.js
           node --check web/portal-admin.js
           node --check web/portal-roster-import.js
           node --check web/portal-batch.js
