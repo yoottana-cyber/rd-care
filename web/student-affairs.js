@@ -1,3 +1,4 @@
+import {scoreHistoryTables} from './score-history.js';
 // RD CONNECT • Student Affairs workbench. Only the existing staff/admin role
 // opens this workspace; backend independently checks every action.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -10,7 +11,7 @@ const formatScore=n=>Number(n)>0?'+'+Number(n):String(Number(n)||0);
 export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
   selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
-  grade:0,monitorQuery:'',scoreSummary:[],ruleKind:'behavior',adjustmentRules:[]};
+  grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[]};
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
  const frame=(body)=>{
@@ -233,10 +234,30 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
    state.ruleEdit=null;toast('บันทึกเกณฑ์แล้ว');await rules();
   });
  }
+ async function loadMonitorStudentDetail({more=false}={}){
+  const student=state.monitorStudent;
+  if(!student)return;
+  const id=Number(student.student_id);
+  const offset=more?Number(state.monitorScore?.next_offset||0):0;
+  const [score,cases]=await Promise.all([
+   api('/api/behavior?student_id='+id+'&offset='+offset),
+   more?Promise.resolve(null):api('/api/affairs/cases?student_id='+id)
+  ]);
+  if(Number(state.monitorStudent?.student_id)!==id)return;
+  state.monitorScore=more?{...score,items:[...(state.monitorScore?.items||[]),...(score.items||[])]}:score;
+  if(cases)state.monitorCases=cases.items||[];
+ }
  async function monitor(refresh=true){
+
   if(refresh){
    const data=await api('/api/affairs/behavior/summary?date='+encodeURIComponent(bangkokToday()));
    state.scoreSummary=data.items||[];
+   if(state.monitorStudent){
+    const found=state.scoreSummary.find(x=>x.student_id===state.monitorStudent.student_id);
+    state.monitorStudent=found||null;
+    if(found)await loadMonitorStudentDetail();
+    else{state.monitorScore=null;state.monitorCases=[]}
+   }
   }
   const all=state.scoreSummary;
   const byGrade=state.grade?all.filter(x=>Number(x.grade)===state.grade):all;
@@ -255,6 +276,12 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
     </select></div>
     <div class="field smallbox"><label for="affairsMonitorQuery">ค้นหานักเรียน / รหัส / ห้อง</label>
      <input type="search" id="affairsMonitorQuery" value="${esc(state.monitorQuery)}" placeholder="พิมพ์เพื่อกรองข้อมูล">
+    </div>
+    <div class="field smallbox"><label for="affairsMonitorLimit">แสดงรายชื่อ</label>
+      <select id="affairsMonitorLimit">
+       ${[['50','50 คน'],['100','100 คน'],['200','200 คน'],['0','ทั้งหมด']].map(([value,text])=>
+        `<option value="${value}" ${Number(value)===state.monitorLimit?'selected':''}>${text}</option>`).join('')}
+      </select>
     </div></div>
    <div class="rd-affairs-metrics">
     <div><span>นักเรียนในระดับที่เลือก</span><strong>${byGrade.length}</strong></div>
@@ -266,18 +293,62 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   <section class="card stack"><div class="row between"><h3>ทะเบียนคะแนนพฤติกรรม</h3>
    <span class="tag">พบ ${visible.length} คน</span></div>
    <div class="table-wrap"><table class="table"><thead><tr><th>ห้อง</th><th>นักเรียน</th>
-    <th>ความดี</th><th>ความผิด</th><th>ปรับแล้ว</th><th>ความผิดคงเหลือ</th></tr></thead><tbody>
-    ${visible.slice(0,150).map(row=>`<tr><td>${esc(row.classroom_label)}</td>
-      <td>${esc(row.full_name)}<div class="muted">${esc(row.student_no)}</div></td>
+    <th>ความดี</th><th>ความผิด</th><th>ปรับแล้ว</th><th>ความผิดคงเหลือ</th><th>รายละเอียด</th></tr></thead><tbody>
+    ${visible.slice(0,state.monitorLimit||visible.length).map(row=>`<tr><td>${esc(row.classroom_label)}</td>
+      <td><button type="button" class="rd-monitor-student-link" data-monitor-detail="${row.student_id}">${esc(row.full_name)}</button><div class="muted">${esc(row.student_no)}</div></td>
       <td>+${Number(row.good_total)||0}</td><td>${Number(row.behavior_deducted)||0}</td>
       <td>${Number(row.behavior_adjusted)||0}</td><td><strong>${Number(row.behavior_remaining)||0}</strong></td>
-    </tr>`).join('')||'<tr><td colspan="6">ยังไม่มีนักเรียนที่ตรงกับตัวกรอง</td></tr>'}
+      <td><button class="button secondary" type="button" data-monitor-detail="${row.student_id}">ดูรายละเอียด</button></td>
+    </tr>`).join('')||'<tr><td colspan="7">ยังไม่มีนักเรียนที่ตรงกับตัวกรอง</td></tr>'}
    </tbody></table></div>
-   ${visible.length>150?'<p class="muted">แสดง 150 คนแรก กรุณาเลือกระดับชั้นหรือใช้คำค้นหาให้แคบลง</p>':''}
-  </section>`);
+   ${state.monitorLimit&&visible.length>state.monitorLimit?'<p class="muted">สามารถเปลี่ยนจำนวนแถวเป็นทั้งหมดเพื่อดูนักเรียนที่เหลือ</p>':''}
+  </section>
+  ${state.monitorStudent?`<section class="card stack" id="affairsMonitorDetail" aria-label="รายละเอียดคะแนนนักเรียน">
+   <div class="row between"><div><h3>รายละเอียดนักเรียน: ${esc(state.monitorStudent.full_name)}</h3>
+     <p class="muted">เลขประจำตัว ${esc(state.monitorStudent.student_no)} • ห้อง ${esc(state.monitorStudent.classroom_label)}</p></div>
+     <button class="button ghost" type="button" id="affairsMonitorClose">ปิดรายละเอียด</button></div>
+   <div class="rd-affairs-metrics">
+    <div class="good"><span>คะแนนความดีสะสม</span><strong>+${Number(state.monitorScore?.good_total)||0}</strong></div>
+    <div><span>ความผิดรวม / ปรับแล้ว</span><strong>${Number(state.monitorScore?.behavior_deducted)||0} / ${Number(state.monitorScore?.behavior_adjusted)||0}</strong></div>
+    <div class="warn-metric"><span>คะแนนความผิดคงเหลือ</span><strong>${Number(state.monitorScore?.behavior_remaining)||0}</strong></div>
+   </div>
+   ${scoreHistoryTables({items:state.monitorScore?.items||[],mode:'all',esc})}
+   ${state.monitorScore?.has_more?'<button class="button secondary" type="button" id="affairsMonitorMore">ดูรายการคะแนนเพิ่มเติม</button>':''}
+   <h4>มาตรการภาคทัณฑ์และทัณฑ์บน</h4>
+   ${state.monitorCases.length?state.monitorCases.map(c=>`<article class="rd-affairs-case">
+    <div class="row between"><strong>${c.measure==='probation'?'ทัณฑ์บน':'ภาคทัณฑ์'}</strong>
+     <span class="tag">${esc(c.state)}</span></div>
+    <p>วันที่ ${esc(thDate(c.school_date))} • รายละเอียด: ${esc(c.details)}</p>
+    ${c.conditions?`<p>เงื่อนไข: ${esc(c.conditions)}</p>`:''}
+    ${c.resolution?`<p>ผลติดตาม: ${esc(c.resolution)}</p>`:''}
+    <p class="muted">ผู้บันทึก ${esc(c.recorder_name)} • แจ้งผู้ปกครอง ${esc(c.guardian_informed_date||'ยังไม่บันทึก')}
+    • ผู้ปกครองรับทราบ ${esc(c.guardian_ack_date||'ยังไม่บันทึก')}</p>
+   </article>`).join(''):'<p class="empty">ยังไม่มีมาตรการภาคทัณฑ์หรือทัณฑ์บน</p>'}
+  </section>`:''}`);
   bind('#affairsGradeSelect','change',(_,el)=>{state.grade=Number(el.value);return monitor(false)});
   bind('#affairsMonitorQuery','change',(_,el)=>{state.monitorQuery=el.value;return monitor(false)});
   bind('#affairsMonitorRefresh','click',()=>monitor(true));
+  bind('#affairsMonitorLimit','change',(_,el)=>{state.monitorLimit=Number(el.value);return monitor(false)});
+  bind('[data-monitor-detail]','click',async(_,el)=>{
+   const student=state.scoreSummary.find(x=>x.student_id===Number(el.dataset.monitorDetail));
+   if(!student)return;
+   state.monitorStudent=student;await loadMonitorStudentDetail();await monitor(false);
+   document.getElementById('affairsMonitorDetail')?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+  bind('#affairsMonitorClose','click',()=>{state.monitorStudent=null;state.monitorScore=null;state.monitorCases=[];return monitor(false)});
+  bind('#affairsMonitorMore','click',async()=>{
+   await loadMonitorStudentDetail({more:true});await monitor(false);
+   document.getElementById('affairsMonitorDetail')?.scrollIntoView({block:'start'});
+  });
+  bind('#affairsMonitorDetail [data-score-delete]','click',async(_,el)=>{
+   const recordId=Number(el.dataset.scoreDelete);
+   if(!window.confirm('ยืนยันลบเฉพาะรายการคะแนนที่คุณบันทึกเอง? ระบบจะเก็บหลักฐานการลบ'))return;
+   await api('/api/behavior/records/'+recordId+'/delete',{method:'POST',body:{}});
+   toast('ลบรายการและคำนวณคะแนนใหม่แล้ว');
+   await loadMonitorStudentDetail();
+   return monitor(true);
+  });
+
  }
  const studentPicker=()=>`<section class="card stack"><h3>ค้นหานักเรียน</h3>
    <form id="affairsStudentSearch" class="row">
