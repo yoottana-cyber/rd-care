@@ -17,6 +17,7 @@ import {loginHref,resolveLoginEntrance} from './login-route.js';
 import {configureRolePwa,isInstalledPwa,preferredHomeRole,rememberHomeRole} from './pwa-role.js';
 import {createPortalAdmin} from './portal-admin.js';
 import {createStudentAffairs} from './student-affairs.js';
+import {createScoreRecording} from './score-recording.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
 import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-ui.js';
 import {initTheme,bindThemeButtons} from './theme.js';
@@ -38,6 +39,8 @@ const lateGate=createLateGate({api,mount,toast,safeRun});
 const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,
  getAlerts:()=>state.stats?.alerts||0});
 const studentAffairs=createStudentAffairs({api,mount,safeRun,toast,rooms:()=>state.rooms});
+const scoreRecorder=createScoreRecording({api,mount,safeRun,toast,rooms:()=>state.rooms,
+ getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc});
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
@@ -645,71 +648,7 @@ function renderLate(){
   }finally{if(button.isConnected)button.disabled=false}
  })));
 }
-async function loadBehavior(){
- if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}
- const [students,rules]=await Promise.all([
-  api('/api/students?classroom_id='+state.roomId),
-  api('/api/affairs/behavior/rules')
- ]);
- state.students=students.items;
- state.behaviorRules=(rules.items||[]).filter(x=>x.active);
- state.studentId=state.students.some(x=>x.id===state.studentId)?state.studentId:state.students[0]?.id||null;
- if(state.studentId){
-  const history=await api('/api/behavior?student_id='+state.studentId);
-  state.behaviors=history.items;state.behaviorScores=history;
- }else{state.behaviors=[];state.behaviorScores={good_total:0,behavior_remaining:0}}
- renderBehavior();
-}
-function renderBehavior(){
- const isGood=state.tab==='good';
- const choices=(state.behaviorRules||[]).filter(x=>isGood?x.category==='good':x.category!=='good');
- const history=(state.behaviors||[]).filter(x=>isGood?x.score_type==='good':x.score_type!=='good');
- const labels={good:'ทำความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
-  serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก',adjustment:'ปรับพฤติกรรม'};
- const scores=state.behaviorScores||{};
- mount(`<div class="stack"><div><h2>${isGood?'คะแนนความดี':'คะแนนพฤติกรรม'}</h2>
-  <p class="muted">${isGood?'คะแนนความดีสะสมแยกต่างหาก ไม่ใช้ลบล้างความผิด':
-    'บันทึกความผิดตามเกณฑ์โรงเรียน • ลดคะแนนความผิดสะสมได้เฉพาะการปรับพฤติกรรมที่ฝ่ายกิจการนักเรียนอนุมัติ'}</p></div>
-  <div class="card stack">${filters({date:false})}
-   <form id="behaviorForm" class="stack">
-    <div class="field"><label for="behaviorStudent">นักเรียน</label>
-    <select id="behaviorStudent" name="student_id">${state.students.map(st=>`
-      <option value="${st.id}" ${st.id===state.studentId?'selected':''}>${st.roll_no}. ${esc(st.full_name)}</option>`).join('')}</select></div>
-    <div class="field"><label for="behaviorRule">${isGood?'เลือกการทำความดี':'เลือกความผิดตามเกณฑ์'}</label>
-     <select id="behaviorRule" name="rule_id" required>
-      <option value="">เลือกเกณฑ์</option>
-      ${choices.map(rule=>`<option value="${rule.id}">${esc(labels[rule.category]||rule.category)}
-       • ${esc(rule.name)} (${rule.points>0?'+':''}${Number(rule.points)})</option>`).join('')}
-     </select></div>
-    <div class="field"><label>รายละเอียดของเหตุการณ์</label>
-     <textarea name="reason" maxlength="300" required placeholder="บันทึกเหตุการณ์ตามข้อเท็จจริง"></textarea></div>
-    <button class="button full" type="submit" ${!state.students.length||!choices.length?'disabled':''}>
-      ${isGood?'บันทึกคะแนนความดี':'บันทึกคะแนนความผิด'}</button>
-    ${!choices.length?'<p class="warn">ฝ่ายกิจการนักเรียนยังไม่ได้เปิดเกณฑ์หมวดนี้</p>':''}
-   </form></div>
-   <div class="card">
-    <div class="row between"><h3>${isGood?'ประวัติความดี':'ประวัติความผิดและการปรับพฤติกรรม'}</h3>
-     <span class="tag">${isGood?'คะแนนความดีสะสม '+Number(scores.good_total||0):
-      'คะแนนความผิดคงเหลือ '+Number(scores.behavior_remaining||0)}</span></div>
-    ${history.length?`<div class="table-wrap"><table class="table"><thead><tr>
-      <th>ประเภท</th><th>คะแนน</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลา</th></tr></thead><tbody>
-      ${history.map(row=>`<tr><td>${esc(row.score_type==='adjustment'?'ปรับพฤติกรรม':row.score_type==='good'?'ความดี':'ความผิด')}</td>
-       <td>${row.points>0?'+':''}${row.points}</td><td>${esc(row.reason)}</td>
-       <td>${esc(row.teacher_name)}</td><td>${esc(row.created_at)}</td></tr>`).join('')}
-      </tbody></table></div>`:'<div class="empty">ยังไม่มีประวัติในหมวดนี้</div>'}
-   </div></div>`);
- bindFilters(loadBehavior);
- $('#behaviorStudent')?.addEventListener('change',e=>safeRun(async()=>{
-  state.studentId=Number(e.target.value);await loadBehavior();
- }));
- $('#behaviorForm').addEventListener('submit',e=>safeRun(async()=>{
-  e.preventDefault();const data=new FormData(e.currentTarget);
-  await api('/api/affairs/behavior/record',{method:'POST',body:{
-   student_id:Number(data.get('student_id')),rule_id:Number(data.get('rule_id')),
-   reason:String(data.get('reason'))}});
-  toast(isGood?'บันทึกคะแนนความดีสำเร็จ':'บันทึกคะแนนความผิดสำเร็จ');await loadBehavior();
- }));
-}
+async function loadBehavior(){return scoreRecorder.load()}
 async function loadAdvisorCenter(){
  const focusIntent=['truancy','attendance_review'].includes(state.notice?.kind)?state.notice:null;
  state.notice=null;
