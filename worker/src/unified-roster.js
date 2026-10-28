@@ -88,6 +88,16 @@ export function planUnifiedRoster(rows,roomMap,existingStudents=[],existingAccou
   errors:items.filter(x=>x.status==='error').length,items};
 }
 
+// A legacy database can also have the new index after migration 0032 while
+// retaining the old table-level room/roll UNIQUE constraint. Check BOTH.
+export async function identityKeyedRosterReady(db){
+ const table=await db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='students'").all();
+ const definition=String(table.results?.[0]?.sql||'');
+ if(!definition||/\\bUNIQUE\\s*\\(\\s*classroom_id\\s*,\\s*roll_no\\s*\\)/i.test(definition))return false;
+ const indices=await db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").all();
+ return (indices.results||[]).length>0;
+}
+
 async function body(req){
  const raw=await req.text();
  if(raw.length>150000)fail(413,'ข้อมูลแต่ละชุดใหญ่เกินไป');
@@ -190,8 +200,7 @@ export async function unifiedRosterEndpoint(req,env,user,path){
  if(rows.length<1||rows.length>max)
   fail(400,commit?'บันทึกได้คำขอละ 1 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)':
    'ตรวจสอบได้คำขอละ 25 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)');
- const schema=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").all();
- const allowArchivedReuse=(schema.results||[]).length>0;
+ const allowArchivedReuse=await identityKeyedRosterReady(env.DB);
  if(!commit){
   const {roomMap,students,accounts}=await gather(env,rows,{rosterOnly,allowArchivedReuse});
   return json(planUnifiedRoster(rows,roomMap,students,accounts,{allowArchivedReuse}));
@@ -238,8 +247,8 @@ export async function unifiedRosterReadiness(env,user){
   try{await env.DB.prepare(sql).all()}
   catch(e){issues.push(key);console.warn('Unified import readiness check failed for',key,e?.name||'DBError')}
  }
- const indexInfo=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").all();
- return json({ok:issues.length===0,archived_roll_reuse_ready:(indexInfo.results||[]).length>0,service:'rd-roster-import',version:'502-diagnostics-v1',
+ const allowArchivedReuse=await identityKeyedRosterReady(env.DB);
+ return json({ok:issues.length===0,archived_roll_reuse_ready:allowArchivedReuse,service:'rd-roster-import',version:'502-diagnostics-v1',
   issues,preview_limit:25,commit_limit:1,
   ...(issues.length?{error:'import_database_not_ready',message:'ฐานข้อมูลนำเข้าไม่พร้อม: '+issues.join(', ')}:{})
  },issues.length?503:200);
