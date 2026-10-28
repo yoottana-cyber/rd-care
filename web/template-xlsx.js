@@ -58,8 +58,13 @@ function sheet(rows,widths,freeze=true){
   '<cols>'+columns+'</cols><sheetData>'+data+'</sheetData></worksheet>';
 }
 export function buildExampleXlsx(kind='students'){
- const isAdvisor=kind==='advisors',isPortal=kind==='portal';
- const students=isPortal?[
+ const isAdvisor=kind==='advisors',isPortal=kind==='portal',isRoster=kind==='roster';
+ const students=isRoster?[
+  ['classroom','roll_no','student_no','full_name'],
+  ['ม.1/1',1,'000001','นักเรียนตัวอย่าง หนึ่ง'],
+  ['ม.1/1',2,'000002','นักเรียนตัวอย่าง สอง'],
+  ['ม.2/1',1,'000003','นักเรียนตัวอย่าง สาม']
+ ]:isPortal?[
   ['student_no','full_name','student_username','student_password','guardian_name','guardian_username','guardian_password'],
   ['000001','นักเรียนตัวอย่าง ก','000001','ReplaceStudentPassword1','ผู้ปกครองตัวอย่าง ก','guardian000001','ReplaceGuardianPassword1'],
   ['000002','นักเรียนตัวอย่าง ข','000002','ReplaceStudentPassword2','ผู้ปกครองตัวอย่าง ข','guardian000002','ReplaceGuardianPassword2']
@@ -74,7 +79,19 @@ export function buildExampleXlsx(kind='students'){
   ['ม.2/3',2,'STU9002','นักเรียนตัวอย่าง สอง','student002','Student#5678'],
   ['ม.3/2',3,'STU9003','นักเรียนตัวอย่าง สาม','student003','Student#9012']
  ];
- const instructions=isPortal?[
+ const instructions=isRoster?[
+  ['RD CONNECT — ตัวอย่างนำเข้าทะเบียนนักเรียนจากไฟล์เดียว','คำอธิบาย'],
+  ['Students','คอลัมน์ 4 ช่องในแถวแรก ห้ามเพิ่มแถวเหนือหัวตาราง'],
+  ['classroom','ห้องเรียน เช่น ม.1/1 ต้องตรงกับห้องที่มีในระบบ'],
+  ['roll_no','เลขที่ 1–100 ในห้อง ไม่ซ้ำกับนักเรียนคนอื่น'],
+  ['student_no','เลขประจำตัวนักเรียน ต้องเก็บเป็นข้อความเพื่อรักษาเลขศูนย์นำหน้า'],
+  ['full_name','ชื่อและนามสกุลนักเรียน'],
+  ['การนำเข้า','เพิ่มใหม่หรืออัปเดตนักเรียนเดิมที่อยู่ห้องเดียวกัน'],
+  ['ข้อมูลเดิม','คง student_id เดิม และประวัติการเช็กชื่อหรือคะแนนพฤติกรรม'],
+  ['การย้ายห้อง','หากต้องการเปลี่ยนห้อง ให้ดำเนินการผ่านเมนูย้ายห้อง'],
+  ['บัญชี','รูปแบบนี้ไม่สร้างหรือแก้ Username/Password นักเรียนและผู้ปกครอง'],
+  ['ความปลอดภัย','ลบชื่อและเลขประจำตัวสมมติในตัวอย่าง แล้วใส่รายชื่อจริงก่อนอัปโหลด']
+ ]:isPortal?[
   ['RD CONNECT — นำเข้าบัญชีนักเรียนและผู้ปกครอง','คำอธิบาย'],
   ['student_no','เลขประจำตัวนักเรียนที่มีอยู่ในระบบ รักษาเลข 0 นำหน้า (Text)'],
   ['full_name','ชื่อ–สกุลนักเรียน เว้นว่างเพื่อใช้ชื่อเดิม'],
@@ -142,7 +159,7 @@ export function buildExampleXlsx(kind='students'){
   '[Content_Types].xml':types,'_rels/.rels':relations,
   'xl/workbook.xml':workbook,'xl/_rels/workbook.xml.rels':bookRelations,
   'xl/styles.xml':styles,
-  'xl/worksheets/sheet1.xml':sheet(students,isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
+  'xl/worksheets/sheet1.xml':sheet(students,isRoster?[17,14,22,40]:isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
   'xl/worksheets/sheet2.xml':sheet(instructions,[49,83]),
   'xl/worksheets/sheet3.xml':sheet(rooms,[32])
  });
@@ -172,6 +189,16 @@ export function downloadPortalAccountExampleXlsx(){
  const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
  const link=document.createElement('a');
  link.href=url;link.download='RD_CONNECT_Student_Guardian_Accounts.xlsx';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+
+export function buildStudentRosterExampleXlsx(){return buildExampleXlsx('roster')}
+export function downloadStudentRosterExampleXlsx(){
+ const bytes=buildStudentRosterExampleXlsx();
+ const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
+ const link=document.createElement('a');
+ link.href=url;link.download='RD_CONNECT_Student_Roster_Template.xlsx';
  document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }

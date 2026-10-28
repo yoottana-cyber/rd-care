@@ -1,4 +1,5 @@
 // Browser file upload for robust roster-only D1 jobs. One file, one click.
+import {downloadStudentRosterExampleXlsx} from './template-xlsx.js';
 // Local file contents and passwords are never persisted in browser storage.
 export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRows,readCsvFile,onSuccess}){
  let busy=false,stop=false,active=null,host=null,lastError='';
@@ -162,6 +163,9 @@ export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRo
    '<div class="field"><label for="rdFileJobFile">ไฟล์ Excel (.xlsx) หรือ CSV</label>'+
    '<input type="file" id="rdFileJobFile" accept=".xlsx,.csv,text/csv"></div>'+
    '<div class="row rd-import-controls">'+
+   '<button type="button" class="button secondary" id="rdFileJobExcelExample">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx)</button>'+ 
+   '<a href="./templates/student-roster-import.csv" download="RD_CONNECT_Student_Roster_Template.csv">ดาวน์โหลดไฟล์ตัวอย่าง CSV (.csv)</a></div>'+
+   '<div class="row rd-import-controls">'+
    '<button type="button" class="button full" id="rdFileJobUpload">นำเข้าไฟล์และเริ่มบันทึก</button>'+
    '<button type="button" class="button secondary" id="rdFileJobContinue" hidden>ทำงานต่อจากที่ค้าง</button>'+
    '<button type="button" class="button secondary" id="rdFileJobPause" hidden>หยุดหลังรายการปัจจุบัน</button></div>'+
@@ -171,6 +175,7 @@ export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRo
    ' หากปิดหน้าเว็บสามารถกลับมาเลือกงานเดิมและทำต่อได้</p>'+
    '<h4>งานที่บันทึกไว้</h4><div id="rdFileJobHistory" class="stack"></div>'+
    '</section>';
+  host.querySelector('#rdFileJobExcelExample').addEventListener('click',downloadStudentRosterExampleXlsx);
   host.querySelector('#rdFileJobUpload').addEventListener('click',upload);
   host.querySelector('#rdFileJobContinue').addEventListener('click',work);
   host.querySelector('#rdFileJobPause').addEventListener('click',()=>{stop=true});
