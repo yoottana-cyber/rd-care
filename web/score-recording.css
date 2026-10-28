@@ -46,6 +46,26 @@
 @media(max-width:600px){.score-history-table{min-width:650px}}
 
 
-.score-entry #scoreAdjustmentForm .tag{align-self:flex-start}
-.score-entry #scoreAdjustmentForm .field select{width:100%}
-@media(max-width:600px){.score-entry #scoreAdjustmentForm button[type="submit"]{width:100%}}
+
+/* Dedicated single-student adjustment menu: selectable roster, selected pupil and progress. */
+.score-adjust-page{max-width:1100px}
+.score-adjust-page .score-student-row{padding:0}
+.score-adjust-select{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+ padding:12px 13px;border:0;background:transparent;text-align:left;color:inherit;cursor:pointer}
+.score-adjust-select:hover,.score-adjust-select.chosen{background:rgba(9,138,85,.09)}
+.score-adjust-select:focus-visible{outline:3px solid #ddaf35;outline-offset:-3px}
+.score-adjust-student-name{min-width:0;font-size:14px;font-weight:750;overflow-wrap:anywhere}
+.score-adjust-student-name small{display:block;font-weight:450;color:#698176;font-size:12px;margin-top:4px}
+.score-adjust-pick-label{font-size:12px;font-weight:800;border:1px solid #c9e5d5;color:#116d46;
+ background:#e8f7ee;padding:7px 9px;border-radius:10px;white-space:nowrap}
+.score-adjust-select.chosen .score-adjust-pick-label{color:#fff;background:#098a55;border-color:#098a55}
+.score-adjust-selected{display:grid;gap:8px;background:#f0fbf5;border:1px solid #cdebd9;
+ border-radius:14px;padding:15px;color:#20553d}
+.score-adjust-selected strong{font-size:17px}
+.score-adjust-selected>span{font-size:13px}
+.score-adjust-summary{display:flex;flex-wrap:wrap;gap:8px}
+.score-adjust-page textarea{min-height:90px}
+[data-theme="dark"] .score-adjust-selected{background:#1f4630;color:#e5f9ec;border-color:#476d50}
+[data-theme="dark"] .score-adjust-select.chosen{background:rgba(66,187,120,.17)}
+@media(max-width:600px){.score-adjust-page #adjustmentSubmit{width:100%}
+ .score-adjust-select{padding:11px 9px}}
