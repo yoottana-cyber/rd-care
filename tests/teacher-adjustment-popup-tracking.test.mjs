@@ -84,9 +84,10 @@ test('Student Affairs has a distinct adjustment follow-up tab with filters, stat
   'behavior_deducted','behavior_adjusted','behavior_remaining','affairsAdjustmentStatus',
   'affairsAdjustmentGrade','affairsAdjustmentQuery','data-monitor-detail','monitorDetailModal()'])
   assert.ok(ui.includes(token),token);
- const teacherUi=source('web/score-recording.js');
- for(const token of ['scoreAdjustmentForm','scoreAdjustmentStudent','scoreAdjustmentRule',
+ const teacherUi=source('web/behavior-adjustment.js');
+ for(const token of ['adjustmentRecordForm','adjustmentRoom','adjustmentRule',
   '/api/affairs/behavior/approved-adjustments','/api/affairs/behavior/adjust',
-  'scoreAdjustmentReason','outstanding'])
+  'adjustmentReason','behavior_remaining'])
   assert.ok(teacherUi.includes(token),token);
+ assert.doesNotMatch(source('web/score-recording.js'),/scoreAdjustmentForm/);
 });
