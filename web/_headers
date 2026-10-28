@@ -1,0 +1,10 @@
+# Cloudflare Pages static files. Revalidate the SW entry point and HTML shell
+# on every visit so installed applications can discover a new release.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/
+  Cache-Control: no-cache, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, must-revalidate
