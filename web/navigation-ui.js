@@ -4,7 +4,7 @@ export const NAV_GROUPS=[
  {id:'attendance',label:'การเช็กชื่อและติดตาม',icon:'◷',
   pages:['attendance','periodAttendance','myTimetable','advisorCenter','late','lateGate','alerts']},
  {id:'care',label:'ดูแลและส่งเสริม',icon:'✦',pages:['behavior','scoreMonitor','adjustment','good','studentAffairs']},
- {id:'management',label:'งานบริหารระบบ',icon:'▦',pages:['adminStudents','portalStudentAccounts','portalGuardianAccounts','portalGuardianLinks' ,'portalAccounts','admin','schoolSettings']}
+ {id:'management',label:'งานบริหารระบบ',icon:'▦',pages:['adminStudents','portalStudentAccounts','portalGuardianAccounts','portalGuardianLinks' ,'portalAccounts','admin','schoolSettings','termSnapshots']}
 ];
 export const PAGE_DESCRIPTIONS={
  dashboard:'สรุปข้อมูลภาพรวมและทางลัดการทำงานประจำวัน',
@@ -28,6 +28,7 @@ export const PAGE_DESCRIPTIONS={
  portalGuardianLinks:'จัดการความสัมพันธ์นักเรียนและผู้ปกครอง พร้อมค้นหาหรือดูทั้งหมด',
  admin:'บริหารบัญชีบุคลากร สิทธิ์ และตั้งค่าระบบ',
  schoolSettings:'ตั้งค่าข้อมูลโรงเรียน ปีการศึกษา ภาคเรียน และเวลาเริ่มลงชื่อมาสาย',
+ termSnapshots:'ข้อมูลทะเบียนนักเรียนและตารางสอนที่บันทึกแยกตามปีการศึกษาและภาคเรียนโดยไม่ทับประวัติเดิม',
  notifications:'ตรวจสอบและตั้งค่าการแจ้งเตือน'
 };
 export function groupNavigation(navs){
