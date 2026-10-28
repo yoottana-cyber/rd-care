@@ -42,3 +42,15 @@ test('import backend rejects oversized requests before reading D1',()=>{
  assert.match(code,/await commitOne\(env,user,raw,plan/);
  assert.doesNotMatch(code,/for\(let i=0;i<rows\.length;i\+\+\)/);
 });
+
+
+test('roster-only can use the original six columns without requiring valid account credentials',()=>{
+ const raw=csvRows('classroom,roll_no,student_no,full_name,username,password\nม.1/1,1,0001,นักเรียน ทดสอบ,BAD USER,123');
+ const rooms=[{label:'ม.1/1'}];
+ assert.equal(prepareRows(raw,rooms)[0].status,'error');
+ assert.equal(prepareRows(raw,rooms,{rosterOnly:true})[0].status,'ready');
+ const ui=readFileSync(new URL('../web/unified-import.js',import.meta.url),'utf8');
+ assert.match(ui,/id="unifiedRosterOnly" checked/);
+ assert.match(ui,/เปลี่ยนโหมดนำเข้าแล้ว/);
+ assert.match(ui,/rosterOnly:accountMode==='roster_only'/);
+});

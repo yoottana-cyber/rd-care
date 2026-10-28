@@ -22,7 +22,7 @@ export function csvRows(text){
  row.push(cell);if(row.some(x=>String(x).trim())){row.source_row=rows.length+1;rows.push(row)}
  return rows;
 }
-export function prepareRows(raw,rooms){
+export function prepareRows(raw,rooms,{rosterOnly=false}={}){
  if(!Array.isArray(raw)||!raw.length)throw Error('ไม่มีข้อมูลในไฟล์');
  const header=raw[0].map(x=>String(x??'').trim().toLowerCase()).join(',');
  if(header!==HEADER)throw Error('ไฟล์ต้องมีหัวตารางตรงตามตัวอย่าง: '+HEADER);
@@ -42,11 +42,11 @@ export function prepareRows(raw,rooms){
   else if(!Number.isInteger(values.roll_no)||values.roll_no<1||values.roll_no>100)message='เลขที่ต้องอยู่ในช่วง 1–100';
   else if(!values.student_no||values.student_no.length>40)message='รหัสนักเรียนไม่ถูกต้อง';
   else if(!values.full_name||values.full_name.length>120)message='ชื่อ–สกุลไม่ถูกต้อง';
-  else if(values.username&&!/^[a-z0-9._-]{3,40}$/i.test(values.username))message='Username ไม่ถูกต้อง';
-  else if(values.password&&(values.password.length<4||values.password.length>128))message='Password ต้องยาว 4–128 ตัว';
-  else if(/^\d{13}$/.test(values.password))message='ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน';
-  else if(ids.has(key)||names.has(uname)||rolls.has(rollkey))message='ข้อมูลซ้ำในไฟล์ (รหัสนักเรียน / Username / เลขที่ในห้อง)';
-  if(!message){ids.add(key);if(uname)names.add(uname);rolls.add(rollkey)}
+  else if(!rosterOnly&&values.username&&!/^[a-z0-9._-]{3,40}$/i.test(values.username))message='Username ไม่ถูกต้อง';
+  else if(!rosterOnly&&values.password&&(values.password.length<4||values.password.length>128))message='Password ต้องยาว 4–128 ตัว';
+  else if(!rosterOnly&&/^\d{13}$/.test(values.password))message='ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน';
+  else if(ids.has(key)||(!rosterOnly&&names.has(uname))||rolls.has(rollkey))message='ข้อมูลซ้ำในไฟล์ (รหัสนักเรียน / Username / เลขที่ในห้อง)';
+  if(!message){ids.add(key);if(uname&&!rosterOnly)names.add(uname);rolls.add(rollkey)}
   return {values,message,status:message?'error':'ready'};
  });
  if(!records.length)throw Error('ไม่มีรายชื่อนักเรียนหลังหัวตาราง');
@@ -122,7 +122,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
     raw=csvRows(pasted);filename='ข้อความ CSV';
    }
    const accountMode=container.querySelector('#unifiedRosterOnly')?.checked?'roster_only':'with_accounts';
-   const prepared=prepareRows(raw,typeof rooms==='function'?rooms():rooms);
+   const prepared=prepareRows(raw,typeof rooms==='function'?rooms():rooms,{rosterOnly:accountMode==='roster_only'});
    rows=prepared.map(x=>x.values);
    preview=prepared.map(x=>({source_row:x.values.source_row,room:x.values.classroom,roll_no:x.values.roll_no,
     student_no:x.values.student_no,full_name:x.values.full_name,username:x.values.username,status:x.status,message:x.message}));
@@ -141,6 +141,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    const valid=preview.filter(x=>['ready','update'].includes(x.status)).length;
    const skip=preview.length-valid;
    phase=(detectedEncoding?'รหัสอักขระ '+detectedEncoding+' • ':'')+
+    (accountMode==='roster_only'?'โหมดทะเบียนอย่างเดียว (ไม่สร้าง/แก้ไขบัญชี) • ':'โหมดรวมบัญชีนักเรียน • ')+
     'พร้อมเพิ่ม/อัปเดต '+valid+' • ข้ามข้อมูลผิดพลาด '+skip+' (ดูรายละเอียดรายแถว)';
 
   }catch(e){rows=[];preview=[];phase='ตรวจสอบไฟล์ไม่สำเร็จ: '+e.message+' • ยังไม่มีการบันทึกข้อมูล';}
@@ -152,10 +153,10 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    preview.find(p=>p.source_row===x.source_row)?.status));
   if(!selected.length)return;
   const invalid=preview.filter(x=>x.status==='error').length;
-  if(!confirm('ยืนยันนำเข้า/อัปเดต '+selected.length+' คนจากไฟล์เดียว? ระบบจะส่งทีละคนเพื่อป้องกัน HTTP 500'+
-   ' และข้ามรายการผิดพลาด '+invalid+' แถว (ข้อมูลเดิมที่สำเร็จแล้วจะไม่ถูกสร้างซ้ำ)'))return;
-  busy=true;stopped=false;
   const accountMode=container.querySelector('#unifiedRosterOnly')?.checked?'roster_only':'with_accounts';
+  const modeNotice=accountMode==='roster_only'?'โหมดทะเบียนอย่างเดียว: จะไม่สร้างบัญชีและไม่เปลี่ยน Username/Password':'โหมดรวมบัญชีนักเรียน: มีการประมวลผลรหัสผ่านซึ่งอาจเกินข้อจำกัด CPU ของ Worker Free';
+  if(!confirm('ยืนยันนำเข้า/อัปเดต '+selected.length+' คน?\n'+modeNotice+'\nรายการที่รูปแบบผิดพลาดจะข้าม '+invalid+' แถว'))return;
+  busy=true;stopped=false;
   // A 502 from Pages indicates that the Worker did not return normally.
   // Check the authenticated schema probe before writing, rather than
   // repeatedly submitting uncertain student updates to a broken backend.
@@ -163,7 +164,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   showPreview(container);
   try{
    const health=await api('/api/admin/unified-import/health',{timeoutMs:15000});
-   if(!health.ok)throw Error('ระบบนำเข้ายังไม่พร้อม');
+   if(!health.ok)throw Error('ระบบนำเข้ายังไม่พร้อม: '+(health.issues||[]).join(', '));
   }catch(e){
    const trace=e.requestId?' (รหัสตรวจสอบ '+e.requestId+')':'';
    phase='ยังไม่เริ่มบันทึก: ตรวจสอบ API ไม่ผ่าน'+(e.httpStatus?' HTTP '+e.httpStatus:'')+
@@ -189,8 +190,9 @@ export function createUnifiedImport({api,rooms,onSuccess}){
      consecutiveErrors++;
      for(const item of group){
       const p=preview.find(entry=>entry.source_row===item.source_row);
-      if(p){p.status='uncertain';p.message='ยังไม่ยืนยันผลจากเซิร์ฟเวอร์: '+e.message+
-       ' • สามารถกดดำเนินการต่อเพื่อตรวจสอบและอัปเดตซ้ำอย่างปลอดภัย'}
+      if(p){p.status='uncertain';p.message='ยังไม่ยืนยันผลจากเซิร์ฟเวอร์'+(e.httpStatus?' HTTP '+e.httpStatus:'')+': '+e.message+
+       (e.requestId?' • รหัสตรวจสอบ '+e.requestId:'')+
+       ' • ระบบจะตรวจข้อมูลเดิมก่อนบันทึกซ้ำเมื่อกดดำเนินการต่อ'}
      }
      if([500,502,503,504].includes(e.httpStatus)||consecutiveErrors>=3){
       pausedDueToServer=true;
@@ -223,7 +225,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    }else phase=(pausedDueToServer?'หยุดหลังพบข้อผิดพลาด Worker/Pages • ':'ดำเนินการแล้วบางส่วน • ')+
       'เพิ่ม '+added+' • อัปเดต '+updated+
       ' • ข้าม '+skipped+' • รอดำเนินการ/ตรวจสอบ '+(pending+uncertain)+
-      ' • ตรวจ Logs หากพบ HTTP 502 แล้วจึงกดดำเนินการต่อ (ไม่ต้องเลือกไฟล์ใหม่)';
+      (pausedDueToServer&&accountMode==='with_accounts'?' • หากเกิด 502 ซ้ำ แนะนำเลือกโหมดทะเบียนอย่างเดียวแล้วตรวจสอบไฟล์ใหม่ (ไม่สร้างบัญชี)':' • ตรวจ Worker Logs หากเกิด HTTP 502 แล้วค่อยดำเนินการต่อ');
   }finally{busy=false;if(cancel?.isConnected)cancel.hidden=true;showPreview(container)}
  }
 
@@ -248,10 +250,9 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    </form>
    <div id="unifiedStatus" class="muted" role="status" aria-live="polite"></div>
    <div id="unifiedPreview"></div>
-   <label class="row rd-import-account-mode"><input type="checkbox" id="unifiedRosterOnly">
-    <span><strong>นำเข้าทะเบียนนักเรียนอย่างเดียว (ลดการประมวลผลเมื่อพบ 502)</strong>
-     <span class="muted">ไม่สร้างบัญชี ไม่เปลี่ยน Username/Password ของบัญชีเดิม
-      สามารถนำเข้าบัญชีนักเรียนและผู้ปกครองแยกภายหลังได้</span></span>
+   <label class="row rd-import-account-mode"><input type="checkbox" id="unifiedRosterOnly" checked>
+    <span><strong>โหมดเสถียร (แนะนำ): นำเข้าทะเบียนนักเรียนอย่างเดียว</strong>
+     <span class="muted">เลือกไว้เป็นค่าเริ่มต้น: ระบบเพิ่ม/อัปเดตทะเบียนเท่านั้น ไม่สร้างบัญชี ไม่เปลี่ยน Username/Password • เอาเครื่องหมายออกเฉพาะเมื่อต้องการนำเข้าบัญชีด้วย (ใช้ CPU เพิ่ม)</span></span>
    </label>
    <button type="button" class="button secondary" id="unifiedCheckApi">ตรวจสอบการเชื่อมต่อ Worker/D1</button>
    <button type="button" class="button full" id="unifiedCommit" hidden>ยืนยันนำเข้าทั้งหมด</button>
@@ -277,7 +278,10 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   container.querySelector('#unifiedCommit').addEventListener('click',()=>commit(container));
   container.querySelector('#unifiedRosterOnly')?.addEventListener('change',()=>{
    if(!preview.length||busy)return;
-   phase='เปลี่ยนโหมดการนำเข้าแล้ว • ระบบจะใช้โหมดที่เลือกสำหรับรายการที่ยังไม่บันทึกสำเร็จ';
+   // A change of import mode alters validation (especially for credentials).
+   // Never commit stale results from a previous preview mode.
+   rows=[];preview=[];previewPage=1;
+   phase='เปลี่ยนโหมดนำเข้าแล้ว • กรุณากดตรวจสอบทั้งไฟล์อีกครั้งก่อนนำเข้า (ไฟล์ที่เลือกยังอยู่)';
    showPreview(container);
   });
   container.querySelector('#unifiedCancel').addEventListener('click',()=>{stopped=true;phase='กำลังหยุดหลังจบชุดที่ทำอยู่...';showPreview(container)});
