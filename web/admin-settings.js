@@ -133,7 +133,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
        <div class="field"><label for="slotSubject">ชื่อวิชา</label><input name="subject" id="slotSubject" maxlength="120" placeholder="เช่น วิทยาการคำนวณ" required></div>
       </div><p class="rd-settings-field-hint">รองรับคาบเดี่ยวและคู่ 1, 1-2, 2, 2-3 จนถึงคาบ 10 และตรวจคาบซ้อนให้อัตโนมัติ</p>
       <button type="submit" class="button full" ${disabled?'disabled':''}>＋ เพิ่มคาบเรียน</button></form></section>
-   </div><div class="rd-settings-notice">ครูสามารถเพิ่มตารางสอนของตนเองได้จากเมนู “ตารางสอนของฉัน” โดยไม่ต้องรออนุมัติ</div></div>`;
+   </div><div class="rd-settings-notice">ครูสามารถเพิ่มตารางสอนได้เองโดยไม่รอ Admin อนุมัติ ระบบตรวจคาบซ้อนของครูและห้องก่อนบันทึก และ Admin ใช้เมนู “ตรวจสอบตารางสอน” เพื่อดูภาพรวม</div></div>`;
  }
  function imports(){
   return `<div class="rd-settings-content"><div class="rd-settings-section-heading">
