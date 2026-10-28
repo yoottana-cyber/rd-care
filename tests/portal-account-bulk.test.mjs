@@ -107,9 +107,12 @@ test('guardian username cannot overwrite a student account',async()=>{
 test('whole-file portal import processes one record per atomic transport request, skipping only invalid rows',()=>{
  const ui=readFileSync(new URL('../web/portal-roster-import.js',import.meta.url),'utf8');
  const backend=readFileSync(new URL('../worker/src/portal-bulk-import.js',import.meta.url),'utf8');
- assert.match(ui,/for\(const row of items\)/);
- assert.match(ui,/rows:\[Object.fromEntries/);
- assert.match(ui,/skipped\+\+/);
+ assert.match(ui,/while\(cursor<items.length\)/);
+ assert.match(ui,/rows:\[data\]/);
+ assert.match(ui,/phase:'student'/);
+ assert.match(ui,/phase:'guardian'/);
+ assert.match(ui,/if\(retryable\)/);
+ assert.match(ui,/ดำเนินการต่อ/);
  assert.match(ui,/\/api\/admin\/portal\/import/);
  assert.match(backend,/CHUNK_SIZE=5/);
  assert.doesNotMatch(ui,/\.slice\(0,10\)/);
@@ -127,4 +130,33 @@ test('no forced first login password change from all portal provisioning and res
   const code=readFileSync(new URL('../'+p,import.meta.url),'utf8');
   assert.match(code,/password_hash,must_change_password,created_by/);
  }
+});
+
+test('student phase avoids guardian hashing or linking in the same Worker request',async()=>{
+ const env=makeDb({exists:false,guardian:false});
+ const response=await importPortalAccounts(req({rows:[row(123)],phase:'student',
+  relationships_verified:true}),env,actor);
+ assert.equal((await response.json()).items[0].phase,'student');
+ assert.equal(env.calls.filter(x=>x.sql.includes('INSERT INTO portal_accounts')).length,1);
+ assert.equal(env.calls.some(x=>x.sql.includes('guardian_student_links')),false);
+ const insert=env.calls.find(x=>x.sql.includes("'student'"));
+ assert.ok(insert);
+});
+test('guardian phase does not rehash or rewrite the student account',async()=>{
+ const env=makeDb({exists:true,guardian:false});
+ const response=await importPortalAccounts(req({rows:[row(123)],phase:'guardian',
+  relationships_verified:true}),env,actor);
+ const result=await response.json();
+ assert.equal(result.items[0].phase,'guardian');
+ assert.equal(env.calls.some(x=>x.sql.includes('INSERT INTO guardian_student_links')),true);
+ assert.equal(env.calls.some(x=>x.sql.startsWith('UPDATE portal_accounts SET username=')),false);
+ assert.equal(env.calls.some(x=>x.sql.includes("VALUES(?,?,'student'")),false);
+});
+test('guardian phase rejects incomplete student provisioning',async()=>{
+ const env=makeDb({exists:false,guardian:false});
+ await assert.rejects(importPortalAccounts(req({rows:[row(123)],phase:'guardian',relationships_verified:true}),env,actor),{code:409});
+});
+test('invalid import phase cannot write accounts',async()=>{
+ const env=makeDb();
+ await assert.rejects(importPortalAccounts(req({rows:[row(123)],phase:'ignored',relationships_verified:true}),env,actor),{code:400});
 });

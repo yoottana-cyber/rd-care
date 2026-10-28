@@ -64,6 +64,7 @@ export function preparePortalRoster(raw){
 const chunks=(items,size)=>Array.from({length:Math.ceil(items.length/size)},(_,i)=>items.slice(i*size,(i+1)*size));
 export function createPortalRosterImport({api,toast,onComplete}){
  let items=[],errors=[],fileName='',running=false,stop=false,count=0,results=[];
+ let cursor=0,phase='student',completed=false,lastMessage='';
  const $=selector=>document.querySelector(selector);
  function update(){
   const summary=$('#portalRosterStatus');
@@ -76,12 +77,13 @@ export function createPortalRosterImport({api,toast,onComplete}){
     errors.slice(0,50).map(e=>'<li>แถว '+e.source_row+' ('+esc(e.student_no)+'): '+esc(e.message)+'</li>').join('')+
     '</ol>'+(errors.length>50?'<p>ยังมีข้อผิดพลาดอีก '+(errors.length-50)+' รายการ</p>':''):'';
   const progress=$('#portalRosterProgress');
-  if(progress)progress.textContent=running?'กำลังนำเข้า '+count+' / '+items.length+
-   ' รายการ — ระบบทำงานเป็นชุดย่อยอัตโนมัติ':
-   count?'เสร็จสิ้น '+count+' / '+items.length+' รายการ':'';
+  if(progress)progress.textContent=running?
+   'กำลังประมวลผลแถว '+(cursor+1)+' / '+items.length+' • '+(phase==='guardian'?'บัญชีผู้ปกครอง':'บัญชีนักเรียน')+
+    ' • สำเร็จครบ '+count+' รายการ':lastMessage;
   const button=$('#portalRosterCommit');
-  if(button){button.disabled=running||!items.length||count>0;
-   button.textContent='นำเข้า/อัปเดต '+items.length+' รายการ (ข้ามข้อผิดพลาด '+errors.length+' แถว)';}
+  if(button){button.disabled=running||!items.length||completed;
+   button.textContent=(cursor>0||phase!=='student'?'ดำเนินการต่อจากแถว '+(cursor+1):'นำเข้า/อัปเดต '+items.length+' รายการ')+
+    ' (ข้ามข้อมูลรูปแบบผิด '+errors.length+' แถว)';}
   const preview=$('#portalRosterPreview');
   if(preview)preview.innerHTML=items.length?
    '<p>แสดงตัวอย่าง '+Math.min(items.length,20)+' จาก '+items.length+' รายการ (ไม่แสดงรหัสผ่าน)</p>'+
@@ -101,7 +103,7 @@ export function createPortalRosterImport({api,toast,onComplete}){
   e.preventDefault();
   if(running)return;
   const form=e.currentTarget,file=form.querySelector('input[type="file"]').files?.[0];
-  items=[];errors=[];count=0;results=[];fileName=file?.name||'';
+  items=[];errors=[];count=0;results=[];cursor=0;phase='student';completed=false;lastMessage='';fileName=file?.name||'';
   try{
    const raw=await readFile(file,String(new FormData(form).get('encoding')||'auto'));
    ({items,errors}=preparePortalRoster(raw));
@@ -109,48 +111,75 @@ export function createPortalRosterImport({api,toast,onComplete}){
   update();
  }
  async function commit(){
-  if(running||!items.length)return;
+  if(running||!items.length||completed)return;
   const verified=$('#portalRosterVerified')?.checked===true;
   if(items.some(r=>r.guardian_username)&&!verified)
    throw Error('ต้องตรวจสอบตัวตนและความสัมพันธ์ก่อนเชื่อมบัญชีผู้ปกครอง');
-  if(!confirm('ยืนยันนำเข้าหรืออัปเดตบัญชี '+items.length+
-   ' แถว โดยข้ามรายการรูปแบบผิด '+errors.length+
-   ' แถว? รหัสผ่านที่ระบุใหม่จะเปลี่ยนรหัสบัญชีเดิม'))return;
-  running=true;stop=false;count=0;results=[];update();
-  let processed=0,skipped=errors.length;
+  if(cursor===0&&phase==='student'&&!confirm('ยืนยันนำเข้า/อัปเดตบัญชี '+items.length+
+   ' แถว โดยข้ามแถวรูปแบบผิด '+errors.length+
+   ' แถว? ระบบจะบันทึกบัญชีนักเรียนและผู้ปกครองแยกคำขอ เพื่อป้องกัน Worker ใช้ทรัพยากรเกิน'))return;
+  running=true;stop=false;lastMessage='';update();
   const cancel=$('#portalRosterStop');if(cancel)cancel.hidden=false;
+  let interrupted='';
   try{
-   // Backend writes each transport batch atomically; use one row per batch so
-   // any unexpected conflict cannot cancel the other valid student accounts.
-   for(const row of items){
+   while(cursor<items.length){
     if(stop)break;
+    const row=items[cursor];
+    const data=Object.fromEntries(Object.entries(row).filter(([key])=>key!=='source_row'));
     try{
-     const r=await api('/api/admin/portal/import',{method:'POST',
-      body:{rows:[Object.fromEntries(Object.entries(row).filter(([k])=>k!=='source_row'))],
-       relationships_verified:verified}});
-     count+=r.imported||0;results.push(...(r.items||[]));
+     // One password hash maximum per Worker invocation. If a response fails
+     // after a DB commit, upsert retries are safe and preserve the student ID.
+     if(phase==='student'){
+      const result=await api('/api/admin/portal/import',{method:'POST',
+       body:{phase:'student',rows:[data],relationships_verified:verified},timeoutMs:30000});
+      results.push(...(result.items||[]));
+      phase=row.guardian_username?'guardian':'complete';
+     }
+     if(phase==='guardian'){
+      const result=await api('/api/admin/portal/import',{method:'POST',
+       body:{phase:'guardian',rows:[data],relationships_verified:verified},timeoutMs:30000});
+      results.push(...(result.items||[]));
+      phase='complete';
+     }
+     if(phase==='complete'){
+      count++;
+      cursor++;
+      phase='student';
+     }
     }catch(error){
-     skipped++;
+     const message=String(error?.message||'ระบบบันทึกไม่สำเร็จ');
+     const retryable=[502,503,504,524].includes(error?.httpStatus)||
+      /Cloudflare Pages|Worker Logs|การเชื่อมต่อล่าช้า|service_binding_fetch_failed|fetch failed/i.test(message);
+     if(retryable){
+      interrupted='พบปัญหาการเชื่อมต่อ Worker ที่แถว '+row.source_row+
+       ' ('+row.student_no+') • สำเร็จ '+count+' รายการ • กด “ดำเนินการต่อ” ได้โดยไม่ต้องเลือกไฟล์ใหม่';
+      break;
+     }
      errors.push({source_row:row.source_row,student_no:row.student_no,
-      message:'ข้ามระหว่างบันทึก: '+error.message});
+      message:'ข้ามระหว่างบันทึก'+(phase==='guardian'?' (บัญชีนักเรียนบันทึกแล้ว)':'')+': '+message});
+     cursor++;
+     phase='student';
     }
-    processed++;update();
-    const progress=$('#portalRosterProgress');
-    if(progress)progress.textContent='ประมวลผล '+processed+'/'+items.length+
-      ' • สำเร็จ '+count+' • ข้าม '+skipped;
+    update();
    }
-   if(processed===items.length){
-    const message='เสร็จสิ้น: เพิ่มหรืออัปเดตบัญชี '+count+' รายการ ข้าม '+skipped+' แถว';
-    toast(message);
-    items=[];fileName='';results=[];update();
-    const status=$('#portalRosterProgress');if(status)status.textContent=message;
+   if(interrupted){
+    lastMessage=interrupted;
+    toast('หยุดชั่วคราวหลังพบปัญหา Worker • นำเข้าต่อได้');
+   }else if(cursor===items.length){
+    completed=true;
+    lastMessage='ดำเนินการครบ '+items.length+' แถว • สำเร็จ '+count+
+     ' รายการ • ข้าม '+errors.length+' รายการ';
+    toast(lastMessage);
     await onComplete?.();
    }else{
-    const message='หยุดหลังประมวลผล '+processed+' แถว: สำเร็จ '+count+' ข้าม '+skipped;
-    toast(message);
-    const status=$('#portalRosterProgress');if(status)status.textContent=message;
+    lastMessage='หยุดชั่วคราว • สำเร็จ '+count+' จาก '+items.length+
+     ' รายการ • กด “ดำเนินการต่อ” เพื่อทำรายการที่เหลือ';
+    toast(lastMessage);
    }
-  }finally{running=false;if(cancel)cancel.hidden=true;update()}
+  }finally{
+   running=false;if(cancel)cancel.hidden=true;
+   update();
+  }
  }
 
  function render(container){

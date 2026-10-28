@@ -25,7 +25,14 @@ export async function importPortalAccounts(req,env,actor){
  if(!body||!Array.isArray(body.rows)||!body.rows.length||body.rows.length>CHUNK_SIZE)
   fail(400,'ส่งข้อมูลเป็นชุดย่อยขนาด 1–5 แถว ระบบจะประมวลผลทั้งไฟล์อัตโนมัติ');
  const rows=body.rows;
- if(rows.some(r=>r?.guardian_username)&&body.relationships_verified!==true)
+ // Split one student's password hash and one guardian hash over separate
+ // authenticated invocations to avoid exceeding Worker CPU in a single request.
+ // Legacy callers keep the original 'all' behavior.
+ const phase=body.phase||'all';
+ if(!['all','student','guardian'].includes(phase))
+  fail(400,'ขั้นตอนนำเข้าบัญชีไม่ถูกต้อง');
+ const doStudent=phase!=='guardian',doGuardian=phase!=='student';
+ if(doGuardian&&rows.some(r=>r?.guardian_username)&&body.relationships_verified!==true)
   fail(400,'ต้องยืนยันการตรวจสอบตัวตนและความสัมพันธ์ของผู้ปกครองก่อนนำเข้า');
  const seen=new Set(),seenGuardians=new Map(),plans=[];
  for(let i=0;i<rows.length;i++){
@@ -49,7 +56,7 @@ export async function importPortalAccounts(req,env,actor){
    .bind(username,old?.id||0).first();
   if(conflict)fail(409,'แถว '+(i+1)+': Username นักเรียนถูกใช้งานแล้ว');
   const stPass=typeof row.student_password==='string'?row.student_password:'';
-  if((!old||stPass)&&!passwordOk(stPass))
+  if(doStudent&&(!old||stPass)&&!passwordOk(stPass))
    fail(400,'แถว '+(i+1)+': รหัสผ่านนักเรียนใหม่ต้องยาว 4–128 ตัว และไม่ใช่เลขบัตรประชาชน');
   const guardianUsername=clean(row.guardian_username,40).toLowerCase();
   const guardianName=clean(row.guardian_name,100);
@@ -73,10 +80,11 @@ export async function importPortalAccounts(req,env,actor){
      fail(400,'แถว '+(i+1)+': Password ผู้ปกครอง Username เดียวกันไม่ตรงกัน');
     if(!guardianPass&&!guardian)guardianPass=prev.pass;
    }
-   if((!guardian||guardianPass)&&!passwordOk(guardianPass))
+   if(doGuardian&&(!guardian||guardianPass)&&!passwordOk(guardianPass))
     fail(400,'แถว '+(i+1)+': รหัสผ่านผู้ปกครองใหม่ต้องยาว 4–128 ตัว');
    if(!prev)seenGuardians.set(guardianUsername,{name:guardianName,pass:guardianPass});
   }
+  if(phase==='guardian'&&!old)fail(409,'ต้องสร้างบัญชีนักเรียนก่อนเชื่อมผู้ปกครอง');
   plans.push({studentNo,studentId:student.id,student,old,username,fullName,stPass,
    guardianUsername,guardianName,guardianPass,guardian});
  }
@@ -94,6 +102,7 @@ export async function importPortalAccounts(req,env,actor){
  const statements=[],result=[];
  for(const p of plans){
   const displayName=p.fullName||p.student.full_name;
+  if(doStudent){
   if(p.fullName&&p.fullName!==p.student.full_name)
    statements.push(statement(env.DB,'UPDATE students SET full_name=? WHERE id=?',
     p.fullName,p.studentId));
@@ -115,7 +124,8 @@ export async function importPortalAccounts(req,env,actor){
     VALUES(?,?,'student',?,?,?,0,?)`,
     p.username,displayName,p.studentId,stSalt,hash,actor.id));
   }
-  if(p.guardianUsername){
+  }
+  if(doGuardian&&p.guardianUsername){
    if(p.guardian){
     if(p.guardianPass){
      const gSalt=salt(),hash=await passwordHash(p.guardianPass,gSalt);
@@ -142,8 +152,8 @@ export async function importPortalAccounts(req,env,actor){
     ON CONFLICT(guardian_account_id,student_id) DO UPDATE SET verified_by=excluded.verified_by`,
     p.studentId,actor.id,p.guardianUsername));
   }
-  result.push({student_no:p.studentNo,student_account:p.old?'updated':'created',
-   guardian_account:p.guardianUsername?(p.guardian?'updated':'created_or_linked'):'none'});
+  result.push({student_no:p.studentNo,phase,student_account:doStudent?(p.old?'updated':'created'):'preserved',
+   guardian_account:doGuardian&&p.guardianUsername?(p.guardian?'updated':'created_or_linked'):'none'});
  }
  statements.push(statement(env.DB,`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
    VALUES(?,'portal_accounts_bulk_upsert','portal_accounts',?)`,actor.id,String(plans.length)));
