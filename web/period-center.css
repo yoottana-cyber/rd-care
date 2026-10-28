@@ -36,10 +36,23 @@
 .period-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#f6ad55}
 .period-dot.done{background:#1ebd85}.period-dot.absent{background:#ef6b85}
 .period-grid-scroll{width:100%;max-width:100%;overflow-x:auto;border:1px solid #e2e9f0;border-radius:10px;scrollbar-color:#bed2de #f2f7f9;overscroll-behavior-x:contain}
-.period-week-grid{width:100%;min-width:1170px;border-collapse:separate;border-spacing:0;table-layout:fixed;font-variant-numeric:tabular-nums;background:#fff}
+.period-week-grid{width:100%;min-width:1530px;border-collapse:separate;border-spacing:0;table-layout:fixed;font-variant-numeric:tabular-nums;background:#fff}
 .period-week-grid th,.period-week-grid td{border-right:1px solid #e5ebf1;border-bottom:1px solid #e5ebf1;text-align:center;padding:6px;vertical-align:middle}
 .period-week-grid thead th{height:45px;background:#eff5fa;color:#526a80;font-weight:650;font-size:11px;position:sticky;top:0;z-index:2}
 .period-week-grid thead th:first-child{left:0;z-index:4;width:110px}
+/* Keep period number and actual lesson clock on separate, centered lines. */
+.period-week-grid thead th.period-column-head{
+ height:69px;min-width:135px;padding:10px 6px;vertical-align:middle;white-space:normal;
+}
+.period-column-head .period-column-number{
+ display:block;line-height:1.4;font-size:12px;font-weight:800;color:#2c5267;
+ white-space:nowrap;
+}
+.period-column-head .period-column-time{
+ display:block;margin-top:5px;font-size:11px;line-height:1.3;font-weight:600;
+ letter-spacing:.01em;color:#237d66;white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+
 .period-week-grid .period-day{width:110px;position:sticky;left:0;z-index:3;background:#eaf4ff;color:#205983;font-size:12px;font-weight:700}
 .period-week-grid .period-day small{display:block;font-size:10px;font-weight:500;margin-top:2px}
 .period-week-grid .period-day-2{background:#fff1f6;color:#ac4871}
@@ -58,6 +71,14 @@
 .period-slot strong{font-size:12px;font-weight:750;color:inherit}
 .period-slot span{font-size:10px;line-height:1.4;max-height:29px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .period-slot small{font-size:9px;opacity:.85}
+.period-slot .period-slot-meta{display:block;font-size:10px;line-height:1.35}
+.period-slot .period-slot-time{
+ display:block;overflow-wrap:normal;overflow:visible;max-height:none;
+ -webkit-line-clamp:unset;line-clamp:unset;
+ font-size:10px;line-height:1.4;font-weight:650;white-space:normal;
+ font-variant-numeric:tabular-nums;
+}
+
 .period-slot em{font-size:9px;font-weight:650;font-style:normal;opacity:.9}
 .period-slot.done{background:linear-gradient(180deg,#edfdf6,#def8eb);border-color:#b7ebd1;color:#207653}
 .period-slot.absent{background:linear-gradient(180deg,#fff0f3,#ffeaec);border-color:#f6bdc8;color:#a84364}
@@ -93,6 +114,9 @@
 [data-theme="dark"] .period-grid-scroll{border-color:#34465e}
 [data-theme="dark"] .period-week-grid{background:#1c293c}
 [data-theme="dark"] .period-week-grid thead th{background:#263d50;color:#d7e6f1}
+[data-theme="dark"] .period-column-head .period-column-number{color:#ecf4ff}
+[data-theme="dark"] .period-column-head .period-column-time{color:#9ce7ce}
+
 [data-theme="dark"] .period-week-grid th,[data-theme="dark"] .period-week-grid td{border-color:#3b5064}
 [data-theme="dark"] .period-empty{background:#1c293c}
 [data-theme="dark"] .period-occupied{background:#22374b}
