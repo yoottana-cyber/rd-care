@@ -71,7 +71,7 @@ jobs:
 
       - name: Apply pending D1 migrations first
         working-directory: worker
-        run: npx --no-install wrangler d1 migrations apply rd-care-dev --remote
+        run: npx --no-install wrangler d1 migrations apply DB --remote
 
       - name: Deploy RD CONNECT Dev Worker
         working-directory: worker
