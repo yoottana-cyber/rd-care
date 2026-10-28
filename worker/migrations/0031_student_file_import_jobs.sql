@@ -27,3 +27,5 @@ CREATE TABLE student_file_import_rows (
  PRIMARY KEY(job_id,source_row)
 );
 CREATE INDEX idx_student_file_import_rows_pending ON student_file_import_rows(job_id,state,source_row);
+CREATE INDEX idx_student_file_import_rows_identity
+ ON student_file_import_rows(job_id,lower(student_no),source_row);
