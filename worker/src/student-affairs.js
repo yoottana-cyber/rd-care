@@ -1,6 +1,7 @@
 import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
+import {searchBehaviorStudents,recordBehaviorBulk} from './behavior-bulk.js';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const staff=u=>['admin','staff'].includes(u?.role)||(u?.role==='teacher'&&Number(u?.student_affairs)===1);
@@ -134,8 +135,8 @@ export async function sendScheduledAttendanceReminders(env){
 }
 export async function studentAffairsRoutes(req,env,u,path){
  const method=req.method;const url=new URL(req.url),q=url.searchParams;
- const ordinaryBehavior=(method==='GET'&&path==='/api/affairs/behavior/rules')||
-  (method==='POST'&&path==='/api/affairs/behavior/record');
+ const ordinaryBehavior=(method==='GET'&&['/api/affairs/behavior/rules','/api/affairs/behavior/students'].includes(path))||
+  (method==='POST'&&['/api/affairs/behavior/record','/api/affairs/behavior/record/bulk'].includes(path));
  if(!staff(u)&&!(['teacher','admin'].includes(u.role)&&ordinaryBehavior))
   fail(403,'เฉพาะครูที่ได้รับมอบหมายสิทธิ์ฝ่ายกิจการนักเรียน');
  let b=null;
@@ -152,6 +153,7 @@ export async function studentAffairsRoutes(req,env,u,path){
     pending:items.filter(x=>x.students>0&&!x.complete).length}});
  }
  if(method==='GET'&&path==='/api/affairs/people')return reply(await roster(env));
+ if(method==='GET'&&path==='/api/affairs/behavior/students')return searchBehaviorStudents(req,env,u);
  if(method==='GET'&&path==='/api/affairs/students'){
   const query=string(q.get('query'),70);
   if(query.length<2)fail(400,'ค้นหาชื่อหรือรหัสนักเรียนอย่างน้อย 2 ตัวอักษร');
@@ -276,6 +278,7 @@ export async function studentAffairsRoutes(req,env,u,path){
   return reply({ok:true,id:updated});
  }
  if(method==='POST'&&path==='/api/affairs/behavior/record')return recordBehavior(env,u,b);
+ if(method==='POST'&&path==='/api/affairs/behavior/record/bulk')return recordBehaviorBulk(env,u,b);
  if(method==='POST'&&path==='/api/affairs/behavior/adjust')return recordBehavior(env,u,b,true);
  if(method==='GET'&&path==='/api/affairs/behavior/summary'){
   const date=q.get('date')||bangkokToday();checkedDate(date);

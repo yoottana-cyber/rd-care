@@ -75,13 +75,13 @@ test('PWA reminders navigate only to authorized local attendance URL after staff
  assert.match(app,/state\.rooms\.some\(r=>Number\(r\.id\)===Number\(query\.get\('classroom_id'\)\)\)/);
 });
 test('student affairs navigation requires an explicit assignment and teachers use controlled conduct rules',()=>{
- const app=read('web/app.js'),worker=read('worker/src/worker.js'),ui=read('web/student-affairs.js');
+ const app=read('web/app.js'),worker=read('worker/src/worker.js'),ui=read('web/student-affairs.js'),scoring=read('web/score-recording.js');
  assert.match(app,/createStudentAffairs/);
  assert.match(app,/state\.user\?\.role==='admin'\|\|Number\(state\.user\?\.student_affairs\)===1/);
  assert.match(app,/if\(tab==='studentAffairs'\)\{/);
  assert.match(app,/return studentAffairs\.load\(\)/);
- assert.match(app,/\/api\/affairs\/behavior\/record/);
- assert.match(app,/behaviorRules/);
+ assert.match(scoring,/\/api\/affairs\/behavior\/record\/bulk/);
+ assert.match(scoring,/\/api\/affairs\/behavior\/rules/);
  assert.match(worker,/student_affairs_assignments/);
  assert.match(worker,/sendScheduledAttendanceReminders\(env\)/);
  for(const name of ['attendance','people','rules','cases'])
