@@ -243,3 +243,12 @@
  .login-wrap .login-brand h1{font-size:30px}
  .login-wrap .login-brand .brand-system-name{font-size:12px}
 }
+
+/* SETUP_TOKEN-verified one-time administrator recovery, hidden until requested. */
+.login-recovery-panel{padding:16px 0 4px;margin:14px 0;border-top:1px solid #d8ebe0}
+.login-recovery-panel[hidden],.login-wrap .login-content form[hidden],.login-wrap .login-content button[hidden]{display:none!important}
+.login-recovery-panel h3{margin:0 0 6px;font-size:15px;color:#155c3b}
+.login-recovery-panel p{font-size:12px;line-height:1.65}
+.login-wrap .login-content .login-recovery-panel form{margin-top:14px}
+[data-theme="dark"] .login-recovery-panel{border-color:#3a6850}
+[data-theme="dark"] .login-recovery-panel h3{color:#d1f8df}
