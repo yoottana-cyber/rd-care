@@ -487,7 +487,7 @@ async function addBehavior(req,env,user){
  await log(env.DB,user.id,'behavior_created','behavior_records',result.meta.last_row_id);
  return json({ok:true,id:result.meta.last_row_id},201);
 }
-async function listBehavior(req,env,user){
+export async function listBehavior(req,env,user){
  const q=new URL(req.url).searchParams;
  const stId=positiveInt(q.get('student_id'));
  // Student Affairs users may inspect school-wide student score histories.
@@ -521,7 +521,7 @@ async function listBehavior(req,env,user){
  return json({items:results.slice(0,limit),has_more:results.length>limit,
   next_offset:offset+Math.min(limit,results.length),total:-totals.behavior_remaining,...totals});
 }
-async function deleteOwnBehavior(req,env,user,recordId){
+export async function deleteOwnBehavior(req,env,user,recordId){
  if(!['admin','staff','teacher'].includes(user.role))
   throw error(403,'ไม่มีสิทธิ์ลบประวัติคะแนน');
  const id=positiveInt(recordId);
