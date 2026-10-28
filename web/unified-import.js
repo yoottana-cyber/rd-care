@@ -53,30 +53,54 @@ export function prepareRows(raw,rooms){
  return records;
 }
 const chunks=(items,size)=>Array.from({length:Math.ceil(items.length/size)},(_,i)=>items.slice(i*size,(i+1)*size));
+// The selected Excel/CSV file can be large; transport uses small, bounded requests.
+export const ROSTER_PREVIEW_CHUNK=25;
+export const ROSTER_COMMIT_CHUNK=1;
+const ROSTER_VIEW_PAGE_SIZE=80;
 export function createUnifiedImport({api,rooms,onSuccess}){
- let rows=[],preview=[],filename='',busy=false,stopped=false,completed=0,phase='',detectedEncoding='';
+ let rows=[],preview=[],filename='',busy=false,stopped=false,phase='',detectedEncoding='';
+ let previewPage=1,previewFilter='all';
  function showPreview(container){
   const place=container.querySelector('#unifiedPreview');if(!place)return;
-  const skipped=preview.filter(x=>['error','skipped'].includes(x.status)).length;
+  const skipped=preview.filter(x=>['error','skipped','uncertain'].includes(x.status)).length;
   const added=preview.filter(x=>x.status==='imported').length;
   const updated=preview.filter(x=>x.status==='updated').length;
-  const pending=preview.filter(x=>['ready','update'].includes(x.status)).length;
-  place.innerHTML=preview.length?`<p class="summary"><strong>${esc(filename)}</strong>: ${preview.length} แถว • เพิ่มแล้ว ${added} • อัปเดตแล้ว ${updated} • ข้าม/ผิดพลาด ${skipped} • รอดำเนินการ ${pending}</p>
+  const pending=preview.filter(x=>['ready','update','uncertain'].includes(x.status)).length;
+  const filtered=previewFilter==='issues'?
+    preview.filter(x=>['error','skipped','uncertain'].includes(x.status)):preview;
+  const pages=Math.max(1,Math.ceil(filtered.length/ROSTER_VIEW_PAGE_SIZE));
+  previewPage=Math.max(1,Math.min(previewPage,pages));
+  const visible=filtered.slice((previewPage-1)*ROSTER_VIEW_PAGE_SIZE,previewPage*ROSTER_VIEW_PAGE_SIZE);
+  place.innerHTML=preview.length?`<p class="summary"><strong>${esc(filename)}</strong>: ${preview.length} แถว • เพิ่มแล้ว ${added} • อัปเดตแล้ว ${updated} • ข้าม/ต้องตรวจ ${skipped} • รอดำเนินการ ${pending}</p>
+   <div class="row" style="align-items:center;flex-wrap:wrap;gap:8px">
+    <button type="button" class="button secondary" id="unifiedAllRows" aria-pressed="${previewFilter==='all'}">ทุกแถว</button>
+    <button type="button" class="button secondary" id="unifiedIssueRows" aria-pressed="${previewFilter==='issues'}">เฉพาะแถวมีปัญหา (${skipped})</button>
+    <span class="muted">แสดง ${filtered.length?((previewPage-1)*ROSTER_VIEW_PAGE_SIZE+1):0}–${Math.min(previewPage*ROSTER_VIEW_PAGE_SIZE,filtered.length)} จาก ${filtered.length} แถว</span>
+    <button type="button" class="button secondary" id="unifiedPrevPage" ${previewPage===1?'disabled':''}>ก่อนหน้า</button>
+    <button type="button" class="button secondary" id="unifiedNextPage" ${previewPage===pages?'disabled':''}>ถัดไป</button>
+   </div>
    <div class="table-wrap" style="max-height:440px;overflow:auto"><table class="table">
     <thead><tr><th>แถว</th><th>ห้อง</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ</th><th>Username</th><th>ผลตรวจ / เหตุผลข้าม</th></tr></thead>
-    <tbody>${preview.map(x=>`<tr><td>${x.source_row}</td><td>${esc(x.room)}</td><td>${x.roll_no}</td><td>${esc(x.student_no)}</td>
+    <tbody>${visible.map(x=>`<tr><td>${x.source_row}</td><td>${esc(x.room)}</td><td>${x.roll_no}</td><td>${esc(x.student_no)}</td>
       <td>${esc(x.full_name)}</td><td>${esc(x.username)}</td>
-      <td class="${['error','skipped'].includes(x.status)?'import-error':['imported','updated'].includes(x.status)?'import-success':''}">
+      <td class="${['error','skipped','uncertain'].includes(x.status)?'import-error':['imported','updated'].includes(x.status)?'import-success':''}">
       ${esc(x.message||(x.status==='update'?'พบข้อมูลเดิม • เตรียมอัปเดต':'พร้อมเพิ่ม'))}</td></tr>`).join('')}</tbody></table></div>`:'';
+  place.querySelector('#unifiedAllRows')?.addEventListener('click',()=>{previewFilter='all';previewPage=1;showPreview(container)});
+  place.querySelector('#unifiedIssueRows')?.addEventListener('click',()=>{previewFilter='issues';previewPage=1;showPreview(container)});
+  place.querySelector('#unifiedPrevPage')?.addEventListener('click',()=>{previewPage--;showPreview(container)});
+  place.querySelector('#unifiedNextPage')?.addEventListener('click',()=>{previewPage++;showPreview(container)});
   const button=container.querySelector('#unifiedCommit');
-  if(button){button.hidden=!pending;button.disabled=busy||!pending;button.textContent='ยืนยันเพิ่ม/อัปเดต '+pending+' รายการ (ข้ามที่ผิดพลาด)'}
+  if(button){
+   button.hidden=!pending;
+   button.disabled=busy||!pending;
+   button.textContent='นำเข้าหรือดำเนินการต่อ '+pending+' รายการ';
   const status=container.querySelector('#unifiedStatus');
   if(status)status.textContent=phase;
  }
 
  async function preflight(container){
   if(busy)return;
-  busy=true;rows=[];preview=[];completed=0;detectedEncoding='';
+  busy=true;rows=[];preview=[];previewPage=1;previewFilter='all';detectedEncoding='';
   const button=container.querySelector('#unifiedPreviewButton');
   if(button)button.disabled=true;
   try{
@@ -103,8 +127,8 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    let checked=0;
    const allowed=prepared.filter(x=>!x.message).map(x=>x.values);
    phase='กำลังตรวจสอบรายการที่รูปแบบถูกต้องในฐานข้อมูล...';showPreview(container);
-   for(const group of chunks(allowed,100)){
-    const result=await api('/api/admin/unified-import/preview',{method:'POST',body:{students:group}});
+   for(const group of chunks(allowed,ROSTER_PREVIEW_CHUNK)){
+    const result=await api('/api/admin/unified-import/preview',{method:'POST',body:{students:group},timeoutMs:30000});
     for(const x of result.items){
      const target=preview.find(p=>p.source_row===x.source_row);
      if(target){target.status=x.status;target.message=x.message}
@@ -117,43 +141,68 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    phase=(detectedEncoding?'รหัสอักขระ '+detectedEncoding+' • ':'')+
     'พร้อมเพิ่ม/อัปเดต '+valid+' • ข้ามข้อมูลผิดพลาด '+skip+' (ดูรายละเอียดรายแถว)';
 
-  }catch(e){rows=[];preview=[];phase=e.message;}
+  }catch(e){rows=[];preview=[];phase='ตรวจสอบไฟล์ไม่สำเร็จ: '+e.message+' • ยังไม่มีการบันทึกข้อมูล';}
   finally{busy=false;if(button?.isConnected)button.disabled=false;showPreview(container)}
  }
  async function commit(container){
   if(busy)return;
-  const selected=rows.filter(x=>['ready','update'].includes(
+  const selected=rows.filter(x=>['ready','update','uncertain'].includes(
    preview.find(p=>p.source_row===x.source_row)?.status));
   if(!selected.length)return;
   const invalid=preview.filter(x=>x.status==='error').length;
-  if(!confirm('ยืนยันเพิ่ม/อัปเดต '+selected.length+' คน และข้ามแถวที่ผิดพลาด '+invalid+
-    ' แถว? ข้อมูลเดิมในห้องเดียวกันจะถูกอัปเดตตามไฟล์'))return;
-  busy=true;stopped=false;let added=0,updated=0,skipped=invalid,processed=0;
+  if(!confirm('ยืนยันนำเข้า/อัปเดต '+selected.length+' คนจากไฟล์เดียว? ระบบจะส่งทีละคนเพื่อป้องกัน HTTP 500'+
+   ' และข้ามรายการผิดพลาด '+invalid+' แถว (ข้อมูลเดิมที่สำเร็จแล้วจะไม่ถูกสร้างซ้ำ)'))return;
+  busy=true;stopped=false;
   const btn=container.querySelector('#unifiedCommit'),cancel=container.querySelector('#unifiedCancel');
   if(btn)btn.disabled=true;if(cancel)cancel.hidden=false;
+  let completed=0,consecutiveErrors=0;
   try{
-   for(const group of chunks(selected,10)){
+   for(const group of chunks(selected,ROSTER_COMMIT_CHUNK)){
     if(stopped)break;
-    const result=await api('/api/admin/unified-import/commit',{method:'POST',body:{students:group}});
-    processed+=group.length;added+=result.added||0;updated+=result.updated||0;skipped+=result.skipped||0;
-    for(const x of result.items||[]){
-     const target=preview.find(p=>p.source_row===x.source_row);
-     if(target){target.status=x.status;target.message=x.message}
+    try{
+     const result=await api('/api/admin/unified-import/commit',{
+      method:'POST',body:{students:group},timeoutMs:30000
+     });
+     for(const entry of result.items||[]){
+      const p=preview.find(item=>item.source_row===entry.source_row);
+      if(p){p.status=entry.status;p.message=entry.message}
+     }
+     completed+=group.length;consecutiveErrors=0;
+    }catch(e){
+     consecutiveErrors++;
+     for(const item of group){
+      const p=preview.find(entry=>entry.source_row===item.source_row);
+      if(p){p.status='uncertain';p.message='ยังไม่ยืนยันผลจากเซิร์ฟเวอร์: '+e.message+
+       ' • สามารถกดดำเนินการต่อเพื่อตรวจสอบและอัปเดตซ้ำอย่างปลอดภัย'}
+     }
+     if(consecutiveErrors>=3){
+      phase='หยุดอัตโนมัติหลังเซิร์ฟเวอร์ขัดข้อง 3 ครั้งติดกัน • ข้อมูลที่สำเร็จแล้วคงอยู่'+
+       ' • ตรวจ Cloudflare Logs แล้วกดดำเนินการต่อได้';
+      break;
+     }
     }
-    phase='ดำเนินการ '+processed+' / '+selected.length+' • เพิ่ม '+added+
-     ' • อัปเดต '+updated+' • ข้าม '+skipped;showPreview(container);
+    if(completed%10===0||completed===selected.length||consecutiveErrors){
+     const added=preview.filter(x=>x.status==='imported').length;
+     const updated=preview.filter(x=>x.status==='updated').length;
+     const invalidNow=preview.filter(x=>['error','skipped'].includes(x.status)).length;
+     phase='ประมวลผล '+completed+' / '+selected.length+
+      ' • เพิ่ม '+added+' • อัปเดต '+updated+' • ข้าม '+invalidNow;
+     showPreview(container);
+    }
    }
-   rows=[];
-   if(processed===selected.length){
-    phase='เสร็จสิ้น • เพิ่มใหม่ '+added+' • อัปเดต '+updated+' • ข้าม '+skipped+
+   const added=preview.filter(x=>x.status==='imported').length;
+   const updated=preview.filter(x=>x.status==='updated').length;
+   const skipped=preview.filter(x=>['error','skipped'].includes(x.status)).length;
+   const uncertain=preview.filter(x=>x.status==='uncertain').length;
+   const pending=preview.filter(x=>['ready','update'].includes(x.status)).length;
+   if(completed===selected.length&&uncertain===0){
+    phase='เสร็จสิ้น • เพิ่ม '+added+' • อัปเดต '+updated+' • ข้าม '+skipped+
      ' รายการ (ดูเหตุผลในตาราง)';
+    // Refresh school rosters only once after the entire file is processed.
     await onSuccess?.();
-   }else phase='หยุดหลังดำเนินการ '+processed+' รายการ • เพิ่ม '+added+
-      ' • อัปเดต '+updated+' • ข้าม '+skipped;
-  }catch(e){
-   rows=[];phase='หยุดหลังดำเนินการ '+processed+' รายการ: '+e.message+
-    ' • เพิ่ม '+added+' • อัปเดต '+updated+' • ข้าม '+skipped+
-    ' — กรุณาตรวจข้อมูลก่อนนำเข้าอีกครั้ง';
+   }else phase='ดำเนินการแล้วบางส่วน • เพิ่ม '+added+' • อัปเดต '+updated+
+      ' • ข้าม '+skipped+' • รอดำเนินการ/ตรวจสอบ '+(pending+uncertain)+
+      ' — กดดำเนินการต่อได้โดยไม่ต้องเลือกไฟล์ใหม่';
   }finally{busy=false;if(cancel?.isConnected)cancel.hidden=true;showPreview(container)}
  }
 
@@ -180,7 +229,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    <div id="unifiedPreview"></div>
    <button type="button" class="button full" id="unifiedCommit" hidden>ยืนยันนำเข้าทั้งหมด</button>
    <button type="button" class="button secondary" id="unifiedCancel" hidden>หยุดหลังจบชุดปัจจุบัน</button>
-   <p class="muted">ระบบแบ่งการบันทึกเป็นชุดละ 10 คนเพื่อความเสถียร บันทึกแต่ละคนแยกธุรกรรม หากแถวใดผิดพลาดจะข้ามเฉพาะแถวนั้น ไม่ยกเลิกรายการอื่น และแสดงจำนวนเพิ่ม/อัปเดต/ข้าม</p>
+   <p class="muted">เลือกไฟล์ได้ทั้งโรงเรียน (เช่น 1,750 คน) ระบบแบ่งตรวจครั้งละ 25 คน และบันทึกทีละคน เพื่อลดข้อผิดพลาด Cloudflare D1 โดยแยกธุรกรรม หากแถวใดผิดพลาดจะข้ามเฉพาะแถวนั้น ไม่ยกเลิกรายการอื่น และแสดงจำนวนเพิ่ม/อัปเดต/ข้าม</p>
    <p class="warn">ก่อนนำเข้า โปรดตรวจสอบความถูกต้องของข้อมูล สิทธิ์ผู้ใช้งาน และข้อกำหนด PDPA ของโรงเรียน</p>
   </section>`;
   container.querySelector('#downloadUnifiedExcel').addEventListener('click',downloadStudentExampleXlsx);
