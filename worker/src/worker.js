@@ -510,7 +510,9 @@ export async function listBehavior(req,env,user){
     CASE WHEN b.affairs_category='adjustment' THEN 'ปรับพฤติกรรม'
      WHEN b.points>0 THEN 'ทำความดี' ELSE 'บันทึกความผิด' END) AS action_name,
   u.display_name AS teacher_name,
-  CASE WHEN b.recorded_by=? THEN 1 ELSE 0 END AS can_delete
+  CASE WHEN b.recorded_by=? AND NOT EXISTS (
+    SELECT 1 FROM truancy_behavior_links l WHERE l.behavior_record_id=b.id
+   ) THEN 1 ELSE 0 END AS can_delete
   FROM behavior_records b
   JOIN users u ON u.id=b.recorded_by
   LEFT JOIN affairs_behavior_rules ar ON ar.id=b.affairs_rule_id
@@ -529,11 +531,14 @@ export async function deleteOwnBehavior(req,env,user,recordId){
   throw error(403,'ไม่มีสิทธิ์ลบประวัติคะแนน');
  const id=positiveInt(recordId);
  if(!id)throw error(400,'รายการไม่ถูกต้อง');
- const row=await env.DB.prepare('SELECT id,recorded_by FROM behavior_records WHERE id=? AND deleted_at IS NULL')
+ const row=await env.DB.prepare(`SELECT b.id,b.recorded_by,
+  EXISTS(SELECT 1 FROM truancy_behavior_links l WHERE l.behavior_record_id=b.id) AS auto_truancy
+  FROM behavior_records b WHERE b.id=? AND b.deleted_at IS NULL`)
   .bind(id).first();
  if(!row)throw error(404,'ไม่พบรายการหรือมีการลบไปแล้ว');
  if(Number(row.recorded_by)!==Number(user.id))
   throw error(403,'ลบได้เฉพาะรายการคะแนนที่ตนเองเป็นผู้บันทึก');
+ if(row.auto_truancy)throw error(409,'คะแนนหนีเรียนผูกกับการเช็กชื่อ กรุณาแก้สถานะรายคาบเพื่อคืนคะแนนอัตโนมัติ');
  const changed=await env.DB.batch([
   env.DB.prepare(`UPDATE behavior_records SET deleted_at=CURRENT_TIMESTAMP,deleted_by=?
    WHERE id=? AND recorded_by=? AND deleted_at IS NULL`).bind(user.id,id,user.id),
