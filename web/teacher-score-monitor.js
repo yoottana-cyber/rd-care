@@ -1,19 +1,49 @@
 // Schoolwide score-monitoring page for teachers and school staff (read-only).
+// Keep roster ordering stable for equal scores, including when a room is selected.
+export function availableScoreMonitorRooms(items,grade=0){
+ const found=new Map();
+ for(const item of items){
+  if(grade&&Number(item.grade)!==Number(grade))continue;
+  const id=Number(item.classroom_id);
+  if(!Number.isSafeInteger(id)||id<=0||found.has(id))continue;
+  found.set(id,{id,label:String(item.classroom_label||'')});
+ }
+ return [...found.values()];
+}
+export function filterAndSortScoreMonitorRows(items,{grade=0,roomId=0,query='',recordFilter='all',sortBy='roster',sortOrder='desc'}={}){
+ const term=String(query).trim().toLocaleLowerCase('th-TH');
+ const results=items.filter(item=>{
+  if(grade&&Number(item.grade)!==Number(grade))return false;
+  if(roomId&&Number(item.classroom_id)!==Number(roomId))return false;
+  const events=Number(item.events)||0;
+  if(recordFilter==='recorded'&&!events)return false;
+  if(recordFilter==='unrecorded'&&events)return false;
+  return !term||[item.student_no,item.full_name,item.classroom_label].some(value=>
+   String(value??'').toLocaleLowerCase('th-TH').includes(term));
+ });
+ if(!['good_total','behavior_deducted','behavior_remaining'].includes(sortBy))return results;
+ const direction=sortOrder==='asc'?1:-1;
+ return results.map((item,index)=>({item,index})).sort((a,b)=>{
+  const difference=(Number(a.item[sortBy])||0)-(Number(b.item[sortBy])||0);
+  return direction*difference||a.index-b.index;
+ }).map(entry=>entry.item);
+}
 export function createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,getTab,escapeHtml}){
  const esc=escapeHtml;
- const state={items:[],query:'',grade:0,limit:100,recordFilter:'all',date:null};
+ const state={items:[],query:'',grade:0,roomId:0,limit:100,recordFilter:'all',
+  sortBy:'roster',sortOrder:'desc',date:null};
  const active=()=>getTab()==='scoreMonitor';
  const count=value=>Number(value)||0;
  const label=()=>state.grade?`ม.${state.grade}`:'ทุกระดับชั้น';
  function filtered(){
-  const query=state.query.trim().toLocaleLowerCase('th-TH');
-  return state.items.filter(row=>{
-   if(state.grade&&Number(row.grade)!==state.grade)return false;
-   if(state.recordFilter==='recorded'&&!count(row.events))return false;
-   if(state.recordFilter==='unrecorded'&&count(row.events))return false;
-   return !query||[row.student_no,row.full_name,row.classroom_label].some(value=>
-    String(value||'').toLocaleLowerCase('th-TH').includes(query));
-  });
+  return filterAndSortScoreMonitorRows(state.items,state);
+ }
+ function selectedRows(){
+  return state.items.filter(row=>(!state.grade||Number(row.grade)===state.grade)&&
+   (!state.roomId||Number(row.classroom_id)===state.roomId));
+ }
+ function roomOptions(){
+  return availableScoreMonitorRooms(state.items,state.grade);
  }
  function paintRows(){
   const container=document.getElementById('scoreMonitorRows');
@@ -41,8 +71,11 @@ export function createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,ge
  }
  function render(){
   if(!active())return;
-  const byGrade=state.items.filter(row=>!state.grade||Number(row.grade)===state.grade);
-  const sum=key=>byGrade.reduce((total,row)=>total+count(row[key]),0);
+  const bySelection=selectedRows();
+  const rooms=roomOptions();
+  const selectedRoom=rooms.find(room=>room.id===state.roomId);
+  const scope=selectedRoom?.label||label();
+  const sum=key=>bySelection.reduce((total,row)=>total+count(row[key]),0);
   mount(`<div class="stack score-monitor-page">
    <section class="card stack">
     <div class="row between"><div><h2>ติดตามคะแนนพฤติกรรม</h2>
@@ -50,7 +83,7 @@ export function createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,ge
       เพื่อใช้ประกอบการดูแลช่วยเหลือนักเรียน โดยไม่มีสิทธิ์แก้ไขจากหน้านี้</p></div>
      <button type="button" class="button secondary" id="scoreMonitorRefresh">↻ อัปเดต</button></div>
     <div class="score-monitor-summary">
-     <div><span>นักเรียน ${label()}</span><strong>${byGrade.length}</strong></div>
+     <div><span>นักเรียน ${esc(scope)}</span><strong>${bySelection.length}</strong></div>
      <div class="score-monitor-good"><span>คะแนนความดีรวม</span><strong>+${sum('good_total')}</strong></div>
      <div><span>คะแนนความผิดรวม</span><strong>${sum('behavior_deducted')}</strong></div>
      <div class="score-monitor-adjusted"><span>ปรับพฤติกรรมแล้ว</span><strong>${sum('behavior_adjusted')}</strong></div>
@@ -69,6 +102,11 @@ export function createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,ge
        ${[1,2,3,4,5,6].map(value=>`<option value="${value}"
         ${state.grade===value?'selected':''}>ม.${value}</option>`).join('')}
       </select></div>
+     <div class="field"><label for="scoreMonitorRoom">ห้องเรียน</label>
+      <select id="scoreMonitorRoom"><option value="0">ทุกห้องเรียน</option>
+       ${rooms.map(room=>`<option value="${room.id}" ${state.roomId===room.id?'selected':''}>
+        ${esc(room.label)}</option>`).join('')}
+      </select></div>
      <div class="field score-monitor-search"><label for="scoreMonitorQuery">ค้นหาชื่อ เลขประจำตัว หรือห้อง</label>
       <input type="search" id="scoreMonitorQuery" autocomplete="off"
        maxlength="80" value="${esc(state.query)}" placeholder="พิมพ์เพื่อค้นหานักเรียน"></div>
@@ -83,8 +121,21 @@ export function createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,ge
        ${[[50,'50 คน'],[100,'100 คน'],[200,'200 คน'],[0,'ทั้งหมด']]
         .map(([value,name])=>`<option value="${value}" ${state.limit===value?'selected':''}>${name}</option>`).join('')}
       </select></div>
+     <div class="field"><label for="scoreMonitorSort">เรียงตามคะแนน</label>
+      <select id="scoreMonitorSort">
+       ${[['roster','ตามทะเบียนนักเรียน'],['good_total','คะแนนความดี'],
+        ['behavior_deducted','คะแนนความผิด'],['behavior_remaining','คะแนนความผิดคงเหลือ']]
+        .map(([key,name])=>`<option value="${key}" ${state.sortBy===key?'selected':''}>${name}</option>`).join('')}
+      </select></div>
+     <div class="field"><label for="scoreMonitorSortOrder">ลำดับคะแนน</label>
+      <select id="scoreMonitorSortOrder" ${state.sortBy==='roster'?'disabled':''}>
+       <option value="desc" ${state.sortOrder==='desc'?'selected':''}>มากไปน้อย</option>
+       <option value="asc" ${state.sortOrder==='asc'?'selected':''}>น้อยไปมาก</option>
+      </select></div>
     </div>
-    <p class="muted">เรียงตามระดับชั้น ห้องเรียน และเลขที่ ไม่มีการจัดอันดับนักเรียนตามคะแนน</p>
+    <p class="muted">${state.sortBy==='roster'?
+     'เรียงตามทะเบียนนักเรียน (ระดับชั้น ห้องเรียน และเลขที่)':
+     'เรียงเพื่อการตรวจสอบคะแนน ไม่ใช่การจัดอันดับหรือตัดสินพฤติกรรมนักเรียน'} · คะแนนเท่ากันคงลำดับตามทะเบียน</p>
     <div class="table-wrap"><table class="table score-monitor-table">
      <thead><tr><th>ห้อง</th><th>นักเรียน</th><th>ความดี</th><th>ความผิด</th>
       <th>ปรับแล้ว</th><th>คงเหลือ</th><th>รายการ</th><th>ประวัติ</th></tr></thead>
@@ -95,7 +146,17 @@ export function createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,ge
   </div>`);
   paintRows();
   document.getElementById('scoreMonitorGrade')?.addEventListener('change',event=>{
-   state.grade=Number(event.target.value);render();
+   state.grade=Number(event.target.value);
+   state.roomId=0;render();
+  });
+  document.getElementById('scoreMonitorRoom')?.addEventListener('change',event=>{
+   state.roomId=Number(event.target.value);render();
+  });
+  document.getElementById('scoreMonitorSort')?.addEventListener('change',event=>{
+   state.sortBy=event.target.value;render();
+  });
+  document.getElementById('scoreMonitorSortOrder')?.addEventListener('change',event=>{
+   state.sortOrder=event.target.value;paintRows();
   });
   document.getElementById('scoreMonitorQuery')?.addEventListener('input',event=>{
    state.query=event.target.value;paintRows();
@@ -120,7 +181,9 @@ export function createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,ge
   const data=await api('/api/affairs/behavior/monitor/summary');
   if(!active())return;
   if(data.read_only!==true){toast('ไม่สามารถตรวจสอบสิทธิ์อ่านอย่างเดียวได้',true);return}
-  state.items=data.items||[];state.date=data.date;render();
+  state.items=data.items||[];state.date=data.date;
+  if(state.roomId&&!roomOptions().some(room=>room.id===state.roomId))state.roomId=0;
+  render();
  }
  return {load};
 }
