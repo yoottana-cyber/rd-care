@@ -42,11 +42,11 @@ export function prepareRows(raw,rooms){
   else if(!Number.isInteger(values.roll_no)||values.roll_no<1||values.roll_no>100)message='เลขที่ต้องอยู่ในช่วง 1–100';
   else if(!values.student_no||values.student_no.length>40)message='รหัสนักเรียนไม่ถูกต้อง';
   else if(!values.full_name||values.full_name.length>120)message='ชื่อ–สกุลไม่ถูกต้อง';
-  else if(!/^[a-z0-9._-]{3,40}$/i.test(values.username))message='Username ไม่ถูกต้อง';
-  else if(values.password.length<4||values.password.length>128)message='Password ต้องยาว 4–128 ตัว';
+  else if(values.username&&!/^[a-z0-9._-]{3,40}$/i.test(values.username))message='Username ไม่ถูกต้อง';
+  else if(values.password&&(values.password.length<4||values.password.length>128))message='Password ต้องยาว 4–128 ตัว';
   else if(/^\d{13}$/.test(values.password))message='ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน';
   else if(ids.has(key)||names.has(uname)||rolls.has(rollkey))message='ข้อมูลซ้ำในไฟล์ (รหัสนักเรียน / Username / เลขที่ในห้อง)';
-  ids.add(key);names.add(uname);rolls.add(rollkey);
+  if(!message){ids.add(key);if(uname)names.add(uname);rolls.add(rollkey)}
   return {values,message,status:message?'error':'ready'};
  });
  if(!records.length)throw Error('ไม่มีรายชื่อนักเรียนหลังหัวตาราง');
@@ -57,18 +57,23 @@ export function createUnifiedImport({api,rooms,onSuccess}){
  let rows=[],preview=[],filename='',busy=false,stopped=false,completed=0,phase='',detectedEncoding='';
  function showPreview(container){
   const place=container.querySelector('#unifiedPreview');if(!place)return;
-  const errors=preview.filter(x=>x.status==='error').length;
-  const imported=preview.filter(x=>x.status==='imported').length;
-  place.innerHTML=preview.length?`<p class="summary"><strong>${esc(filename)}</strong>: ${preview.length} คน / มีปัญหา ${errors} / นำเข้าแล้ว ${imported}</p>
+  const skipped=preview.filter(x=>['error','skipped'].includes(x.status)).length;
+  const added=preview.filter(x=>x.status==='imported').length;
+  const updated=preview.filter(x=>x.status==='updated').length;
+  const pending=preview.filter(x=>['ready','update'].includes(x.status)).length;
+  place.innerHTML=preview.length?`<p class="summary"><strong>${esc(filename)}</strong>: ${preview.length} แถว • เพิ่มแล้ว ${added} • อัปเดตแล้ว ${updated} • ข้าม/ผิดพลาด ${skipped} • รอดำเนินการ ${pending}</p>
    <div class="table-wrap" style="max-height:440px;overflow:auto"><table class="table">
-    <thead><tr><th>แถว</th><th>ห้อง</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ</th><th>Username</th><th>ผลตรวจ</th></tr></thead>
+    <thead><tr><th>แถว</th><th>ห้อง</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ</th><th>Username</th><th>ผลตรวจ / เหตุผลข้าม</th></tr></thead>
     <tbody>${preview.map(x=>`<tr><td>${x.source_row}</td><td>${esc(x.room)}</td><td>${x.roll_no}</td><td>${esc(x.student_no)}</td>
-      <td>${esc(x.full_name)}</td><td>${esc(x.username)}</td><td class="${x.status==='error'?'import-error':x.status==='imported'?'import-success':''}">${esc(x.message|| (x.status==='imported'?'นำเข้าสำเร็จ':'พร้อมนำเข้า'))}</td></tr>`).join('')}</tbody></table></div>`:'';
+      <td>${esc(x.full_name)}</td><td>${esc(x.username)}</td>
+      <td class="${['error','skipped'].includes(x.status)?'import-error':['imported','updated'].includes(x.status)?'import-success':''}">
+      ${esc(x.message||(x.status==='update'?'พบข้อมูลเดิม • เตรียมอัปเดต':'พร้อมเพิ่ม'))}</td></tr>`).join('')}</tbody></table></div>`:'';
   const button=container.querySelector('#unifiedCommit');
-  if(button){button.hidden=!preview.length||imported===preview.length;button.disabled=busy||errors>0||preview.some(x=>x.status==='imported');}
+  if(button){button.hidden=!pending;button.disabled=busy||!pending;button.textContent='ยืนยันเพิ่ม/อัปเดต '+pending+' รายการ (ข้ามที่ผิดพลาด)'}
   const status=container.querySelector('#unifiedStatus');
   if(status)status.textContent=phase;
  }
+
  async function preflight(container){
   if(busy)return;
   busy=true;rows=[];preview=[];completed=0;detectedEncoding='';
@@ -96,57 +101,66 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    preview=prepared.map(x=>({source_row:x.values.source_row,room:x.values.classroom,roll_no:x.values.roll_no,
     student_no:x.values.student_no,full_name:x.values.full_name,username:x.values.username,status:x.status,message:x.message}));
    let checked=0;
-   if(prepared.some(x=>x.message)){
-    phase=(detectedEncoding?'ตรวจพบรหัสอักขระ '+detectedEncoding+' • ':'')+'พบข้อมูลผิดพลาดภายในไฟล์ กรุณาแก้ไขก่อนนำเข้า';
-   }else{
-    phase='กำลังตรวจสอบข้อมูลในฐานข้อมูล...';showPreview(container);
-    const groups=chunks(rows,100);
-    for(const group of groups){
-     const result=await api('/api/admin/unified-import/preview',{method:'POST',body:{students:group}});
-     for(const x of result.items){
-      const target=preview.find(p=>p.source_row===x.source_row);
-      if(target){target.status=x.status;target.message=x.message}
-     }
-     checked+=group.length;
-     phase='ตรวจแล้ว '+checked+' / '+rows.length+' คน';showPreview(container);
+   const allowed=prepared.filter(x=>!x.message).map(x=>x.values);
+   phase='กำลังตรวจสอบรายการที่รูปแบบถูกต้องในฐานข้อมูล...';showPreview(container);
+   for(const group of chunks(allowed,100)){
+    const result=await api('/api/admin/unified-import/preview',{method:'POST',body:{students:group}});
+    for(const x of result.items){
+     const target=preview.find(p=>p.source_row===x.source_row);
+     if(target){target.status=x.status;target.message=x.message}
     }
-    phase=(detectedEncoding?'ตรวจพบรหัสอักขระ '+detectedEncoding+' • ':'')+(preview.some(x=>x.status==='error')?'พบรายการที่ต้องแก้ไข ไม่สามารถเริ่มบันทึกได้':
-     'ตรวจสอบครบทั้งไฟล์แล้ว พร้อมนำเข้า '+rows.length+' คน');
+    checked+=group.length;
+    phase='ตรวจแล้ว '+checked+' / '+allowed.length+' คน';showPreview(container);
    }
+   const valid=preview.filter(x=>['ready','update'].includes(x.status)).length;
+   const skip=preview.length-valid;
+   phase=(detectedEncoding?'รหัสอักขระ '+detectedEncoding+' • ':'')+
+    'พร้อมเพิ่ม/อัปเดต '+valid+' • ข้ามข้อมูลผิดพลาด '+skip+' (ดูรายละเอียดรายแถว)';
+
   }catch(e){rows=[];preview=[];phase=e.message;}
   finally{busy=false;if(button?.isConnected)button.disabled=false;showPreview(container)}
  }
  async function commit(container){
-  if(busy||!preview.length||preview.some(x=>x.status!=='ready'))return;
-  if(!confirm('ยืนยันนำเข้านักเรียนและบัญชี '+rows.length+' คนจากทุกห้องที่ระบุในไฟล์? ระบบจะทยอยบันทึกเป็นชุดย่อย'))return;
-  busy=true;stopped=false;let imported=0;
+  if(busy)return;
+  const selected=rows.filter(x=>['ready','update'].includes(
+   preview.find(p=>p.source_row===x.source_row)?.status));
+  if(!selected.length)return;
+  const invalid=preview.filter(x=>x.status==='error').length;
+  if(!confirm('ยืนยันเพิ่ม/อัปเดต '+selected.length+' คน และข้ามแถวที่ผิดพลาด '+invalid+
+    ' แถว? ข้อมูลเดิมในห้องเดียวกันจะถูกอัปเดตตามไฟล์'))return;
+  busy=true;stopped=false;let added=0,updated=0,skipped=invalid,processed=0;
   const btn=container.querySelector('#unifiedCommit'),cancel=container.querySelector('#unifiedCancel');
   if(btn)btn.disabled=true;if(cancel)cancel.hidden=false;
   try{
-   for(const group of chunks(rows,10)){
+   for(const group of chunks(selected,10)){
     if(stopped)break;
     const result=await api('/api/admin/unified-import/commit',{method:'POST',body:{students:group}});
-    imported+=result.imported;
-    for(const x of result.items){
+    processed+=group.length;added+=result.added||0;updated+=result.updated||0;skipped+=result.skipped||0;
+    for(const x of result.items||[]){
      const target=preview.find(p=>p.source_row===x.source_row);
-     if(target){target.status='imported';target.message='นำเข้าสำเร็จ'}
+     if(target){target.status=x.status;target.message=x.message}
     }
-    phase='นำเข้าสำเร็จ '+imported+' / '+rows.length+' คน';
-    showPreview(container);
+    phase='ดำเนินการ '+processed+' / '+selected.length+' • เพิ่ม '+added+
+     ' • อัปเดต '+updated+' • ข้าม '+skipped;showPreview(container);
    }
-   if(imported===rows.length){
-    rows=[];phase='นำเข้าครบ '+imported+' คนแล้ว (บัญชีพร้อมใช้งาน)';
+   rows=[];
+   if(processed===selected.length){
+    phase='เสร็จสิ้น • เพิ่มใหม่ '+added+' • อัปเดต '+updated+' • ข้าม '+skipped+
+     ' รายการ (ดูเหตุผลในตาราง)';
     await onSuccess?.();
-   }else{rows=[];phase='หยุดการนำเข้าหลังบันทึก '+imported+' คน กรุณาตรวจรายชื่อก่อนเริ่มไฟล์ใหม่';}
+   }else phase='หยุดหลังดำเนินการ '+processed+' รายการ • เพิ่ม '+added+
+      ' • อัปเดต '+updated+' • ข้าม '+skipped;
   }catch(e){
-   rows=[];phase='การนำเข้าหยุดหลังบันทึก '+imported+' คน: '+e.message+
-     ' — ชุดที่บันทึกแล้วจะยังอยู่ กรุณาตรวจรายชื่อในระบบก่อนนำเข้าไฟล์อีกครั้ง';
+   rows=[];phase='หยุดหลังดำเนินการ '+processed+' รายการ: '+e.message+
+    ' • เพิ่ม '+added+' • อัปเดต '+updated+' • ข้าม '+skipped+
+    ' — กรุณาตรวจข้อมูลก่อนนำเข้าอีกครั้ง';
   }finally{busy=false;if(cancel?.isConnected)cancel.hidden=true;showPreview(container)}
  }
+
  function render(container){
   if(!container)return;
   container.innerHTML=`<section class="card stack"><h3>นำเข้านักเรียนและบัญชีจากทุกห้องในไฟล์เดียว</h3>
-   <p class="muted">ไฟล์มาตรฐาน 6 คอลัมน์: classroom,roll_no,student_no,full_name,username,password • ไม่ต้องเลือกห้องเรียน • รองรับรายชื่อจำนวนมาก โดยระบบแบ่งชุดนำเข้าอัตโนมัติ</p>
+   <p class="muted">ไฟล์มาตรฐาน 6 คอลัมน์: classroom,roll_no,student_no,full_name,username,password • ใช้รหัสนักเรียนอัปเดตข้อมูลเดิมในห้องเดิมได้ทันที • แถวผิดพลาดจะข้ามและแสดงเหตุผล</p>
    <p class="row" style="flex-wrap:wrap"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV UTF-8 สำหรับ Excel (.csv)</a></p>
    <form id="unifiedForm" class="stack">
      <div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".xlsx,.csv,text/csv"></div>
@@ -157,7 +171,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
      </select></div>
      <div class="field"><label>หรือวาง CSV ตามรูปแบบไฟล์ตัวอย่าง</label>
       <textarea name="csv" rows="3" placeholder="classroom,roll_no,student_no,full_name,username,password"></textarea></div>
-     <p class="muted">ระบุห้องเรียนตรงกับที่มีในระบบ เช่น ม.1/1 และ ม.2/3 • รหัสนักเรียนและ Username ที่มี 0 นำหน้า ให้ตั้งคอลัมน์ Excel เป็น Text</p>
+     <p class="muted">ระบุห้องเรียนตรงกับที่มีในระบบ เช่น ม.1/1 และ ม.2/3 • รหัสนักเรียนและ Username ที่มี 0 นำหน้า ให้ตั้งคอลัมน์ Excel เป็น Text • บัญชีเดิมเว้น Password ว่างได้ • เปลี่ยนห้องต้องใช้เมนูย้ายห้อง</p>
      <p class="muted">ไฟล์ CSV ที่บันทึกจาก Excel บางเครื่องใช้รหัสภาษาไทย Windows-874/TIS-620 ระบบจะอ่านให้อัตโนมัติ หากชื่อกลายเป็น � ให้ใช้ไฟล์ต้นฉบับหรือบันทึกใหม่เป็น CSV UTF-8</p>
      <p class="warn">Password ขั้นต่ำ 4 ตัวตามที่ตั้งค่าไว้ แต่ควรใช้รหัสผ่านยาวและไม่ซ้ำ ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน และโปรดเก็บไฟล์รหัสผ่านเป็นความลับ</p>
      <button class="button full" id="unifiedPreviewButton" type="submit">ตรวจสอบทั้งไฟล์ก่อนนำเข้า</button>
@@ -166,7 +180,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    <div id="unifiedPreview"></div>
    <button type="button" class="button full" id="unifiedCommit" hidden>ยืนยันนำเข้าทั้งหมด</button>
    <button type="button" class="button secondary" id="unifiedCancel" hidden>หยุดหลังจบชุดปัจจุบัน</button>
-   <p class="muted">ระบบแบ่งการบันทึกเป็นชุดละ 10 คนเพื่อความเสถียร แต่ละชุดบันทึกแบบครบหรือไม่บันทึกเลย หากเกิดข้อผิดพลาดระหว่างทาง รายการที่สำเร็จแล้วจะไม่ถูกย้อนกลับทั้งไฟล์</p>
+   <p class="muted">ระบบแบ่งการบันทึกเป็นชุดละ 10 คนเพื่อความเสถียร บันทึกแต่ละคนแยกธุรกรรม หากแถวใดผิดพลาดจะข้ามเฉพาะแถวนั้น ไม่ยกเลิกรายการอื่น และแสดงจำนวนเพิ่ม/อัปเดต/ข้าม</p>
    <p class="warn">ก่อนนำเข้า โปรดตรวจสอบความถูกต้องของข้อมูล สิทธิ์ผู้ใช้งาน และข้อกำหนด PDPA ของโรงเรียน</p>
   </section>`;
   container.querySelector('#downloadUnifiedExcel').addEventListener('click',downloadStudentExampleXlsx);
