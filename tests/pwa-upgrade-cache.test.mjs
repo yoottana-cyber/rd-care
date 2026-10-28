@@ -62,6 +62,7 @@ function swHarness(){
  };
  const deleted=[],requested=[];
  let fetchResponse={ok:true,type:'basic',redirected:false,clone(){return this},value:'fresh'};
+ let fetchError=null;
  const self={
   location:{origin:'https://example.test'},
   registration:{scope:'https://example.test/rd-care/'},
@@ -70,11 +71,14 @@ function swHarness(){
   addEventListener(name,handler){handlers.set(name,handler)}
  };
  runInNewContext(code,{self,caches,URL,Request,Response,
-  fetch:async(req,options)=>{requested.push({url:req.url||req,options});return fetchResponse},
+  fetch:async(req,options)=>{requested.push({url:req.url||req,options});
+   if(fetchError)throw fetchError;
+   return fetchResponse},
   console});
  return {
   handlers,entries,requested,put,deleted,
-  setResponse(value){fetchResponse=value}
+  setResponse(value){fetchResponse=value},
+  setError(error){fetchError=error}
  };
 }
 test('worker preloads shell and removes only old RD CONNECT caches, retaining unrelated app data',async()=>{
@@ -109,13 +113,22 @@ test('online static modules prefer fresh network responses, offline use only kno
  assert.equal((await out).value,'fresh');
  assert.ok(h.requested[0].options.cache==='no-store');
  assert.ok(h.put.includes(script));
- h.setResponse(undefined);
- const requested=h.requested.length;
- // A network failure should fall back to the previously precached module.
- const networkError=async()=>{throw Error('offline')};
- // Simulate a fetch failure by replacing the mock fetch via harness setter.
- h.setResponse({then(){throw Error('offline')}});
- assert.ok(requested>0);
+ h.setError(new Error('offline'));
+ h.handlers.get('fetch')({request:{url:script,method:'GET',mode:'cors'},
+  respondWith:p=>{out=p}});
+ assert.equal((await out).value,'fresh','most recent cached version survives network outage');
+ let navigation;
+ h.entries.set('https://example.test/rd-care/index.html',{value:'offline shell'});
+ h.handlers.get('fetch')({request:{
+  url:'https://example.test/rd-care/?login=guardian',method:'GET',mode:'navigate'
+ },respondWith:p=>{navigation=p}});
+ assert.equal((await navigation).value,'offline shell');
+ // Navigation with an unrecognized path must not substitute the shell.
+ let arbitrary=false;
+ h.handlers.get('fetch')({request:{
+  url:'https://example.test/rd-care/private/student/42',method:'GET',mode:'navigate'
+ },respondWith:()=>{arbitrary=true}});
+ assert.equal(arbitrary,false);
 });
 test('update handler registers no-cache and checks version on startup and periodically without auto reload',async()=>{
  let handler,registered=null,checkCount=0,noticeCount=0,interval=null;
