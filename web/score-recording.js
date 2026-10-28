@@ -1,6 +1,5 @@
 // Shared teacher entry screen: multi-room student selection for conduct and merit.
-import {scoreHistoryTables} from './score-history.js';
-export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,escapeHtml}){
+export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,escapeHtml,scorePopup}){
  const modes={
   behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''},
   good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''}
@@ -36,8 +35,6 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
   const fromRoom=u.students.length>0&&u.students.every(x=>u.picked.has(x.id));
   const selected=[...u.picked.values()];
   const groupCount=new Set(selected.map(x=>x.classroom_id)).size;
-  const points=isGood?'คะแนนความดีสะสม '+Number(u.scores.good_total||0):
-   'คะแนนความผิดคงเหลือ '+Number(u.scores.behavior_remaining||0);
   mount(`<div class="stack score-entry">
    <div><h2>${title(key)}</h2><p class="muted">${isGood?
     'บันทึกความดีให้หลายคนพร้อมกัน โดยคะแนนความดีแยกจากคะแนนพฤติกรรม':
@@ -78,7 +75,8 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
      <button type="button" class="button ghost" id="scoreClearSelected" ${count?'':'disabled'}>ล้างรายชื่อที่เลือก</button></div>
     <div class="score-selected" aria-live="polite">
      ${selected.length?selected.map(st=>`<span class="score-selected-chip">${esc(st.full_name)} · ${esc(st.classroom_label)}
-      <button type="button" data-score-remove="${st.id}" aria-label="นำ ${esc(st.full_name)} ออกจากรายการ">×</button></span>`).join(''):
+      <button type="button" data-score-remove="${st.id}" aria-label="นำ ${esc(st.full_name)} ออกจากรายการ">×</button>
+      <button type="button" class="score-chip-history" data-score-focus="${st.id}">ประวัติ</button></span>`).join(''):
       '<p class="muted">ยังไม่ได้เลือกนักเรียน สามารถติ๊กเลือกจากห้องหรือค้นหาเลขประจำตัวได้</p>'}
     </div>
     <form id="scoreForm" class="stack">
@@ -93,26 +91,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
      ${!filtered.length?'<p class="warn">ยังไม่มีเกณฑ์คะแนนหมวดนี้ที่เปิดใช้งาน</p>':''}
     </form>
    </section>
-   <section class="card stack" aria-label="ประวัติคะแนนนักเรียน">
-    <div class="row between"><h3>ประวัติของ ${esc(u.focusName||'นักเรียนที่เลือกดู')}</h3><span class="tag">${points}</span></div>
-    ${scoreHistoryTables({items:u.history,mode:key,esc})}
-    ${u.hasMore?'<button class="button secondary" type="button" id="scoreLoadMore">ดูประวัติเพิ่มเติม</button>':''}
-   </section>
   </div>`);
-  document.querySelectorAll('[data-score-delete]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
-   rememberDraft();
-   const id=Number(btn.dataset.scoreDelete);
-   if(!window.confirm('ยืนยันลบรายการคะแนนที่คุณบันทึกเอง? คะแนนจะถูกปรับปรุงและเก็บหลักฐานการลบไว้'))return;
-   btn.disabled=true;
-   try{
-    await api('/api/behavior/records/'+id+'/delete',{method:'POST',body:{}});
-    toast('ลบรายการของคุณแล้ว และอัปเดตคะแนนใหม่เรียบร้อย');
-    await loadHistory(key);
-   }finally{if(btn.isConnected)btn.disabled=false}
-  })));
-  document.querySelector('#scoreLoadMore')?.addEventListener('click',()=>safeRun(async()=>{
-   rememberDraft();await loadHistory(key,{more:true});
-  }));
   document.querySelector('#scoreRoom')?.addEventListener('change',e=>safeRun(async()=>{
    rememberDraft();setRoomId(Number(e.target.value));await load();
   }));
@@ -144,8 +123,8 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
   }));
   document.querySelectorAll('[data-score-focus]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
    rememberDraft();const studentId=Number(btn.dataset.scoreFocus);
-   const st=u.students.find(x=>x.id===studentId)||u.results.find(x=>x.id===studentId);
-   if(st){setFocus(u,st);await loadHistory(key)}
+   const st=u.picked.get(studentId)||u.students.find(x=>x.id===studentId)||u.results.find(x=>x.id===studentId);
+   if(st){setFocus(u,st);await scorePopup.open({student:st,mode:key})}
   })));
   document.querySelectorAll('[data-score-remove]').forEach(btn=>btn.addEventListener('click',()=>{
    rememberDraft();u.picked.delete(Number(btn.dataset.scoreRemove));draw();
@@ -167,20 +146,9 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
     if(first)setFocus(u,first);
     u.picked.clear();u.reason='';
     toast('บันทึก'+title(key)+'สำเร็จ '+Number(result.count||ids.length)+' คน');
-    if(getTab()===key)await loadHistory(key);
+    if(getTab()===key)draw();
    }finally{if(button?.isConnected)button.disabled=false}
   }));
- }
- async function loadHistory(key,{more=false}={}){
-  const u=modes[key],focusId=u.focusId;
-  if(!focusId){u.history=[];u.hasMore=false;u.nextOffset=0;if(getTab()===key)draw();return}
-  const offset=more?u.nextOffset:0;
-  const data=await api('/api/behavior?student_id='+focusId+'&offset='+offset);
-  if(getTab()!==key||u.focusId!==focusId)return;
-  u.history=more?[...u.history,...(data.items||[])]:data.items||[];
-  u.hasMore=Boolean(data.has_more);
-  u.nextOffset=Number(data.next_offset)||0;
-  u.scores=data;draw();
  }
  async function load(){
   const key=mode(),u=modes[key],roomId=getRoomId();
@@ -193,9 +161,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
   const label=roomLabel();
   u.students=(students.items||[]).map(st=>({...st,classroom_id:roomId,classroom_label:label}));
   u.rules=(rules.items||[]).filter(x=>x.active);
-  if(!u.focusId&&u.students.length)setFocus(u,u.students[0]);
-  if(u.focusId)await loadHistory(key);
-  else draw();
+  draw();
  }
  return {load};
 }

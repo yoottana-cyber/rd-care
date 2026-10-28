@@ -86,8 +86,8 @@ test('Student Affairs has a distinct adjustment follow-up tab with filters, stat
   assert.ok(ui.includes(token),token);
  const teacherUi=source('web/behavior-adjustment.js');
  for(const token of ['adjustmentRecordForm','adjustmentRoom','adjustmentRule',
-  '/api/affairs/behavior/approved-adjustments','/api/affairs/behavior/adjust',
-  'adjustmentReason','behavior_remaining'])
+  '/api/affairs/behavior/approved-adjustments','/api/affairs/behavior/adjust/bulk',
+  'adjustmentReason','adjustmentToggleRoom'])
   assert.ok(teacherUi.includes(token),token);
  assert.doesNotMatch(source('web/score-recording.js'),/scoreAdjustmentForm/);
 });

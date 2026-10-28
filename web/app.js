@@ -18,6 +18,7 @@ import {configureRolePwa,isInstalledPwa,preferredHomeRole,rememberHomeRole} from
 import {createPortalAdmin} from './portal-admin.js';
 import {createStudentAffairs} from './student-affairs.js';
 import {createScoreRecording} from './score-recording.js';
+import {createScoreHistoryPopup} from './score-history-popup.js';
 import {createBehaviorAdjustment} from './behavior-adjustment.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
 import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-ui.js';
@@ -40,10 +41,11 @@ const lateGate=createLateGate({api,mount,toast,safeRun});
 const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,
  getAlerts:()=>state.stats?.alerts||0});
 const studentAffairs=createStudentAffairs({api,mount,safeRun,toast,rooms:()=>state.rooms});
+const scorePopup=createScoreHistoryPopup({api,toast,safeRun,escapeHtml:esc});
 const scoreRecorder=createScoreRecording({api,mount,safeRun,toast,rooms:()=>state.rooms,
- getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc});
+ getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
 const behaviorAdjustment=createBehaviorAdjustment({api,mount,safeRun,toast,rooms:()=>state.rooms,
- getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc});
+ getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
@@ -330,7 +332,7 @@ function roomOptions(advisorOnly=false){
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
-async function showTab(tab){if(tab!=='lateGate')lateGate.destroy();portalAdminUI?.cancel();state.tab=tab;
+async function showTab(tab){scorePopup.close();if(tab!=='lateGate')lateGate.destroy();portalAdminUI?.cancel();state.tab=tab;
  if(tab==='attendance')state.kind='daily';
  if(tab==='periodAttendance'||tab==='periodCheckin')state.kind='period';
  if(tab!=='adminStudents')unifiedImport.clear();

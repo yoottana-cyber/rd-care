@@ -93,11 +93,17 @@ test('staff monitor lists every student and supports clickable detailed case/sco
  const worker=source('worker/src/student-affairs.js');
  assert.doesNotMatch(worker,/ORDER BY c\.grade,c\.room,s\.roll_no LIMIT 1500/);
 });
-test('teacher pages show separate history and ask confirmation before deleting their own entry',()=>{
- const ui=source('web/score-recording.js');
- assert.match(ui,/scoreHistoryTables/);
- assert.match(ui,/data-score-delete/);
- assert.match(ui,/window\.confirm/);
- assert.match(ui,/scoreLoadMore/);
+test('teacher record pages open one shared popup with own-only delete confirmation',()=>{
+ const ui=source('web/score-recording.js'),adjust=source('web/behavior-adjustment.js');
+ const popup=source('web/score-history-popup.js');
+ for(const page of [ui,adjust])assert.match(page,/scorePopup\.open/);
+ assert.doesNotMatch(ui,/scoreHistoryTables\(\{/);
+ assert.doesNotMatch(adjust,/scoreHistoryTables\(\{/);
+ assert.match(popup,/scoreHistoryTables/);
+ assert.match(popup,/data-score-delete/);
+ assert.match(popup,/window\.confirm/);
+ assert.match(popup,/rdScorePopupMore/);
+ assert.match(popup,/aria-modal="true"/);
+ assert.match(popup,/rdScorePopupClose/);
  assert.match(source('worker/src/worker.js'),/if\(req\.method==='POST'&&recordDelete\)return deleteOwnBehavior/);
 });
