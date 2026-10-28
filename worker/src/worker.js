@@ -488,17 +488,59 @@ async function addBehavior(req,env,user){
  return json({ok:true,id:result.meta.last_row_id},201);
 }
 async function listBehavior(req,env,user){
- const stId=positiveInt(new URL(req.url).searchParams.get('student_id'));
- await studentAccess(env,user,stId);
- const {results}=await env.DB.prepare(`SELECT b.id,b.points,b.reason,b.created_at,
+ const q=new URL(req.url).searchParams;
+ const stId=positiveInt(q.get('student_id'));
+ // Student Affairs users may inspect school-wide student score histories.
+ if(isStaff(user)||Number(user.student_affairs)===1){
+  const found=await env.DB.prepare('SELECT id FROM students WHERE id=? AND active=1').bind(stId).first();
+  if(!found)throw error(404,'ไม่พบนักเรียน');
+ }else await studentAccess(env,user,stId);
+ const limitRaw=q.get('limit'),offsetRaw=q.get('offset');
+ const limit=limitRaw===null?100:Number(limitRaw);
+ const offset=offsetRaw===null?0:Number(offsetRaw);
+ if(!Number.isSafeInteger(limit)||limit<1||limit>200||
+    !Number.isSafeInteger(offset)||offset<0||offset>100000)
+  throw error(400,'รูปแบบการแบ่งหน้าประวัติไม่ถูกต้อง');
+ const {results}=await env.DB.prepare(`SELECT b.id,b.points,b.reason,b.created_at,b.recorded_by,
   b.affairs_category,${caseTypeSql('b')} AS score_type,
-  u.display_name AS teacher_name FROM behavior_records b
-  JOIN users u ON u.id=b.recorded_by WHERE b.student_id=? ORDER BY b.id DESC LIMIT 100`)
-  .bind(stId).all();
+  COALESCE(ar.name,adj.name,
+    CASE WHEN b.affairs_category='adjustment' THEN 'ปรับพฤติกรรม'
+     WHEN b.points>0 THEN 'ทำความดี' ELSE 'บันทึกความผิด' END) AS action_name,
+  u.display_name AS teacher_name,
+  CASE WHEN b.recorded_by=? THEN 1 ELSE 0 END AS can_delete
+  FROM behavior_records b
+  JOIN users u ON u.id=b.recorded_by
+  LEFT JOIN affairs_behavior_rules ar ON ar.id=b.affairs_rule_id
+  LEFT JOIN affairs_adjustment_rules adj ON adj.id=b.adjustment_rule_id
+  WHERE b.student_id=? AND b.deleted_at IS NULL
+  ORDER BY b.id DESC LIMIT ? OFFSET ?`)
+  .bind(user.id,stId,limit+1,offset).all();
  const row=await env.DB.prepare(`SELECT ${scoreColumns('b')}
   FROM behavior_records b WHERE b.student_id=?`).bind(stId).first();
  const totals=scoreSummary(row);
- return json({items:results,total:-totals.behavior_remaining,...totals});
+ return json({items:results.slice(0,limit),has_more:results.length>limit,
+  next_offset:offset+Math.min(limit,results.length),total:-totals.behavior_remaining,...totals});
+}
+async function deleteOwnBehavior(req,env,user,recordId){
+ if(!['admin','staff','teacher'].includes(user.role))
+  throw error(403,'ไม่มีสิทธิ์ลบประวัติคะแนน');
+ const id=positiveInt(recordId);
+ if(!id)throw error(400,'รายการไม่ถูกต้อง');
+ const row=await env.DB.prepare('SELECT id,recorded_by FROM behavior_records WHERE id=? AND deleted_at IS NULL')
+  .bind(id).first();
+ if(!row)throw error(404,'ไม่พบรายการหรือมีการลบไปแล้ว');
+ if(Number(row.recorded_by)!==Number(user.id))
+  throw error(403,'ลบได้เฉพาะรายการคะแนนที่ตนเองเป็นผู้บันทึก');
+ const changed=await env.DB.batch([
+  env.DB.prepare(`UPDATE behavior_records SET deleted_at=CURRENT_TIMESTAMP,deleted_by=?
+   WHERE id=? AND recorded_by=? AND deleted_at IS NULL`).bind(user.id,id,user.id),
+  env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
+   SELECT ?,'affairs_behavior_deleted','behavior_records',CAST(id AS TEXT)
+   FROM behavior_records WHERE id=? AND deleted_by=? AND deleted_at IS NOT NULL`)
+   .bind(user.id,id,user.id)
+ ]);
+ if(changed[0]?.meta?.changes!==1)throw error(409,'รายการมีการเปลี่ยนแปลง กรุณารีเฟรช');
+ return json({ok:true,deleted_id:id});
 }
 async function listAlerts(req,env,user){
  const q=new URL(req.url).searchParams;
@@ -931,6 +973,8 @@ async function route(req,env,ctx){
  if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
  if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
  if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
+ const recordDelete=/^\/api\/behavior\/records\/(\d+)\/delete$/.exec(path);
+ if(req.method==='POST'&&recordDelete)return deleteOwnBehavior(req,env,user,recordDelete[1]);
  // Never permit free-form points to bypass approved school scoring rules.
  if(req.method==='POST'&&path==='/api/behavior')
   throw error(403,'กรุณาบันทึกผ่านเกณฑ์ความดี ความผิด หรือปรับพฤติกรรมที่ฝ่ายกิจการนักเรียนกำหนด');
