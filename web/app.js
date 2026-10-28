@@ -58,7 +58,8 @@ const scoreRecorder=createScoreRecording({api,mount,safeRun,toast,rooms:()=>stat
 const behaviorAdjustment=createBehaviorAdjustment({api,mount,safeRun,toast,rooms:()=>state.rooms,
  getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
 const adminStudentState={roomId:null,items:[],editId:null};
-const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
+const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()},
+ onOpenConflict:async(id,roomId)=>{adminStudentState.roomId=roomId;adminStudentState.editId=id;await showTab('adminStudents')}});
 const studentStatistics=createStudentStatistics({api,mount,safeRun,isActive:()=>state.tab==='studentStatistics',
  onRoom:async id=>{adminStudentState.roomId=id;adminStudentState.editId=null;await showTab('adminStudents')}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});

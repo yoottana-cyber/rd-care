@@ -44,7 +44,7 @@ export function planUnifiedRoster(rows,roomMap,existingStudents=[],existingAccou
    else if(current&&Number(current.classroom_id)!==Number(roomId))
     message ||= 'นักเรียนอยู่คนละห้อง โปรดย้ายห้องผ่านเมนูทะเบียนเพื่อรักษาประวัติเช็กชื่อ';
    if(occupied&&key(occupied.student_no)!==id)
-    message ||= 'เลขที่นี้มีนักเรียนอื่นใช้อยู่แล้วในห้อง';
+    message ||= occupied.deleted_at?'เลขที่ยังมีข้อมูลที่เก็บประวัติอยู่ในห้อง':'เลขที่นี้มีนักเรียนอื่นใช้อยู่แล้วในห้อง';
    const existingAccount=current?accountsByStudent.get(Number(current.id)):null;
    const login=student.username||(existingAccount?.username||'');
    if(student.password&&!login){
@@ -71,10 +71,15 @@ export function planUnifiedRoster(rows,roomMap,existingStudents=[],existingAccou
    }
   }
   if(message)status='error';
+  const conflicting=student?takenRolls.get(roomId+':'+student.roll_no):null;
+  const conflict=conflicting&&key(conflicting.student_no)!==key(student.student_no)?conflicting:null;
   return {source_row:line,room:roomLabel,student_no:clean(raw?.student_no),
    full_name:clean(raw?.full_name),username:clean(raw?.username).toLowerCase(),
    roll_no:Number(raw?.roll_no),existing_id:existingId,account_action:accountAction,
-   status,message};
+   status,message,conflict_student:conflict?{
+    id:Number(conflict.id),classroom_id:Number(roomId),student_no:conflict.student_no,
+    full_name:conflict.full_name||'',active:Number(conflict.active)===1,archived:!!conflict.deleted_at
+   }:null};
  });
  return {ready:items.every(x=>x.status!=='error'),valid:items.filter(x=>x.status!=='error').length,
   added:items.filter(x=>x.status==='ready').length,
@@ -98,12 +103,12 @@ async function gather(env,rows,{rosterOnly=false}={}){
  const roomMap=new Map(rooms.map(x=>[x.label,x.id]));
  const ids=[...new Set(rows.map(x=>key(x?.student_no)).filter(x=>x.length>0&&x.length<=40))];
  const checks=[];
- if(ids.length)checks.push(env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,deleted_at FROM students WHERE lower(student_no) IN ('+
+ if(ids.length)checks.push(env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,full_name,active,deleted_at FROM students WHERE lower(student_no) IN ('+
   sqlPlaceholders(ids)+')').bind(...ids));
  for(const room of rooms){
   const rolls=[...new Set(rows.filter(x=>roomMap.get(clean(x.classroom))===room.id).map(x=>Number(x.roll_no))
    .filter(x=>Number.isInteger(x)&&x>0&&x<=100))];
-  if(rolls.length)checks.push(env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,deleted_at FROM students WHERE classroom_id=? AND roll_no IN ('+
+  if(rolls.length)checks.push(env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,full_name,active,deleted_at FROM students WHERE classroom_id=? AND roll_no IN ('+
    sqlPlaceholders(rolls)+')').bind(room.id,...rolls));
  }
  const checked=checks.length?await env.DB.batch(checks):[];

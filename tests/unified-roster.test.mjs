@@ -113,3 +113,18 @@ test('frontend allows empty credentials and marks conflicting rows without stopp
  const planned=prepareRows(raw,rooms);
  assert.deepEqual(planned.map(x=>x.status),['ready','error','ready']);
 });
+
+test('conflict preview explains who owns the room roll without exposing passwords',()=>{
+ const input={...record(1),student_no:'NEW006',username:'',password:'private'};
+ const existing=[{id:91,student_no:'DEMO1001',classroom_id:1,roll_no:1,full_name:'นักเรียนตัวอย่าง ม.1/1',active:1,deleted_at:null}];
+ const output=planUnifiedRoster([input],map,existing);
+ assert.equal(output.items[0].status,'error');
+ assert.match(output.items[0].message,/เลขที่นี้มีนักเรียนอื่น/);
+ assert.deepEqual(output.items[0].conflict_student,{
+  id:91,classroom_id:1,student_no:'DEMO1001',full_name:'นักเรียนตัวอย่าง ม.1/1',active:true,archived:false
+ });
+ assert.equal(JSON.stringify(output).includes('private'),false);
+ const archived=planUnifiedRoster([input],map,[{...existing[0],deleted_at:'2026-10-28'}]);
+ assert.equal(archived.items[0].conflict_student.archived,true);
+ assert.match(archived.items[0].message,/เก็บประวัติ/);
+});

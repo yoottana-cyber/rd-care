@@ -57,9 +57,19 @@ const chunks=(items,size)=>Array.from({length:Math.ceil(items.length/size)},(_,i
 export const ROSTER_PREVIEW_CHUNK=25;
 export const ROSTER_COMMIT_CHUNK=1;
 const ROSTER_VIEW_PAGE_SIZE=80;
-export function createUnifiedImport({api,rooms,onSuccess}){
+export function createUnifiedImport({api,rooms,onSuccess,onOpenConflict}){
  let rows=[],preview=[],filename='',busy=false,stopped=false,phase='',detectedEncoding='';
  let previewPage=1,previewFilter='all';
+ const conflictHtml=x=>{
+  const student=x.conflict_student;
+  if(!student)return '';
+  const label=student.archived?'เก็บเป็นประวัติ':student.active?'ใช้งาน':'พักข้อมูล';
+  return '<div class="rd-import-conflict-detail">ข้อมูลที่ครองเลขที่นี้: <strong>'+esc(student.full_name||'(ไม่ระบุชื่อ)')+
+    '</strong> • รหัส '+esc(student.student_no)+' • '+label+
+    (!student.archived&&onOpenConflict?
+      ' <button type="button" class="button secondary" data-conflict-student="'+Number(student.id)+
+      '" data-conflict-room="'+Number(student.classroom_id)+'">ตรวจข้อมูลเดิมในทะเบียน</button>':'')+'</div>';
+ };
  function showPreview(container){
   const place=container.querySelector('#unifiedPreview');if(!place)return;
   const skipped=preview.filter(x=>['error','skipped','uncertain'].includes(x.status)).length;
@@ -84,7 +94,13 @@ export function createUnifiedImport({api,rooms,onSuccess}){
     <tbody>${visible.map(x=>`<tr><td>${x.source_row}</td><td>${esc(x.room)}</td><td>${x.roll_no}</td><td>${esc(x.student_no)}</td>
       <td>${esc(x.full_name)}</td><td>${esc(x.username)}</td>
       <td class="${['error','skipped','uncertain'].includes(x.status)?'import-error':['imported','updated'].includes(x.status)?'import-success':''}">
-      ${esc(x.message||(x.status==='update'?'พบข้อมูลเดิม • เตรียมอัปเดต':'พร้อมเพิ่ม'))}</td></tr>`).join('')}</tbody></table></div>`:'';
+      ${esc(x.message||(x.status==='update'?'พบข้อมูลเดิม • เตรียมอัปเดต':'พร้อมเพิ่ม'))}${conflictHtml(x)}</td></tr>`).join('')}</tbody></table></div>`:'';
+  place.querySelectorAll('[data-conflict-student]').forEach(button=>button.addEventListener('click',()=>{
+   if(!onOpenConflict)return;
+   if(!confirm('เปิดทะเบียนเพื่อเทียบข้อมูลเดิม? หน้า Preview ที่ยังไม่บันทึกจะถูกปิด และต้องเลือกไฟล์ตรวจสอบใหม่ภายหลัง'))return;
+   Promise.resolve(onOpenConflict(Number(button.dataset.conflictStudent),Number(button.dataset.conflictRoom)))
+    .catch(e=>{phase='เปิดทะเบียนไม่สำเร็จ: '+e.message;showPreview(container)});
+  }));
   place.querySelector('#unifiedAllRows')?.addEventListener('click',()=>{previewFilter='all';previewPage=1;showPreview(container)});
   place.querySelector('#unifiedIssueRows')?.addEventListener('click',()=>{previewFilter='issues';previewPage=1;showPreview(container)});
   place.querySelector('#unifiedPrevPage')?.addEventListener('click',()=>{previewPage--;showPreview(container)});
@@ -133,7 +149,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
     const result=await api('/api/admin/unified-import/preview',{method:'POST',body:{students:group,account_mode:accountMode},timeoutMs:30000});
     for(const x of result.items){
      const target=preview.find(p=>p.source_row===x.source_row);
-     if(target){target.status=x.status;target.message=x.message}
+     if(target){target.status=x.status;target.message=x.message;target.conflict_student=x.conflict_student||null}
     }
     checked+=group.length;
     phase='ตรวจแล้ว '+checked+' / '+allowed.length+' คน';showPreview(container);
@@ -183,7 +199,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
      });
      for(const entry of result.items||[]){
       const p=preview.find(item=>item.source_row===entry.source_row);
-      if(p){p.status=entry.status;p.message=entry.message}
+      if(p){p.status=entry.status;p.message=entry.message;p.conflict_student=entry.conflict_student||null}
      }
      completed+=group.length;consecutiveErrors=0;
     }catch(e){
