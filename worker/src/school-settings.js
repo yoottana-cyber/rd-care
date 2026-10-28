@@ -7,7 +7,8 @@ const reply=data=>new Response(JSON.stringify(data),{status:200,headers:{
 export const DEFAULT_SCHOOL_SETTINGS=Object.freeze({
  school_name:'โรงเรียนรัษฎา',academic_year:2569,semester:2,
  semester_start_date:null,semester_end_date:null,
- school_start_time:'08:00',late_cutoff_time:'08:00'
+ school_start_time:'08:00',late_cutoff_time:'08:00',
+ first_period_start_time:'08:30',period_duration_minutes:50
 });
 const keys=Object.keys(DEFAULT_SCHOOL_SETTINGS);
 const timePattern=/^([01]\d|2[0-3]):[0-5]\d$/;
@@ -30,18 +31,27 @@ export function validateSchoolSettings(body){
  if((start&&!end)||(!start&&end)||start&&end&&start>end)
   fail(400,'ต้องกำหนดวันเริ่มและสิ้นสุดภาคเรียนให้ครบ และวันสิ้นสุดต้องไม่ก่อนวันเริ่ม');
  const schoolStart=body.school_start_time,cutoff=body.late_cutoff_time;
+ const firstPeriod=body.first_period_start_time,duration=body.period_duration_minutes;
  if(typeof schoolStart!=='string'||typeof cutoff!=='string'||
   !timePattern.test(schoolStart)||!timePattern.test(cutoff))
   fail(400,'เวลาเรียนและเวลาเริ่มมาสายต้องเป็น HH:MM');
  if(schoolStart<'05:00'||schoolStart>'12:00'||cutoff<'05:00'||cutoff>'12:00'||cutoff<schoolStart)
   fail(400,'เวลาเริ่มมาสายต้องไม่น้อยกว่าเวลาเริ่มเรียน และอยู่ระหว่าง 05:00–12:00 น.');
+ if(typeof firstPeriod!=='string'||!timePattern.test(firstPeriod)||firstPeriod<'05:00'||firstPeriod>'18:00')
+  fail(400,'เวลาเริ่มคาบที่ 1 ต้องเป็นเวลาระหว่าง 05:00–18:00 น.');
+ if(![40,45,50].includes(duration))
+  fail(400,'เวลาเรียนหนึ่งคาบต้องเลือก 50, 45 หรือ 40 นาทีเท่านั้น');
+ const [h,m]=firstPeriod.split(':').map(Number);
+ if(h*60+m+10*duration>24*60)fail(400,'ระยะเวลาคาบเรียนทั้งวันเกินเวลา 24:00 น.');
  return {school_name:name,academic_year:year,semester,
   semester_start_date:start,semester_end_date:end,
-  school_start_time:schoolStart,late_cutoff_time:cutoff};
+  school_start_time:schoolStart,late_cutoff_time:cutoff,
+  first_period_start_time:firstPeriod,period_duration_minutes:duration};
 }
 export async function getSchoolSettings(env){
  const result=await env.DB.prepare(
-  'SELECT school_name,academic_year,semester,semester_start_date,semester_end_date,school_start_time,late_cutoff_time,updated_by,updated_at FROM school_settings WHERE id=1'
+  'SELECT school_name,academic_year,semester,semester_start_date,semester_end_date,school_start_time,late_cutoff_time,
+   first_period_start_time,period_duration_minutes,updated_by,updated_at FROM school_settings WHERE id=1'
  ).first();
  return result?{...DEFAULT_SCHOOL_SETTINGS,...result}:DEFAULT_SCHOOL_SETTINGS;
 }
@@ -74,9 +84,10 @@ export async function schoolSettingsRoutes(req,env,user,path){
  await env.DB.batch([
   env.DB.prepare(`UPDATE school_settings SET school_name=?,academic_year=?,semester=?,
    semester_start_date=?,semester_end_date=?,school_start_time=?,late_cutoff_time=?,
-   updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=1`)
+   first_period_start_time=?,period_duration_minutes=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=1`)
     .bind(next.school_name,next.academic_year,next.semester,next.semester_start_date,
-     next.semester_end_date,next.school_start_time,next.late_cutoff_time,user.id),
+     next.semester_end_date,next.school_start_time,next.late_cutoff_time,
+     next.first_period_start_time,next.period_duration_minutes,user.id),
   env.DB.prepare(`INSERT INTO school_settings_history(actor_id,previous_value,next_value)
    VALUES(?,?,?)`).bind(user.id,JSON.stringify(oldValue),JSON.stringify(next)),
   env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
