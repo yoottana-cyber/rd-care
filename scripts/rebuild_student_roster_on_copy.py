@@ -51,7 +51,7 @@ def rebuild(db):
                    " ON students(classroom_id,roll_no) WHERE deleted_at IS NULL")
         db.execute("""
            UPDATE student_enrollments AS h
-           SET end_date=CASE WHEN date(s.deleted_at)>h.start_date THEN date(s.deleted_at)
+           SET end_date=CASE WHEN date(s.deleted_at)>=h.start_date THEN date(s.deleted_at,'+1 day')
                ELSE date(h.start_date,'+1 day') END
            FROM students AS s WHERE s.id=h.student_id
              AND s.deleted_at IS NOT NULL AND h.end_date IS NULL
