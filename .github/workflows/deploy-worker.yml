@@ -73,6 +73,10 @@ jobs:
         working-directory: worker
         run: npx --no-install wrangler d1 migrations apply DB --remote
 
+      - name: Seed room catalog only if this D1 database has no classrooms
+        working-directory: worker
+        run: npx --no-install wrangler d1 execute DB --remote --file=classrooms_only.sql
+
       - name: Deploy RD CONNECT Dev Worker
         working-directory: worker
         run: npx --no-install wrangler deploy
