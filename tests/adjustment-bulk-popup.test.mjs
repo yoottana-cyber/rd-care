@@ -124,7 +124,7 @@ test('all three teacher menus open responsive history popup, not inline history 
  assert.match(adjust,/scorePopup\.open\(\{student:st,mode:'behavior'/);
  for(const token of ['role="dialog"','aria-modal="true"','rdScorePopupClose',
   "event.key==='Escape'","event.key!=='Tab",'data-score-delete','rdScorePopupMore',
-  'scoreHistoryTables','class="rd-score-popup-overlay"'])assert.ok(popup.includes(token),token);
+  'scoreHistoryTables',"overlay.className='rd-score-popup-overlay'"])assert.ok(popup.includes(token),token);
  assert.match(css,/rd-score-popup-overlay/);
  assert.match(css,/max-height:calc\(100dvh/);
  assert.match(text('web/app.js'),/scorePopup\.close\(\)/);
