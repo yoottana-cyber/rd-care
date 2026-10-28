@@ -1,6 +1,6 @@
--- Safe first-run room catalog for an EMPTY trial D1 database.
--- No sample students, users or passwords are inserted here.
-INSERT OR IGNORE INTO classrooms (grade,room,label) VALUES
+-- Seed 48 rooms ONLY when initializing a completely empty D1 database.
+-- Never insert demo students or overwrite an existing school room catalog.
+WITH desired(grade,room,label) AS (VALUES
 (1,1,'ม.1/1'),
 (1,2,'ม.1/2'),
 (1,3,'ม.1/3'),
@@ -48,4 +48,8 @@ INSERT OR IGNORE INTO classrooms (grade,room,label) VALUES
 (6,4,'ม.6/4'),
 (6,5,'ม.6/5'),
 (6,6,'ม.6/6'),
-(6,7,'ม.6/7');
+(6,7,'ม.6/7')
+)
+INSERT OR IGNORE INTO classrooms(grade,room,label)
+SELECT grade,room,label FROM desired
+WHERE NOT EXISTS (SELECT 1 FROM classrooms);
