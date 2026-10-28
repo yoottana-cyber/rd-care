@@ -1,6 +1,7 @@
 import {readXlsxRows} from './xlsx-reader.js';
 import {downloadStudentExampleXlsx} from './template-xlsx.js';
 import {readCsvFile} from './csv-encoding.js';
+import {createStudentFileJobUi} from './student-file-jobs.js';
 
 const HEADER='classroom,roll_no,student_no,full_name,username,password';
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -58,6 +59,7 @@ export const ROSTER_PREVIEW_CHUNK=25;
 export const ROSTER_COMMIT_CHUNK=1;
 const ROSTER_VIEW_PAGE_SIZE=80;
 export function createUnifiedImport({api,rooms,onSuccess}){
+ const fileJobs=createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRows,readCsvFile,onSuccess});
  let rows=[],preview=[],filename='',busy=false,stopped=false,phase='',detectedEncoding='';
  let previewPage=1,previewFilter='all';
  function showPreview(container){
@@ -229,7 +231,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
 
  function render(container){
   if(!container)return;
-  container.innerHTML=`<section class="card stack"><h3>นำเข้านักเรียนและบัญชีจากทุกห้องในไฟล์เดียว</h3>
+  container.innerHTML=`<div id="studentFileJobsHolder"></div><section class="card stack"><h3>นำเข้าแบบเดิม (รวมบัญชีนักเรียน)</h3>
    <p class="muted">ไฟล์มาตรฐาน 6 คอลัมน์: classroom,roll_no,student_no,full_name,username,password • ใช้รหัสนักเรียนอัปเดตข้อมูลเดิมในห้องเดิมได้ทันที • แถวผิดพลาดจะข้ามและแสดงเหตุผล</p>
    <p class="row rd-import-file-links"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV UTF-8 สำหรับ Excel (.csv)</a></p>
    <form id="unifiedForm" class="stack">
@@ -259,6 +261,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    <p class="muted">เลือกไฟล์ได้ทั้งโรงเรียน (เช่น 1,750 คน) ระบบแบ่งตรวจครั้งละ 25 คน และบันทึกทีละคน เพื่อลดข้อผิดพลาด Cloudflare D1 โดยแยกธุรกรรม หากแถวใดผิดพลาดจะข้ามเฉพาะแถวนั้น ไม่ยกเลิกรายการอื่น และแสดงจำนวนเพิ่ม/อัปเดต/ข้าม</p>
    <p class="warn">ก่อนนำเข้า โปรดตรวจสอบความถูกต้องของข้อมูล สิทธิ์ผู้ใช้งาน และข้อกำหนด PDPA ของโรงเรียน</p>
   </section>`;
+  fileJobs.render(container.querySelector('#studentFileJobsHolder'));
   container.querySelector('#downloadUnifiedExcel').addEventListener('click',downloadStudentExampleXlsx);
   container.querySelector('#unifiedForm').addEventListener('submit',e=>{e.preventDefault();preflight(container)});
   container.querySelector('#unifiedCheckApi').addEventListener('click',async()=>{
