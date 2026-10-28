@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planUnifiedRoster,unifiedRosterEndpoint} from '../worker/src/unified-roster.js';
+import {planUnifiedRoster,unifiedRosterEndpoint,identityKeyedRosterReady} from '../worker/src/unified-roster.js';
 import {prepareRows,csvRows} from '../web/unified-import.js';
 
 const rooms=[{id:1,label:'ม.1/1'},{id:2,label:'ม.2/3'},{id:3,label:'ม.3/2'}];
@@ -136,4 +136,17 @@ test('after identity-keyed migration archived student ID remains and does not oc
  const ready=planUnifiedRoster([imported],map,[archived],[],{allowArchivedReuse:true});
  assert.equal(ready.items[0].status,'ready');
  assert.equal(ready.items[0].conflict_student,null);
+});
+
+test('migration capability check rejects old table uniqueness even if new index exists',async()=>{
+ function db(tableSql){
+  return {prepare(sql){return {async all(){
+   if(sql.includes("type='table'"))return {results:[{sql:tableSql}]};
+   return {results:[{name:'uq_students_current_room_roll'}]};
+  }}}};
+ }
+ const legacy="CREATE TABLE students(id INTEGER PRIMARY KEY, student_no TEXT UNIQUE, classroom_id INTEGER, roll_no INTEGER, UNIQUE(classroom_id,roll_no))";
+ const current="CREATE TABLE students(id INTEGER PRIMARY KEY, student_no TEXT UNIQUE, classroom_id INTEGER, roll_no INTEGER)";
+ assert.equal(await identityKeyedRosterReady(db(legacy)),false);
+ assert.equal(await identityKeyedRosterReady(db(current)),true);
 });
