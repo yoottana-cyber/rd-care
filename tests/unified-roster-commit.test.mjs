@@ -90,3 +90,39 @@ test('server caps preview at 25 and commit at 1 so no oversized D1 request is ac
  const result=await answer.json();
  assert.equal(result.items.length,25);
 });
+
+test('roster-only import keeps existing student account and password untouched',async()=>{
+ const {DB,committed}=fakeRosterDB();
+ const row=data('STU001',4,'ชื่อแก้ไข','Password123');
+ row.username='student-newname';
+ const request=new Request('https://rd-care.example/api/admin/unified-import/commit',{
+  method:'POST',body:JSON.stringify({account_mode:'roster_only',students:[row]})
+ });
+ const answer=await unifiedRosterEndpoint(request,{DB},{id:7,role:'admin'},'/api/admin/unified-import/commit');
+ const result=await answer.json();
+ assert.equal(result.updated,1);
+ assert.equal(result.accounts,0);
+ assert.equal(committed.length,1);
+ assert(committed[0].every(x=>!x.sql.includes('portal_accounts')));
+ assert(committed[0].every(x=>!x.sql.includes('portal_sessions')));
+});
+test('roster-only allows new student creation without account hashing or username changes',async()=>{
+ const {DB,committed}=fakeRosterDB();
+ const row=data('STU490',5,'ใหม่','Password123');
+ row.username='student-490';
+ const request=new Request('https://rd-care.example/api/admin/unified-import/commit',{
+  method:'POST',body:JSON.stringify({account_mode:'roster_only',students:[row]})
+ });
+ const answer=await unifiedRosterEndpoint(request,{DB},{id:7,role:'admin'},'/api/admin/unified-import/commit');
+ const result=await answer.json();
+ assert.equal(result.added,1);
+ assert.equal(result.accounts,0);
+ assert(committed[0].every(x=>!x.sql.includes('portal_accounts')));
+});
+test('unrecognized account mode is rejected rather than silently removing accounts',async()=>{
+ const {DB}=fakeRosterDB();
+ const request=new Request('https://rd-care.example/api/admin/unified-import/preview',{
+  method:'POST',body:JSON.stringify({account_mode:'invalid',students:[data('STU490',5,'ใหม่')]})
+ });
+ await assert.rejects(()=>unifiedRosterEndpoint(request,{DB},{id:7,role:'admin'},'/api/admin/unified-import/preview'),{code:400});
+});
