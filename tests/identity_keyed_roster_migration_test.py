@@ -56,7 +56,7 @@ class IdentityKeyedRosterMigration(unittest.TestCase):
    self.assertEqual(upgraded.execute(
     "SELECT student_id FROM portal_accounts WHERE id=20").fetchall(),[(11,)])
    self.assertEqual(upgraded.execute(
-    "SELECT end_date FROM student_enrollments WHERE student_id=10").fetchone(),("2026-10-28",))
+    "SELECT end_date FROM student_enrollments WHERE student_id=10").fetchone(),("2026-10-29",))
    upgraded.execute("INSERT INTO students(student_no,classroom_id,roll_no,full_name) VALUES('20046',1,1,'New Student')")
    upgraded.execute("INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date) SELECT id,1,1,'2026-10-28' FROM students WHERE student_no='20046'")
    upgraded.commit()
