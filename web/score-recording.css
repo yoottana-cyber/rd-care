@@ -69,3 +69,40 @@
 [data-theme="dark"] .score-adjust-select.chosen{background:rgba(66,187,120,.17)}
 @media(max-width:600px){.score-adjust-page #adjustmentSubmit{width:100%}
  .score-adjust-select{padding:11px 9px}}
+
+/* Teacher popups: consistent conduct / adjustment / merit history panels. */
+body.rd-score-popup-open{overflow:hidden}
+.rd-score-popup-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+ background:rgba(5,25,18,.68);backdrop-filter:blur(3px);padding:clamp(10px,3vw,30px)}
+.rd-score-popup-dialog{background:var(--card,#fff);width:min(980px,100%);max-height:calc(100dvh - 24px);
+ overflow:auto;overscroll-behavior:contain;border-radius:22px;padding:24px!important;
+ box-shadow:0 22px 65px rgba(0,20,12,.28);gap:16px}
+.rd-score-popup-heading{align-items:flex-start}
+.rd-score-popup-heading h3{font-size:19px;margin:0}
+.rd-score-popup-heading p{font-size:13px;color:#718577;margin:5px 0 0}
+.rd-score-popup-close{width:42px;height:42px;border-radius:50%;border:1px solid #ccdfd3;
+ background:#eff9f2;color:#286445;font-size:28px;cursor:pointer;flex:0 0 42px}
+.rd-score-popup-close:hover{background:#d8f1e1}
+.rd-score-popup-close:focus-visible{outline:3px solid #d2ad35;outline-offset:3px}
+.rd-score-popup-metrics{display:flex;gap:8px;flex-wrap:wrap}
+.rd-score-popup-dialog .score-history-group{min-width:0}
+.rd-score-popup-dialog .table-wrap{max-height:none}
+.score-selected-chip .score-chip-history,.score-chip-history{border:0;border-radius:16px;
+ background:#fff;color:#07693f;font-size:11px;font-weight:750;padding:5px 9px;cursor:pointer}
+.score-chip-history:hover{background:#d6f3e1}
+.score-adjust-preview{display:grid;gap:10px;padding:14px;border:1px solid #d6e9dc;
+ border-radius:14px;background:#f6fbf7}
+.score-adjust-preview h4,.score-adjust-preview p{margin:0}
+.score-adjust-preview .table-wrap{max-height:320px}
+.score-adjust-page .score-adjust-check{flex:1;display:flex;gap:10px;align-items:center;min-width:0}
+.score-adjust-page .score-student-row:has(input:checked){background:rgba(9,138,85,.065)}
+.score-adjust-page .score-selected-chip{gap:6px}
+[data-theme="dark"] .rd-score-popup-dialog{background:#21372b;color:#e1f8e8}
+[data-theme="dark"] .rd-score-popup-close{background:#325340;color:#e2faeb;border-color:#456954}
+[data-theme="dark"] .score-adjust-preview{background:#264435;border-color:#496954}
+@media(max-width:600px){
+ .rd-score-popup-overlay{padding:7px}
+ .rd-score-popup-dialog{max-height:calc(100dvh - 14px);border-radius:16px;padding:15px!important}
+ .score-adjust-page .score-student-row{padding:9px 7px}
+ .score-adjust-page .score-chip-history{padding:5px 7px}
+}
