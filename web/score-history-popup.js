@@ -73,9 +73,10 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
   if(!state)return;
   const current=state,requestVersion=version;
   const offset=more?current.nextOffset:0;
-  const data=await api('/api/behavior?student_id='+Number(current.student.id)+'&offset='+offset);
+  const data=await api(current.endpoint+'?student_id='+Number(current.student.id)+'&offset='+offset);
   if(state!==current||version!==requestVersion)return;
-  current.items=more?[...current.items,...(data.items||[])]:data.items||[];
+  const rows=current.readOnly?(data.items||[]).map(row=>({...row,can_delete:0})):(data.items||[]);
+  current.items=more?[...current.items,...rows]:rows;
   current.scores=data;
   current.hasMore=Boolean(data.has_more);
   current.nextOffset=Number(data.next_offset)||0;
@@ -83,11 +84,12 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
   (overlay.querySelector(more?'#rdScorePopupMore':'#rdScorePopupClose')||
    overlay.querySelector('#rdScorePopupClose'))?.focus();
  }
- async function open({student,mode='all',onChange}){
+ async function open({student,mode='all',onChange,readOnly=false}){
   if(!student?.id)return;
   close();
   returnFocus=document.activeElement;
-  state={student,mode,onChange,items:[],scores:{},hasMore:false,nextOffset:0};
+  state={student,mode,onChange,readOnly,endpoint:readOnly?'/api/affairs/behavior/monitor/history':'/api/behavior',
+   items:[],scores:{},hasMore:false,nextOffset:0};
   // Show a helpful loading state while fetching the student record.
   overlay=document.createElement('div');
   overlay.className='rd-score-popup-overlay';
