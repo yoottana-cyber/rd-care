@@ -93,10 +93,12 @@ async function saveLesson(req,env,user,id){
     lesson.subject_code,lesson.subject,id,user.id,term.academic_year,term.semester,id).run();
   if(!result.meta.changes)fail(409,'ตารางสอนถูกแก้ไขแล้ว กรุณาโหลดข้อมูลใหม่');
  }else{
-  const result=await env.DB.prepare(`INSERT INTO timetable
+  let result;
+  try{result=await env.DB.prepare(`INSERT INTO timetable
    (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject,active,approval_status,academic_year,semester)
    VALUES(?,?,?,?,?,?,?,1,'approved',?,?)`).bind(lesson.classroom_id,user.id,lesson.day_of_week,lesson.period,
       lesson.end_period,lesson.subject_code,lesson.subject,term.academic_year,term.semester).run();
+  }catch(e){if(/TIMETABLE_OVERLAP/.test(String(e?.message||'')))fail(409,'คาบเรียนชนกับตารางสอนที่เพิ่งบันทึก กรุณาโหลดข้อมูลใหม่');throw e}
   changedId=result.meta.last_row_id;
  }
  await env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
