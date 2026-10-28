@@ -8,10 +8,15 @@ const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<
 const id=x=>Number(x)||0;
 const periodName=slot=>slot.period===slot.end_period?String(slot.period):slot.period+'-'+slot.end_period;
 export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeriodAttendance}){
- let lessons=[],rooms=[],editId=null;
+ let lessons=[],rooms=[],editId=null,year=null,semester=null,current=null,editable=true,terms=[];
  async function load(){
-  const [lessonsResult,roomResult]=await Promise.all([api('/api/my-timetable'),api('/api/classrooms/catalog')]);
-  lessons=lessonsResult.items;rooms=roomResult.items;render();
+  const q=new URLSearchParams();
+  if(year&&semester){q.set('year',year);q.set('semester',semester)}
+  const [result,roomResult]=await Promise.all([api('/api/my-timetable'+(q.size?'?'+q:'')),api('/api/classrooms/catalog')]);
+  lessons=result.items;rooms=roomResult.items;current=result.current;editable=result.editable;
+  year=result.term.academic_year;semester=result.term.semester;terms=result.terms||[];
+  if(!editable)editId=null;
+  render();
  }
  function render(){
   const edit=lessons.find(row=>row.id===editId);
@@ -20,8 +25,15 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
   mount(`<section class="stack teacher-timetable">
    <div><div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>
     <h2>📚 ตารางสอนของฉัน</h2>
-    <p class="muted">ครูเพิ่มตารางสอนด้วยตนเองแล้วเช็กชื่อรายคาบได้ทันที ไม่ต้องรออนุมัติ • ระบบจะตรวจคาบซ้อนก่อนบันทึก</p></div>
-   <section class="card stack">
+    <p class="muted">ครูเพิ่มตารางสอนด้วยตนเองแล้วเช็กชื่อรายคาบได้ทันที ไม่ต้องรออนุมัติ • ระบบตรวจคาบซ้อนภายในภาคเรียนเดียวกัน</p></div>
+   <section class="card stack"><div class="row between"><strong>ปีการศึกษา ${year} • ภาคเรียน ${semester}</strong>
+    <div class="field"><label for="myTeachingTerm">ดูตารางสอนภาคเรียน</label><select id="myTeachingTerm">
+    ${[{academic_year:current?.academic_year,semester:current?.semester},...terms]
+      .filter((t,i,all)=>all.findIndex(x=>x.academic_year===t.academic_year&&x.semester===t.semester)===i)
+      .map(t=>`<option value="${t.academic_year}:${t.semester}" ${t.academic_year===year&&t.semester===semester?'selected':''}>ปี ${t.academic_year} / ${t.semester}</option>`).join('')}
+    </select></div></div>
+    ${editable?'<p class="muted">ภาคเรียนปัจจุบัน: เพิ่มหรือแก้คาบได้ทันที</p>':'<p class="muted">ประวัติภาคเรียนเก่า: อ่านอย่างเดียว</p>'}</section>
+   ${editable?`<section class="card stack">
     <h3>${edit?'แก้ไขรายการตารางสอน':'เพิ่มรายการตารางสอน'}</h3>
     <form id="myTimetableForm" class="stack">
      <div class="grid two">
@@ -37,19 +49,23 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
      <div class="row"><button class="button" type="submit" ${rooms.length?'':'disabled'}>${edit?'บันทึกการแก้ไข':'เพิ่มตารางสอน'}</button>
       ${edit?'<button class="button secondary" id="cancelTimetableEdit" type="button">ยกเลิกแก้ไข</button>':''}</div>
     </form>
-   </section>
+   </section>`:'<p class="muted">ข้อมูลย้อนหลัง เปิดดูอย่างเดียว</p>'}
    <section class="card stack"><div class="row between"><h3>ตารางสอนรายสัปดาห์ (${lessons.length} รายการ)</h3><span class="muted">เรียงตามวันและคาบ</span></div>
    ${lessons.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วัน</th><th>คาบ</th><th>ห้อง</th><th>รหัสวิชา</th><th>ชื่อวิชา</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
     <tbody>${lessons.map(s=>`<tr><td>${days[s.day_of_week-1]}</td><td><strong>${periodName(s)}</strong></td><td>${escapeHtml(s.classroom_label)}</td><td>${escapeHtml(s.subject_code||'—')}</td><td>${escapeHtml(s.subject)}</td><td><span class="tag">${s.approval_status==='approved'&&s.active===1?'พร้อมเช็กชื่อ':'ยังไม่เปิดใช้ (แก้คาบซ้อน)'}</span></td><td><div class="row">
-     <button type="button" class="button secondary" data-edit-lesson="${s.id}">แก้ไข</button>
+     ${editable?`<button type="button" class="button secondary" data-edit-lesson="${s.id}">แก้ไข</button>
      <button type="button" class="button ghost" data-archive-lesson="${s.id}">ลบ</button>
-     <button type="button" class="button secondary" data-open-lesson="${s.id}" ${s.approval_status==='approved'&&s.active===1?'':'disabled'}>เช็กชื่อ</button>
+     <button type="button" class="button secondary" data-open-lesson="${s.id}" ${s.approval_status==='approved'&&s.active===1?'':'disabled'}>เช็กชื่อ</button>`:'<span class="muted">ย้อนหลัง</span>'}
     </div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีตารางสอน กรุณาเพิ่มวิชาที่สอนด้านบน</div>'}
     <p class="muted">บันทึกแล้วเริ่มเช็กชื่อได้ทันที • ตารางสอนเดิมที่คาบซ้อนจะยังปิดใช้งานจนกว่าจะแก้ไข • รายการที่เคยเช็กชื่อแล้วแก้หรือลบไม่ได้เพื่อรักษาประวัติ</p>
    </section>
   </section>`);
+  document.querySelector('#myTeachingTerm')?.addEventListener('change',e=>safeRun(async()=>{
+   const [y,t]=e.target.value.split(':').map(Number);year=y;semester=t;editId=null;await load();
+  }));
   document.querySelector('#myTimetableForm')?.addEventListener('submit',event=>safeRun(async()=>{
-   event.preventDefault();const form=event.currentTarget;
+   event.preventDefault();if(!editable)return;
+   const form=event.currentTarget;
    const button=form.querySelector('button[type="submit"]');button.disabled=true;
    try{
     const data=new FormData(form),parts=String(data.get('period_range')).split('-').map(Number);
