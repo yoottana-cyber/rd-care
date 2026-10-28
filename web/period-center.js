@@ -63,7 +63,10 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
   ]);
   if(view!=='week'||week!==selectedWeek)return;
   lessons=timetable.items;statuses=review.items;clockSettings=clock;
-  periodClock=periodClockRows(clock.first_period_start_time,Number(clock.period_duration_minutes));
+  periodClock=periodClockRows(clock.first_period_start_time,Number(clock.period_duration_minutes),10,{
+   lunch_after_period:Number(clock.lunch_after_period??0),lunch_break_minutes:Number(clock.lunch_break_minutes??0),
+   between_period_break_minutes:Number(clock.between_period_break_minutes??0)
+  });
   renderWeek();
  }
  function renderWeek(){
@@ -78,7 +81,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
     <div class="period-stat"><span>✅</span><div><strong>${number(recorded)}</strong><small>รายการที่บันทึกในสัปดาห์</small></div></div>
    </div>
    <section class="card stack period-week-panel">
-    <div class="period-panel-title"><div><h3>ตารางสอนรายสัปดาห์</h3><p class="muted">คลิกวิชาในช่องคาบเพื่อเช็กชื่อนักเรียนได้ทันที • รูปแบบ ${clockSettings?.period_duration_minutes||50} นาที/คาบ (ไม่รวมเวลาพัก)</p></div>
+    <div class="period-panel-title"><div><h3>ตารางสอนรายสัปดาห์</h3><p class="muted">คลิกวิชาในช่องคาบเพื่อเช็กชื่อนักเรียนได้ทันที • รูปแบบ ${clockSettings?.period_duration_minutes||50} นาที/คาบ • ${Number(clockSettings?.lunch_after_period)>0?'พักกลางวันหลังคาบ '+clockSettings.lunch_after_period+' ('+clockSettings.lunch_break_minutes+' นาที)':'ยังไม่กำหนดพักกลางวัน'} • พักระหว่างคาบ ${clockSettings?.between_period_break_minutes||0} นาที</p></div>
     <div class="period-week-controls"><button type="button" class="button ghost" id="periodPrevWeek" aria-label="สัปดาห์ก่อน">‹</button>
      <strong>${esc(weekTitle.format(new Date(utc(week))))} – ${esc(weekTitle.format(new Date(utc(weekEnd))))}</strong>
      <button type="button" class="button ghost" id="periodNextWeek" aria-label="สัปดาห์ถัดไป">›</button>
