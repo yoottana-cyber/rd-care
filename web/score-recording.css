@@ -1,0 +1,35 @@
+/* Teacher merit and conduct: scalable student selection across authorized rooms. */
+.score-entry{max-width:1100px}
+.score-entry h3{margin:0}
+.score-search{display:flex;align-items:end;flex-wrap:wrap;gap:10px}
+.score-search>.field{flex:1 1 290px}
+.score-search>.button{min-height:44px}
+.score-room-bar{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.score-room-bar>.field{flex:1 1 230px}
+.score-room-bar>.button{min-height:44px}
+.score-student-list,.score-search-results{border:1px solid #dce6e4;border-radius:14px;overflow:auto;max-height:380px;background:var(--card,#fff)}
+.score-search-results{padding:8px 10px;max-height:320px}
+.score-search-results>.muted{margin:4px 0 8px}
+.score-student-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid #e8eeec}
+.score-student-row:last-child{border-bottom:0}
+.score-student-row:has(input:checked){background:rgba(9,138,85,.065)}
+.score-student-row label{display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0;flex:1;font-weight:650;line-height:1.4}
+.score-student-row input[type=checkbox]{width:19px;height:19px;accent-color:#098a55;flex:0 0 19px}
+.score-student-row label span{min-width:0;overflow-wrap:anywhere}
+.score-student-row label small{font-weight:450;font-size:12px;color:#668278;display:block}
+.score-student-row .button{white-space:nowrap;font-size:12px;padding:7px 9px}
+.score-selected{min-height:48px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.score-selected .muted{margin:0}
+.score-selected-chip{display:inline-flex;align-items:center;gap:8px;background:#e8f7ef;border:1px solid #bde6ce;border-radius:24px;padding:6px 6px 6px 12px;color:#156747;font-size:12px;font-weight:650}
+.score-selected-chip button{border:0;background:#d0eeda;color:#116440;width:23px;height:23px;line-height:1;border-radius:50%;font-size:19px;cursor:pointer}
+.score-selected-chip button:hover{background:#aee1c1}
+.score-entry textarea{min-height:75px}
+@media(max-width:600px){
+ .score-search>.field{flex-basis:100%}
+ .score-search>.button{flex:1}
+ .score-room-bar>.field{flex-basis:100%}
+ .score-room-bar>.button{width:100%}
+ .score-student-row{gap:6px;padding:10px 8px}
+ .score-student-row .button{padding:7px;font-size:11px}
+ .score-student-list{max-height:320px}
+}
