@@ -163,32 +163,38 @@ async function commitOne(env,user,raw,plan,roomId){
 export async function unifiedRosterEndpoint(req,env,user,path){
  if(user?.role!=='admin')fail(403,'เฉพาะ Admin');
  if(req.method!=='POST')fail(405,'Method not allowed');
+ // Cloudflare D1 Free allows at most 50 queries per invocation, and each
+ // prepared statement can bind no more than 100 parameters. Previewing 25
+ // students avoids hitting those limits even for many students in one room.
+ // Commit exactly one student per request: PBKDF2 + validation + per-student
+ // D1.batch must never be multiplied by a 10-person request.
  const b=await body(req),rows=b.students,commit=path.endsWith('/commit');
- if(rows.length<1||rows.length>(commit?10:100))
-  fail(400,commit?'ระบบบันทึกชุดละไม่เกิน 10 คนอัตโนมัติ':'ระบบตรวจสอบชุดละไม่เกิน 100 คนอัตโนมัติ');
- const {roomMap,students,accounts}=await gather(env,rows);
- const planned=planUnifiedRoster(rows,roomMap,students,accounts);
- if(!commit)return json(planned);
- const items=[],results={added:0,updated:0,skipped:0,accounts:0};
- for(let i=0;i<rows.length;i++){
-  // Recheck each row before writing, including changes made by earlier rows.
-  const fresh=await gather(env,[rows[i]]);
-  const plan=planUnifiedRoster([rows[i]],fresh.roomMap,fresh.students,fresh.accounts).items[0];
-  plan.source_row=planned.items[i].source_row;
-  if(planned.items[i].status==='error'||plan.status==='error'){
-   items.push({...plan,status:'skipped',message:planned.items[i].message||plan.message});
-   results.skipped++;continue;
-  }
-  try{
-   await commitOne(env,user,rows[i],plan,fresh.roomMap.get(plan.room));
-   if(plan.status==='update')results.updated++;else results.added++;
-   if(plan.account_action!=='none')results.accounts++;
-   items.push({...plan,status:plan.status==='update'?'updated':'imported',
-    message:plan.status==='update'?'อัปเดตข้อมูลเดิมแล้ว':'เพิ่มนักเรียนแล้ว'});
-  }catch(e){
-   items.push({...plan,status:'skipped',message:sqlStatus(e?.message)});
-   results.skipped++;
-  }
+ const max=commit?1:25;
+ if(rows.length<1||rows.length>max)
+  fail(400,commit?'บันทึกได้คำขอละ 1 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)':
+   'ตรวจสอบได้คำขอละ 25 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)');
+ if(!commit){
+  const {roomMap,students,accounts}=await gather(env,rows);
+  return json(planUnifiedRoster(rows,roomMap,students,accounts));
  }
- return json({ok:true,imported:results.added+results.updated,...results,items},201);
+ const raw=rows[0],line=Number.isSafeInteger(raw?.source_row)&&raw.source_row>0?raw.source_row:2;
+ const {roomMap,students,accounts}=await gather(env,[raw]);
+ const plan=planUnifiedRoster([raw],roomMap,students,accounts).items[0];
+ plan.source_row=line;
+ if(plan.status==='error')
+  return json({ok:true,imported:0,added:0,updated:0,skipped:1,accounts:0,
+   items:[{...plan,status:'skipped',message:plan.message}]},200);
+ try{
+  await commitOne(env,user,raw,plan,roomMap.get(plan.room));
+  const updated=plan.status==='update';
+  return json({ok:true,imported:1,added:updated?0:1,updated:updated?1:0,
+   skipped:0,accounts:plan.account_action==='none'?0:1,
+   items:[{...plan,status:updated?'updated':'imported',
+    message:updated?'อัปเดตข้อมูลเดิมแล้ว':'เพิ่มนักเรียนแล้ว'}]},201);
+ }catch(e){
+  // Never log SQL bind values or identifiable student data on shared Workers.
+  console.warn('Student roster import: one record skipped after database write failed');
+  return json({ok:true,imported:0,added:0,updated:0,skipped:1,accounts:0,
+   items:[{...plan,status:'skipped',message:sqlStatus(e?.message)}]},200);
+ }
 }

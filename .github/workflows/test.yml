@@ -94,6 +94,8 @@ jobs:
           assert c.execute('SELECT count(*) FROM students').fetchone()[0] == 15
           print('D1/SQLite structure and dummy data verified')
           PY
+      - name: Large student import casefold lookup index and FK safety
+        run: python3 -m unittest discover -s tests -p 'large_roster_lookup_migration_test.py' -v
       - name: School period length migration and attendance history invariants
         run: python3 -m unittest discover -s tests -p 'school_period_clock_migration_test.py' -v
       - name: School settings migration and history constraints

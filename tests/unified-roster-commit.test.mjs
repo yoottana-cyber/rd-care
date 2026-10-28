@@ -40,20 +40,24 @@ function fakeRosterDB({failStudentNo=null}={}){
 const req=rows=>new Request('https://rd-care.example/api/admin/unified-import/commit',{
  method:'POST',body:JSON.stringify({students:rows})
 });
-test('one bad backend write skips its row but preserves successful update and create',async()=>{
+test('a failed student write does not cancel previous successes across isolated requests',async()=>{
  const {DB,committed}=fakeRosterDB({failStudentNo:'STU003'});
  const rows=[data('STU001',2,'ชื่อใหม่'),data('STU002',3,'ชื่อสอง'),data('STU003',4,'ชื่อสาม')];
- const answer=await unifiedRosterEndpoint(req(rows),{DB},{id:7,role:'admin'},'/api/admin/unified-import/commit');
- const result=await answer.json();
- assert.equal(answer.status,201);
- assert.deepEqual([result.added,result.updated,result.skipped],[1,1,1]);
- assert.deepEqual(result.items.map(x=>x.status),['updated','imported','skipped']);
+ const responses=[];
+ for(const row of rows){
+  const answer=await unifiedRosterEndpoint(req([row]),{DB},{id:7,role:'admin'},'/api/admin/unified-import/commit');
+  responses.push({httpStatus:answer.status,...await answer.json()});
+ }
+ assert.deepEqual(responses.map(x=>x.added),[0,1,0]);
+ assert.deepEqual(responses.map(x=>x.updated),[1,0,0]);
+ assert.deepEqual(responses.map(x=>x.skipped),[0,0,1]);
+ assert.deepEqual(responses.map(x=>x.items[0].status),['updated','imported','skipped']);
  assert.equal(committed.length,2);
  assert.match(committed[0][0].sql,/UPDATE students SET full_name/);
  assert.match(committed[0][1].sql,/UPDATE student_enrollments SET roll_no/);
  assert.match(committed[1][0].sql,/INSERT INTO students/);
  assert.match(committed[1][1].sql,/INSERT INTO student_enrollments/);
- assert.equal(JSON.stringify(result).includes('password'),false);
+ assert.equal(JSON.stringify(responses).includes('password'),false);
 });
 test('moving existing student into another classroom is never performed by imported roster',async()=>{
  const {DB,committed}=fakeRosterDB();
@@ -69,4 +73,20 @@ test('teacher cannot access or submit school-wide roster import',async()=>{
   unifiedRosterEndpoint(req([data('STU002',2,'ชื่อ')]),{DB},{id:7,role:'teacher'},
    '/api/admin/unified-import/commit'),
   {code:403});
+});
+
+test('server caps preview at 25 and commit at 1 so no oversized D1 request is accepted',async()=>{
+ const {DB}=fakeRosterDB();
+ const many=Array.from({length:26},(_,i)=>data('S'+i,i+1,'Student '+i));
+ await assert.rejects(
+  unifiedRosterEndpoint(req(many),{DB},{id:1,role:'admin'},'/api/admin/unified-import/preview'),
+  {code:400});
+ await assert.rejects(
+  unifiedRosterEndpoint(req(many.slice(0,2)),{DB},{id:1,role:'admin'},'/api/admin/unified-import/commit'),
+  {code:400});
+ const answer=await unifiedRosterEndpoint(req(many.slice(0,25)),{DB},{id:1,role:'admin'},
+  '/api/admin/unified-import/preview');
+ assert.equal(answer.status,200);
+ const result=await answer.json();
+ assert.equal(result.items.length,25);
 });
