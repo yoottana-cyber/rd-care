@@ -28,7 +28,7 @@ export async function periodWeekStatus(req,env,user){
   SUM(CASE WHEN a.status='leave' THEN 1 ELSE 0 END) AS leave
   FROM attendance_period a JOIN timetable t ON t.id=a.timetable_id
   LEFT JOIN period_truancy tr ON tr.student_id=a.student_id AND tr.timetable_id=a.timetable_id AND tr.school_date=a.school_date
-  WHERE t.teacher_user_id=? AND t.active=1 AND a.school_date BETWEEN ? AND ?
+  WHERE t.teacher_user_id=? AND a.school_date BETWEEN ? AND ?
   GROUP BY a.timetable_id,a.school_date`).bind(user.id,monday,last).all();
  return json({items:results,from:monday,to:last});
 }
@@ -40,7 +40,7 @@ export async function periodCourseReport(req,env,user){
  if(q.has('timetable_id')&&!selected)fail(400,'กรุณาเลือกรายวิชา');
  if(selected){
   // Ownership and activation must be verified before any student event data is read.
-  const own=await env.DB.prepare('SELECT id FROM timetable WHERE id=? AND teacher_user_id=? AND active=1')
+  const own=await env.DB.prepare('SELECT id FROM timetable WHERE id=? AND teacher_user_id=?')
    .bind(selected,user.id).first();
   if(!own)fail(404,'ไม่พบรายวิชาของครู');
   const {results}=await env.DB.prepare(`SELECT a.school_date,
@@ -75,7 +75,7 @@ export async function periodCourseReport(req,env,user){
   FROM timetable t JOIN classrooms c ON c.id=t.classroom_id
   LEFT JOIN attendance_period a ON a.timetable_id=t.id AND a.school_date BETWEEN ? AND ?
   LEFT JOIN period_truancy tr ON tr.student_id=a.student_id AND tr.timetable_id=a.timetable_id AND tr.school_date=a.school_date
-  WHERE t.teacher_user_id=? AND t.active=1
+  WHERE t.teacher_user_id=? AND (t.active=1 OR a.student_id IS NOT NULL)
   GROUP BY t.id
   ORDER BY c.grade,c.room,t.day_of_week,t.period`)
   .bind(from,to,user.id).all();
