@@ -131,7 +131,7 @@ async function records(req,env,a){
     ORDER BY school_date DESC LIMIT 90`).bind(id,from,to),
   env.DB.prepare(`SELECT substr(b.created_at,1,10) AS record_date,b.points,b.reason,
     b.affairs_category,${caseTypeSql('b')} AS score_type FROM behavior_records b
-    WHERE b.student_id=? AND substr(b.created_at,1,10) BETWEEN ? AND ?
+    WHERE b.student_id=? AND b.deleted_at IS NULL AND substr(b.created_at,1,10) BETWEEN ? AND ?
     ORDER BY b.id DESC LIMIT 100`).bind(id,from,to),
   env.DB.prepare(`SELECT ${scoreColumns('b')} FROM behavior_records b
     WHERE b.student_id=? AND substr(b.created_at,1,10) BETWEEN ? AND ?`).bind(id,from,to)
