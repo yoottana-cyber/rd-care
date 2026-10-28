@@ -44,8 +44,7 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
    ${hasMore?'<button type="button" class="button secondary" id="rdScorePopupMore">ดูประวัติเพิ่มเติม</button>':''}
   </section>`;
   const dialog=overlay.querySelector('[role="dialog"]');
-  overlay.addEventListener('click',onBackdrop,{once:true});
-  function onBackdrop(event){if(event.target===overlay)close();else if(overlay)overlay.addEventListener('click',onBackdrop,{once:true})}
+  overlay.onclick=event=>{if(event.target===overlay)close()};
   dialog.addEventListener('keydown',event=>{
    if(event.key==='Escape'){event.preventDefault();close();return}
    if(event.key!=='Tab')return;
@@ -81,7 +80,8 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
   current.hasMore=Boolean(data.has_more);
   current.nextOffset=Number(data.next_offset)||0;
   draw();
-  overlay.querySelector(more?'#rdScorePopupMore':'#rdScorePopupClose')?.focus();
+  (overlay.querySelector(more?'#rdScorePopupMore':'#rdScorePopupClose')||
+   overlay.querySelector('#rdScorePopupClose'))?.focus();
  }
  async function open({student,mode='all',onChange}){
   if(!student?.id)return;
