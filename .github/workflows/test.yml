@@ -60,6 +60,7 @@ jobs:
           node --check web/portal-ui.js
           node --check web/student-affairs.js
           node --check web/score-recording.js
+          node --check web/score-history.js
           node --check web/portal-admin.js
           node --check web/portal-roster-import.js
           node --check web/portal-batch.js

@@ -97,3 +97,11 @@
 @media(max-width:540px){.rd-affairs-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
 [data-theme="dark"] .rd-affairs-holiday{background:#234432;border-color:#456e56}
 [data-theme="dark"] .rd-affairs-holiday span{color:#d2ecda}
+
+
+.rd-monitor-student-link{border:0;background:none;text-align:left;padding:0;color:#07764c;font-weight:800;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.rd-monitor-student-link:hover{color:#075836}
+#affairsMonitorDetail{scroll-margin-top:24px}
+#affairsMonitorDetail h4{font-size:15px;color:#116041;margin:6px 0 0}
+#affairsMonitorDetail .score-history-group{display:grid;gap:10px}
+[data-theme="dark"] .rd-monitor-student-link{color:#87e4b9}

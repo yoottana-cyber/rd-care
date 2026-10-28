@@ -1,8 +1,9 @@
 // Shared teacher entry screen: multi-room student selection for conduct and merit.
+import {scoreHistoryTables} from './score-history.js';
 export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,escapeHtml}){
  const modes={
-  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],scores:{},ruleId:'',reason:''},
-  good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],scores:{},ruleId:'',reason:''}
+  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''},
+  good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''}
  };
  const esc=escapeHtml;
  const mode=()=>getTab()==='good'?'good':'behavior';
@@ -32,7 +33,6 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  function draw(){
   const key=mode(),u=modes[key],isGood=key==='good',count=u.picked.size;
   const filtered=u.rules.filter(r=>isGood?r.category==='good':r.category!=='good');
-  const history=u.history.filter(x=>isGood?x.score_type==='good':x.score_type!=='good');
   const fromRoom=u.students.length>0&&u.students.every(x=>u.picked.has(x.id));
   const selected=[...u.picked.values()];
   const groupCount=new Set(selected.map(x=>x.classroom_id)).size;
@@ -95,14 +95,24 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
    </section>
    <section class="card stack" aria-label="ประวัติคะแนนนักเรียน">
     <div class="row between"><h3>ประวัติของ ${esc(u.focusName||'นักเรียนที่เลือกดู')}</h3><span class="tag">${points}</span></div>
-    ${history.length?`<div class="table-wrap"><table class="table"><thead><tr>
-     <th>ประเภท</th><th>คะแนน</th><th>เหตุผล</th><th>ผู้บันทึก</th><th>เวลา</th></tr></thead><tbody>
-     ${history.map(row=>`<tr><td>${esc(actions[row.affairs_category]|| (row.score_type==='good'?'ความดี':'ความผิด'))}</td>
-      <td>${Number(row.points)>0?'+':''}${Number(row.points)}</td><td>${esc(row.reason)}</td>
-      <td>${esc(row.teacher_name)}</td><td>${esc(row.created_at)}</td></tr>`).join('')}
-     </tbody></table></div>`:'<div class="empty">ยังไม่มีประวัติในหมวดนี้</div>'}
+    ${scoreHistoryTables({items:u.history,mode:key,esc})}
+    ${u.hasMore?'<button class="button secondary" type="button" id="scoreLoadMore">ดูประวัติเพิ่มเติม</button>':''}
    </section>
   </div>`);
+  document.querySelectorAll('[data-score-delete]').forEach(btn=>btn.addEventListener('click',()=>safeRun(async()=>{
+   rememberDraft();
+   const id=Number(btn.dataset.scoreDelete);
+   if(!window.confirm('ยืนยันลบรายการคะแนนที่คุณบันทึกเอง? คะแนนจะถูกปรับปรุงและเก็บหลักฐานการลบไว้'))return;
+   btn.disabled=true;
+   try{
+    await api('/api/behavior/records/'+id+'/delete',{method:'POST',body:{}});
+    toast('ลบรายการของคุณแล้ว และอัปเดตคะแนนใหม่เรียบร้อย');
+    await loadHistory(key);
+   }finally{if(btn.isConnected)btn.disabled=false}
+  })));
+  document.querySelector('#scoreLoadMore')?.addEventListener('click',()=>safeRun(async()=>{
+   rememberDraft();await loadHistory(key,{more:true});
+  }));
   document.querySelector('#scoreRoom')?.addEventListener('change',e=>safeRun(async()=>{
    rememberDraft();setRoomId(Number(e.target.value));await load();
   }));
@@ -161,12 +171,16 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
    }finally{if(button?.isConnected)button.disabled=false}
   }));
  }
- async function loadHistory(key){
+ async function loadHistory(key,{more=false}={}){
   const u=modes[key],focusId=u.focusId;
-  if(!focusId){u.history=[];u.scores={};if(getTab()===key)draw();return}
-  const data=await api('/api/behavior?student_id='+focusId);
+  if(!focusId){u.history=[];u.hasMore=false;u.nextOffset=0;if(getTab()===key)draw();return}
+  const offset=more?u.nextOffset:0;
+  const data=await api('/api/behavior?student_id='+focusId+'&offset='+offset);
   if(getTab()!==key||u.focusId!==focusId)return;
-  u.history=data.items||[];u.scores=data;draw();
+  u.history=more?[...u.history,...(data.items||[])]:data.items||[];
+  u.hasMore=Boolean(data.has_more);
+  u.nextOffset=Number(data.next_offset)||0;
+  u.scores=data;draw();
  }
  async function load(){
   const key=mode(),u=modes[key],roomId=getRoomId();

@@ -77,7 +77,7 @@ async function recordBehavior(env,u,b,adjust=false){
    SELECT ?,?,?,?,NULL,'adjustment',? WHERE ?>0 AND ?<=
     (SELECT COALESCE(SUM(CASE WHEN points<0 THEN -points
       WHEN affairs_category='adjustment' AND points>0 THEN -points ELSE 0 END),0)
-     FROM behavior_records WHERE student_id=?)`)
+     FROM behavior_records WHERE student_id=? AND deleted_at IS NULL)`)
    .bind(student,points,reason,u.id,adjustId,points,points,student).run();
   if(!insert.meta.changes)fail(409,'คะแนนพฤติกรรมค้างสะสมไม่เพียงพอสำหรับเกณฑ์ปรับพฤติกรรมที่เลือก');
  }else{
@@ -285,8 +285,8 @@ export async function studentAffairsRoutes(req,env,u,path){
   const {results}=await env.DB.prepare(`SELECT c.grade,c.label AS classroom_label,s.id AS student_id,
    s.student_no,s.full_name,${scoreColumns('b')},
    COUNT(b.id) AS events FROM students s JOIN classrooms c ON c.id=s.classroom_id
-   LEFT JOIN behavior_records b ON b.student_id=s.id AND substr(b.created_at,1,10)<=?
-   WHERE s.active=1 GROUP BY s.id ORDER BY c.grade,c.room,s.roll_no LIMIT 1500`).bind(date).all();
+   LEFT JOIN behavior_records b ON b.student_id=s.id AND b.deleted_at IS NULL AND substr(b.created_at,1,10)<=?
+   WHERE s.active=1 GROUP BY s.id ORDER BY c.grade,c.room,s.roll_no`).bind(date).all();
   return reply({date,items:results.map(r=>({...r,...scoreSummary(r)}))});
  }
  if(method==='GET'&&path==='/api/affairs/cases'){
