@@ -955,10 +955,14 @@ async function route(req,env,ctx){
  if(path.startsWith('/api/late/qr/'))return lateGateStaffRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/school/period-clock'){
   requireRole(user,['teacher','staff','admin']);
-  const time=await env.DB.prepare(`SELECT first_period_start_time,period_duration_minutes
+  const time=await env.DB.prepare(`SELECT first_period_start_time,period_duration_minutes,
+   lunch_after_period,lunch_break_minutes,between_period_break_minutes
    FROM school_settings WHERE id=1`).first();
   return json({first_period_start_time:time?.first_period_start_time||'08:30',
-   period_duration_minutes:time?.period_duration_minutes||50});
+   period_duration_minutes:time?.period_duration_minutes||50,
+   lunch_after_period:time?.lunch_after_period??0,
+   lunch_break_minutes:time?.lunch_break_minutes??0,
+   between_period_break_minutes:time?.between_period_break_minutes??0});
  }
  if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
  if(req.method==='GET'&&path==='/api/classrooms/catalog'){

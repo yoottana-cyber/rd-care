@@ -17,9 +17,11 @@ class PeriodClockMigrationTests(unittest.TestCase):
   self.db.execute("INSERT INTO timetable(id,classroom_id,teacher_user_id,day_of_week,period,subject) VALUES(1,1,1,3,1,'คณิต')")
   self.db.execute("INSERT INTO attendance_period(student_id,timetable_id,school_date,status,recorded_by) VALUES(1,1,'2026-10-28','present',1)")
   self.db.executescript((ROOT/'0028_school_period_clock.sql').read_text(encoding='utf8'))
+  self.db.executescript((ROOT/'0029_school_lunch_and_recess.sql').read_text(encoding='utf8'))
  def tearDown(self):self.db.close()
  def test_defaults_do_not_change_late_qr_or_historical_attendance(self):
   self.assertEqual(self.db.execute("SELECT first_period_start_time,period_duration_minutes FROM school_settings").fetchone(),('08:30',50))
+  self.assertEqual(self.db.execute("SELECT lunch_after_period,lunch_break_minutes,between_period_break_minutes FROM school_settings").fetchone(),(0,0,0))
   self.assertEqual(self.db.execute("SELECT academic_year,semester,school_start_time,late_cutoff_time FROM school_settings").fetchone(),(2570,1,'07:40','08:10'))
   self.assertEqual(self.db.execute("SELECT timetable_id,status FROM attendance_period").fetchone(),(1,'present'))
   self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(),[])
@@ -34,5 +36,22 @@ class PeriodClockMigrationTests(unittest.TestCase):
   self.db.execute("UPDATE school_settings SET first_period_start_time='09:00',period_duration_minutes=40")
   self.assertEqual(self.db.execute("SELECT id,period FROM timetable").fetchone(),(1,1))
   self.assertEqual(self.db.execute("SELECT school_date,status FROM attendance_period").fetchone(),('2026-10-28','present'))
+  self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(),[])
+ def test_lunch_and_recess_fields_reject_invalid_values(self):
+  for after in (0,4,5,9):
+   self.db.execute("UPDATE school_settings SET lunch_after_period=?",(after,))
+   self.assertEqual(self.db.execute("SELECT lunch_after_period FROM school_settings").fetchone()[0],after)
+  self.db.execute("UPDATE school_settings SET lunch_after_period=4,lunch_break_minutes=60,between_period_break_minutes=5")
+  self.assertEqual(self.db.execute("SELECT lunch_break_minutes,between_period_break_minutes FROM school_settings").fetchone(),(60,5))
+  for field,value in [('lunch_after_period',-1),('lunch_after_period',10),
+                       ('lunch_break_minutes',14),('lunch_break_minutes',181),
+                       ('between_period_break_minutes',-1),('between_period_break_minutes',31)]:
+   with self.assertRaises(sqlite3.IntegrityError):
+    self.db.execute(f"UPDATE school_settings SET {field}=?",(value,))
+ def test_recess_change_does_not_mutate_existing_attendance_or_late_qr(self):
+  self.db.execute("UPDATE school_settings SET lunch_after_period=5,lunch_break_minutes=45,between_period_break_minutes=10")
+  self.assertEqual(self.db.execute("SELECT id,period FROM timetable").fetchone(),(1,1))
+  self.assertEqual(self.db.execute("SELECT school_date,status FROM attendance_period").fetchone(),('2026-10-28','present'))
+  self.assertEqual(self.db.execute("SELECT late_cutoff_time FROM school_settings").fetchone()[0],'08:10')
   self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(),[])
 if __name__=='__main__': unittest.main()

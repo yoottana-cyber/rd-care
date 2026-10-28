@@ -86,3 +86,15 @@
 [data-theme="dark"] .rd-lesson-time{color:#b0d8c0}
 @media(max-width:850px){.rd-period-preview{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:510px){.rd-period-preview{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+
+/* Explicit lunch and recess breaks in the 10-period preview */
+.rd-period-preview-break{min-width:0;display:flex;flex-direction:column;gap:5px;justify-content:center;align-items:center;
+ background:linear-gradient(130deg,#fff5e0,#fffaf1);border:1px dashed #dca64b;border-radius:13px;
+ padding:10px 6px;text-align:center}
+.rd-period-preview-break strong{font-size:12px;color:#875614}
+.rd-period-preview-break span{font-size:11px;font-variant-numeric:tabular-nums;color:#705c3f}
+.rd-period-preview-break:has(strong:first-child){grid-column:auto}
+[data-theme="dark"] .rd-period-preview-break{background:linear-gradient(130deg,#443923,#342e26);border-color:#96743b}
+[data-theme="dark"] .rd-period-preview-break strong{color:#ffd28c}
+[data-theme="dark"] .rd-period-preview-break span{color:#e4d0b1}

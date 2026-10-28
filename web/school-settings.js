@@ -84,13 +84,28 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
       </div>
      </div>
      <div class="rd-period-modes"><span>ปกติ 50 นาที</span><span>ร่นคาบ 45 นาที</span><span>ร่นคาบ 40 นาที</span></div>
+     <h4>🍽️ พักกลางวันและพักระหว่างคาบ</h4>
+     <div class="rd-school-settings-grid">
+      <div class="field"><label for="schoolSetting_lunch_after_period">เริ่มพักกลางวันหลังคาบ</label>
+       <select id="schoolSetting_lunch_after_period" name="lunch_after_period" required>
+        <option value="0" ${Number(s.lunch_after_period)===0?'selected':''}>ไม่กำหนดช่วงพักกลางวัน</option>
+        ${Array.from({length:9},(_,i)=>i+1).map(period=>`<option value="${period}" ${Number(s.lunch_after_period)===period?'selected':''}>หลังคาบที่ ${period}</option>`).join('')}
+       </select></div>
+      ${field('lunch_break_minutes','ระยะเวลาพักกลางวัน (นาที)',s.lunch_break_minutes,'number',
+       'min="0" max="180" step="1" required')}
+      ${field('between_period_break_minutes','พักระหว่างคาบทั่วไป (นาที)',s.between_period_break_minutes,'number',
+       'min="0" max="30" step="1" required')}
+     </div>
+     <p class="muted">พักกลางวัน 15–180 นาที หรือเลือกไม่กำหนดเพื่อปิดช่วงพัก;
+      พักระหว่างคาบทั่วไป 0–30 นาที (ใช้ทุกคู่คาบ ยกเว้นรอยต่อที่เป็นพักกลางวัน
+      ซึ่งจะใช้เวลาพักกลางวันแทน ไม่บวกซ้ำ)</p>
      <h4>ตัวอย่างเวลาเรียนคาบที่ 1–10</h4>
-     <p class="muted">คำนวณต่อเนื่องจากเวลาเริ่มคาบที่ 1
-      <strong>ยังไม่รวมพักกลางวัน พักระหว่างคาบ หรือกิจกรรมพิเศษ</strong>
-      เพื่อไม่สมมติเวลาพักที่โรงเรียนยังไม่ได้กำหนด</p>
+     <p class="muted">ตัวอย่างคำนวณตามพักกลางวันและเวลาพักระหว่างคาบที่กำหนด
+      โดยไม่มีการเพิ่มเวลาเข้าแถวหรือกิจกรรมอื่นที่ยังไม่ได้ตั้งค่า</p>
      <div class="rd-period-preview" id="rdPeriodClockPreview" aria-live="polite"></div>
-     <p class="muted">เวลาที่เลือกจะปรากฏเป็นเวลาอ้างอิงในตารางสอนของครูและหน้าเช็กชื่อรายคาบ
-      ไม่ปรับหมายเลขคาบหรือข้อมูลเช็กชื่อย้อนหลัง</p>
+     <p class="muted">ตัวอย่างนี้ใช้กับทั้งโรงเรียน และมีผลต่อเวลาอ้างอิงในหน้าครูหลังบันทึก
+      แต่ไม่แก้หมายเลขคาบ กฎการเช็กชื่อ หรือประวัติย้อนหลัง
+      หากคาบคู่พาดผ่านช่วงพัก ระบบจะแสดงข้อความเตือนว่ามีช่วงพักคั่น</p>
     </section>
     <div class="rd-school-settings-actions">
      <button type="submit" class="button" ${busy?'disabled':''}>
@@ -127,10 +142,16 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
    safeRun(()=>save(event.currentTarget));
   });
   document.getElementById('schoolSettingsReload')?.addEventListener('click',()=>safeRun(load));
-  for(const id of ['first_period_start_time','period_duration_minutes']){
+  for(const id of ['first_period_start_time','period_duration_minutes',
+   'lunch_break_minutes','between_period_break_minutes']){
    document.getElementById('schoolSetting_'+id)?.addEventListener('input',updatePeriodPreview);
    document.getElementById('schoolSetting_'+id)?.addEventListener('change',updatePeriodPreview);
   }
+  document.getElementById('schoolSetting_lunch_after_period')?.addEventListener('change',event=>{
+   const lunch=document.getElementById('schoolSetting_lunch_break_minutes');
+   if(lunch)lunch.value=Number(event.target.value)===0?'0':Number(lunch.value)===0?'60':lunch.value;
+   updatePeriodPreview();
+  });
   updatePeriodPreview();
   document.querySelectorAll('[data-school-jump]').forEach(button=>
    button.addEventListener('click',()=>safeRun(()=>navigate(button.dataset.schoolJump))));
@@ -140,15 +161,32 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
   if(!target)return;
   const start=document.getElementById('schoolSetting_first_period_start_time')?.value;
   const duration=Number(document.getElementById('schoolSetting_period_duration_minutes')?.value);
+  const after=Number(document.getElementById('schoolSetting_lunch_after_period')?.value);
+  const lunchInput=document.getElementById('schoolSetting_lunch_break_minutes');
+  // When lunch is disabled, normalize its minutes to zero and keep it in FormData.
+  if(lunchInput){
+   lunchInput.readOnly=after===0;
+   if(after===0)lunchInput.value='0';
+  }
+  const options={lunch_after_period:after,
+   lunch_break_minutes:Number(lunchInput?.value),
+   between_period_break_minutes:Number(document.getElementById('schoolSetting_between_period_break_minutes')?.value)};
   try{
-   target.innerHTML=periodClockRows(start,duration).map(row=>`<div class="rd-period-preview-item">
-    <strong>คาบ ${row.period}</strong><span>${escape(row.start)}–${escape(row.end)} น.</span></div>`).join('');
-  }catch{target.textContent='โปรดตรวจสอบเวลาเริ่มคาบและรูปแบบคาบเรียน'}
+   target.innerHTML=periodClockRows(start,duration,10,options).map(row=>`
+     ${row.breakBefore?`<div class="rd-period-preview-break">
+      <strong>${row.breakBefore.kind==='lunch'?'🍽️ พักกลางวัน':'☕ พักระหว่างคาบ'}</strong>
+      <span>${escape(row.breakBefore.start)}–${escape(row.breakBefore.end)} น.
+       (${row.breakBefore.minutes} นาที)</span></div>`:''}
+     <div class="rd-period-preview-item">
+      <strong>คาบ ${row.period}</strong><span>${escape(row.start)}–${escape(row.end)} น.</span></div>`).join('');
+  }catch{target.textContent='โปรดตรวจสอบเวลาเริ่มคาบและการตั้งค่าช่วงพักให้ถูกต้อง'}
  }
  const names={school_name:'ชื่อโรงเรียน',academic_year:'ปีการศึกษา',semester:'ภาคเรียน',
   semester_start_date:'วันเปิดภาคเรียน',semester_end_date:'วันสิ้นสุดภาคเรียน',
   school_start_time:'เวลาเริ่มเรียน',late_cutoff_time:'เวลาเริ่มมาสาย',
-  first_period_start_time:'เวลาเริ่มคาบที่ 1',period_duration_minutes:'ระยะเวลาคาบเรียน (นาที)'};
+  first_period_start_time:'เวลาเริ่มคาบที่ 1',period_duration_minutes:'ระยะเวลาคาบเรียน (นาที)',
+  lunch_after_period:'พักกลางวันหลังคาบ',lunch_break_minutes:'พักกลางวัน (นาที)',
+  between_period_break_minutes:'พักระหว่างคาบ (นาที)'};
  function changedDetails(record){
   return Object.entries(names).filter(([key])=>record.previous?.[key]!==record.next?.[key])
    .map(([key,label])=>label+': '+(record.previous?.[key]??'—')+' → '+(record.next?.[key]??'—'))
@@ -163,6 +201,9 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
   values.academic_year=Number(values.academic_year);
   values.semester=Number(values.semester);
   values.period_duration_minutes=Number(values.period_duration_minutes);
+  values.lunch_after_period=Number(values.lunch_after_period);
+  values.lunch_break_minutes=Number(values.lunch_break_minutes);
+  values.between_period_break_minutes=Number(values.between_period_break_minutes);
   if(Boolean(values.semester_start_date)!==Boolean(values.semester_end_date)){
    toast('กรุณากรอกวันเปิดและปิดภาคเรียนทั้งสองช่อง หรือเว้นว่างทั้งคู่',true);return;
   }
@@ -172,7 +213,7 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
   if(values.late_cutoff_time<values.school_start_time){
    toast('เวลาเริ่มนับว่ามาสายต้องไม่ก่อนเวลาเริ่มเรียน',true);return;
   }
-  try{periodClockRows(values.first_period_start_time,values.period_duration_minutes)}
+  try{periodClockRows(values.first_period_start_time,values.period_duration_minutes,10,values)}
   catch{toast('กรุณาตรวจสอบเวลาเริ่มคาบที่ 1 และระยะเวลาคาบเรียน',true);return}
   if(values.late_cutoff_time!==current.late_cutoff_time&&
    !window.confirm('เวลาเริ่มมาสายจะเปลี่ยนจาก '+current.late_cutoff_time+
