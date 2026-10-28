@@ -20,6 +20,8 @@ export async function onRequest({ request, env }) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
+  const upstreamTraceId = crypto.randomUUID();
+  headers.set('x-rd-request-id',upstreamTraceId);
   const upstream = new Request(request, { headers });
   try {
     const response = await env.RD_CARE_API.fetch(upstream);
@@ -30,7 +32,7 @@ export async function onRequest({ request, env }) {
     // A 502 here means the Service Binding fetch rejected before the Worker
     // could return its normal JSON error. Keep a trace ID, but never log request
     // bodies, authorization headers, names, or student identifiers.
-    const requestId = crypto.randomUUID();
+    const requestId = upstreamTraceId;
     console.error('RD Care Pages gateway: upstream rejected',requestId,error?.name||'unknown');
     return Response.json(
       { error: 'service_binding_fetch_failed',
