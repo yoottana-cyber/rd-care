@@ -93,7 +93,7 @@ export function planUnifiedRoster(rows,roomMap,existingStudents=[],existingAccou
 export async function identityKeyedRosterReady(db){
  const table=await db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='students'").all();
  const definition=String(table.results?.[0]?.sql||'');
- if(!definition||/\\bUNIQUE\\s*\\(\\s*classroom_id\\s*,\\s*roll_no\\s*\\)/i.test(definition))return false;
+ if(!definition||/\bUNIQUE\s*\(\s*classroom_id\s*,\s*roll_no\s*\)/i.test(definition))return false;
  const indices=await db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").all();
  return (indices.results||[]).length>0;
 }
