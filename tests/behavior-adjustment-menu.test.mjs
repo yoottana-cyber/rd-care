@@ -12,7 +12,7 @@ test('teacher adjustment is a standalone app menu, route and dashboard shortcut'
  assert.match(app,/\['adjustment','บันทึกการปรับพฤติกรรม','🌱'\]/);
  assert.match(app,/if\(tab==='adjustment'\)return behaviorAdjustment\.load\(\)/);
  assert.match(app,/\['adjustment','🌱','บันทึกการปรับพฤติกรรม'/);
- assert.match(nav,/pages:\['behavior','adjustment','good','studentAffairs'\]/);
+ assert.match(nav,/pages:\['behavior','scoreMonitor','adjustment','good','studentAffairs'\]/);
  assert.match(nav,/adjustment:'บันทึกการปรับพฤติกรรม/);
 });
 
