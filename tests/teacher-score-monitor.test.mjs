@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {schoolScoreMonitorSummary,schoolScoreMonitorHistory,allowSchoolScoreMonitor} from '../worker/src/teacher-score-monitor.js';
 import {studentAffairsRoutes} from '../worker/src/student-affairs.js';
 import {createTeacherScoreMonitor} from '../web/teacher-score-monitor.js';
+import {scoreHistoryTables} from '../web/score-history.js';
 
 const source=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const request=path=>new Request('https://rd.test'+path);
@@ -111,4 +112,16 @@ test('score monitor can initialize without any write calls',()=>{
   mount:()=>{},safeRun:x=>x(),toast:()=>{},scorePopup:{open:()=>{}},
   getTab:()=> 'scoreMonitor',escapeHtml:value=>String(value)});
  assert.equal(typeof screen.load,'function');
+});
+
+test('read-only history hides management column even if an item claims deletion permission',()=>{
+ const html=scoreHistoryTables({readOnly:true,mode:'all',esc:value=>String(value),items:[
+  {id:3,can_delete:1,points:-5,reason:'ทดสอบ',score_type:'behavior',
+   action_name:'ความผิด',created_at:'2026-10-28 00:00:00'},
+  {id:4,can_delete:1,points:5,reason:'ช่วยเพื่อน',score_type:'good',
+   action_name:'ทำความดี',created_at:'2026-10-28 00:00:00'}
+ ]});
+ assert.match(html,/ประวัติคะแนนความดี/);
+ assert.match(html,/ประวัติความผิดและการปรับพฤติกรรม/);
+ assert.doesNotMatch(html,/data-score-delete|score-delete-own|<th>จัดการ<\/th>/);
 });
