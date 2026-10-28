@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {weekMonday,lessonPeriod,buildWeekRows} from '../web/period-center.js';
 
@@ -31,4 +32,21 @@ test('archived and inactive lessons do not appear in calendar',()=>{
  {id:9,day_of_week:1,period:3,approval_status:'approved',active:0}
  ];
  assert.equal(buildWeekRows(lessons,'2026-10-26')[0].cells.filter(x=>x.lesson).length,0);
+});
+
+test('weekly period headings keep number and clock on separate lines and preserve ten column layout',()=>{
+ const page=readFileSync(new URL('../web/period-center.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../web/period-center.css',import.meta.url),'utf8');
+ assert.match(page,/Array\.from\(\{length:10\}/);
+ assert.match(page,/class="period-column-head"/);
+ assert.match(page,/class="period-column-number"/);
+ assert.match(page,/class="period-column-time"/);
+ assert.match(page,/periodClock\[i\]/);
+ assert.match(page,/class="period-slot-meta"/);
+ assert.match(page,/class="period-slot-time"/);
+ assert.match(css,/\.period-column-head \.period-column-number\s*\{\s*display:block/);
+ assert.match(css,/\.period-column-head \.period-column-time\s*\{\s*display:block/);
+ assert.match(css,/min-width:1530px/);
+ assert.match(css,/\.period-grid-scroll\{[^}]*overflow-x:auto/);
+ assert.match(css,/\[data-theme="dark"\] \.period-column-head \.period-column-time/);
 });
