@@ -91,7 +91,7 @@ async function body(req){
  return data;
 }
 function sqlPlaceholders(values){return values.map(()=>'?').join(',')}
-async function gather(env,rows){
+async function gather(env,rows,{rosterOnly=false}={}){
  const roomNames=[...new Set(rows.map(x=>clean(x?.classroom)).filter(Boolean))];
  const rooms=roomNames.length?(await env.DB.prepare('SELECT id,label FROM classrooms WHERE label IN ('+
   sqlPlaceholders(roomNames)+')').bind(...roomNames).all()).results:[];
@@ -113,13 +113,13 @@ async function gather(env,rows){
  const conditions=[],params=[];
  if(names.length){conditions.push('lower(username) IN ('+sqlPlaceholders(names)+')');params.push(...names)}
  if(studentIds.length){conditions.push('student_id IN ('+sqlPlaceholders(studentIds)+')');params.push(...studentIds)}
- const accounts=conditions.length?(await env.DB.prepare('SELECT id,username,role,student_id FROM portal_accounts WHERE '+
+ const accounts=!rosterOnly&&conditions.length?(await env.DB.prepare('SELECT id,username,role,student_id FROM portal_accounts WHERE '+
   conditions.join(' OR ')).bind(...params).all()).results:[];
  return {roomMap,students,accounts};
 }
 function sqlStatus(message){return /UNIQUE|constraint|TIMETABLE_OVERLAP/i.test(String(message||''))
  ?'ข้อมูลซ้ำหรือเลขที่ถูกใช้แล้ว กรุณาตรวจสอบข้อมูลล่าสุด': 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง';}
-async function commitOne(env,user,raw,plan,roomId){
+async function commitOne(env,user,raw,plan,roomId,{rosterOnly=false,traceId=''}={}){
  const student=validateRow(raw,roomId);
  const stmts=[];
  const currentId=plan.existing_id;
@@ -135,7 +135,7 @@ async function commitOne(env,user,raw,plan,roomId){
    SELECT id,?,?,?,? FROM students WHERE lower(student_no)=lower(?)`)
    .bind(roomId,student.roll_no,bangkokToday(),user.id,student.student_no));
  }
- const linkedAccount= currentId ? await env.DB.prepare('SELECT id,username FROM portal_accounts WHERE student_id=? AND role=\'student\'')
+ const linkedAccount= !rosterOnly&&currentId ? await env.DB.prepare('SELECT id,username FROM portal_accounts WHERE student_id=? AND role=\'student\'')
   .bind(currentId).first():null;
  if(linkedAccount){
   if(plan.account_action==='update'){
@@ -149,7 +149,7 @@ async function commitOne(env,user,raw,plan,roomId){
     .bind(nextUsername,student.full_name,linkedAccount.id));
   }else stmts.push(env.DB.prepare('UPDATE portal_accounts SET display_name=? WHERE id=?')
    .bind(student.full_name,linkedAccount.id));
- }else if(plan.account_action==='create'){
+ }else if(!rosterOnly&&plan.account_action==='create'){
   const salt=hex(16),hash=await passwordHash(student.password,salt);
   stmts.push(env.DB.prepare(`INSERT INTO portal_accounts
    (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
@@ -158,6 +158,7 @@ async function commitOne(env,user,raw,plan,roomId){
  }
  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
   .bind(user.id,currentId?'student_import_updated':'student_import_created','students',String(currentId||student.student_no)));
+ if(traceId)console.info('rd-import-phase',traceId,'write_batch_begin',currentId?'update':'insert');
  await env.DB.batch(stmts); // One student per atomic D1 batch: failure skips only that row.
 }
 export async function unifiedRosterEndpoint(req,env,user,path){
@@ -168,24 +169,34 @@ export async function unifiedRosterEndpoint(req,env,user,path){
  // students avoids hitting those limits even for many students in one room.
  // Commit exactly one student per request: PBKDF2 + validation + per-student
  // D1.batch must never be multiplied by a 10-person request.
- const b=await body(req),rows=b.students,commit=path.endsWith('/commit');
+ const b=await body(req),commit=path.endsWith('/commit');
+ const rosterOnly=b.account_mode==='roster_only';
+ if(b.account_mode!==undefined&&!['roster_only','with_accounts'].includes(b.account_mode))
+  fail(400,'รูปแบบการนำเข้าไม่ถูกต้อง');
+ // In roster-only mode, server ignores credentials even if the source file has them.
+ // Staff can import/repair student identity without running PBKDF2 for each account.
+ const rows=rosterOnly?b.students.map(x=>({...x,username:'',password:''})):b.students;
+ const traceId=String(req.headers.get('x-rd-request-id')||'').slice(0,64);
+ if(traceId)console.info('rd-import-phase',traceId,'request_start',commit?'commit':'preview',rosterOnly?'roster_only':'with_accounts');
  const max=commit?1:25;
  if(rows.length<1||rows.length>max)
   fail(400,commit?'บันทึกได้คำขอละ 1 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)':
    'ตรวจสอบได้คำขอละ 25 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)');
  if(!commit){
-  const {roomMap,students,accounts}=await gather(env,rows);
+  const {roomMap,students,accounts}=await gather(env,rows,{rosterOnly});
   return json(planUnifiedRoster(rows,roomMap,students,accounts));
  }
  const raw=rows[0],line=Number.isSafeInteger(raw?.source_row)&&raw.source_row>0?raw.source_row:2;
- const {roomMap,students,accounts}=await gather(env,[raw]);
+ const {roomMap,students,accounts}=await gather(env,[raw],{rosterOnly});
+ if(traceId)console.info('rd-import-phase',traceId,'lookup_complete');
  const plan=planUnifiedRoster([raw],roomMap,students,accounts).items[0];
  plan.source_row=line;
  if(plan.status==='error')
   return json({ok:true,imported:0,added:0,updated:0,skipped:1,accounts:0,
    items:[{...plan,status:'skipped',message:plan.message}]},200);
  try{
-  await commitOne(env,user,raw,plan,roomMap.get(plan.room));
+  if(traceId)console.info('rd-import-phase',traceId,'commit_begin',plan.status,plan.account_action);
+  await commitOne(env,user,raw,plan,roomMap.get(plan.room),{rosterOnly,traceId});
   const updated=plan.status==='update';
   return json({ok:true,imported:1,added:updated?0:1,updated:updated?1:0,
    skipped:0,accounts:plan.account_action==='none'?0:1,
@@ -193,7 +204,7 @@ export async function unifiedRosterEndpoint(req,env,user,path){
     message:updated?'อัปเดตข้อมูลเดิมแล้ว':'เพิ่มนักเรียนแล้ว'}]},201);
  }catch(e){
   // Never log SQL bind values or identifiable student data on shared Workers.
-  console.warn('Student roster import: one record skipped after database write failed');
+  console.warn('Student roster import: one record skipped after database write failed',traceId||'untraced');
   return json({ok:true,imported:0,added:0,updated:0,skipped:1,accounts:0,
    items:[{...plan,status:'skipped',message:sqlStatus(e?.message)}]},200);
  }
