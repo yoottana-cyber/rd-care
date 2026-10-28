@@ -174,6 +174,19 @@ function loginPage(){
     <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong><small>สูงสุด 30 วัน • ไม่แนะนำสำหรับคอมพิวเตอร์สาธารณะ</small></span></label>
    <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
   </form>
+  <button type="button" class="button secondary full" id="openAdminRecovery">ตั้งรหัสผ่าน Admin ใหม่ (ผู้ดูแลระบบ)</button>
+  <section class="login-recovery-panel" id="adminRecoverySection" hidden aria-label="กู้คืนรหัสผู้ดูแลระบบ">
+   <h3>ตั้งรหัส Admin ใหม่ผ่าน Cloudflare</h3>
+   <p class="muted">ใช้ SETUP_TOKEN ของ Worker ยืนยันสิทธิ์ได้หนึ่งครั้ง โดยตั้งรหัสผ่านใหม่บนอุปกรณ์นี้ ไม่ต้องส่งให้ใคร</p>
+   <form id="adminRecoveryForm">
+    <div class="field"><label for="adminRecoveryToken">SETUP_TOKEN จาก Cloudflare</label><input id="adminRecoveryToken" type="password" autocomplete="off" required minlength="32" placeholder="รหัสยืนยันสำหรับผู้ดูแลระบบ"></div>
+    <div class="field"><label for="adminRecoveryPassword">รหัส Admin ใหม่ (อย่างน้อย 12 ตัว)</label><input id="adminRecoveryPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="128"></div>
+    <div class="field"><label for="adminRecoveryConfirm">ยืนยันรหัส Admin ใหม่</label><input id="adminRecoveryConfirm" type="password" autocomplete="new-password" required minlength="12" maxlength="128"></div>
+    <button class="button full" type="submit">ยืนยันตั้งรหัส Admin ใหม่</button>
+    <button class="button secondary full" type="button" id="closeAdminRecovery">ยกเลิก</button>
+   </form>
+   <p class="muted">หากไม่ทราบ SETUP_TOKEN ให้ตั้งค่าใหม่ใน Cloudflare → Workers &amp; Pages → rd-care-api-dev → Settings → Variables and Secrets โดยใช้ค่าสุ่มที่ยาวอย่างน้อย 32 ตัวอักษร</p>
+  </section>
   ${!isInstalledPwa()?'<div class="login-links"><a href="./" class="button secondary full" id="staffBackToChoice">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</a></div>':''}
   <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้งแอป RD CONNECT ครู</button>
    <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
@@ -195,6 +208,37 @@ function renderLogin(){
    await boot();toast('เข้าสู่ระบบสำเร็จ');
   }finally{if(button.isConnected)button.disabled=false}
  }));
+ $('#openAdminRecovery')?.addEventListener('click',()=>{
+  $('#adminRecoverySection').hidden=false;
+  $('#loginForm').hidden=true;
+  $('#openAdminRecovery').hidden=true;
+  $('#adminRecoveryToken').focus();
+ });
+ $('#closeAdminRecovery')?.addEventListener('click',()=>{
+  $('#adminRecoveryForm').reset();
+  $('#adminRecoverySection').hidden=true;
+  $('#loginForm').hidden=false;
+  $('#openAdminRecovery').hidden=false;
+ });
+ $('#adminRecoveryForm')?.addEventListener('submit',event=>{
+  event.preventDefault();
+  safeRun(async()=>{
+   const form=$('#adminRecoveryForm'),button=form.querySelector('[type=submit]');
+   const token=$('#adminRecoveryToken').value;
+   const password=$('#adminRecoveryPassword').value;
+   if(password!==$('#adminRecoveryConfirm').value)throw Error('รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน');
+   button.disabled=true;
+   try{
+    const result=await api('/api/auth/recover-admin',{method:'POST',auth:false,timeoutMs:30000,
+     body:{setup_token:token,password,confirm:'RESET-ADMIN-PASSWORD'}});
+    form.reset();
+    renderLogin();
+    $('#username').value=result.username;
+    $('#password').focus();
+    toast('ตั้งรหัส Admin ใหม่สำเร็จ กรุณาเข้าสู่ระบบ');
+   }finally{if(button.isConnected)button.disabled=false}
+  });
+ });
  $('#loginInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install()));
 }
 function renderStudentLate(){
