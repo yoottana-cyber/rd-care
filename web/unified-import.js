@@ -121,6 +121,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
     if(pasted.includes('\ufffd'))throw Error('ข้อความที่วางมีอักขระภาษาไทยเสียหาย (�) กรุณาเลือกไฟล์ CSV ต้นฉบับหรือ Excel .xlsx แทน');
     raw=csvRows(pasted);filename='ข้อความ CSV';
    }
+   const accountMode=container.querySelector('#unifiedRosterOnly')?.checked?'roster_only':'with_accounts';
    const prepared=prepareRows(raw,typeof rooms==='function'?rooms():rooms);
    rows=prepared.map(x=>x.values);
    preview=prepared.map(x=>({source_row:x.values.source_row,room:x.values.classroom,roll_no:x.values.roll_no,
@@ -129,7 +130,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    const allowed=prepared.filter(x=>!x.message).map(x=>x.values);
    phase='กำลังตรวจสอบรายการที่รูปแบบถูกต้องในฐานข้อมูล...';showPreview(container);
    for(const group of chunks(allowed,ROSTER_PREVIEW_CHUNK)){
-    const result=await api('/api/admin/unified-import/preview',{method:'POST',body:{students:group},timeoutMs:30000});
+    const result=await api('/api/admin/unified-import/preview',{method:'POST',body:{students:group,account_mode:accountMode},timeoutMs:30000});
     for(const x of result.items){
      const target=preview.find(p=>p.source_row===x.source_row);
      if(target){target.status=x.status;target.message=x.message}
@@ -154,6 +155,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   if(!confirm('ยืนยันนำเข้า/อัปเดต '+selected.length+' คนจากไฟล์เดียว? ระบบจะส่งทีละคนเพื่อป้องกัน HTTP 500'+
    ' และข้ามรายการผิดพลาด '+invalid+' แถว (ข้อมูลเดิมที่สำเร็จแล้วจะไม่ถูกสร้างซ้ำ)'))return;
   busy=true;stopped=false;
+  const accountMode=container.querySelector('#unifiedRosterOnly')?.checked?'roster_only':'with_accounts';
   // A 502 from Pages indicates that the Worker did not return normally.
   // Check the authenticated schema probe before writing, rather than
   // repeatedly submitting uncertain student updates to a broken backend.
@@ -176,7 +178,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
     if(stopped)break;
     try{
      const result=await api('/api/admin/unified-import/commit',{
-      method:'POST',body:{students:group},timeoutMs:30000
+      method:'POST',body:{students:group,account_mode:accountMode},timeoutMs:30000
      });
      for(const entry of result.items||[]){
       const p=preview.find(item=>item.source_row===entry.source_row);
@@ -246,6 +248,11 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    </form>
    <div id="unifiedStatus" class="muted" role="status" aria-live="polite"></div>
    <div id="unifiedPreview"></div>
+   <label class="row rd-import-account-mode"><input type="checkbox" id="unifiedRosterOnly">
+    <span><strong>นำเข้าทะเบียนนักเรียนอย่างเดียว (ลดการประมวลผลเมื่อพบ 502)</strong>
+     <span class="muted">ไม่สร้างบัญชี ไม่เปลี่ยน Username/Password ของบัญชีเดิม
+      สามารถนำเข้าบัญชีนักเรียนและผู้ปกครองแยกภายหลังได้</span></span>
+   </label>
    <button type="button" class="button secondary" id="unifiedCheckApi">ตรวจสอบการเชื่อมต่อ Worker/D1</button>
    <button type="button" class="button full" id="unifiedCommit" hidden>ยืนยันนำเข้าทั้งหมด</button>
    <button type="button" class="button secondary" id="unifiedCancel" hidden>หยุดหลังจบชุดปัจจุบัน</button>
@@ -268,6 +275,11 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    }finally{busy=false;showPreview(container)}
   });
   container.querySelector('#unifiedCommit').addEventListener('click',()=>commit(container));
+  container.querySelector('#unifiedRosterOnly')?.addEventListener('change',()=>{
+   if(!preview.length||busy)return;
+   phase='เปลี่ยนโหมดการนำเข้าแล้ว • ระบบจะใช้โหมดที่เลือกสำหรับรายการที่ยังไม่บันทึกสำเร็จ';
+   showPreview(container);
+  });
   container.querySelector('#unifiedCancel').addEventListener('click',()=>{stopped=true;phase='กำลังหยุดหลังจบชุดที่ทำอยู่...';showPreview(container)});
   showPreview(container);
  }
