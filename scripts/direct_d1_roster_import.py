@@ -155,6 +155,8 @@ def plan_rows(rows, snapshot):
     return output
 
 def row_sql(row, actor_id, today):
+    if row["action"] == "skip":
+        return []
     name = safe_literal(row["full_name"])
     number = safe_literal(row["student_no"])
     room = int(row["classroom_id"])
