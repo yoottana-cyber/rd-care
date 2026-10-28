@@ -42,11 +42,15 @@ test('one file upload from browser supports 4 and 6 columns, durable resume and 
  assert.match(ui,/source_row/);
  assert.doesNotMatch(ui,/localStorage|sessionStorage/);
 });
-test('student file import new primary UI coexists with legacy account importer',()=>{
+test('original six-column student importer is restored; existing server jobs remain safe',()=>{
  const ui=source('web/unified-import.js');
  const worker=source('worker/src/worker.js');
- assert.match(ui,/studentFileJobsHolder/);
- assert.match(ui,/createStudentFileJobUi/);
+ assert.match(ui,/นำเข้านักเรียนและบัญชีจากทุกห้องในไฟล์เดียว/);
+ assert.match(ui,/classroom,roll_no,student_no,full_name,username,password/);
+ assert.match(ui,/id="downloadUnifiedExcel"/);
+ assert.match(ui,/templates\/student-all-rooms-import\.csv/);
+ assert.doesNotMatch(ui,/studentFileJobsHolder|createStudentFileJobUi|fileJobs\.render/);
+ // Previously staged jobs are not deleted or invalidated by the UI rollback.
  assert.match(worker,/studentFileJobRoutes/);
  assert.match(worker,/cleanupStudentFileJobs/);
  const migration=source('worker/migrations/0031_student_file_import_jobs.sql');
