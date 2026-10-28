@@ -22,9 +22,7 @@
    migrations_dir = "migrations"
 4. Commit การแก้ไฟล์บน Branch main ระบบ GitHub Actions ชื่อ Deploy RD CONNECT Dev Worker จะ apply migrations ทั้งหมดแล้ว deploy Worker อัตโนมัติ
 5. ตรวจ GitHub Actions ว่าผ่านทั้งการทดสอบและ Deploy; อย่าเริ่มนำเข้าหากขั้นตอน Migrate/Deploy ไม่ผ่าน
-6. สร้างห้องเรียนจากโฟลเดอร์ worker ด้วยคำสั่ง:
-   npx wrangler d1 execute DB --remote --file=classrooms_only.sql
-   (ใช้ Wrangler ที่ login เข้า Cloudflare Account เดียวกับ Worker)
+6. GitHub Actions จะสร้างรายชื่อห้องเรียนให้โดยอัตโนมัติ เฉพาะเมื่อ D1 ใหม่นั้นยังไม่มีห้องเรียน (ไม่มีข้อมูล DEMO)
 7. ตั้งบัญชี Admin ครั้งแรกด้วย POST /api/setup ไปยัง Worker ใหม่ โดยใช้ค่า x-setup-token ที่ตั้งใน Cloudflare และรหัสผ่าน Admin ใหม่อย่างน้อย 12 ตัวอักษร
 8. เข้าระบบ Admin, ตรวจ /api/admin/unified-import/health ว่า archived_roll_reuse_ready เป็น true
 9. นำเข้า ม.1 แล้วตรวจสถิติห้องเรียน ก่อนนำเข้า ม.2–ม.6
