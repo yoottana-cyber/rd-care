@@ -72,14 +72,14 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   previewPage=Math.max(1,Math.min(previewPage,pages));
   const visible=filtered.slice((previewPage-1)*ROSTER_VIEW_PAGE_SIZE,previewPage*ROSTER_VIEW_PAGE_SIZE);
   place.innerHTML=preview.length?`<p class="summary"><strong>${esc(filename)}</strong>: ${preview.length} แถว • เพิ่มแล้ว ${added} • อัปเดตแล้ว ${updated} • ข้าม/ต้องตรวจ ${skipped} • รอดำเนินการ ${pending}</p>
-   <div class="row" style="align-items:center;flex-wrap:wrap;gap:8px">
+   <div class="row rd-import-controls">
     <button type="button" class="button secondary" id="unifiedAllRows" aria-pressed="${previewFilter==='all'}">ทุกแถว</button>
     <button type="button" class="button secondary" id="unifiedIssueRows" aria-pressed="${previewFilter==='issues'}">เฉพาะแถวมีปัญหา (${skipped})</button>
     <span class="muted">แสดง ${filtered.length?((previewPage-1)*ROSTER_VIEW_PAGE_SIZE+1):0}–${Math.min(previewPage*ROSTER_VIEW_PAGE_SIZE,filtered.length)} จาก ${filtered.length} แถว</span>
     <button type="button" class="button secondary" id="unifiedPrevPage" ${previewPage===1?'disabled':''}>ก่อนหน้า</button>
     <button type="button" class="button secondary" id="unifiedNextPage" ${previewPage===pages?'disabled':''}>ถัดไป</button>
    </div>
-   <div class="table-wrap" style="max-height:440px;overflow:auto"><table class="table">
+   <div class="table-wrap rd-import-table-scroll"><table class="table">
     <thead><tr><th>แถว</th><th>ห้อง</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ</th><th>Username</th><th>ผลตรวจ / เหตุผลข้าม</th></tr></thead>
     <tbody>${visible.map(x=>`<tr><td>${x.source_row}</td><td>${esc(x.room)}</td><td>${x.roll_no}</td><td>${esc(x.student_no)}</td>
       <td>${esc(x.full_name)}</td><td>${esc(x.username)}</td>
@@ -154,9 +154,23 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   if(!confirm('ยืนยันนำเข้า/อัปเดต '+selected.length+' คนจากไฟล์เดียว? ระบบจะส่งทีละคนเพื่อป้องกัน HTTP 500'+
    ' และข้ามรายการผิดพลาด '+invalid+' แถว (ข้อมูลเดิมที่สำเร็จแล้วจะไม่ถูกสร้างซ้ำ)'))return;
   busy=true;stopped=false;
+  // A 502 from Pages indicates that the Worker did not return normally.
+  // Check the authenticated schema probe before writing, rather than
+  // repeatedly submitting uncertain student updates to a broken backend.
+  phase='ตรวจสอบการเชื่อมต่อ Worker และโครงสร้างฐานข้อมูลก่อนนำเข้า...';
+  showPreview(container);
+  try{
+   const health=await api('/api/admin/unified-import/health',{timeoutMs:15000});
+   if(!health.ok)throw Error('ระบบนำเข้ายังไม่พร้อม');
+  }catch(e){
+   const trace=e.requestId?' (รหัสตรวจสอบ '+e.requestId+')':'';
+   phase='ยังไม่เริ่มบันทึก: ตรวจสอบ API ไม่ผ่าน'+(e.httpStatus?' HTTP '+e.httpStatus:'')+
+    ' • '+e.message+trace+' • โปรดตรวจ Cloudflare Worker Logs / Service Binding';
+   busy=false;showPreview(container);return;
+  }
   const btn=container.querySelector('#unifiedCommit'),cancel=container.querySelector('#unifiedCancel');
   if(btn)btn.disabled=true;if(cancel)cancel.hidden=false;
-  let completed=0,consecutiveErrors=0;
+  let completed=0,consecutiveErrors=0,pausedDueToServer=false;
   try{
    for(const group of chunks(selected,ROSTER_COMMIT_CHUNK)){
     if(stopped)break;
@@ -176,9 +190,10 @@ export function createUnifiedImport({api,rooms,onSuccess}){
       if(p){p.status='uncertain';p.message='ยังไม่ยืนยันผลจากเซิร์ฟเวอร์: '+e.message+
        ' • สามารถกดดำเนินการต่อเพื่อตรวจสอบและอัปเดตซ้ำอย่างปลอดภัย'}
      }
-     if(consecutiveErrors>=3){
-      phase='หยุดอัตโนมัติหลังเซิร์ฟเวอร์ขัดข้อง 3 ครั้งติดกัน • ข้อมูลที่สำเร็จแล้วคงอยู่'+
-       ' • ตรวจ Cloudflare Logs แล้วกดดำเนินการต่อได้';
+     if([500,502,503,504].includes(e.httpStatus)||consecutiveErrors>=3){
+      pausedDueToServer=true;
+      // Stop on first 5xx: repeated writes make diagnosis difficult and
+      // may make a request's commit result uncertain.
       break;
      }
     }
@@ -203,9 +218,10 @@ export function createUnifiedImport({api,rooms,onSuccess}){
      ' รายการ (ดูเหตุผลในตาราง)';
     // Refresh school rosters only once after the entire file is processed.
     await onSuccess?.();
-   }else phase='ดำเนินการแล้วบางส่วน • เพิ่ม '+added+' • อัปเดต '+updated+
+   }else phase=(pausedDueToServer?'หยุดหลังพบข้อผิดพลาด Worker/Pages • ':'ดำเนินการแล้วบางส่วน • ')+
+      'เพิ่ม '+added+' • อัปเดต '+updated+
       ' • ข้าม '+skipped+' • รอดำเนินการ/ตรวจสอบ '+(pending+uncertain)+
-      ' — กดดำเนินการต่อได้โดยไม่ต้องเลือกไฟล์ใหม่';
+      ' • ตรวจ Logs หากพบ HTTP 502 แล้วจึงกดดำเนินการต่อ (ไม่ต้องเลือกไฟล์ใหม่)';
   }finally{busy=false;if(cancel?.isConnected)cancel.hidden=true;showPreview(container)}
  }
 
@@ -213,7 +229,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   if(!container)return;
   container.innerHTML=`<section class="card stack"><h3>นำเข้านักเรียนและบัญชีจากทุกห้องในไฟล์เดียว</h3>
    <p class="muted">ไฟล์มาตรฐาน 6 คอลัมน์: classroom,roll_no,student_no,full_name,username,password • ใช้รหัสนักเรียนอัปเดตข้อมูลเดิมในห้องเดิมได้ทันที • แถวผิดพลาดจะข้ามและแสดงเหตุผล</p>
-   <p class="row" style="flex-wrap:wrap"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV UTF-8 สำหรับ Excel (.csv)</a></p>
+   <p class="row rd-import-file-links"><button type="button" class="button secondary" id="downloadUnifiedExcel">ดาวน์โหลดไฟล์ตัวอย่าง Excel (.xlsx) ฟอนต์ไทยที่แก้ไขแล้ว</button> <a href="./templates/student-all-rooms-import.csv" download>ดาวน์โหลดตัวอย่าง CSV UTF-8 สำหรับ Excel (.csv)</a></p>
    <form id="unifiedForm" class="stack">
      <div class="field"><label>เลือกไฟล์ Excel .xlsx หรือ CSV .csv</label><input name="file" type="file" accept=".xlsx,.csv,text/csv"></div>
      <div class="field"><label>รหัสภาษาไทยของไฟล์ CSV</label><select name="encoding">
@@ -230,6 +246,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    </form>
    <div id="unifiedStatus" class="muted" role="status" aria-live="polite"></div>
    <div id="unifiedPreview"></div>
+   <button type="button" class="button secondary" id="unifiedCheckApi">ตรวจสอบการเชื่อมต่อ Worker/D1</button>
    <button type="button" class="button full" id="unifiedCommit" hidden>ยืนยันนำเข้าทั้งหมด</button>
    <button type="button" class="button secondary" id="unifiedCancel" hidden>หยุดหลังจบชุดปัจจุบัน</button>
    <p class="muted">เลือกไฟล์ได้ทั้งโรงเรียน (เช่น 1,750 คน) ระบบแบ่งตรวจครั้งละ 25 คน และบันทึกทีละคน เพื่อลดข้อผิดพลาด Cloudflare D1 โดยแยกธุรกรรม หากแถวใดผิดพลาดจะข้ามเฉพาะแถวนั้น ไม่ยกเลิกรายการอื่น และแสดงจำนวนเพิ่ม/อัปเดต/ข้าม</p>
@@ -237,6 +254,19 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   </section>`;
   container.querySelector('#downloadUnifiedExcel').addEventListener('click',downloadStudentExampleXlsx);
   container.querySelector('#unifiedForm').addEventListener('submit',e=>{e.preventDefault();preflight(container)});
+  container.querySelector('#unifiedCheckApi').addEventListener('click',async()=>{
+   if(busy)return;
+   busy=true;phase='กำลังตรวจสอบ Worker และฐานข้อมูล...';showPreview(container);
+   try{
+    const result=await api('/api/admin/unified-import/health',{timeoutMs:15000});
+    phase=result.ok?'Worker/D1 พร้อมนำเข้า • จำกัดการบันทึกทีละ 1 คน':
+     'พบข้อผิดพลาดฐานข้อมูล: '+(result.issues||[]).join(', ');
+   }catch(e){
+    phase='การตรวจสอบไม่สำเร็จ'+(e.httpStatus?' HTTP '+e.httpStatus:'')+
+     ' • '+e.message+(e.requestId?' • รหัสตรวจสอบ '+e.requestId:'')+
+     ' • โปรดตรวจ Cloudflare Logs';
+   }finally{busy=false;showPreview(container)}
+  });
   container.querySelector('#unifiedCommit').addEventListener('click',()=>commit(container));
   container.querySelector('#unifiedCancel').addEventListener('click',()=>{stopped=true;phase='กำลังหยุดหลังจบชุดที่ทำอยู่...';showPreview(container)});
   showPreview(container);

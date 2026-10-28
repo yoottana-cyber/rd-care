@@ -198,3 +198,27 @@ export async function unifiedRosterEndpoint(req,env,user,path){
    items:[{...plan,status:'skipped',message:sqlStatus(e?.message)}]},200);
  }
 }
+
+/**
+ * Authenticated, PII-free import readiness probe.
+ * Distinguishes a missing schema from a failing Pages Service Binding.
+ */
+export async function unifiedRosterReadiness(env,user){
+ if(user?.role!=='admin')fail(403,'เฉพาะ Admin');
+ const checks=[
+  ['students','SELECT id,student_no,classroom_id,roll_no,full_name,deleted_at FROM students LIMIT 0'],
+  ['enrollments','SELECT student_id,classroom_id,roll_no,end_date FROM student_enrollments LIMIT 0'],
+  ['accounts','SELECT id,username,student_id,password_hash,display_name FROM portal_accounts LIMIT 0'],
+  ['sessions','SELECT account_id FROM portal_sessions LIMIT 0'],
+  ['audit','SELECT actor_id,action,entity_id FROM audit_logs LIMIT 0']
+ ];
+ const issues=[];
+ for(const [key,sql] of checks){
+  try{await env.DB.prepare(sql).all()}
+  catch(e){issues.push(key);console.warn('Unified import readiness check failed for',key,e?.name||'DBError')}
+ }
+ return json({ok:issues.length===0,service:'rd-roster-import',version:'502-diagnostics-v1',
+  issues,preview_limit:25,commit_limit:1,
+  ...(issues.length?{error:'import_database_not_ready',message:'ฐานข้อมูลนำเข้าไม่พร้อม: '+issues.join(', ')}:{})
+ },issues.length?503:200);
+}

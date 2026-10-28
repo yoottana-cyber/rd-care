@@ -53,3 +53,10 @@
  .rd-pwa-update-actions{width:100%}
  .rd-pwa-update-actions .button{flex:1}
 }
+
+
+/* Unified student import: CSP-compliant styles for long 1,750-row previews. */
+.rd-import-controls{align-items:center;flex-wrap:wrap;gap:8px}
+.rd-import-table-scroll{max-height:440px;overflow:auto}
+
+.rd-import-file-links{flex-wrap:wrap}

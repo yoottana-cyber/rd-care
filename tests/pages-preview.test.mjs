@@ -50,7 +50,12 @@ test('Pages preview returns controlled error when service unavailable', async ()
     env: { RD_CARE_API: { async fetch() { throw new Error('internal secret'); } } }
   });
   assert.equal(response.status, 502);
-  assert.equal((await response.json()).error, 'preview_api_unavailable');
+  const body = await response.json();
+  assert.equal(body.error, 'service_binding_fetch_failed');
+  assert.equal(typeof body.request_id,'string');
+  assert.match(body.request_id,/^[0-9a-f-]{36}$/);
+  assert.equal(response.headers.get('x-rd-request-id'),body.request_id);
+  assert.doesNotMatch(JSON.stringify(body),/internal secret/);
 });
 
 test('Pages API route rejects paths outside /api/', async () => {
