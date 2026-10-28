@@ -144,6 +144,7 @@ async function commitOne(env,user,raw,plan,roomId){
     const salt=hex(16),hash=await passwordHash(student.password,salt);
     stmts.push(env.DB.prepare('UPDATE portal_accounts SET username=?,display_name=?,password_salt=?,password_hash=?,must_change_password=0 WHERE id=?')
      .bind(nextUsername,student.full_name,salt,hash,linkedAccount.id));
+    stmts.push(env.DB.prepare('DELETE FROM portal_sessions WHERE account_id=?').bind(linkedAccount.id));
    }else stmts.push(env.DB.prepare('UPDATE portal_accounts SET username=?,display_name=? WHERE id=?')
     .bind(nextUsername,student.full_name,linkedAccount.id));
   }else stmts.push(env.DB.prepare('UPDATE portal_accounts SET display_name=? WHERE id=?')
