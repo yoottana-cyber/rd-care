@@ -69,6 +69,13 @@ jobs:
             exit 1
           fi
 
+      - name: Read-only inspect original trial D1 before reset
+        if: github.event_name == 'push' && github.event.head_commit.message == 'ops(dev): inspect existing trial D1 before reset'
+        working-directory: worker
+        env:
+          RD_TRIAL_RESET_DRY_RUN: '1'
+        run: node scripts/reset-trial-d1-once.mjs
+
       - name: Apply pending D1 migrations first
         working-directory: worker
         run: npx --no-install wrangler d1 migrations apply DB --remote
