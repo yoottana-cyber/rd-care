@@ -34,6 +34,7 @@ test('Pages preview forwards auth and body but never browser origin or cookies',
       assert.equal(request.headers.get('content-type'), 'application/json');
       assert.equal(request.headers.get('origin'), null);
       assert.equal(request.headers.get('cookie'), null);
+      assert.match(request.headers.get('x-rd-request-id'),/^[a-f0-9-]{36}$/);
       assert.deepEqual(await request.json(), { username: 'demo' });
       return Response.json({ ok: true });
     }}}
