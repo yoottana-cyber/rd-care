@@ -50,8 +50,9 @@ export function validateSchoolSettings(body){
 }
 export async function getSchoolSettings(env){
  const result=await env.DB.prepare(
-  'SELECT school_name,academic_year,semester,semester_start_date,semester_end_date,school_start_time,late_cutoff_time,
-   first_period_start_time,period_duration_minutes,updated_by,updated_at FROM school_settings WHERE id=1'
+  `SELECT school_name,academic_year,semester,semester_start_date,semester_end_date,
+   school_start_time,late_cutoff_time,first_period_start_time,period_duration_minutes,
+   updated_by,updated_at FROM school_settings WHERE id=1`
  ).first();
  return result?{...DEFAULT_SCHOOL_SETTINGS,...result}:DEFAULT_SCHOOL_SETTINGS;
 }
