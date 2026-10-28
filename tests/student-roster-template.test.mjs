@@ -21,7 +21,7 @@ test('CSV template is UTF-8 BOM with exactly four fields and no passwords',()=>{
  const contents=readFileSync(new URL('../web/templates/student-roster-import.csv',import.meta.url),'utf8');
  assert(contents.startsWith('\ufeff'));
  const rows=csvRows(contents);
- assert.deepEqual(rows[0],['classroom','roll_no','student_no','full_name']);
+ assert.deepEqual([...rows[0]],['classroom','roll_no','student_no','full_name']);
  assert.equal(rows.length,4);
  assert.equal(rows[1][2],'000001');
  assert.doesNotMatch(contents,/username|password/);
