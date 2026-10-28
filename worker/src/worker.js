@@ -8,6 +8,7 @@ import {searchStudents} from './student-search.js';
 import {advisorImportEndpoint} from './advisor-import.js';
 import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint,unifiedRosterReadiness} from './unified-roster.js';
+import {studentFileJobRoutes,cleanupStudentFileJobs} from './student-file-jobs.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
@@ -659,6 +660,8 @@ async function adminRoutes(req,env,user,path){
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
  if(req.method==='POST'&&/^\/api\/admin\/(users|students)\/\d+\/delete$/.test(path))
   return adminDeleteIdentity(req,env,user,path);
+ if(path==='/api/admin/student-file-jobs'||path.startsWith('/api/admin/student-file-jobs/'))
+  return studentFileJobRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/unified-import/health')return unifiedRosterReadiness(env,user);
  if(path==='/api/admin/unified-import/preview'||path==='/api/admin/unified-import/commit')
   return unifiedRosterEndpoint(req,env,user,path);
@@ -1015,7 +1018,8 @@ export default {
    deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
    deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
    sendScheduledAttendanceReminders(env).catch(e=>console.warn('RD scheduled daily attendance reminder',e?.name)),
-    deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name))
+    deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name)),
+    cleanupStudentFileJobs(env).catch(e=>console.warn('RD student import cleanup',e?.name))
   ]));
  },
  async fetch(req,env,ctx){
