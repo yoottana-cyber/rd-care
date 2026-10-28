@@ -18,6 +18,7 @@ import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
 import {adminDeleteIdentity} from './admin-delete.js';
+import {schoolSettingsRoutes} from './school-settings.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -643,6 +644,7 @@ async function dashboard(req,env,user){
 }
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
+ if(path==='/api/admin/school-settings')return schoolSettingsRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
  if(path==='/api/admin/advisors/preview'||path==='/api/admin/advisors/commit')return advisorImportEndpoint(req,env,user,path);
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
