@@ -5,7 +5,7 @@ import {scoreHistoryTables} from './score-history.js';
 export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
  const esc=escapeHtml;
  let state=null,overlay=null,returnFocus=null,version=0;
- const heading=mode=>mode==='good'?'ประวัติคะแนนความดี':'ประวัติความผิดและการปรับพฤติกรรม';
+ const heading=mode=>mode==='good'?'ประวัติคะแนนความดี':mode==='all'?'ประวัติคะแนนพฤติกรรมและความดี':'ประวัติความผิดและการปรับพฤติกรรม';
  function close(){
   version++;
   if(overlay){overlay.remove();overlay=null}
@@ -30,6 +30,7 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
     aria-modal="true" aria-labelledby="rdScoreHistoryHeading" tabindex="-1">
    <div class="row between rd-score-popup-heading">
     <div><h3 id="rdScoreHistoryHeading">${heading(mode)}</h3>
+     ${state.readOnly?'<span class="tag">อ่านอย่างเดียว</span>':''}
      <p>${esc(student.full_name)} · ${esc(student.student_no||'')}
       ${student.classroom_label?' · '+esc(student.classroom_label):''}</p></div>
     <button type="button" class="rd-score-popup-close" id="rdScorePopupClose"
@@ -40,7 +41,7 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
     <span class="tag">ความผิดคงเหลือ ${remaining}</span>
     <span class="tag">ปรับแล้ว ${Number(scores.behavior_adjusted)||0}</span>
    </div>
-   ${scoreHistoryTables({items,mode,esc})}
+   ${scoreHistoryTables({items,mode,esc,readOnly:state.readOnly})}
    ${hasMore?'<button type="button" class="button secondary" id="rdScorePopupMore">ดูประวัติเพิ่มเติม</button>':''}
   </section>`;
   const dialog=overlay.querySelector('[role="dialog"]');
@@ -73,9 +74,10 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
   if(!state)return;
   const current=state,requestVersion=version;
   const offset=more?current.nextOffset:0;
-  const data=await api('/api/behavior?student_id='+Number(current.student.id)+'&offset='+offset);
+  const data=await api(current.endpoint+'?student_id='+Number(current.student.id)+'&offset='+offset);
   if(state!==current||version!==requestVersion)return;
-  current.items=more?[...current.items,...(data.items||[])]:data.items||[];
+  const rows=current.readOnly?(data.items||[]).map(row=>({...row,can_delete:0})):(data.items||[]);
+  current.items=more?[...current.items,...rows]:rows;
   current.scores=data;
   current.hasMore=Boolean(data.has_more);
   current.nextOffset=Number(data.next_offset)||0;
@@ -83,11 +85,12 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
   (overlay.querySelector(more?'#rdScorePopupMore':'#rdScorePopupClose')||
    overlay.querySelector('#rdScorePopupClose'))?.focus();
  }
- async function open({student,mode='all',onChange}){
+ async function open({student,mode='all',onChange,readOnly=false}){
   if(!student?.id)return;
   close();
   returnFocus=document.activeElement;
-  state={student,mode,onChange,items:[],scores:{},hasMore:false,nextOffset:0};
+  state={student,mode,onChange,readOnly,endpoint:readOnly?'/api/affairs/behavior/monitor/history':'/api/behavior',
+   items:[],scores:{},hasMore:false,nextOffset:0};
   // Show a helpful loading state while fetching the student record.
   overlay=document.createElement('div');
   overlay.className='rd-score-popup-overlay';

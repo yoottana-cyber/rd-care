@@ -3,7 +3,7 @@ export const NAV_GROUPS=[
  {id:'overview',label:'ภาพรวม',icon:'◈',pages:['dashboard']},
  {id:'attendance',label:'การเช็กชื่อและติดตาม',icon:'◷',
   pages:['attendance','periodAttendance','myTimetable','advisorCenter','late','lateGate','alerts']},
- {id:'care',label:'ดูแลและส่งเสริม',icon:'✦',pages:['behavior','adjustment','good','studentAffairs']},
+ {id:'care',label:'ดูแลและส่งเสริม',icon:'✦',pages:['behavior','scoreMonitor','adjustment','good','studentAffairs']},
  {id:'management',label:'งานบริหารระบบ',icon:'▦',pages:['adminStudents','portalStudentAccounts','portalGuardianAccounts','portalGuardianLinks','portalAccounts','admin']}
 ];
 export const PAGE_DESCRIPTIONS={
@@ -16,6 +16,7 @@ export const PAGE_DESCRIPTIONS={
  late:'ตรวจสอบและบันทึกข้อมูลนักเรียนมาสาย',
  lateGate:'จัดการจุดสแกน QR ลงชื่อมาสาย',
  behavior:'บันทึกคะแนนความผิดตามเกณฑ์โรงเรียน แยกจากการปรับพฤติกรรม',
+ scoreMonitor:'ติดตามคะแนนความดี ความผิดและการปรับพฤติกรรมของนักเรียนทุกห้องแบบอ่านอย่างเดียว',
  adjustment:'บันทึกการปรับพฤติกรรมรายคนตามเกณฑ์ที่ฝ่ายกิจการนักเรียนกำหนด',
  good:'ส่งเสริมและบันทึกคะแนนความดีแยกต่างหาก',
  studentAffairs:'ติดตามการเช็กชื่อ กำหนดเกณฑ์ และดูแลพฤติกรรม',

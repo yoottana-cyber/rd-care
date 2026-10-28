@@ -31,6 +31,7 @@ jobs:
           node --check worker/src/period-reports.js
           node --check worker/src/staff-push.js
           node --check worker/src/student-affairs.js
+          node --check worker/src/teacher-score-monitor.js
           node --check worker/src/behavior-bulk.js
           node --check worker/src/adjustment-bulk.js
           node --check worker/src/admin-delete.js
@@ -64,6 +65,7 @@ jobs:
           node --check web/behavior-adjustment.js
           node --check web/score-history.js
           node --check web/score-history-popup.js
+          node --check web/teacher-score-monitor.js
           node --check web/portal-admin.js
           node --check web/portal-roster-import.js
           node --check web/portal-batch.js

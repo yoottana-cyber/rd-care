@@ -2,6 +2,7 @@ import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
 import {searchBehaviorStudents,recordBehaviorBulk} from './behavior-bulk.js';
+import {schoolScoreMonitorSummary,schoolScoreMonitorHistory} from './teacher-score-monitor.js';
 import {previewBehaviorAdjustments,recordBehaviorAdjustmentBulk} from './adjustment-bulk.js';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
@@ -137,7 +138,7 @@ export async function sendScheduledAttendanceReminders(env){
 }
 export async function studentAffairsRoutes(req,env,u,path){
  const method=req.method;const url=new URL(req.url),q=url.searchParams;
- const ordinaryBehavior=(method==='GET'&&['/api/affairs/behavior/rules','/api/affairs/behavior/students','/api/affairs/behavior/approved-adjustments'].includes(path))||
+ const ordinaryBehavior=(method==='GET'&&['/api/affairs/behavior/rules','/api/affairs/behavior/students','/api/affairs/behavior/approved-adjustments','/api/affairs/behavior/monitor/summary','/api/affairs/behavior/monitor/history'].includes(path))||
   (method==='POST'&&['/api/affairs/behavior/record','/api/affairs/behavior/record/bulk','/api/affairs/behavior/adjust','/api/affairs/behavior/adjust/preview','/api/affairs/behavior/adjust/bulk'].includes(path));
  if(!staff(u)&&!(['teacher','admin'].includes(u.role)&&ordinaryBehavior))
   fail(403,'เฉพาะครูที่ได้รับมอบหมายสิทธิ์ฝ่ายกิจการนักเรียน');
@@ -156,6 +157,8 @@ export async function studentAffairsRoutes(req,env,u,path){
  }
  if(method==='GET'&&path==='/api/affairs/people')return reply(await roster(env));
  if(method==='GET'&&path==='/api/affairs/behavior/students')return searchBehaviorStudents(req,env,u);
+ if(method==='GET'&&path==='/api/affairs/behavior/monitor/summary')return schoolScoreMonitorSummary(env,u);
+ if(method==='GET'&&path==='/api/affairs/behavior/monitor/history')return schoolScoreMonitorHistory(req,env,u);
  if(method==='GET'&&path==='/api/affairs/students'){
   const query=string(q.get('query'),70);
   if(query.length<2)fail(400,'ค้นหาชื่อหรือรหัสนักเรียนอย่างน้อย 2 ตัวอักษร');
