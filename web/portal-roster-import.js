@@ -80,7 +80,8 @@ export function createPortalRosterImport({api,toast,onComplete}){
    ' รายการ — ระบบทำงานเป็นชุดย่อยอัตโนมัติ':
    count?'เสร็จสิ้น '+count+' / '+items.length+' รายการ':'';
   const button=$('#portalRosterCommit');
-  if(button)button.disabled=running||!items.length||!!errors.length||count>0;
+  if(button){button.disabled=running||!items.length||count>0;
+   button.textContent='นำเข้า/อัปเดต '+items.length+' รายการ (ข้ามข้อผิดพลาด '+errors.length+' แถว)';}
   const preview=$('#portalRosterPreview');
   if(preview)preview.innerHTML=items.length?
    '<p>แสดงตัวอย่าง '+Math.min(items.length,20)+' จาก '+items.length+' รายการ (ไม่แสดงรหัสผ่าน)</p>'+
@@ -108,40 +109,55 @@ export function createPortalRosterImport({api,toast,onComplete}){
   update();
  }
  async function commit(){
-  if(running||!items.length||errors.length)return;
+  if(running||!items.length)return;
   const verified=$('#portalRosterVerified')?.checked===true;
   if(items.some(r=>r.guardian_username)&&!verified)
    throw Error('ต้องตรวจสอบตัวตนและความสัมพันธ์ก่อนเชื่อมบัญชีผู้ปกครอง');
-  if(!confirm('ยืนยันนำเข้าหรืออัปเดตบัญชี '+items.length+' แถว? หากระบุรหัสผ่านใหม่ บัญชีเดิมจะถูกตั้งรหัสตามไฟล์'))return;
-  running=true;stop=false;count=0;update();
+  if(!confirm('ยืนยันนำเข้าหรืออัปเดตบัญชี '+items.length+
+   ' แถว โดยข้ามรายการรูปแบบผิด '+errors.length+
+   ' แถว? รหัสผ่านที่ระบุใหม่จะเปลี่ยนรหัสบัญชีเดิม'))return;
+  running=true;stop=false;count=0;results=[];update();
+  let processed=0,skipped=errors.length;
   const cancel=$('#portalRosterStop');if(cancel)cancel.hidden=false;
   try{
-   for(const group of chunks(items,5)){
+   // Backend writes each transport batch atomically; use one row per batch so
+   // any unexpected conflict cannot cancel the other valid student accounts.
+   for(const row of items){
     if(stop)break;
-    const r=await api('/api/admin/portal/import',{method:'POST',
-     body:{rows:group.map(({source_row,...rest})=>rest),relationships_verified:verified}});
-    count+=r.imported;results.push(...(r.items||[]));update();
+    try{
+     const r=await api('/api/admin/portal/import',{method:'POST',
+      body:{rows:[Object.fromEntries(Object.entries(row).filter(([k])=>k!=='source_row'))],
+       relationships_verified:verified}});
+     count+=r.imported||0;results.push(...(r.items||[]));
+    }catch(error){
+     skipped++;
+     errors.push({source_row:row.source_row,student_no:row.student_no,
+      message:'ข้ามระหว่างบันทึก: '+error.message});
+    }
+    processed++;update();
+    const progress=$('#portalRosterProgress');
+    if(progress)progress.textContent='ประมวลผล '+processed+'/'+items.length+
+      ' • สำเร็จ '+count+' • ข้าม '+skipped;
    }
-   if(count===items.length){
-    toast('นำเข้า/อัปเดตบัญชีสำเร็จ '+count+' รายการ');
-    items=[];errors=[];fileName='';results=[];update();
+   if(processed===items.length){
+    const message='เสร็จสิ้น: เพิ่มหรืออัปเดตบัญชี '+count+' รายการ ข้าม '+skipped+' แถว';
+    toast(message);
+    items=[];fileName='';results=[];update();
+    const status=$('#portalRosterProgress');if(status)status.textContent=message;
     await onComplete?.();
-   }else toast('นำเข้าแล้ว '+count+' รายการ สามารถเลือกไฟล์เดิมเพื่อนำเข้าอีกครั้งได้');
-  }catch(err){
-   toast('นำเข้าสำเร็จแล้ว '+count+' รายการ ก่อนพบข้อผิดพลาด: '+err.message);
-   if($('#portalRosterProgress'))$('#portalRosterProgress').textContent=
-    'หยุดที่รายการ '+(count+1)+' • '+err.message+' • แก้ไขข้อมูลแล้วนำเข้าไฟล์เดิมซ้ำได้';
-  }finally{
-   running=false;if(cancel)cancel.hidden=true;
-   // Do not preserve raw passwords in a persisted preview after a successful import.
-   if(count===items.length)items=[];
-  }
+   }else{
+    const message='หยุดหลังประมวลผล '+processed+' แถว: สำเร็จ '+count+' ข้าม '+skipped;
+    toast(message);
+    const status=$('#portalRosterProgress');if(status)status.textContent=message;
+   }
+  }finally{running=false;if(cancel)cancel.hidden=true;update()}
  }
+
  function render(container){
   if(!container)return;
   container.innerHTML=`<section class="card stack">
    <h3>นำเข้าบัญชีนักเรียนและผู้ปกครองทั้งโรงเรียน</h3>
-   <p class="muted">เลือกไฟล์เดียวได้ทั้งโรงเรียน ไม่จำกัดจำนวนแถวที่ต้องกดนำเข้า • ระบบทยอยบันทึกชุดละ 5 แถว เพื่อความเสถียร
+   <p class="muted">เลือกไฟล์เดียวได้ทั้งโรงเรียน ไม่จำกัดจำนวนแถวที่ต้องกดนำเข้า • ระบบแยกบันทึกทีละรายการเพื่อข้ามแถวที่ผิดพลาด
    และอัปเดตบัญชีเดิมโดยจับคู่ <strong>เลขประจำตัวนักเรียน</strong></p>
    <div class="row" style="flex-wrap:wrap;gap:8px">
     <button type="button" id="portalDownloadXlsx" class="button secondary">ดาวน์โหลดตัวอย่าง Excel (.xlsx)</button>
@@ -164,7 +180,7 @@ export function createPortalRosterImport({api,toast,onComplete}){
    <div id="portalRosterPreview"></div>
    <label class="row"><input type="checkbox" id="portalRosterVerified">
     ยืนยันว่าโรงเรียนตรวจสอบตัวตนและความสัมพันธ์ผู้ปกครองตามเอกสารที่ได้รับก่อนนำเข้า</label>
-   <button type="button" class="button full" id="portalRosterCommit" disabled>นำเข้า/อัปเดตทั้งไฟล์</button>
+   <button type="button" class="button full" id="portalRosterCommit" disabled>นำเข้า/อัปเดตบัญชีที่ผ่านการตรวจสอบ (ข้ามแถวผิด)</button>
    <button type="button" class="button secondary" id="portalRosterStop" hidden>หยุดหลังจบชุดปัจจุบัน</button>
    <div id="portalRosterProgress" role="status" aria-live="polite"></div>
    <p class="warn">ไฟล์มีรหัสผ่านและข้อมูลผู้เรียน โปรดเก็บไว้ในพื้นที่ปลอดภัย ไม่ส่งเข้ากลุ่มสาธารณะ
