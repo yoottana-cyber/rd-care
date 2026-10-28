@@ -15,8 +15,9 @@ class AutoTruancyScoreTests(unittest.TestCase):
   self.db=sqlite3.connect(':memory:')
   self.db.execute('PRAGMA foreign_keys=ON')
   for file in ('0001_initial.sql','0002_notification_outbox.sql',
-               '0006_student_guardian_portal.sql','0013_truancy_push.sql',
-               '0018_student_affairs.sql','0020_separate_merit_conduct_adjustments.sql',
+               '0006_student_guardian_portal.sql','0007_teacher_timetable.sql',
+               '0008_teacher_timetable_approvals.sql','0009_teacher_timetable_immediate.sql',
+               '0013_truancy_push.sql','0018_student_affairs.sql','0020_separate_merit_conduct_adjustments.sql',
                '0023_behavior_record_soft_delete.sql'):
    self.db.executescript((MIGRATIONS/file).read_text(encoding='utf8'))
   self.db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
