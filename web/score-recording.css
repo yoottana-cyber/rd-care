@@ -33,3 +33,14 @@
  .score-student-row .button{padding:7px;font-size:11px}
  .score-student-list{max-height:320px}
 }
+
+
+.score-history-group{display:grid;gap:10px}
+.score-history-group h4{margin:6px 0 0;color:#166347;font-size:15px}
+.score-history-table th,.score-history-table td{vertical-align:top;white-space:normal;min-width:75px}
+.score-history-table td:nth-child(2){min-width:150px}
+.score-history-table td:nth-child(4){min-width:130px;overflow-wrap:anywhere}
+.score-history-table .score-history-points{font-variant-numeric:tabular-nums;white-space:nowrap}
+.score-history-table .score-delete-own{font-size:12px;padding:6px 10px}
+.score-history-table .tag{margin-left:6px}
+@media(max-width:600px){.score-history-table{min-width:650px}}
