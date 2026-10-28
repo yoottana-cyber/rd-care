@@ -85,6 +85,7 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
     <p class="muted">การแจ้งเตือนและวันหยุดใช้ข้อมูลชุดเดียวกับฝ่ายกิจการนักเรียน ไม่สร้างการตั้งค่าซ้ำ</p>
     <div class="rd-school-settings-links">
      <button type="button" class="button secondary" data-school-jump="studentAffairs">🏫 เวลาแจ้งเตือน · วันหยุด · เกณฑ์คะแนน</button>
+     <button type="button" class="button secondary" data-school-jump="timetableAudit">🔍 ตรวจสอบตารางสอนและคาบซ้อน</button>
      <button type="button" class="button secondary" data-school-jump="admin">👥 บัญชีบุคลากร · ครูที่ปรึกษา · ตารางสอน</button>
     </div>
    </section>

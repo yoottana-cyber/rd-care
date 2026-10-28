@@ -72,10 +72,12 @@ async function saveLesson(req,env,user,id){
     lesson.subject_code,lesson.subject,id,user.id,id).run();
   if(!result.meta.changes)fail(409,'ตารางสอนถูกแก้ไขแล้ว กรุณาโหลดข้อมูลใหม่');
  }else{
-  const result=await env.DB.prepare(`INSERT INTO timetable
+  let result;
+  try{result=await env.DB.prepare(`INSERT INTO timetable
    (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject,active,approval_status)
    VALUES(?,?,?,?,?,?,?,1,'approved')`).bind(lesson.classroom_id,user.id,lesson.day_of_week,lesson.period,
       lesson.end_period,lesson.subject_code,lesson.subject).run();
+  }catch(e){if(/TIMETABLE_OVERLAP/.test(String(e?.message||'')))fail(409,'คาบเรียนชนกับรายการที่เพิ่งบันทึก กรุณาเลือกคาบอื่น');throw e}
   changedId=result.meta.last_row_id;
  }
  await env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')

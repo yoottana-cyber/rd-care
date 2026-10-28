@@ -18,6 +18,7 @@ import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
 import {adminDeleteIdentity} from './admin-delete.js';
+import {adminTimetableAudit} from './timetable-audit.js';
 import {schoolTermRoutes} from './school-terms.js';
 import {schoolSettingsRoutes} from './school-settings.js';
 
@@ -645,6 +646,7 @@ async function dashboard(req,env,user){
 }
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
+ if(path==='/api/admin/timetable/audit')return adminTimetableAudit(req,env,user);
  if(path==='/api/admin/school-settings')return schoolSettingsRoutes(req,env,user,path);
  if(path==='/api/admin/term-snapshots')return schoolTermRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
@@ -692,10 +694,12 @@ async function adminRoutes(req,env,user,path){
    AND period<=? AND COALESCE(end_period,period)>=? LIMIT 1`)
    .bind(lesson.day_of_week,lesson.classroom_id,teacherId,lesson.end_period,lesson.period).first();
   if(clash)throw error(409,'ตารางสอนซ้อนกับคาบเดิมของครูหรือห้องเรียน');
-  const res=await env.DB.prepare(`INSERT INTO timetable
+  let res;
+  try{res=await env.DB.prepare(`INSERT INTO timetable
    (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject)
    VALUES(?,?,?,?,?,?,?)`)
    .bind(lesson.classroom_id,teacherId,lesson.day_of_week,lesson.period,lesson.end_period,lesson.subject_code,lesson.subject).run();
+  }catch(e){if(/TIMETABLE_OVERLAP/.test(String(e?.message||'')))throw error(409,'มีครูบันทึกตารางสอนคาบนี้แล้ว กรุณาตรวจสอบคาบซ้อน');throw e}
   await log(env.DB,user.id,'timetable_created','timetable',res.meta.last_row_id);
   return json({ok:true,id:res.meta.last_row_id},201);
  }
