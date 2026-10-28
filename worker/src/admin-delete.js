@@ -54,7 +54,7 @@ export async function adminDeleteIdentity(req,env,actor,path){
    bind(env.DB,"DELETE FROM portal_accounts WHERE student_id=? AND role='student'",id),
    // Close the currently occupied seat while preserving membership history.
    bind(env.DB,`UPDATE student_enrollments SET end_date=CASE
-    WHEN date('now','+7 hours')>start_date THEN date('now','+7 hours')
+    WHEN date('now','+7 hours')>=start_date THEN date('now','+7 hours','+1 day')
     ELSE date(start_date,'+1 day') END WHERE student_id=? AND end_date IS NULL`,id),
    bind(env.DB,`UPDATE students SET active=0,deleted_at=CURRENT_TIMESTAMP,
       student_no=?,full_name=? WHERE id=? AND deleted_at IS NULL`,
