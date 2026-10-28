@@ -17,6 +17,7 @@ jobs:
           node --check worker/src/admin-validation.js
           node --check worker/src/student-import.js
           node --check worker/src/unified-roster.js
+          node --check worker/src/student-statistics.js
           node --check worker/src/late-self.js
           node --check worker/src/late-qr.js
           node --check worker/src/late-qr-auto.js
@@ -62,6 +63,7 @@ jobs:
           node --check web/request-cache.js
           node --check web/xlsx-reader.js
           node --check web/unified-import.js
+          node --check web/student-statistics.js
           node --check web/advisor-import.js
           node --check web/template-xlsx.js
           node --check web/csv-encoding.js

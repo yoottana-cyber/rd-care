@@ -2,6 +2,7 @@ import {API_BASE_URL} from './config.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
+import {createStudentStatistics} from './student-statistics.js';
 import {createAdvisorImport} from './advisor-import.js';
 import {createAdminSettings} from './admin-settings.js';
 import {createSchoolSettings} from './school-settings.js';
@@ -58,6 +59,8 @@ const behaviorAdjustment=createBehaviorAdjustment({api,mount,safeRun,toast,rooms
  getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
 const adminStudentState={roomId:null,items:[],editId:null};
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()}});
+const studentStatistics=createStudentStatistics({api,mount,safeRun,isActive:()=>state.tab==='studentStatistics',
+ onRoom:async id=>{adminStudentState.roomId=id;adminStudentState.editId=null;await showTab('adminStudents')}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
 const adminSettings=createAdminSettings({api,mount,safeRun,toast,
  getUsers:()=>state.users,getRooms:()=>state.rooms,reload:loadAdmin,
@@ -250,7 +253,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],...(['teacher','staff','admin'].includes(state.user?.role)?[['scoreMonitor','ติดตามคะแนนพฤติกรรม','📊']]:[]),['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️'],['schoolSettings','ตั้งค่าระบบโรงเรียน','🏫'],['timetableAudit','ตรวจสอบตารางสอน','🔍'],['termSnapshots','ทะเบียนและตารางสอนรายภาคเรียน','📘']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],...(['teacher','staff','admin'].includes(state.user?.role)?[['scoreMonitor','ติดตามคะแนนพฤติกรรม','📊']]:[]),['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['studentStatistics','สถิติจำนวนนักเรียน','📊'],['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️'],['schoolSettings','ตั้งค่าระบบโรงเรียน','🏫'],['timetableAudit','ตรวจสอบตารางสอน','🔍'],['termSnapshots','ทะเบียนและตารางสอนรายภาคเรียน','📘']]:[])];
  const sidebar=renderSidebarNavigation(navs,state.tab);
  const page=pageLocation(navs,state.tab);
  const pageIcon=navs.find(x=>x[0]===(state.tab==='periodCheckin'?'periodAttendance':state.tab))?.[2]||'✦';
@@ -397,6 +400,10 @@ async function showTab(tab){scorePopup.close();if(tab!=='lateGate')lateGate.dest
   if(state.user?.role!=='admin'){state.tab='dashboard';toast('เฉพาะผู้ดูแลระบบ',true);return loadDashboard()}
   return schoolSettings.load();
  }
+ if(tab==='studentStatistics'){
+  if(state.user?.role!=='admin'){state.tab='dashboard';toast('เฉพาะผู้ดูแลระบบ',true);return loadDashboard()}
+  return studentStatistics.load();
+ }
  if(tab==='adminStudents')return loadAdminStudents();
  if(['portalStudentAccounts','portalGuardianAccounts','portalGuardianLinks','portalAccounts'].includes(tab)){
   if(state.user?.role!=='admin'){toast('เฉพาะผู้ดูแลระบบ',true);return loadDashboard()}
@@ -433,7 +440,7 @@ function renderDashboard(){
   ['adjustment','🌱','บันทึกการปรับพฤติกรรม','ปรับคะแนนความผิดตามเกณฑ์ที่อนุมัติ','quick-teal'],
    ['good','⭐','คะแนนความดี','บันทึกความดีแยกจากพฤติกรรม','quick-blue'],
   ['alerts','🔔','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
-  ...(state.user?.role==='admin'?[['adminStudents','🎓','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue'],['schoolSettings','🏫','ตั้งค่าระบบโรงเรียน','ปีการศึกษา ภาคเรียน และเวลาลงชื่อมาสาย','quick-teal']]:[])
+  ...(state.user?.role==='admin'?[['studentStatistics','📊','สถิติจำนวนนักเรียน','ตรวจสอบห้องที่ยังไม่มีนักเรียน','quick-teal'],['adminStudents','🎓','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue'],['schoolSettings','🏫','ตั้งค่าระบบโรงเรียน','ปีการศึกษา ภาคเรียน และเวลาลงชื่อมาสาย','quick-teal']]:[])
  ];
  mount(`<section class="stack">
   <div class="dashboard-hero">
@@ -813,7 +820,7 @@ function renderAdminStudents(){
    <button type="button" class="button ${s.active?'ghost':'secondary'}" data-toggle-student="${s.id}">${s.active?'พักข้อมูล':'เปิดใช้งาน'}</button>
    <button type="button" class="button danger" data-delete-student="${s.id}">ลบข้อมูล</button></td></tr>`).join('');
  mount(`<section class="stack">
-  <div><h2>จัดการข้อมูลนักเรียน</h2><p class="muted">เพิ่ม แก้ไข ย้ายห้อง พักหรือนำข้อมูลออกจากรายการ โดยรักษาประวัติเช็กชื่อย้อนหลังไว้</p></div>
+  <div class="row between"><div><h2>จัดการข้อมูลนักเรียน</h2><p class="muted">เพิ่ม แก้ไข ย้ายห้อง พักหรือนำข้อมูลออกจากรายการ โดยรักษาประวัติเช็กชื่อย้อนหลังไว้</p></div><button class="button secondary" type="button" data-tab="studentStatistics">📊 สถิติจำนวนนักเรียน</button></div>
   <div class="card stack"><div class="row between"><div class="field smallbox"><label for="adminStudentRoom">ห้องเรียน</label><select id="adminStudentRoom">${rooms(adminStudentState.roomId)}</select></div>
    <div><strong>${activeCount} คน</strong><p class="muted">พักข้อมูล ${items.length-activeCount} คน</p></div></div>
    <div class="field"><label for="adminStudentSearch">ค้นหารายชื่อหรือรหัสนักเรียน</label><input id="adminStudentSearch" placeholder="พิมพ์ชื่อหรือรหัสนักเรียน" type="search"></div>

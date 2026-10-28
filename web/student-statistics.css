@@ -1,0 +1,28 @@
+/* Admin room coverage dashboard: responsive, keyboard-accessible controls. */
+.rd-room-statistics .rd-stat-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:20px 22px;border-radius:18px;border:1px solid #d0e9dc;background:linear-gradient(115deg,#e4f7eb,#e8f3ff)}
+.rd-stat-hero h2{font-size:23px;margin:7px 0 5px;color:#18593e}.rd-stat-hero p{color:#507766;margin:0}
+.rd-stat-kicker{font-size:11px;letter-spacing:.08em;color:#27835b;font-weight:850}
+.rd-stat-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.rd-stat-metric{border:1px solid #d6e8de;background:#fff;border-radius:15px;padding:17px;min-width:0;display:flex;flex-direction:column;gap:6px}
+.rd-stat-metric span{font-weight:700;font-size:13px;color:#527565}.rd-stat-metric strong{color:#157c50;font-size:29px;line-height:1.15;font-variant-numeric:tabular-nums}.rd-stat-metric small{color:#7c9887;font-size:12px}
+.rd-stat-alert{background:#fff5ee;border-color:#eccdaf}.rd-stat-alert strong{color:#b45623}
+.rd-stat-grades{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px}
+.rd-stat-grade{text-align:left;border:1px solid #dae9e0;border-radius:13px;background:#f7fcf9;padding:13px;display:flex;flex-direction:column;gap:7px;min-width:0;color:#356a4f}
+.rd-stat-grade span{font-weight:800;font-size:13px}.rd-stat-grade strong{color:#157e52;font-size:22px;white-space:nowrap}.rd-stat-grade strong small{font-size:12px}.rd-stat-grade>small{font-size:11px;color:#678775}
+.rd-stat-grade.selected,.rd-stat-grade:hover{background:#e4f6e9;border-color:#218b5d}.rd-stat-grade.selected{box-shadow:inset 0 0 0 1px #218b5d}
+.rd-stat-filters{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:12px}
+.rd-stat-table th,.rd-stat-table td{white-space:nowrap}
+.rd-stat-table .rd-room-number{font-weight:750;font-variant-numeric:tabular-nums}
+.rd-stat-table tbody tr.rd-room-zero{background:#fff6f0}
+.rd-room-pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800}
+.rd-room-pill.zero{background:#ffeadf;color:#a2481f;border:1px solid #efc5a7}.rd-room-pill.filled{background:#e5f8ed;color:#0f7445;border:1px solid #b4e0c5}
+.rd-stat-no-data{text-align:center!important;padding:24px!important;color:#738d7e}
+[data-theme="dark"] .rd-stat-hero{background:linear-gradient(115deg,#224334,#243947);border-color:#436853}
+[data-theme="dark"] .rd-stat-hero h2,[data-theme="dark"] .rd-stat-hero p{color:#d9f0e2}
+[data-theme="dark"] .rd-stat-metric,[data-theme="dark"] .rd-stat-grade{background:#24392f;border-color:#41624f}
+[data-theme="dark"] .rd-stat-metric strong,[data-theme="dark"] .rd-stat-grade strong{color:#8be4b4}
+[data-theme="dark"] .rd-stat-metric.rd-stat-alert,[data-theme="dark"] .rd-stat-table tbody tr.rd-room-zero{background:#453329}
+[data-theme="dark"] .rd-stat-grade.selected{background:#285e43}
+@media(max-width:1000px){.rd-stat-grades{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.rd-stat-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.rd-stat-filters{grid-template-columns:1fr}}
+@media(max-width:440px){.rd-stat-grades{grid-template-columns:repeat(2,minmax(0,1fr))}.rd-stat-metric strong{font-size:25px}.rd-stat-table .button{padding:8px;font-size:12px}}
