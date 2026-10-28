@@ -15,7 +15,10 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
    api('/api/my-timetable'),api('/api/classrooms/catalog'),api('/api/school/period-clock')
   ]);
   lessons=lessonsResult.items;rooms=roomResult.items;clockSettings=clock;
-  periodClock=periodClockRows(clock.first_period_start_time,Number(clock.period_duration_minutes));render();
+  periodClock=periodClockRows(clock.first_period_start_time,Number(clock.period_duration_minutes),10,{
+   lunch_after_period:Number(clock.lunch_after_period??0),lunch_break_minutes:Number(clock.lunch_break_minutes??0),
+   between_period_break_minutes:Number(clock.between_period_break_minutes??0)
+  });render();
  }
  function render(){
   const edit=lessons.find(row=>row.id===editId);
@@ -28,7 +31,7 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
    <div><div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>
     <h2>📚 ตารางสอนของฉัน</h2>
     <p class="muted">ครูเพิ่มตารางสอนด้วยตนเองแล้วเช็กชื่อรายคาบได้ทันที ไม่ต้องรออนุมัติ • ระบบจะตรวจคาบซ้อนก่อนบันทึก</p>
-    <p class="muted">เวลาอ้างอิง: คาบละ ${clockSettings?.period_duration_minutes||50} นาที • คาบที่ 1 เริ่ม ${escapeHtml(clockSettings?.first_period_start_time||'08:30')} น. (ยังไม่รวมเวลาพัก)</p></div>
+    <p class="muted">เวลาอ้างอิง: คาบละ ${clockSettings?.period_duration_minutes||50} นาที • คาบที่ 1 เริ่ม ${escapeHtml(clockSettings?.first_period_start_time||'08:30')} น. • ${Number(clockSettings?.lunch_after_period)>0?'พักกลางวันหลังคาบ '+clockSettings.lunch_after_period+' ('+clockSettings.lunch_break_minutes+' นาที)':'ไม่มีพักกลางวันในตาราง'} • พักระหว่างคาบ ${clockSettings?.between_period_break_minutes||0} นาที</p></div>
    <section class="card stack">
     <h3>${edit?'แก้ไขรายการตารางสอน':'เพิ่มรายการตารางสอน'}</h3>
     <form id="myTimetableForm" class="stack">
