@@ -44,3 +44,8 @@
 .score-history-table .score-delete-own{font-size:12px;padding:6px 10px}
 .score-history-table .tag{margin-left:6px}
 @media(max-width:600px){.score-history-table{min-width:650px}}
+
+
+.score-entry #scoreAdjustmentForm .tag{align-self:flex-start}
+.score-entry #scoreAdjustmentForm .field select{width:100%}
+@media(max-width:600px){.score-entry #scoreAdjustmentForm button[type="submit"]{width:100%}}
