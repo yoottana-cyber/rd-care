@@ -377,12 +377,85 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
    </tbody></table></div>
    ${state.monitorLimit&&visible.length>state.monitorLimit?'<p class="muted">สามารถเปลี่ยนจำนวนแถวเป็นทั้งหมดเพื่อดูนักเรียนที่เหลือ</p>':''}
   </section>
-  ${monitorDetailModal()}
+  ${monitorDetailModal()}`);
   bind('#affairsGradeSelect','change',(_,el)=>{state.grade=Number(el.value);return monitor(false)});
   bind('#affairsMonitorQuery','change',(_,el)=>{state.monitorQuery=el.value;return monitor(false)});
   bind('#affairsMonitorRefresh','click',()=>monitor(true));
   bind('#affairsMonitorLimit','change',(_,el)=>{state.monitorLimit=Number(el.value);return monitor(false)});
 
+ }
+
+ const improvementStatus=row=>{
+  if(Number(row.behavior_deducted)<=0)return 'none';
+  if(Number(row.behavior_remaining)<=0)return 'completed';
+  return Number(row.behavior_adjusted)>0?'progress':'pending';
+ };
+ const improvementLabels={pending:'ยังไม่บันทึกการปรับ',progress:'ปรับแล้วบางส่วน',completed:'ปรับครบตามคะแนน'};
+ async function trackAdjustments(refresh=true){
+  if(refresh){
+   const data=await api('/api/affairs/behavior/summary?date='+encodeURIComponent(bangkokToday()));
+   state.scoreSummary=data.items||[];
+   if(state.monitorStudent){
+    const found=state.scoreSummary.find(row=>Number(row.student_id)===Number(state.monitorStudent.student_id));
+    state.monitorStudent=found||null;
+    if(found)await loadMonitorStudentDetail();
+    else{state.monitorScore=null;state.monitorCases=[]}
+   }
+  }
+  const items=state.scoreSummary.filter(row=>Number(row.behavior_deducted)>0);
+  const byGrade=state.adjustmentGrade?items.filter(row=>Number(row.grade)===state.adjustmentGrade):items;
+  const query=state.adjustmentQuery.trim().toLocaleLowerCase('th-TH');
+  const visible=byGrade.filter(row=>{
+   if(state.adjustmentStatus!=='all'&&improvementStatus(row)!==state.adjustmentStatus)return false;
+   return !query||[row.full_name,row.student_no,row.classroom_label].some(value=>
+    String(value||'').toLocaleLowerCase('th-TH').includes(query));
+  });
+  const sum=key=>byGrade.reduce((n,row)=>n+Number(row[key]||0),0);
+  frame(`<section class="card stack">
+   <div class="row between"><div><h3>ติดตามการปรับพฤติกรรม</h3>
+    <p class="muted">สรุปความคืบหน้าการปรับคะแนนสำหรับนักเรียนที่มีประวัติความผิด
+     สถานะเป็นเพียงข้อมูลคะแนน ไม่ใช่คำตัดสินพฤติกรรมนักเรียน</p></div>
+    <button id="affairsAdjustmentRefresh" type="button" class="button secondary">↻ อัปเดต</button></div>
+   <div class="rd-affairs-metrics">
+    <div><span>นักเรียนที่มีประวัติความผิด</span><strong>${byGrade.length}</strong></div>
+    <div class="good"><span>คะแนนปรับพฤติกรรมรวม</span><strong>${sum('behavior_adjusted')}</strong></div>
+    <div class="warn-metric"><span>คะแนนความผิดคงเหลือรวม</span><strong>${sum('behavior_remaining')}</strong></div>
+   </div>
+   <div class="row">
+    <div class="field smallbox"><label for="affairsAdjustmentGrade">ระดับชั้น</label>
+     <select id="affairsAdjustmentGrade"><option value="0">ทุกระดับชั้น</option>
+      ${[1,2,3,4,5,6].map(i=>`<option value="${i}" ${state.adjustmentGrade===i?'selected':''}>ม.${i}</option>`).join('')}
+     </select></div>
+    <div class="field smallbox"><label for="affairsAdjustmentStatus">สถานะ</label>
+     <select id="affairsAdjustmentStatus">
+      ${Object.entries({all:'ทุกสถานะ',...improvementLabels}).map(([key,label])=>
+       `<option value="${key}" ${state.adjustmentStatus===key?'selected':''}>${label}</option>`).join('')}
+     </select></div>
+    <div class="field smallbox"><label for="affairsAdjustmentQuery">ค้นหาชื่อ รหัส หรือห้อง</label>
+     <input id="affairsAdjustmentQuery" type="search" value="${esc(state.adjustmentQuery)}" placeholder="พิมพ์ค้นหา"></div>
+   </div>
+  </section>
+  <section class="card stack">
+   <div class="row between"><h3>ทะเบียนติดตามการปรับพฤติกรรม</h3><span class="tag">พบ ${visible.length} คน</span></div>
+   <div class="table-wrap"><table class="table"><thead><tr>
+    <th>ห้อง</th><th>นักเรียน / เลขประจำตัว</th><th>ความผิดรวม</th><th>ปรับแล้ว</th>
+    <th>คงเหลือ</th><th>สถานะ</th><th>รายละเอียด</th></tr></thead><tbody>
+    ${visible.map(row=>`<tr>
+     <td>${esc(row.classroom_label)}</td>
+     <td><button type="button" class="rd-monitor-student-link" data-monitor-detail="${row.student_id}">${esc(row.full_name)}</button>
+      <div class="muted">${esc(row.student_no)}</div></td>
+     <td>${Number(row.behavior_deducted)||0}</td><td>${Number(row.behavior_adjusted)||0}</td>
+     <td><strong>${Number(row.behavior_remaining)||0}</strong></td>
+     <td><span class="tag">${improvementLabels[improvementStatus(row)]}</span></td>
+     <td><button type="button" class="button secondary" data-monitor-detail="${row.student_id}">ดูรายละเอียด</button></td>
+    </tr>`).join('')||'<tr><td colspan="7">ไม่มีนักเรียนที่ตรงกับเงื่อนไข</td></tr>'}
+    </tbody></table></div>
+  </section>
+  ${monitorDetailModal()}`);
+  bind('#affairsAdjustmentRefresh','click',()=>trackAdjustments(true));
+  bind('#affairsAdjustmentGrade','change',(_,el)=>{state.adjustmentGrade=Number(el.value);return trackAdjustments(false)});
+  bind('#affairsAdjustmentStatus','change',(_,el)=>{state.adjustmentStatus=el.value;return trackAdjustments(false)});
+  bind('#affairsAdjustmentQuery','change',(_,el)=>{state.adjustmentQuery=el.value;return trackAdjustments(false)});
  }
  const studentPicker=()=>`<section class="card stack"><h3>ค้นหานักเรียน</h3>
    <form id="affairsStudentSearch" class="row">
