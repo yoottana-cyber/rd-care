@@ -25,14 +25,13 @@ export async function searchBehaviorStudents(req,env,user){
   fail(400,'คำค้นมีรูปแบบไม่ถูกต้อง');
  const term=query.trim();
  if(term.length<2)fail(400,'กรุณากรอกเลขประจำตัวหรือชื่อนักเรียนอย่างน้อย 2 ตัวอักษร');
- const pattern='%'+term.replace(/[\\%_]/g,ch=>'\\'+ch)+'%';
  const restricted=!affairsUser(user);
  const where=restricted?`AND ${accessible}`:'';
- const args=restricted?[pattern,pattern,user.id,user.id,term]:[pattern,pattern,term];
+ const args=restricted?[term,term,user.id,user.id,term]:[term,term,term];
  const {results}=await env.DB.prepare(`SELECT s.id,s.student_no,s.full_name,s.roll_no,
   s.classroom_id,c.label AS classroom_label
   FROM students s JOIN classrooms c ON c.id=s.classroom_id
-  WHERE s.active=1 AND (s.student_no LIKE ? ESCAPE '\' OR s.full_name LIKE ? ESCAPE '\')
+  WHERE s.active=1 AND (instr(lower(s.student_no),lower(?))>0 OR instr(lower(s.full_name),lower(?))>0)
   ${where}
   ORDER BY CASE WHEN s.student_no=? THEN 0 ELSE 1 END,c.grade,c.room,s.roll_no
   LIMIT 60`).bind(...args).all();
