@@ -44,7 +44,7 @@ async function oneRow(env,j,r){
  catch(e){await countRow(env,j,r,'skipped',e.message);return}
  const current=await env.DB.prepare('SELECT id,classroom_id,roll_no,active,deleted_at FROM students WHERE lower(student_no)=lower(?)')
   .bind(student.student_no).first();
- const occupant=await env.DB.prepare('SELECT id FROM students WHERE classroom_id=? AND roll_no=?')
+ const occupant=await env.DB.prepare('SELECT id FROM students WHERE classroom_id=? AND roll_no=? AND deleted_at IS NULL')
   .bind(room.id,student.roll_no).first();
  const occupied=await env.DB.prepare("SELECT student_id FROM student_enrollments WHERE classroom_id=? AND roll_no=? AND end_date IS NULL")
   .bind(room.id,student.roll_no).first();

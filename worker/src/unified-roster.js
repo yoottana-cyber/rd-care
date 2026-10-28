@@ -21,10 +21,10 @@ function validateRow(raw,roomId){
  return {...s,username,password};
 }
 
-export function planUnifiedRoster(rows,roomMap,existingStudents=[],existingAccounts=[]){
+export function planUnifiedRoster(rows,roomMap,existingStudents=[],existingAccounts=[],{allowArchivedReuse=false}={}){
  const ids=new Set(),usernames=new Set(),rolls=new Set();
  const studentByNo=new Map(existingStudents.map(x=>[key(x.student_no),x]));
- const takenRolls=new Map(existingStudents.map(x=>[x.classroom_id+':'+x.roll_no,x]));
+ const takenRolls=new Map(existingStudents.filter(x=>!allowArchivedReuse||!x.deleted_at).map(x=>[x.classroom_id+':'+x.roll_no,x]));
  const accountsByStudent=new Map(existingAccounts.filter(x=>x.role==='student'&&x.student_id)
   .map(x=>[Number(x.student_id),x]));
  const accountsByUsername=new Map(existingAccounts.map(x=>[key(x.username),x]));
@@ -96,7 +96,7 @@ async function body(req){
  return data;
 }
 function sqlPlaceholders(values){return values.map(()=>'?').join(',')}
-async function gather(env,rows,{rosterOnly=false}={}){
+async function gather(env,rows,{rosterOnly=false,allowArchivedReuse=false}={}){
  const roomNames=[...new Set(rows.map(x=>clean(x?.classroom)).filter(Boolean))];
  const rooms=roomNames.length?(await env.DB.prepare('SELECT id,label FROM classrooms WHERE label IN ('+
   sqlPlaceholders(roomNames)+')').bind(...roomNames).all()).results:[];
@@ -109,7 +109,7 @@ async function gather(env,rows,{rosterOnly=false}={}){
   const rolls=[...new Set(rows.filter(x=>roomMap.get(clean(x.classroom))===room.id).map(x=>Number(x.roll_no))
    .filter(x=>Number.isInteger(x)&&x>0&&x<=100))];
   if(rolls.length)checks.push(env.DB.prepare('SELECT id,student_no,classroom_id,roll_no,full_name,active,deleted_at FROM students WHERE classroom_id=? AND roll_no IN ('+
-   sqlPlaceholders(rolls)+')').bind(room.id,...rolls));
+   sqlPlaceholders(rolls)+')'+(allowArchivedReuse?' AND deleted_at IS NULL':'')).bind(room.id,...rolls));
  }
  const checked=checks.length?await env.DB.batch(checks):[];
  const students=[...new Map(checked.flatMap(x=>x.results||[]).map(x=>[Number(x.id),x])).values()];
@@ -184,6 +184,8 @@ export async function unifiedRosterEndpoint(req,env,user,path){
  // In roster-only mode, server ignores credentials even if the source file has them.
  // Staff can import/repair student identity without running PBKDF2 for each account.
  const rows=rosterOnly?b.students.map(x=>({...x,username:'',password:''})):b.students;
+ const upgraded=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").first();
+ const allowArchivedReuse=Boolean(upgraded);
  const traceId=String(req.headers.get('x-rd-request-id')||'').slice(0,64);
  if(traceId)console.info('rd-import-phase',traceId,'request_start',commit?'commit':'preview',rosterOnly?'roster_only':'with_accounts');
  const max=commit?1:25;
@@ -191,13 +193,13 @@ export async function unifiedRosterEndpoint(req,env,user,path){
   fail(400,commit?'บันทึกได้คำขอละ 1 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)':
    'ตรวจสอบได้คำขอละ 25 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)');
  if(!commit){
-  const {roomMap,students,accounts}=await gather(env,rows,{rosterOnly});
-  return json(planUnifiedRoster(rows,roomMap,students,accounts));
+  const {roomMap,students,accounts}=await gather(env,rows,{rosterOnly,allowArchivedReuse});
+  return json(planUnifiedRoster(rows,roomMap,students,accounts,{allowArchivedReuse}));
  }
  const raw=rows[0],line=Number.isSafeInteger(raw?.source_row)&&raw.source_row>0?raw.source_row:2;
- const {roomMap,students,accounts}=await gather(env,[raw],{rosterOnly});
+ const {roomMap,students,accounts}=await gather(env,[raw],{rosterOnly,allowArchivedReuse});
  if(traceId)console.info('rd-import-phase',traceId,'lookup_complete');
- const plan=planUnifiedRoster([raw],roomMap,students,accounts).items[0];
+ const plan=planUnifiedRoster([raw],roomMap,students,accounts,{allowArchivedReuse}).items[0];
  plan.source_row=line;
  if(plan.status==='error')
   return json({ok:true,imported:0,added:0,updated:0,skipped:1,accounts:0,
@@ -236,7 +238,8 @@ export async function unifiedRosterReadiness(env,user){
   try{await env.DB.prepare(sql).all()}
   catch(e){issues.push(key);console.warn('Unified import readiness check failed for',key,e?.name||'DBError')}
  }
- return json({ok:issues.length===0,service:'rd-roster-import',version:'502-diagnostics-v1',
+ const upgraded=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").first();
+ return json({ok:issues.length===0,archived_roll_reuse_ready:Boolean(upgraded),service:'rd-roster-import',version:'502-diagnostics-v1',
   issues,preview_limit:25,commit_limit:1,
   ...(issues.length?{error:'import_database_not_ready',message:'ฐานข้อมูลนำเข้าไม่พร้อม: '+issues.join(', ')}:{})
  },issues.length?503:200);

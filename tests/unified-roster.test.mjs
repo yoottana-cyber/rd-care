@@ -128,3 +128,12 @@ test('conflict preview explains who owns the room roll without exposing password
  assert.equal(archived.items[0].conflict_student.archived,true);
  assert.match(archived.items[0].message,/เก็บประวัติ/);
 });
+
+test('after identity-keyed migration archived student ID remains and does not occupy an active roll',()=>{
+ const archived={id:1,student_no:'archived-student-1',classroom_id:1,roll_no:1,full_name:'Archived',active:0,deleted_at:'2026-10-28'};
+ const imported={...record(1),student_no:'20046',username:'',password:''};
+ assert.equal(planUnifiedRoster([imported],map,[archived]).items[0].status,'error');
+ const ready=planUnifiedRoster([imported],map,[archived],[],{allowArchivedReuse:true});
+ assert.equal(ready.items[0].status,'ready');
+ assert.equal(ready.items[0].conflict_student,null);
+});
