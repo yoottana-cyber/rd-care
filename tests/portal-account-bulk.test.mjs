@@ -104,11 +104,12 @@ test('guardian username cannot overwrite a student account',async()=>{
  await assert.rejects(()=>importPortalAccounts(req({rows:[row(123)],
   relationships_verified:true}),env,actor),{code:409});
 });
-test('new imports are internally chunked; user has one whole-file submission',()=>{
+test('whole-file portal import processes one record per atomic transport request, skipping only invalid rows',()=>{
  const ui=readFileSync(new URL('../web/portal-roster-import.js',import.meta.url),'utf8');
  const backend=readFileSync(new URL('../worker/src/portal-bulk-import.js',import.meta.url),'utf8');
- assert.match(ui,/chunks\(items,5\)/);
- assert.match(ui,/for\(const group of chunks/);
+ assert.match(ui,/for\(const row of items\)/);
+ assert.match(ui,/rows:\[Object.fromEntries/);
+ assert.match(ui,/skipped\+\+/);
  assert.match(ui,/\/api\/admin\/portal\/import/);
  assert.match(backend,/CHUNK_SIZE=5/);
  assert.doesNotMatch(ui,/\.slice\(0,10\)/);
