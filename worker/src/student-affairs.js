@@ -64,7 +64,7 @@ async function recordBehavior(env,u,b,adjust=false){
  }else{
   ruleId=id(b.rule_id);
   const rule=ruleId?await env.DB.prepare(
-   'SELECT id,name,category,points,active FROM affairs_behavior_rules WHERE id=?')
+   'SELECT id,name,category,points,active FROM affairs_behavior_rules WHERE id=? AND id NOT IN (SELECT rule_id FROM truancy_score_policy)')
    .bind(ruleId).first():null;
   if(!rule?.active)fail(400,'เลือกเกณฑ์คะแนนที่ฝ่ายกิจการนักเรียนเปิดใช้งาน');
   points=Number(rule.points);category=rule.category;ruleName=rule.name;
@@ -237,12 +237,17 @@ export async function studentAffairsRoutes(req,env,u,path){
   return reply({ok:true,...outcome});
  }
  if(method==='GET'&&path==='/api/affairs/behavior/rules'){
-  const {results}=await env.DB.prepare(`SELECT id,name,category,points,active,updated_at
+  const {results}=await env.DB.prepare(`SELECT id,name,category,points,active,updated_at,
+     CASE WHEN id=(SELECT rule_id FROM truancy_score_policy WHERE id=1) THEN 1 ELSE 0 END AS automatic
     FROM affairs_behavior_rules ${staff(u)?'':'WHERE active=1'} ORDER BY category,id`).all();
   return reply({items:results,category_labels:label});
  }
  if(method==='POST'&&path==='/api/affairs/behavior/rules'){
   const ruleId=b.id===null||b.id===undefined?null:id(b.id);
+  if(ruleId){
+   const protectedRule=await env.DB.prepare('SELECT 1 AS protected FROM truancy_score_policy WHERE rule_id=?').bind(ruleId).first();
+   if(protectedRule)fail(409,'เกณฑ์หนีเรียน -10 ทำงานอัตโนมัติ แก้ไขจากเมนูนี้ไม่ได้');
+  }
   const name=text(b.name,120),category=String(b.category||''),points=Number(b.points),active=b.active!==false;
   if(!categories.includes(category)||!Number.isInteger(points)||Math.abs(points)>50||points===0||
     (category==='good'&&points<0)||(category!=='good'&&points>0))

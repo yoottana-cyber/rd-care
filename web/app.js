@@ -563,7 +563,7 @@ function renderAttendance(){
  ${state.user?.role==='teacher'?'<button type="button" class="button secondary" data-tab="myTimetable">📚 จัดการตารางสอนของฉัน</button>':''}`}
  </div><div class="card stack">
  ${!daily?renderDailyOverview():''}
- ${!daily?'<p class="warn">🚨 เมื่อบันทึก “หนีเรียน” ระบบจะตรวจอุปกรณ์ของครูที่ปรึกษาและผู้ปกครองที่เปิดรับ Push แล้ว และแสดงผลตรวจสอบหลังบันทึก • การแก้ไขย้อนหลังจะส่งเหตุที่เพิ่งแก้ภายในช่วง 14 วันที่อนุญาต โปรดตรวจสอบก่อนยืนยัน</p>':''}
+ ${!daily?'<p class="warn">🚨 เมื่อบันทึก “หนีเรียน” จะหักคะแนนพฤติกรรมหัวข้อหนีเรียน -10 อัตโนมัติ (ไม่หักซ้ำเมื่อบันทึกเดิม) และระบบจะตรวจอุปกรณ์ของครูที่ปรึกษาและผู้ปกครองที่เปิดรับ Push แล้ว และแสดงผลตรวจสอบหลังบันทึก • การแก้ไขย้อนหลังจะส่งเหตุที่เพิ่งแก้ภายในช่วง 14 วันที่อนุญาต โปรดตรวจสอบก่อนยืนยัน</p>':''}
  ${!daily&&state.pushFeedback?`<div class="${state.pushFeedback.ready&&state.pushFeedback.reason==='queued'?'ok':'warn'}" role="status">
  <strong>ผลการแจ้งเตือนหนีเรียนล่าสุด</strong> • ${Number(state.pushFeedback.events)||0} รายการ
  <p>${state.pushFeedback.reason==='missing_vapid'?'ยังส่ง Push ไม่ได้ เพราะเซิร์ฟเวอร์ตั้งค่า VAPID ไม่ครบ':
@@ -599,7 +599,7 @@ function updateAttendanceControls(){for(const el of $$('[data-student]')){const 
 async function saveAttendance(){
  if(!state.students.length)return;
  if(state.kind==='period'&&Object.values(state.statuses).includes('truancy')&&!confirm(
-  'ยืนยันการบันทึกสถานะหนีเรียน? ระบบจะส่งแจ้งเตือนถึงครูที่ปรึกษาและผู้ปกครองที่เปิดรับ Push หลังบันทึก'
+  'ยืนยันบันทึกสถานะหนีเรียนและหักคะแนนพฤติกรรม -10 ต่อรายการโดยอัตโนมัติ? บันทึกซ้ำจะไม่หักเพิ่ม และหากแก้สถานะจากหนีเรียน ระบบจะคืนคะแนนส่วนนี้ พร้อมแจ้ง Push ไปยังอุปกรณ์ที่เปิดรับ'
  ))return;
  const button=$('#saveAttendance');button.disabled=true;
  try{

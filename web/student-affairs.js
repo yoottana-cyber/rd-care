@@ -219,8 +219,8 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
      <article class="rd-affairs-rule ${rule.active?'':'inactive'}">
       <div class="row between"><strong>${esc(rule.name)}</strong><b>${formatScore(rule.points)}</b></div>
       <p class="muted">${esc(isAdjustment?'ลดคะแนนความผิดคงเหลือ':types[rule.category])}
-       • ${rule.active?'ใช้งาน':'ปิดใช้งาน'}</p>
-      <button type="button" class="button secondary" data-affairs-rule-edit="${rule.id}">แก้ไขเกณฑ์</button>
+       • ${rule.automatic?'หักคะแนนอัตโนมัติเมื่อครูบันทึกหนีเรียน':rule.active?'ใช้งาน':'ปิดใช้งาน'}</p>
+      ${rule.automatic?'<span class="tag">ระบบหักคะแนนอัตโนมัติ · ไม่ต้องบันทึกซ้ำ</span>':`<button type="button" class="button secondary" data-affairs-rule-edit="${rule.id}">แก้ไขเกณฑ์</button>`}
      </article>`).join('')||'<p class="empty">ยังไม่ได้ตั้งเกณฑ์ในหมวดนี้</p>'}</div>
    </section>`);
   bind('[data-affairs-rule-kind]','click',(_,el)=>{

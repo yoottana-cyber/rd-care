@@ -44,7 +44,7 @@ export async function recordBehaviorBulk(env,user,body){
   fail(400,'ต้องใช้เกณฑ์คะแนนที่ได้รับอนุมัติ ไม่สามารถกรอกคะแนนเอง');
  const ids=normalizeBehaviorStudentIds(body.student_ids),ruleId=id(body.rule_id);
  const rule=ruleId?await env.DB.prepare(
-  'SELECT id,name,category,points,active FROM affairs_behavior_rules WHERE id=?')
+  'SELECT id,name,category,points,active FROM affairs_behavior_rules WHERE id=? AND id NOT IN (SELECT rule_id FROM truancy_score_policy)')
   .bind(ruleId).first():null;
  if(!rule?.active||!['good','minor','moderate','serious','very_serious'].includes(rule.category))
   fail(400,'กรุณาเลือกเกณฑ์คะแนนที่เปิดใช้งาน');
