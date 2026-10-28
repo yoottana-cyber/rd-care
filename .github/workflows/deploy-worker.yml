@@ -70,7 +70,8 @@ jobs:
           fi
 
       - name: Read-only inspect original trial D1 before reset
-        if: github.event_name == 'push' && github.event.head_commit.message == 'ops(dev): inspect existing trial D1 before reset'
+        if: >-
+          github.event_name == 'push' && github.event.head_commit.message == 'ops(dev): inspect existing trial D1 before reset'
         working-directory: worker
         env:
           RD_TRIAL_RESET_DRY_RUN: '1'
