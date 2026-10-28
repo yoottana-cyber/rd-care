@@ -38,7 +38,7 @@ class ClashGuardTests(unittest.TestCase):
  def test_conflicting_update_rejected(self):
   self.insert(room=2,teacher=2,period=3)
   with self.assertRaisesRegex(sqlite3.IntegrityError,'TIMETABLE_OVERLAP'):
-   self.db.execute('UPDATE timetable SET period=2 WHERE classroom_id=2')
+   self.db.execute('UPDATE timetable SET period=2,teacher_user_id=1 WHERE classroom_id=2')
  def test_old_history_not_deleted_by_triggers(self):
   self.db.execute('UPDATE timetable SET active=0,approval_status=\'archived\' WHERE id=10')
   self.insert(room=1,teacher=2,period=2)
