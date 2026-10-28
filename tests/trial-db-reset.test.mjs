@@ -20,7 +20,7 @@ test('trial reset drops children before student, classroom, user and migration t
   ['classrooms','users'],['users','d1_migrations'],['students','d1_migrations']
  ])assert.ok(p(child)<p(parent),child+' before '+parent);
  assert.equal(plan.length,schema.length);
- assert(plan.every(sql=>/^DROP TABLE IF EXISTS "[A-Za-z_]+";$/.test(sql)));
+ assert(plan.every(sql=>/^DROP TABLE IF EXISTS "[A-Za-z_][A-Za-z0-9_]*";$/.test(sql)));
 });
 test('unknown tables, missing references and FK cycles abort before any DELETE',()=>{
  const unknown=[...schema,{name:'someone_elses_table',type:'table',sql:'CREATE TABLE someone_elses_table(id INTEGER)'}];
