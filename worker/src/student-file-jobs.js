@@ -171,3 +171,8 @@ export async function studentFileJobRoutes(req,env,user,path){
  }
  fail(405,'Method not allowed');
 }
+
+/** Remove staged personal records after retention window (completed: 7d, others: 30d). */
+export async function cleanupStudentFileJobs(env){
+ await env.DB.prepare("DELETE FROM student_file_import_jobs WHERE (status='completed' AND created_at<datetime('now','-7 days')) OR created_at<datetime('now','-30 days')").run();
+}
