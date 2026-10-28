@@ -98,7 +98,15 @@ async function api(path,{method='GET',body,auth=true,timeoutMs=12000}={}){
  try{
   const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();advisorImporter.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}throw Error(data.error||`HTTP ${response.status}`)}
+  if(!response.ok){
+   if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();advisorImporter.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
+   const message=response.status>=500?(data.message||data.error||`HTTP ${response.status}`):
+    (data.error||data.message||`HTTP ${response.status}`);
+   const failure=new Error(message);failure.httpStatus=response.status;
+   failure.errorCode=data.error||'';
+   failure.requestId=data.request_id||response.headers.get('x-rd-request-id')||'';
+   throw failure;
+  }
   return data;
  }catch(e){if(e.name==='AbortError')throw Error('การเชื่อมต่อล่าช้า กรุณาลองใหม่');throw e}
  finally{clearTimeout(timer)}
