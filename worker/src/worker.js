@@ -8,7 +8,7 @@ import {searchStudents} from './student-search.js';
 import {advisorImportEndpoint} from './advisor-import.js';
 import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint,unifiedRosterReadiness} from './unified-roster.js';
-import {studentFileJobRoutes} from './student-file-jobs.js';
+import {studentFileJobRoutes,cleanupStudentFileJobs} from './student-file-jobs.js';
 import {teacherTimetableRoutes,validateLesson} from './teacher-timetable.js';
 import {periodWeekStatus,periodCourseReport} from './period-reports.js';
 import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
@@ -1018,7 +1018,8 @@ export default {
    deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
    deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
    sendScheduledAttendanceReminders(env).catch(e=>console.warn('RD scheduled daily attendance reminder',e?.name)),
-    deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name))
+    deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name)),
+    cleanupStudentFileJobs(env).catch(e=>console.warn('RD student import cleanup',e?.name))
   ]));
  },
  async fetch(req,env,ctx){
