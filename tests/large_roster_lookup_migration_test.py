@@ -11,10 +11,11 @@ class LargeRosterLookupIndexTests(unittest.TestCase):
   for path in ('0001_initial.sql','0006_student_guardian_portal.sql'):
    self.db.executescript((ROOT/path).read_text(encoding='utf8'))
   self.db.execute("INSERT INTO users(id,username,display_name,role,password_salt,password_hash) VALUES(1,'admin','Admin','admin','s','h')")
-  self.db.execute("INSERT INTO classrooms(id,grade,room,label) VALUES(1,1,1,'ม.1/1')")
+  for room in range(1,19):
+   self.db.execute("INSERT INTO classrooms(id,grade,room,label) VALUES(?,1,?,?)",(room,room,'ม.1/'+str(room)))
   for i in range(1,1751):
-   self.db.execute("INSERT INTO students(id,student_no,classroom_id,roll_no,full_name) VALUES(?,?,1,?,?)",
-    (i,'S'+str(i).zfill(6),(i-1)%100+1,'Student '+str(i))) if i <=100 else None
+   self.db.execute("INSERT INTO students(id,student_no,classroom_id,roll_no,full_name) VALUES(?,?,?,?,?)",
+    (i,'S'+str(i).zfill(6),(i-1)//100+1,(i-1)%100+1,'Student '+str(i)))
   self.db.execute("INSERT INTO portal_accounts(username,display_name,role,student_id,password_salt,password_hash,created_by) VALUES('student00001','Student','student',1,'salt','hash',1)")
   self.db.commit()
   self.db.executescript((ROOT/'0030_large_roster_import_lookup.sql').read_text(encoding='utf8'))
