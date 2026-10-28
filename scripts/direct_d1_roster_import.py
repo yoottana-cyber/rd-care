@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -51,11 +52,12 @@ def read_csv(path, encoding):
 def wrangler(database, sql=None, file=None, export=None):
     if sum(v is not None for v in (sql, file, export)) != 1:
         raise ValueError("choose one Wrangler operation")
+    executable = shutil.which("npx") or shutil.which("npx.cmd") or "npx"
     if export:
-        cmd = ["npx", "--no-install", "wrangler", "d1", "export",
+        cmd = [executable, "--no-install", "wrangler", "d1", "export",
                database, "--remote", "--skip-confirmation", "--output", str(export)]
     else:
-        cmd = ["npx", "--no-install", "wrangler", "d1", "execute",
+        cmd = [executable, "--no-install", "wrangler", "d1", "execute",
                database, "--remote", "--json", "--yes"]
         cmd += ["--command", sql] if sql is not None else ["--file", str(file)]
     try:
