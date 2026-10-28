@@ -8,7 +8,9 @@ if(!config.includes('database_id = "'+EXPECTED_DB_ID+'"')||
 const sql=[
  "SELECT (SELECT COUNT(*) FROM classrooms) AS rooms,",
  "(SELECT COUNT(*) FROM students) AS students,",
- "(SELECT COUNT(*) FROM users) AS users,",
+ "(SELECT COUNT(*) FROM users) AS users,"
+ "(SELECT COUNT(*) FROM users WHERE role='admin' AND active=1 AND deleted_at IS NULL) AS active_admins,"
+ ,"(SELECT COUNT(*) FROM admin_recovery_state) AS recovery_used,",
  "(SELECT COUNT(*) FROM d1_migrations) AS migrations,",
  "(SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll') AS index_ready,",
  "(SELECT sql FROM sqlite_master WHERE type='table' AND name='students') AS student_sql"
@@ -24,3 +26,4 @@ if(Number(row.rooms)!==48||Number(row.index_ready)!==1||
  Number(row.migrations)<32)throw Error('Original D1 has not completed new roster migrations');
 console.log('RD Care original D1 verified: 48 rooms, live-only unique roll index, '+
  row.migrations+' migrations, '+row.students+' students and '+row.users+' staff accounts.');
+console.log('Admin recovery diagnostics (no account names): active_admins='+Number(row.active_admins)+', recovery_used='+Number(row.recovery_used));
