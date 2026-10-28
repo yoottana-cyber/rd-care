@@ -14,7 +14,7 @@ export function allowSchoolScoreMonitor(user){
 export async function schoolScoreMonitorSummary(env,user){
  if(!allowSchoolScoreMonitor(user))fail(403,'เฉพาะบุคลากรโรงเรียน');
  const date=bangkokToday();
- const {results}=await env.DB.prepare(`SELECT c.grade,c.label AS classroom_label,
+ const {results}=await env.DB.prepare(`SELECT c.id AS classroom_id,c.grade,c.label AS classroom_label,
   s.id AS student_id,s.student_no,s.full_name,${scoreColumns('b')},
   COUNT(b.id) AS events
   FROM students s
