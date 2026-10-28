@@ -30,3 +30,29 @@
  .rd-school-settings-facts{width:100%}
  .rd-school-settings-facts>div{flex:1;min-width:95px}
  .rd-school-settings-actions .button,.rd-school-settings-links .button{flex:1 1 100%}}
+
+
+/* Read-only semester snapshots for administrators */
+.rd-term-page{max-width:1250px;margin:0 auto}
+.rd-term-controls{display:flex;align-items:end;flex-wrap:wrap;gap:14px}
+.rd-term-controls>.field{min-width:220px;flex:1 1 230px}
+.rd-term-controls>.button{align-self:end}
+.rd-term-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.rd-term-stats>div{padding:14px;border-radius:14px;background:#ecf8f0;border:1px solid #cce9d6;display:flex;flex-direction:column;gap:7px}
+.rd-term-stats small{color:#436b52}
+.rd-term-stats strong{font-size:24px;color:#15663d}
+.rd-term-status{padding:14px 18px;border:1px solid #9fd8b2;border-radius:14px;background:#eaf9ef}
+.rd-term-status strong{color:#1d7142}
+.rd-term-status p{margin:7px 0 12px;line-height:1.65}
+.rd-term-status button{margin-top:4px}
+.rd-term-status:has(#termCapture){background:#fff9ed;border-color:#eecf89}
+[data-theme="dark"] .rd-term-stats>div{background:#243b2d;border-color:#536a5c}
+[data-theme="dark"] .rd-term-stats strong{color:#b5efd0}
+[data-theme="dark"] .rd-term-stats small{color:#bdd4c6}
+[data-theme="dark"] .rd-term-status{background:#1d3b2a;border-color:#50765c}
+[data-theme="dark"] .rd-term-status:has(#termCapture){background:#453820;border-color:#8c734b}
+[data-theme="dark"] .rd-term-status strong{color:#ddf9e5}
+@media(max-width:700px){.rd-term-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rd-term-controls{display:grid;grid-template-columns:1fr}
+ .rd-term-controls>.field{min-width:0}
+ .rd-term-stats strong{font-size:20px}}

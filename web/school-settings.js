@@ -76,6 +76,11 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
     </div>
    </form>
    <section class="card stack">
+    <h3>📘 ทะเบียนและตารางสอนตามภาคเรียน</h3>
+    <p class="muted">ตรวจสอบรายชื่อและตารางสอนของแต่ละภาคเรียน และบันทึกข้อมูลอ้างอิงโดยไม่แก้ประวัติเช็กชื่อเดิม</p>
+    <button type="button" class="button secondary" data-school-jump="termSnapshots">ดูข้อมูลทะเบียนและตารางสอนตามภาคเรียน</button>
+   </section>
+   <section class="card stack">
     <h3>🔗 เมนูตั้งค่าที่มีอยู่แล้ว</h3>
     <p class="muted">การแจ้งเตือนและวันหยุดใช้ข้อมูลชุดเดียวกับฝ่ายกิจการนักเรียน ไม่สร้างการตั้งค่าซ้ำ</p>
     <div class="rd-school-settings-links">
