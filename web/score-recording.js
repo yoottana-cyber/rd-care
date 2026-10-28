@@ -19,9 +19,11 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
   if(rule)u.ruleId=rule.value;
   if(reason)u.reason=reason.value;
   if(query)u.query=query.value;
+  const adjustmentReason=document.querySelector('#scoreAdjustmentReason');
+  if(adjustmentReason)u.adjustmentReason=adjustmentReason.value;
  }
  function setFocus(u,item){
-  u.focusId=item.id;u.focusName=item.full_name;
+  u.focusId=item.id;u.focusName=item.full_name;u.focusStudent=item;
  }
  function addPicked(u,item){
   if(u.picked.has(item.id))return true;
@@ -33,8 +35,8 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  function draw(){
   const key=mode(),u=modes[key],isGood=key==='good',count=u.picked.size;
   const filtered=u.rules.filter(r=>isGood?r.category==='good':r.category!=='good');
-  const adjustmentCandidates=[...new Map([...u.students,...u.results,...u.picked.values()]
-   .map(student=>[Number(student.id),student])).values()];
+  const adjustmentCandidates=[...new Map([u.focusStudent,...u.students,...u.results,...u.picked.values()]
+   .filter(Boolean).map(student=>[Number(student.id),student])).values()];
   const outstanding=Number(u.scores.behavior_remaining||0);
   const adjustmentRules=(u.adjustmentRules||[]).filter(rule=>Number(rule.points)>0&&Number(rule.points)<=outstanding);
   const fromRoom=u.students.length>0&&u.students.every(x=>u.picked.has(x.id));
@@ -114,7 +116,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
        ${adjustmentRules.map(rule=>`<option value="${rule.id}">${esc(rule.name)} (+${Number(rule.points)} คะแนน)</option>`).join('')}
       </select></div>
      <div class="field"><label for="scoreAdjustmentReason">รายละเอียดการปรับพฤติกรรม <span class="muted">(ไม่บังคับ)</span></label>
-      <textarea id="scoreAdjustmentReason" name="reason" maxlength="300" placeholder="เว้นว่างได้ ระบบใช้ชื่อเกณฑ์เป็นเหตุผล"></textarea></div>
+      <textarea id="scoreAdjustmentReason" name="reason" maxlength="300" placeholder="เว้นว่างได้ ระบบใช้ชื่อเกณฑ์เป็นเหตุผล">${esc(u.adjustmentReason||'')}</textarea></div>
      <button type="submit" class="button" ${!u.focusId||!adjustmentRules.length?'disabled':''}>บันทึกการปรับพฤติกรรม</button>
      ${!u.adjustmentRules.length?'<p class="muted">ฝ่ายกิจการนักเรียนยังไม่เปิดเกณฑ์ปรับพฤติกรรม</p>':
        !adjustmentRules.length?'<p class="muted">คะแนนความผิดคงเหลือไม่เพียงพอสำหรับเกณฑ์ที่เปิดใช้งาน</p>':''}
@@ -142,6 +144,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
    try{
     await api('/api/affairs/behavior/adjust',{method:'POST',body:{
      student_id:studentId,adjustment_rule_id:ruleId,reason:String(form.get('reason')||'')}});
+    u.adjustmentReason='';
     toast('บันทึกปรับพฤติกรรมสำเร็จ');
     await loadHistory(key);
    }finally{if(button?.isConnected)button.disabled=false}
