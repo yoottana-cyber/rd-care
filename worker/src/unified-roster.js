@@ -184,14 +184,14 @@ export async function unifiedRosterEndpoint(req,env,user,path){
  // In roster-only mode, server ignores credentials even if the source file has them.
  // Staff can import/repair student identity without running PBKDF2 for each account.
  const rows=rosterOnly?b.students.map(x=>({...x,username:'',password:''})):b.students;
- const upgraded=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").first();
- const allowArchivedReuse=Boolean(upgraded);
  const traceId=String(req.headers.get('x-rd-request-id')||'').slice(0,64);
  if(traceId)console.info('rd-import-phase',traceId,'request_start',commit?'commit':'preview',rosterOnly?'roster_only':'with_accounts');
  const max=commit?1:25;
  if(rows.length<1||rows.length>max)
   fail(400,commit?'บันทึกได้คำขอละ 1 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)':
    'ตรวจสอบได้คำขอละ 25 คน (โปรแกรมจะส่งทั้งไฟล์อัตโนมัติ)');
+ const schema=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").all();
+ const allowArchivedReuse=(schema.results||[]).length>0;
  if(!commit){
   const {roomMap,students,accounts}=await gather(env,rows,{rosterOnly,allowArchivedReuse});
   return json(planUnifiedRoster(rows,roomMap,students,accounts,{allowArchivedReuse}));
@@ -238,8 +238,8 @@ export async function unifiedRosterReadiness(env,user){
   try{await env.DB.prepare(sql).all()}
   catch(e){issues.push(key);console.warn('Unified import readiness check failed for',key,e?.name||'DBError')}
  }
- const upgraded=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").first();
- return json({ok:issues.length===0,archived_roll_reuse_ready:Boolean(upgraded),service:'rd-roster-import',version:'502-diagnostics-v1',
+ const indexInfo=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").all();
+ return json({ok:issues.length===0,archived_roll_reuse_ready:(indexInfo.results||[]).length>0,service:'rd-roster-import',version:'502-diagnostics-v1',
   issues,preview_limit:25,commit_limit:1,
   ...(issues.length?{error:'import_database_not_ready',message:'ฐานข้อมูลนำเข้าไม่พร้อม: '+issues.join(', ')}:{})
  },issues.length?503:200);
