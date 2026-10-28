@@ -5,7 +5,7 @@ import {scoreHistoryTables} from './score-history.js';
 export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
  const esc=escapeHtml;
  let state=null,overlay=null,returnFocus=null,version=0;
- const heading=mode=>mode==='good'?'ประวัติคะแนนความดี':'ประวัติความผิดและการปรับพฤติกรรม';
+ const heading=mode=>mode==='good'?'ประวัติคะแนนความดี':mode==='all'?'ประวัติคะแนนพฤติกรรมและความดี':'ประวัติความผิดและการปรับพฤติกรรม';
  function close(){
   version++;
   if(overlay){overlay.remove();overlay=null}
@@ -30,6 +30,7 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
     aria-modal="true" aria-labelledby="rdScoreHistoryHeading" tabindex="-1">
    <div class="row between rd-score-popup-heading">
     <div><h3 id="rdScoreHistoryHeading">${heading(mode)}</h3>
+     ${state.readOnly?'<span class="tag">อ่านอย่างเดียว</span>':''}
      <p>${esc(student.full_name)} · ${esc(student.student_no||'')}
       ${student.classroom_label?' · '+esc(student.classroom_label):''}</p></div>
     <button type="button" class="rd-score-popup-close" id="rdScorePopupClose"
@@ -40,7 +41,7 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
     <span class="tag">ความผิดคงเหลือ ${remaining}</span>
     <span class="tag">ปรับแล้ว ${Number(scores.behavior_adjusted)||0}</span>
    </div>
-   ${scoreHistoryTables({items,mode,esc})}
+   ${scoreHistoryTables({items,mode,esc,readOnly:state.readOnly})}
    ${hasMore?'<button type="button" class="button secondary" id="rdScorePopupMore">ดูประวัติเพิ่มเติม</button>':''}
   </section>`;
   const dialog=overlay.querySelector('[role="dialog"]');
