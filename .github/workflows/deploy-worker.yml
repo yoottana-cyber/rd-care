@@ -69,22 +69,6 @@ jobs:
             exit 1
           fi
 
-      - name: Read-only inspect original trial D1 before reset
-        if: >-
-          github.event_name == 'push' && github.event.head_commit.message == 'ops(dev): inspect existing trial D1 before reset'
-        working-directory: worker
-        env:
-          RD_TRIAL_RESET_DRY_RUN: '1'
-        run: node scripts/reset-trial-d1-once.mjs
-
-      - name: One-time approved reset of the exact original trial D1
-        if: >-
-          github.event_name == 'push' && github.event.head_commit.message == 'ops(dev): execute approved one-time original D1 reset'
-        working-directory: worker
-        env:
-          RD_TRIAL_RESET_CONFIRMED: 'RESET-RD-CARE-DEV-TRIAL-ALL'
-        run: node scripts/reset-trial-d1-once.mjs
-
       - name: Apply pending D1 migrations first
         working-directory: worker
         run: npx --no-install wrangler d1 migrations apply DB --remote
@@ -92,6 +76,10 @@ jobs:
       - name: Seed room catalog only if this D1 database has no classrooms
         working-directory: worker
         run: npx --no-install wrangler d1 execute DB --remote --file=classrooms_only.sql
+
+      - name: Verify original D1 schema and 48 classroom catalog
+        working-directory: worker
+        run: node scripts/verify-trial-d1.mjs
 
       - name: Deploy RD CONNECT Dev Worker
         working-directory: worker
