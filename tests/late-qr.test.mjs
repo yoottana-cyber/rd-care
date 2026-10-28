@@ -53,7 +53,7 @@ test('permanent QR route uses fixed public URL, and keeps manual approval',()=>{
  assert.match(backend,/late_qr=gate/);
  assert.match(backend,/b\.token==='gate'/);
  assert.match(backend,/late_static_qr_submissions/);
- assert.match(backend,/openGate\(\)/);
+ assert.match(backend,/await openGate\(env\)/);
  assert.match(backend,/state='pending'/);
  assert.match(backend,/source=isPermanent/);
 });

@@ -31,6 +31,7 @@ jobs:
           node --check worker/src/period-reports.js
           node --check worker/src/staff-push.js
           node --check worker/src/student-affairs.js
+          node --check worker/src/school-settings.js
           node --check worker/src/teacher-score-monitor.js
           node --check worker/src/behavior-bulk.js
           node --check worker/src/adjustment-bulk.js
@@ -67,6 +68,7 @@ jobs:
           node --check web/score-history.js
           node --check web/score-history-popup.js
           node --check web/teacher-score-monitor.js
+          node --check web/school-settings.js
           node --check web/portal-admin.js
           node --check web/portal-roster-import.js
           node --check web/portal-batch.js
@@ -87,6 +89,8 @@ jobs:
           assert c.execute('SELECT count(*) FROM students').fetchone()[0] == 15
           print('D1/SQLite structure and dummy data verified')
           PY
+      - name: School settings migration and history constraints
+        run: python3 -m unittest discover -s tests -p 'school_settings_migration_test.py' -v
       - name: Teacher timetable migration and overlap validation
         run: python3 -m unittest discover -s tests -p 'teacher_timetable_migration_test.py' -v
       - name: Truancy edit and Push dispatch regression (real D1 SQL)

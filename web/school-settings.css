@@ -1,0 +1,32 @@
+/* Admin-only central school settings */
+.rd-school-settings{max-width:1240px;margin:auto}
+.rd-school-settings-intro{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;
+ background:linear-gradient(116deg,#e6f7ed,#f0f8ff);border:1px solid #c8e7d7;border-radius:20px;padding:24px}
+.rd-school-settings-intro h2{margin:6px 0 8px;font-size:clamp(21px,3vw,29px);color:#146341}
+.rd-school-settings-intro p{margin:0;color:#507261;line-height:1.55}
+.rd-school-settings-kicker{font-weight:750;letter-spacing:.12em;color:#1d8d5b;font-size:10px}
+.rd-school-settings-facts{display:flex;flex-wrap:wrap;gap:10px}
+.rd-school-settings-facts>div{min-width:115px;display:flex;flex-direction:column;gap:6px;padding:12px 15px;
+ border:1px solid #d2e9dc;background:rgba(255,255,255,.78);border-radius:14px}
+.rd-school-settings-facts span{font-size:11px;color:#658775}
+.rd-school-settings-facts strong{font-size:21px;color:#176343}
+.rd-school-settings .card h3{margin:0}
+.rd-school-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.rd-school-settings-grid input,.rd-school-settings-grid select,.rd-school-settings .field input{width:100%}
+.rd-school-settings-notice{background:#fff8e7;border-left:4px solid #d9a33c;border-radius:10px;padding:12px 16px}
+.rd-school-settings-notice strong{color:#815715}
+.rd-school-settings-notice p{margin:5px 0 0;line-height:1.6}
+.rd-school-settings-actions,.rd-school-settings-links{display:flex;flex-wrap:wrap;gap:10px}
+.rd-school-settings-history{min-width:650px}
+.rd-school-settings-history td{vertical-align:top}
+[data-theme="dark"] .rd-school-settings-intro{background:linear-gradient(116deg,#203d30,#233c47);border-color:#486455}
+[data-theme="dark"] .rd-school-settings-intro h2,[data-theme="dark"] .rd-school-settings-facts strong{color:#ccf8de}
+[data-theme="dark"] .rd-school-settings-intro p,[data-theme="dark"] .rd-school-settings-kicker{color:#b4dbc5}
+[data-theme="dark"] .rd-school-settings-facts>div{background:#20392d;border-color:#456150}
+[data-theme="dark"] .rd-school-settings-notice{background:#483820;border-color:#f5ba53}
+[data-theme="dark"] .rd-school-settings-notice strong{color:#ffcf79}
+@media(max-width:660px){.rd-school-settings-intro{padding:15px}
+ .rd-school-settings-grid{grid-template-columns:1fr}
+ .rd-school-settings-facts{width:100%}
+ .rd-school-settings-facts>div{flex:1;min-width:95px}
+ .rd-school-settings-actions .button,.rd-school-settings-links .button{flex:1 1 100%}}

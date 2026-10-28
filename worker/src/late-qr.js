@@ -1,4 +1,5 @@
 import {autoApproveLateQr,revokeAutoLateQr} from './late-qr-auto.js';
+import {getLateCutoffTime} from './school-settings.js';
 // School gate QR check-in. Server time in Bangkok is authoritative.
 // Permanent printed QR is a public URL, NOT student authentication. Students must log in.
 const textEncoder=new TextEncoder();
@@ -8,7 +9,7 @@ export const schoolTime=(value=new Date())=>{
  return x;
 };
 export const schoolDay=(value=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(value);
-export const lateGateOpen=(value=new Date())=>schoolTime(value)>'08:00';
+export const lateGateOpen=(value=new Date(),cutoff='08:00')=>schoolTime(value)>cutoff;
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=(data)=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const hashed=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',textEncoder.encode(value)))].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -22,8 +23,9 @@ function secureCode(code){
  return code;
 }
 function allowedStaff(user){if(!['teacher','staff','admin'].includes(user?.role))fail(403,'เฉพาะครูเวรหรือผู้ดูแลระบบ')}
-function openGate(){
- if(!lateGateOpen())fail(403,'เปิดลงชื่อมาสายหลัง 08.00 น. ตามเวลาโรงเรียนเท่านั้น');
+async function openGate(env){
+ const cutoff=await getLateCutoffTime(env);
+ if(!lateGateOpen(new Date(),cutoff))fail(403,'เปิดลงชื่อมาสายหลัง '+cutoff+' น. ตามเวลาโรงเรียนเท่านั้น');
 }
 export async function lateGateStaffRoutes(req,env,user,path){
  allowedStaff(user);
@@ -34,10 +36,11 @@ export async function lateGateStaffRoutes(req,env,user,path){
   const url='https://rd-care.pages.dev/?late_qr=gate';
   const {default:qrcode}=await import('qrcode-generator');
   const qr=qrcode(0,'M');qr.addData(url);qr.make();
-  return reply({url,svg:qr.createSvgTag({cellSize:8,margin:16,scalable:true}),permanent:true});
+  return reply({url,svg:qr.createSvgTag({cellSize:8,margin:16,scalable:true}),permanent:true,
+   cutoff_time:await getLateCutoffTime(env)});
  }
  if(path==='/api/late/qr/rotate'&&req.method==='POST'){
-  openGate();
+  await openGate(env);
   const token=[...crypto.getRandomValues(new Uint8Array(20))].map(v=>v.toString(16).padStart(2,'0')).join('');
   const until=stamp()+180;
   await env.DB.batch([
@@ -176,7 +179,7 @@ export async function lateGateStaffRoutes(req,env,user,path){
 export async function submitStudentLateQr(req,env,account){
  if(account.role!=='student'||account.must_change_password||!account.student_id||!account.active)
   fail(403,'กรุณาเข้าสู่ระบบด้วยบัญชีนักเรียนและเปลี่ยนรหัสผ่านชั่วคราวก่อน');
- openGate();
+ await openGate(env);
  const b=await read(req),permanent=b.token==='gate';
  const token=permanent?'gate':secureCode(b.token);
  const reason=typeof b.reason==='string'?b.reason.trim():'';

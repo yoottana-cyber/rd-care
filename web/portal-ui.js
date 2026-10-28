@@ -458,7 +458,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <p>สแกน QR ของครูเวร แล้วลงชื่อผ่านบัญชีนักเรียนของตนเอง</p></div>
     ${lateQrToken?`<section class="rd-portal-card rd-portal-qr-card">
      <span class="rd-portal-qr-icon" aria-hidden="true">◷</span><h2>ยืนยันลงชื่อมาสาย</h2>
-     <p>ระบบบันทึกเวลาจากเซิร์ฟเวอร์และอนุมัติอัตโนมัติเมื่อกดยืนยันหลัง 08.00 น.</p>
+     <p>ระบบบันทึกเวลาจากเซิร์ฟเวอร์ และอนุมัติอัตโนมัติเมื่อกดยืนยันหลังเวลาเริ่มมาสายที่โรงเรียนกำหนด</p>
      <form id="studentLateQrForm" class="stack">
       <div class="field"><label for="lateQrReason">สาเหตุที่มาสาย (ไม่บังคับ)</label>
        <textarea id="lateQrReason" maxlength="300" name="reason" placeholder="ระบุสาเหตุที่มาสาย"></textarea></div>

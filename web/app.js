@@ -4,6 +4,7 @@ import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
 import {createAdvisorImport} from './advisor-import.js';
 import {createAdminSettings} from './admin-settings.js';
+import {createSchoolSettings} from './school-settings.js';
 import {createMyTimetable,periodChoices} from './my-timetable.js';
 import {createLateGate} from './late-gate.js';
 import {readLateGateIntent} from './late-qr-intent.js';
@@ -43,6 +44,7 @@ const lateGate=createLateGate({api,mount,toast,safeRun});
 const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,safeRun,showTab,
  getAlerts:()=>state.stats?.alerts||0});
 const studentAffairs=createStudentAffairs({api,mount,safeRun,toast,rooms:()=>state.rooms});
+const schoolSettings=createSchoolSettings({api,mount,safeRun,toast,navigate:showTab});
 const scorePopup=createScoreHistoryPopup({api,toast,safeRun,escapeHtml:esc});
 const teacherScoreMonitor=createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,
  getTab:()=>state.tab,escapeHtml:esc});
@@ -236,7 +238,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],...(['teacher','staff','admin'].includes(state.user?.role)?[['scoreMonitor','ติดตามคะแนนพฤติกรรม','📊']]:[]),['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],...(['teacher','staff','admin'].includes(state.user?.role)?[['scoreMonitor','ติดตามคะแนนพฤติกรรม','📊']]:[]),['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️'],['schoolSettings','ตั้งค่าระบบโรงเรียน','🏫']]:[])];
  const sidebar=renderSidebarNavigation(navs,state.tab);
  const page=pageLocation(navs,state.tab);
  const pageIcon=navs.find(x=>x[0]===(state.tab==='periodCheckin'?'periodAttendance':state.tab))?.[2]||'✦';
@@ -371,6 +373,10 @@ async function showTab(tab){scorePopup.close();if(tab!=='lateGate')lateGate.dest
  if(tab==='adjustment')return behaviorAdjustment.load();
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
+ if(tab==='schoolSettings'){
+  if(state.user?.role!=='admin'){state.tab='dashboard';toast('เฉพาะผู้ดูแลระบบ',true);return loadDashboard()}
+  return schoolSettings.load();
+ }
  if(tab==='adminStudents')return loadAdminStudents();
  if(['portalStudentAccounts','portalGuardianAccounts','portalGuardianLinks','portalAccounts'].includes(tab)){
   if(state.user?.role!=='admin'){toast('เฉพาะผู้ดูแลระบบ',true);return loadDashboard()}
@@ -407,7 +413,7 @@ function renderDashboard(){
   ['adjustment','🌱','บันทึกการปรับพฤติกรรม','ปรับคะแนนความผิดตามเกณฑ์ที่อนุมัติ','quick-teal'],
    ['good','⭐','คะแนนความดี','บันทึกความดีแยกจากพฤติกรรม','quick-blue'],
   ['alerts','🔔','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
-  ...(state.user?.role==='admin'?[['adminStudents','🎓','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue']]:[])
+  ...(state.user?.role==='admin'?[['adminStudents','🎓','จัดการนักเรียน','นำเข้าและแก้ไขข้อมูล','quick-blue'],['schoolSettings','🏫','ตั้งค่าระบบโรงเรียน','ปีการศึกษา ภาคเรียน และเวลาลงชื่อมาสาย','quick-teal']]:[])
  ];
  mount(`<section class="stack">
   <div class="dashboard-hero">
