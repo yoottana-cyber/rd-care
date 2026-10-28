@@ -56,3 +56,19 @@
  .rd-term-controls{display:grid;grid-template-columns:1fr}
  .rd-term-controls>.field{min-width:0}
  .rd-term-stats strong{font-size:20px}}
+
+
+/* Administrator timetable audit: filters and real-time clash summaries */
+.rd-timetable-audit{max-width:1260px;margin:0 auto}
+.rd-audit-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rd-audit-stats>div{border:1px solid #c8e4d4;border-radius:14px;background:#eff9f3;padding:13px;display:flex;flex-direction:column;gap:5px}
+.rd-audit-stats small{color:#4f7762}
+.rd-audit-stats strong{font-size:24px;font-weight:800;color:#147149}
+.rd-audit-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end}
+.rd-audit-filters .field{min-width:0}
+.rd-audit-filters input,.rd-audit-filters select{max-width:100%;width:100%}
+.rd-audit-checkbox{display:flex;align-items:center;gap:7px;font-size:13px;grid-column:1/-1}
+[data-theme="dark"] .rd-audit-stats>div{background:#253c2d;border-color:#526c58}
+[data-theme="dark"] .rd-audit-stats strong{color:#bcf4d2}
+@media(max-width:880px){.rd-audit-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.rd-audit-filters{grid-template-columns:1fr}.rd-audit-stats strong{font-size:20px}}
