@@ -177,8 +177,9 @@ function loginPage(){
   <button type="button" class="button secondary full" id="openAdminRecovery">ตั้งรหัสผ่าน Admin ใหม่ (ผู้ดูแลระบบ)</button>
   <section class="login-recovery-panel" id="adminRecoverySection" hidden aria-label="กู้คืนรหัสผู้ดูแลระบบ">
    <h3>ตั้งรหัส Admin ใหม่ผ่าน Cloudflare</h3>
-   <p class="muted">ใช้ SETUP_TOKEN ของ Worker ยืนยันสิทธิ์ได้หนึ่งครั้ง โดยตั้งรหัสผ่านใหม่บนอุปกรณ์นี้ ไม่ต้องส่งให้ใคร</p>
+   <p class="muted">ใช้ SETUP_TOKEN ของ Worker ยืนยันสิทธิ์หนึ่งครั้ง หากไม่มี Admin ระบบจะสร้างบัญชีใหม่ หากมีอยู่หนึ่งบัญชีจะเปลี่ยนรหัสผ่านเดิมโดยไม่ลบข้อมูล</p>
    <form id="adminRecoveryForm">
+    <div class="field"><label for="adminRecoveryUsername">ชื่อผู้ใช้ Admin (กรณีต้องสร้างบัญชีใหม่)</label><input id="adminRecoveryUsername" type="text" autocomplete="username" value="admin" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]{3,40}"></div>
     <div class="field"><label for="adminRecoveryToken">SETUP_TOKEN จาก Cloudflare</label><input id="adminRecoveryToken" type="password" autocomplete="off" required minlength="32" placeholder="รหัสยืนยันสำหรับผู้ดูแลระบบ"></div>
     <div class="field"><label for="adminRecoveryPassword">รหัส Admin ใหม่ (อย่างน้อย 12 ตัว)</label><input id="adminRecoveryPassword" type="password" autocomplete="new-password" required minlength="12" maxlength="128"></div>
     <div class="field"><label for="adminRecoveryConfirm">ยืนยันรหัส Admin ใหม่</label><input id="adminRecoveryConfirm" type="password" autocomplete="new-password" required minlength="12" maxlength="128"></div>
@@ -230,7 +231,7 @@ function renderLogin(){
    button.disabled=true;
    try{
     const result=await api('/api/auth/recover-admin',{method:'POST',auth:false,timeoutMs:30000,
-     body:{setup_token:token,password,confirm:'RESET-ADMIN-PASSWORD'}});
+     body:{setup_token:token,password,username:$('#adminRecoveryUsername').value,confirm:'RESET-ADMIN-PASSWORD'}});
     form.reset();
     renderLogin();
     $('#username').value=result.username;
