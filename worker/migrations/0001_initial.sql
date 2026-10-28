@@ -37,8 +37,7 @@ CREATE TABLE IF NOT EXISTS students (
  classroom_id INTEGER NOT NULL REFERENCES classrooms(id),
  roll_no INTEGER NOT NULL CHECK(roll_no BETWEEN 1 AND 100),
  full_name TEXT NOT NULL,
- active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
- UNIQUE(classroom_id,roll_no)
+ active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))
 );
 CREATE INDEX IF NOT EXISTS idx_students_room ON students(classroom_id,active,roll_no);
 CREATE TABLE IF NOT EXISTS timetable (
