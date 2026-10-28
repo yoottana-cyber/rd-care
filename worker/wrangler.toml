@@ -17,3 +17,12 @@ binding = "DB"
 database_name = "rd-care-dev"
 database_id = "161c2fb5-cd80-42bd-bbab-28b5d61df3e0"
 migrations_dir = "migrations"
+
+# Keep invocation outcome/CPU diagnostics for 502 investigation.
+# Custom import stages log only a gateway request UUID; never student data.
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = true
+head_sampling_rate = 1
