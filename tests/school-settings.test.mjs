@@ -54,7 +54,7 @@ test('defaults are explicit but not silently applied to existing student data',(
  assert.match(ddl,/INSERT OR IGNORE INTO school_settings\(id\) VALUES\(1\)/);
  assert.doesNotMatch(ddl,/DELETE FROM (students|attendance_daily|timetable)/);
 });
-test('settings validation rejects invalid dates, time ordering, unknown keys and malformed names',()=>{
+test('settings validation rejects invalid dates, time ordering, unknown keys and malformed names',async()=>{
  const good={...DEFAULT_SCHOOL_SETTINGS,school_start_time:'07:40',
   late_cutoff_time:'08:15',semester_start_date:'2026-11-01',
   semester_end_date:'2027-04-01'};
