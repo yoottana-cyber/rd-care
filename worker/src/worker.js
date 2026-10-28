@@ -20,7 +20,6 @@ import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
 import {adminDeleteIdentity} from './admin-delete.js';
-import {recoverAdminPassword} from './admin-recovery.js';
 import {adminTimetableAudit} from './timetable-audit.js';
 import {schoolTermRoutes} from './school-terms.js';
 import {schoolSettingsRoutes} from './school-settings.js';
@@ -947,7 +946,6 @@ async function route(req,env,ctx){
  // Keep the historical service identifier for existing uptime monitors. Expose the new public brand separately.
   if(req.method==='GET'&&path==='/api/health')return json({ok:true,service:'RD Care API',brand:'RD CONNECT',display_name:'RD CONNECT API',time:bangkokToday()});
  if(req.method==='POST'&&path==='/api/setup')return setup(req,env);
- if(req.method==='POST'&&path==='/api/auth/recover-admin')return recoverAdminPassword(req,env);
  if(req.method==='POST'&&path==='/api/auth/login')return login(req,env);
  if(path.startsWith('/api/portal/'))return portalRoutes(req,env,path,ctx);
  if(req.method==='POST'&&path==='/api/student/late/report')return submitLateSelf(req,env);
