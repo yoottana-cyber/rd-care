@@ -1,12 +1,19 @@
 // Admin-only school configuration console; all writes are validated again by Worker.
-const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&#39;'}[ch]));
+const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const displayDate=value=>{
  if(!value)return 'ยังไม่กำหนด';
  const [y,m,d]=value.split('-').map(Number);
  return new Intl.DateTimeFormat('th-TH',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'})
   .format(new Date(Date.UTC(y,m-1,d)));
 };
-const dateTime=value=>value?displayDate(value.slice(0,10))+' • '+value.slice(11,16)+' น.':'';
+const dateTime=value=>{
+ if(!value)return '';
+ const date=new Date(value.replace(' ','T')+'Z');
+ return Number.isFinite(date.getTime())?new Intl.DateTimeFormat('th-TH',{
+  timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric',
+  hour:'2-digit',minute:'2-digit',hour12:false
+ }).format(date):String(value);
+};
 export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
  let current=null,history=[],busy=false;
  const field=(name,label,value,type='text',attrs='')=>
