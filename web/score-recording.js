@@ -31,7 +31,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  }
  function draw(){
   const key=mode(),u=modes[key],isGood=key==='good',count=u.picked.size;
-  const filtered=u.rules.filter(r=>isGood?r.category==='good':r.category!=='good');
+  const filtered=u.rules.filter(r=>Number(r.automatic)!==1&&(isGood?r.category==='good':r.category!=='good'));
   const fromRoom=u.students.length>0&&u.students.every(x=>u.picked.has(x.id));
   const selected=[...u.picked.values()];
   const groupCount=new Set(selected.map(x=>x.classroom_id)).size;
