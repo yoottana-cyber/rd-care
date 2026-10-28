@@ -26,10 +26,10 @@ test('CSV template is UTF-8 BOM with exactly four fields and no passwords',()=>{
  assert.equal(rows[1][2],'000001');
  assert.doesNotMatch(contents,/username|password/);
 });
-test('Admin upload screen shows both templates next to file picker',()=>{
- const ui=readFileSync(new URL('../web/student-file-jobs.js',import.meta.url),'utf8');
- assert.match(ui,/downloadStudentRosterExampleXlsx/);
- assert.match(ui,/id="rdFileJobExcelExample"/);
- assert.match(ui,/templates\/student-roster-import\.csv/);
- assert.match(ui,/id="rdFileJobFile"/);
+test('admin screen uses the original six-column examples, not the new four-column sample',()=>{
+ const ui=readFileSync(new URL('../web/unified-import.js',import.meta.url),'utf8');
+ assert.match(ui,/downloadStudentExampleXlsx/);
+ assert.match(ui,/student-all-rooms-import\.csv/);
+ assert.match(ui,/id="unifiedPreviewButton"/);
+ assert.doesNotMatch(ui,/downloadStudentRosterExampleXlsx|student-roster-import\.csv|studentFileJobsHolder/);
 });
