@@ -141,6 +141,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
    <div class="rd-settings-import-grid">
     <section class="rd-settings-panel">${panel('🎓','นำเข้าทะเบียนนักเรียน','ใช้เมนูเดียวกับศูนย์ทะเบียน ไม่มีฟอร์มซ้ำ')}
      <p class="rd-settings-field-hint">นำเข้าจาก Excel/CSV ทั้งโรงเรียน: รายการเดิมจะอัปเดตตามเลขประจำตัวนักเรียน แถวผิดพลาดจะข้ามและแสดงเหตุผล โดยไม่ย้ายห้องหรือเปลี่ยนประวัติเช็กชื่อเอง</p>
+     <p class="rd-settings-field-hint">ตรวจความถูกต้องและการคุ้มครองข้อมูลส่วนบุคคลก่อนนำเข้า ห้ามเผยแพร่ไฟล์ที่มีข้อมูลนักเรียนหรือรหัสผ่าน</p>
      <button type="button" class="button full" id="openStudentRosterImport">เปิดศูนย์ทะเบียนและนำเข้านักเรียน</button>
     </section>
     <div id="advisorImportHolder" class="rd-settings-advisor-import"></div>
