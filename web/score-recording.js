@@ -152,7 +152,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
    if(button)button.disabled=true;
    try{
     const result=await api('/api/affairs/behavior/record/bulk',{method:'POST',
-     body:{student_ids:ids,rule_id:Number(u.ruleId),reason:u.reason}});
+     body:{student_ids:ids,rule_id:Number(u.ruleId),reason:u.reason},timeoutMs:30000});
     const first=u.picked.get(ids[0]);
     if(first)setFocus(u,first);
     u.picked.clear();u.reason='';
