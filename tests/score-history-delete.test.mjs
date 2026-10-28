@@ -68,7 +68,9 @@ test('pagination and issuer ownership appear in active score history query',asyn
  assert.equal(result.next_offset,1);
  assert.equal(result.behavior_remaining,2);
  assert.match(calls[1].sql,/WHERE b.student_id=\? AND b.deleted_at IS NULL/);
- assert.match(calls[1].sql,/CASE WHEN b.recorded_by=\? THEN 1 ELSE 0 END AS can_delete/);
+ assert.match(calls[1].sql,/CASE WHEN b.recorded_by=\? AND NOT EXISTS/);
+ assert.match(calls[1].sql,/FROM truancy_behavior_links/);
+ assert.match(calls[1].sql,/THEN 1 ELSE 0 END AS can_delete/);
  assert.match(calls[1].sql,/LEFT JOIN affairs_adjustment_rules/);
  assert.deepEqual(calls[1].args,[9,14,11,0]);
 });
