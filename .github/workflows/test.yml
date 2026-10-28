@@ -28,6 +28,7 @@ jobs:
           node --check worker/src/advisor-import.js
           node --check worker/src/user-password-policy.js
           node --check worker/src/teacher-timetable.js
+          node --check worker/src/timetable-audit.js
           node --check worker/src/period-reports.js
           node --check worker/src/staff-push.js
           node --check worker/src/student-affairs.js
@@ -43,6 +44,7 @@ jobs:
           node --check worker/src/web-push-crypto.js
           node --check web/late-gate.js
           node --check web/my-timetable.js
+          node --check web/timetable-audit.js
           node --check web/period-center.js
           node --check web/mobile-nav.js
           node --check web/navigation-ui.js
