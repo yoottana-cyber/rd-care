@@ -29,3 +29,27 @@
 .guardian-truancy-notices .alert-item{border-left:3px solid #db5061;padding-left:12px}
 .guardian-truancy-notices #guardianPushStatus{margin:0}
 @media(max-width:780px){.pills:has([data-status="truancy"]){max-width:280px}.pills [data-status="truancy"]{min-height:38px}}
+
+
+/* Non-disruptive update prompt: never reload an in-progress attendance form. */
+.rd-pwa-update-notice{
+ position:fixed;z-index:9999;bottom:max(18px,env(safe-area-inset-bottom));
+ left:50%;transform:translateX(-50%);width:min(620px,calc(100% - 24px));
+ display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:12px;padding:15px 18px;border-radius:18px;border:1px solid #9dd8bc;
+ background:#effbf4;color:#124b30;box-shadow:0 15px 38px rgba(5,43,26,.23);
+}
+.rd-pwa-update-copy{display:flex;flex-direction:column;gap:3px;flex:1 1 230px;line-height:1.4}
+.rd-pwa-update-copy strong{font-weight:800;font-size:14px}
+.rd-pwa-update-copy span{font-size:12px;color:#416b56}
+.rd-pwa-update-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rd-pwa-update-actions .button{font-size:13px;min-height:38px}
+[data-theme="dark"] .rd-pwa-update-notice{
+ background:#1d3a2c;color:#e0faea;border-color:#56896e
+}
+[data-theme="dark"] .rd-pwa-update-copy span{color:#b5dac5}
+@media(max-width:600px){
+ .rd-pwa-update-notice{bottom:max(82px,calc(env(safe-area-inset-bottom) + 74px));padding:12px}
+ .rd-pwa-update-actions{width:100%}
+ .rd-pwa-update-actions .button{flex:1}
+}

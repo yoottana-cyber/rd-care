@@ -46,6 +46,7 @@ jobs:
           node --check web/navigation-ui.js
           node --check web/notification-settings.js
           node --check web/pwa-client.js
+          node --check web/pwa-updates.js
           node --check web/auth-session.js
           node --check web/admin-settings.js
           node --check web/guardian-push.js
