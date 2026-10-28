@@ -57,7 +57,7 @@ function swHarness(){
  };
  const caches={
   async open(){return cache},
-  async keys(){return ['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78','another-app-data']},
+  async keys(){return ['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78','rd-care-shell-v79','another-app-data']},
   async delete(key){deleted.push(key);return true}
  };
  const deleted=[],requested=[];
@@ -90,7 +90,7 @@ test('worker preloads shell and removes only old RD CONNECT caches, retaining un
  assert.ok(h.entries.has('https://example.test/rd-care/teacher-score-monitor.js'));
  assert.ok(h.entries.has('https://example.test/rd-care/pwa-updates.js'));
  await new Promise((resolve,reject)=>h.handlers.get('activate')({waitUntil:p=>p.then(resolve,reject)}));
- assert.deepEqual(h.deleted,['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78']);
+ assert.deepEqual(h.deleted,['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78','rd-care-shell-v79']);
 });
 test('worker never intercepts private API calls or unknown same-origin resources',()=>{
  const h=swHarness(),fetchHandler=h.handlers.get('fetch');
