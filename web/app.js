@@ -62,7 +62,7 @@ const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:a
 const adminSettings=createAdminSettings({api,mount,safeRun,toast,
  getUsers:()=>state.users,getRooms:()=>state.rooms,reload:loadAdmin,
  refreshRooms:refreshClassroomList,clearStudentCache:()=>referenceCache.clear(),
- advisorImporter,parseCsv,periodChoices});
+ advisorImporter,parseCsv,periodChoices,navigate:showTab});
 async function refreshClassroomList(){
  const result=await api('/api/classrooms');
  state.rooms=result.items;referenceCache.clear();
