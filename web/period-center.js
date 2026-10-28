@@ -91,7 +91,13 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
     <div class="period-legend"><span><i class="period-dot done"></i> เช็กแล้ว</span><span><i class="period-dot pending"></i> ยังไม่เช็ก</span>
      <span><i class="period-dot absent"></i> มีรายการไม่เข้าคาบ</span></div>
     <div class="period-grid-scroll" role="region" aria-label="ตารางสอนรายสัปดาห์ เลื่อนดูคาบ 1 ถึง 10 ได้" tabindex="0">
-     <table class="period-week-grid"><thead><tr><th scope="col">วัน / วันที่</th>${Array.from({length:10},(_,i)=>`<th scope="col">คาบ ${i+1}<small class="rd-lesson-time">${lessonClockLabel(i+1,i+1,periodClock)}</small></th>`).join('')}</tr></thead>
+     <table class="period-week-grid"><thead><tr><th scope="col">วัน / วันที่</th>${Array.from({length:10},(_,i)=>{
+      const clock=periodClock[i],range=clock?clock.start+'–'+clock.end:'—';
+      return `<th scope="col" class="period-column-head" aria-label="คาบที่ ${i+1} เวลา ${esc(range)} น.">
+       <span class="period-column-number">คาบที่ ${i+1}</span>
+       <span class="period-column-time">${esc(range)}</span>
+      </th>`;
+     }).join('')}</tr></thead>
      <tbody>${cells.map(row=>`<tr><th scope="row" class="period-day period-day-${row.day_of_week}">${esc(row.dayShort)}<small>${esc(row.date.slice(8))}/${esc(row.date.slice(5,7))}</small></th>
       ${row.cells.map(cell=>cell.lesson?(()=>{
        const l=cell.lesson;
@@ -102,7 +108,8 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
         <button type="button" class="period-slot ${kind}" data-check-lesson="${l.id}" data-check-date="${row.date}" ${allowed?'':'disabled'}
          title="${esc(l.subject)} • ${esc(l.classroom_label)} • คาบ ${lessonPeriod(l)}">
          <strong>${esc(l.classroom_label)}</strong><span>${esc(l.subject)}</span>
-         <small>${esc(l.subject_code||'ไม่ระบุรหัส')} · คาบ ${lessonPeriod(l)} · ${lessonClockLabel(l.period,l.end_period,periodClock)}</small>
+         <small class="period-slot-meta">${esc(l.subject_code||'ไม่ระบุรหัส')} · คาบ ${lessonPeriod(l)}</small>
+         <span class="period-slot-time">${esc(lessonClockLabel(l.period,l.end_period,periodClock))}</span>
          <em>${hasAbsent?'มีรายการไม่เข้าคาบ':hasSaved?'เช็กแล้ว':'ยังไม่เช็ก'}</em>
         </button></td>`;
       })():`<td class="period-empty"><span>–</span></td>`).join('')}</tr>`).join('')}</tbody></table></div>
