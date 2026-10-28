@@ -1,4 +1,5 @@
 // Teacher-owned timetable editor. No privileged teacher ID is accepted from forms.
+import {periodClockRows,lessonClockLabel} from './period-clock.js';
 const days=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
 export const periodChoices=Array.from({length:10},(_,index)=>{
  const p=index+1;
@@ -8,19 +9,26 @@ const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<
 const id=x=>Number(x)||0;
 const periodName=slot=>slot.period===slot.end_period?String(slot.period):slot.period+'-'+slot.end_period;
 export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeriodAttendance}){
- let lessons=[],rooms=[],editId=null;
+ let lessons=[],rooms=[],editId=null,periodClock=[],clockSettings=null;
  async function load(){
-  const [lessonsResult,roomResult]=await Promise.all([api('/api/my-timetable'),api('/api/classrooms/catalog')]);
-  lessons=lessonsResult.items;rooms=roomResult.items;render();
+  const [lessonsResult,roomResult,clock]=await Promise.all([
+   api('/api/my-timetable'),api('/api/classrooms/catalog'),api('/api/school/period-clock')
+  ]);
+  lessons=lessonsResult.items;rooms=roomResult.items;clockSettings=clock;
+  periodClock=periodClockRows(clock.first_period_start_time,Number(clock.period_duration_minutes));render();
  }
  function render(){
   const edit=lessons.find(row=>row.id===editId);
   const currentPeriod=edit?periodName(edit):'1';
-  const options=periodChoices.map(value=>`<option value="${value}" ${value===currentPeriod?'selected':''}>คาบ ${value}</option>`).join('');
+  const options=periodChoices.map(value=>{
+   const [first,last=first]=value.split('-').map(Number);
+   return `<option value="${value}" ${value===currentPeriod?'selected':''}>คาบ ${value} (${lessonClockLabel(first,last,periodClock)})</option>`;
+  }).join('');
   mount(`<section class="stack teacher-timetable">
    <div><div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>
     <h2>📚 ตารางสอนของฉัน</h2>
-    <p class="muted">ครูเพิ่มตารางสอนด้วยตนเองแล้วเช็กชื่อรายคาบได้ทันที ไม่ต้องรออนุมัติ • ระบบจะตรวจคาบซ้อนก่อนบันทึก</p></div>
+    <p class="muted">ครูเพิ่มตารางสอนด้วยตนเองแล้วเช็กชื่อรายคาบได้ทันที ไม่ต้องรออนุมัติ • ระบบจะตรวจคาบซ้อนก่อนบันทึก</p>
+    <p class="muted">เวลาอ้างอิง: คาบละ ${clockSettings?.period_duration_minutes||50} นาที • คาบที่ 1 เริ่ม ${escapeHtml(clockSettings?.first_period_start_time||'08:30')} น. (ยังไม่รวมเวลาพัก)</p></div>
    <section class="card stack">
     <h3>${edit?'แก้ไขรายการตารางสอน':'เพิ่มรายการตารางสอน'}</h3>
     <form id="myTimetableForm" class="stack">
@@ -39,8 +47,8 @@ export function createMyTimetable({api,mount,toast,refreshRooms,safeRun,openPeri
     </form>
    </section>
    <section class="card stack"><div class="row between"><h3>ตารางสอนรายสัปดาห์ (${lessons.length} รายการ)</h3><span class="muted">เรียงตามวันและคาบ</span></div>
-   ${lessons.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วัน</th><th>คาบ</th><th>ห้อง</th><th>รหัสวิชา</th><th>ชื่อวิชา</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
-    <tbody>${lessons.map(s=>`<tr><td>${days[s.day_of_week-1]}</td><td><strong>${periodName(s)}</strong></td><td>${escapeHtml(s.classroom_label)}</td><td>${escapeHtml(s.subject_code||'—')}</td><td>${escapeHtml(s.subject)}</td><td><span class="tag">${s.approval_status==='approved'&&s.active===1?'พร้อมเช็กชื่อ':'ยังไม่เปิดใช้ (แก้คาบซ้อน)'}</span></td><td><div class="row">
+   ${lessons.length?`<div class="table-wrap"><table class="table"><thead><tr><th>วัน</th><th>คาบ</th><th>เวลาอ้างอิง</th><th>ห้อง</th><th>รหัสวิชา</th><th>ชื่อวิชา</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+    <tbody>${lessons.map(s=>`<tr><td>${days[s.day_of_week-1]}</td><td><strong>${periodName(s)}</strong></td><td><span class="rd-lesson-time">${lessonClockLabel(s.period,s.end_period,periodClock)}</span></td><td>${escapeHtml(s.classroom_label)}</td><td>${escapeHtml(s.subject_code||'—')}</td><td>${escapeHtml(s.subject)}</td><td><span class="tag">${s.approval_status==='approved'&&s.active===1?'พร้อมเช็กชื่อ':'ยังไม่เปิดใช้ (แก้คาบซ้อน)'}</span></td><td><div class="row">
      <button type="button" class="button secondary" data-edit-lesson="${s.id}">แก้ไข</button>
      <button type="button" class="button ghost" data-archive-lesson="${s.id}">ลบ</button>
      <button type="button" class="button secondary" data-open-lesson="${s.id}" ${s.approval_status==='approved'&&s.active===1?'':'disabled'}>เช็กชื่อ</button>
