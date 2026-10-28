@@ -132,10 +132,10 @@ async function commitOne(env,user,raw,plan,roomId){
   stmts.push(env.DB.prepare('INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,?,?,1)')
    .bind(student.student_no,roomId,student.roll_no,student.full_name));
   stmts.push(env.DB.prepare(`INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date,changed_by)
-   SELECT id,?,?,?,? FROM students WHERE lower(student_no)=lower(?)')
+   SELECT id,?,?,?,? FROM students WHERE lower(student_no)=lower(?)`)
    .bind(roomId,student.roll_no,bangkokToday(),user.id,student.student_no));
  }
- const linkedAccount= currentId ? await env.DB.prepare('SELECT id,username FROM portal_accounts WHERE student_id=? AND role='student'')
+ const linkedAccount= currentId ? await env.DB.prepare('SELECT id,username FROM portal_accounts WHERE student_id=? AND role=\'student\'')
   .bind(currentId).first():null;
  if(linkedAccount){
   if(plan.account_action==='update'){
@@ -152,7 +152,7 @@ async function commitOne(env,user,raw,plan,roomId){
   const salt=hex(16),hash=await passwordHash(student.password,salt);
   stmts.push(env.DB.prepare(`INSERT INTO portal_accounts
    (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
-   SELECT ?,full_name,'student',id,?,?,0,? FROM students WHERE lower(student_no)=lower(?)')
+   SELECT ?,full_name,'student',id,?,?,0,? FROM students WHERE lower(student_no)=lower(?)`)
    .bind(student.username||student.student_no,salt,hash,user.id,student.student_no));
  }
  stmts.push(env.DB.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)')
