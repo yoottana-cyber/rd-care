@@ -953,6 +953,13 @@ async function route(req,env,ctx){
  if(path.startsWith('/api/push/'))return staffPushRoutes(req,env,user,path);
  if(path.startsWith('/api/affairs/'))return studentAffairsRoutes(req,env,user,path);
  if(path.startsWith('/api/late/qr/'))return lateGateStaffRoutes(req,env,user,path);
+ if(req.method==='GET'&&path==='/api/school/period-clock'){
+  requireRole(user,['teacher','staff','admin']);
+  const time=await env.DB.prepare(`SELECT first_period_start_time,period_duration_minutes
+   FROM school_settings WHERE id=1`).first();
+  return json({first_period_start_time:time?.first_period_start_time||'08:30',
+   period_duration_minutes:time?.period_duration_minutes||50});
+ }
  if(req.method==='GET'&&path==='/api/classrooms')return classrooms(env,user);
  if(req.method==='GET'&&path==='/api/classrooms/catalog'){
   const {results}=await env.DB.prepare('SELECT id,grade,room,label FROM classrooms ORDER BY grade,room').all();

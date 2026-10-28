@@ -37,7 +37,8 @@ function mockDb(initial=DEFAULT_SCHOOL_SETTINGS){
    const old={...settings};
    settings={school_name:update.args[0],academic_year:update.args[1],semester:update.args[2],
     semester_start_date:update.args[3],semester_end_date:update.args[4],
-    school_start_time:update.args[5],late_cutoff_time:update.args[6],updated_by:update.args[7]};
+    school_start_time:update.args[5],late_cutoff_time:update.args[6],
+    first_period_start_time:update.args[7],period_duration_minutes:update.args[8],updated_by:update.args[9]};
    history=[{previous_value:JSON.stringify(old),next_value:JSON.stringify(settings)}];
    return stmts.map(()=>({meta:{changes:1}}));
   }
@@ -47,6 +48,8 @@ function mockDb(initial=DEFAULT_SCHOOL_SETTINGS){
 test('defaults are explicit but not silently applied to existing student data',()=>{
  assert.equal(DEFAULT_SCHOOL_SETTINGS.school_name,'โรงเรียนรัษฎา');
  assert.equal(DEFAULT_SCHOOL_SETTINGS.late_cutoff_time,'08:00');
+ assert.equal(DEFAULT_SCHOOL_SETTINGS.first_period_start_time,'08:30');
+ assert.equal(DEFAULT_SCHOOL_SETTINGS.period_duration_minutes,50);
  assert.equal(DEFAULT_SCHOOL_SETTINGS.semester_start_date,null);
  const ddl=file('worker/migrations/0024_school_settings.sql');
  assert.match(ddl,/CREATE TABLE IF NOT EXISTS school_settings/);
@@ -65,6 +68,10 @@ test('settings validation rejects invalid dates, time ordering, unknown keys and
   {late_cutoff_time:'08:60'},{semester_start_date:'2026-02-30'},
   {semester_start_date:'2026-11-01',semester_end_date:null},
   {semester_start_date:'2027-04-02',semester_end_date:'2027-04-01'},
+  {first_period_start_time:'04:00'},{first_period_start_time:'22:00'},
+  {first_period_start_time:'18:00',period_duration_minutes:50},
+  {period_duration_minutes:55},{period_duration_minutes:35},
+  {period_duration_minutes:'45'},
   {extra_flag:true}
  ]){
   await assert.rejects(async()=>validateSchoolSettings({...good,...bad}),{code:400});
@@ -91,17 +98,21 @@ test('admin reads current settings and audited history without changes',async()=
 test('admin saves a change atomically with history and audit, repeated identical saves are idempotent',async()=>{
  const env=mockDb();
  const changed={...DEFAULT_SCHOOL_SETTINGS,academic_year:2570,semester:1,
-  school_start_time:'07:30',late_cutoff_time:'08:10'};
+  school_start_time:'07:30',late_cutoff_time:'08:10',
+  first_period_start_time:'09:00',period_duration_minutes:45};
  const response=await schoolSettingsRoutes(request('POST',changed),env,admin,path);
  assert.equal(response.status,200);
  const data=await response.json();
  assert.equal(data.settings.late_cutoff_time,'08:10');
  assert.equal(data.settings.academic_year,2570);
+ assert.equal(data.settings.first_period_start_time,'09:00');
+ assert.equal(data.settings.period_duration_minutes,45);
  assert.equal(env.batchCalls.length,1);
  assert.equal(env.batchCalls[0].length,3);
  assert.ok(env.calls.some(x=>x.sql.includes("school_settings_history")));
  assert.ok(env.calls.some(x=>x.sql.includes("school_settings_updated")));
  assert.equal(await getLateCutoffTime(env),'08:10');
+ assert.deepEqual(env.batchCalls[0].length,3);
  const again=await schoolSettingsRoutes(request('POST',changed),env,admin,path);
  assert.equal((await again.json()).unchanged,true);
  assert.equal(env.batchCalls.length,1);
@@ -134,8 +145,12 @@ test('admin navigation, mobile PWA and printable QR reflect the settings without
  assert.match(page,/\/api\/admin\/school-settings/);
  assert.match(page,/data-school-jump="studentAffairs"/);
  assert.match(gate,/state\.qr\?\.cutoff_time/);
- assert.match(shell,/rd-care-shell-v81/);
+ assert.match(shell,/rd-care-shell-v82/);
  assert.match(shell,/school-settings\.js/);
+ assert.match(shell,/period-clock\.js/);
+ assert.match(page,/period_duration_minutes/);
+ assert.match(page,/first_period_start_time/);
+ assert.match(page,/rdPeriodClockPreview/);
  assert.match(html,/school-settings\.css/);
  const client=createSchoolSettings({api:async()=>{},mount:()=>{},safeRun:fn=>fn(),toast:()=>{},navigate:()=>{}});
  assert.equal(typeof client.load,'function');

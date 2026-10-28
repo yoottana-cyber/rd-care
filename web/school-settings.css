@@ -67,3 +67,22 @@
 [data-theme="dark"] .rd-school-audit-stats>div{background:#203b2c;border-color:#597365}
 [data-theme="dark"] .rd-school-audit-stats strong{color:#c5f5d7}
 @media(max-width:650px){.rd-school-audit-filters{grid-template-columns:1fr}.rd-school-audit-stats strong{font-size:19px}}
+
+
+/* Term-independent school-wide lesson duration choices and timetable preview */
+.rd-period-settings h4{margin:0;font-size:15px}
+.rd-period-modes{display:flex;flex-wrap:wrap;gap:8px}
+.rd-period-modes span{font-size:12px;padding:6px 11px;border-radius:999px;
+ background:#ebf8ef;border:1px solid #c2e7cc;color:#216d43}
+.rd-period-preview{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}
+.rd-period-preview-item{display:flex;flex-direction:column;gap:5px;align-items:center;
+ padding:12px 6px;background:#f4f9fc;border:1px solid #dce8ef;border-radius:13px}
+.rd-period-preview-item strong{color:#175a41;font-size:13px}
+.rd-period-preview-item span{font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
+.rd-lesson-time{font-size:12px;font-variant-numeric:tabular-nums;color:#4c7562;white-space:nowrap}
+[data-theme="dark"] .rd-period-modes span{background:#274334;border-color:#466950;color:#b6edd0}
+[data-theme="dark"] .rd-period-preview-item{background:#233540;border-color:#4c6570}
+[data-theme="dark"] .rd-period-preview-item strong{color:#b5f4d1}
+[data-theme="dark"] .rd-lesson-time{color:#b0d8c0}
+@media(max-width:850px){.rd-period-preview{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:510px){.rd-period-preview{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -1,4 +1,5 @@
 // Admin-only school configuration console; all writes are validated again by Worker.
+import {periodClockRows,PERIOD_DURATION_CHOICES} from './period-clock.js';
 const escape=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const displayDate=value=>{
  if(!value)return 'ยังไม่กำหนด';
@@ -32,6 +33,7 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
      <div><span>ปีการศึกษา</span><strong>${escape(s.academic_year)}</strong></div>
      <div><span>ภาคเรียน</span><strong>${escape(s.semester)}</strong></div>
      <div><span>เริ่มมาสายหลัง</span><strong>${escape(s.late_cutoff_time)} น.</strong></div>
+     <div><span>ระยะเวลาคาบ</span><strong>${escape(s.period_duration_minutes)} นาที</strong></div>
     </div>
    </section>
    <form id="schoolSettingsForm" class="stack">
@@ -69,6 +71,27 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
        ส่วนการเช็กชื่อรายวัน/รายคาบเดิมไม่ได้ถูกเปลี่ยนย้อนหลัง</p>
      </div>
     </section>
+    <section class="card stack rd-period-settings">
+     <h3>🕒 ตั้งค่าเวลาคาบเรียน</h3>
+     <p class="muted">กำหนดเวลาเริ่มคาบที่ 1 และเลือกเวลาเรียนปกติหรือร่นคาบ โดยไม่เปลี่ยนเวลาเริ่มมาสาย</p>
+     <div class="rd-school-settings-grid">
+      ${field('first_period_start_time','เวลาเริ่มคาบที่ 1',s.first_period_start_time,'time','required')}
+      <div class="field"><label for="schoolSetting_period_duration_minutes">รูปแบบเวลาเรียน</label>
+       <select id="schoolSetting_period_duration_minutes" name="period_duration_minutes" required>
+        ${PERIOD_DURATION_CHOICES.map(value=>`<option value="${value}" ${Number(s.period_duration_minutes)===value?'selected':''}>
+         ${value===50?'ปกติ':value===45?'ร่นคาบ':'ร่นคาบพิเศษ'} — คาบละ ${value} นาที</option>`).join('')}
+       </select>
+      </div>
+     </div>
+     <div class="rd-period-modes"><span>ปกติ 50 นาที</span><span>ร่นคาบ 45 นาที</span><span>ร่นคาบ 40 นาที</span></div>
+     <h4>ตัวอย่างเวลาเรียนคาบที่ 1–10</h4>
+     <p class="muted">คำนวณต่อเนื่องจากเวลาเริ่มคาบที่ 1
+      <strong>ยังไม่รวมพักกลางวัน พักระหว่างคาบ หรือกิจกรรมพิเศษ</strong>
+      เพื่อไม่สมมติเวลาพักที่โรงเรียนยังไม่ได้กำหนด</p>
+     <div class="rd-period-preview" id="rdPeriodClockPreview" aria-live="polite"></div>
+     <p class="muted">เวลาที่เลือกจะปรากฏเป็นเวลาอ้างอิงในตารางสอนของครูและหน้าเช็กชื่อรายคาบ
+      ไม่ปรับหมายเลขคาบหรือข้อมูลเช็กชื่อย้อนหลัง</p>
+    </section>
     <div class="rd-school-settings-actions">
      <button type="submit" class="button" ${busy?'disabled':''}>
       ${busy?'กำลังบันทึก...':'บันทึกการตั้งค่าโรงเรียน'}</button>
@@ -104,12 +127,28 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
    safeRun(()=>save(event.currentTarget));
   });
   document.getElementById('schoolSettingsReload')?.addEventListener('click',()=>safeRun(load));
+  for(const id of ['first_period_start_time','period_duration_minutes']){
+   document.getElementById('schoolSetting_'+id)?.addEventListener('input',updatePeriodPreview);
+   document.getElementById('schoolSetting_'+id)?.addEventListener('change',updatePeriodPreview);
+  }
+  updatePeriodPreview();
   document.querySelectorAll('[data-school-jump]').forEach(button=>
    button.addEventListener('click',()=>safeRun(()=>navigate(button.dataset.schoolJump))));
  }
+ function updatePeriodPreview(){
+  const target=document.getElementById('rdPeriodClockPreview');
+  if(!target)return;
+  const start=document.getElementById('schoolSetting_first_period_start_time')?.value;
+  const duration=Number(document.getElementById('schoolSetting_period_duration_minutes')?.value);
+  try{
+   target.innerHTML=periodClockRows(start,duration).map(row=>`<div class="rd-period-preview-item">
+    <strong>คาบ ${row.period}</strong><span>${escape(row.start)}–${escape(row.end)} น.</span></div>`).join('');
+  }catch{target.textContent='โปรดตรวจสอบเวลาเริ่มคาบและรูปแบบคาบเรียน'}
+ }
  const names={school_name:'ชื่อโรงเรียน',academic_year:'ปีการศึกษา',semester:'ภาคเรียน',
   semester_start_date:'วันเปิดภาคเรียน',semester_end_date:'วันสิ้นสุดภาคเรียน',
-  school_start_time:'เวลาเริ่มเรียน',late_cutoff_time:'เวลาเริ่มมาสาย'};
+  school_start_time:'เวลาเริ่มเรียน',late_cutoff_time:'เวลาเริ่มมาสาย',
+  first_period_start_time:'เวลาเริ่มคาบที่ 1',period_duration_minutes:'ระยะเวลาคาบเรียน (นาที)'};
  function changedDetails(record){
   return Object.entries(names).filter(([key])=>record.previous?.[key]!==record.next?.[key])
    .map(([key,label])=>label+': '+(record.previous?.[key]??'—')+' → '+(record.next?.[key]??'—'))
@@ -123,6 +162,7 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
   values.semester_end_date=values.semester_end_date||null;
   values.academic_year=Number(values.academic_year);
   values.semester=Number(values.semester);
+  values.period_duration_minutes=Number(values.period_duration_minutes);
   if(Boolean(values.semester_start_date)!==Boolean(values.semester_end_date)){
    toast('กรุณากรอกวันเปิดและปิดภาคเรียนทั้งสองช่อง หรือเว้นว่างทั้งคู่',true);return;
   }
@@ -132,6 +172,8 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
   if(values.late_cutoff_time<values.school_start_time){
    toast('เวลาเริ่มนับว่ามาสายต้องไม่ก่อนเวลาเริ่มเรียน',true);return;
   }
+  try{periodClockRows(values.first_period_start_time,values.period_duration_minutes)}
+  catch{toast('กรุณาตรวจสอบเวลาเริ่มคาบที่ 1 และระยะเวลาคาบเรียน',true);return}
   if(values.late_cutoff_time!==current.late_cutoff_time&&
    !window.confirm('เวลาเริ่มมาสายจะเปลี่ยนจาก '+current.late_cutoff_time+
     ' เป็น '+values.late_cutoff_time+' น. และมีผลต่อการสแกน QR มาสายทันที ยืนยันบันทึก?'))return;

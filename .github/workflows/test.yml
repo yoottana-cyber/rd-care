@@ -43,6 +43,7 @@ jobs:
           node --check worker/src/truancy-push.js
           node --check worker/src/web-push-crypto.js
           node --check web/late-gate.js
+          node --check web/period-clock.js
           node --check web/my-timetable.js
           node --check web/timetable-audit.js
           node --check web/period-center.js
@@ -93,6 +94,8 @@ jobs:
           assert c.execute('SELECT count(*) FROM students').fetchone()[0] == 15
           print('D1/SQLite structure and dummy data verified')
           PY
+      - name: School period length migration and attendance history invariants
+        run: python3 -m unittest discover -s tests -p 'school_period_clock_migration_test.py' -v
       - name: School settings migration and history constraints
         run: python3 -m unittest discover -s tests -p 'school_settings_migration_test.py' -v
       - name: Semester snapshot FK and historical attendance invariants
