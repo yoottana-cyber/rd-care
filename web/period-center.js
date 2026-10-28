@@ -1,4 +1,5 @@
 // Modern period attendance hub: interactive weekly timetable + course-based reports.
+import {periodClockRows,lessonClockLabel} from './period-clock.js';
 // No sample student data; all counts and events come from authenticated RD CONNECT APIs.
 const days=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
 const shortDays=['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
@@ -27,7 +28,8 @@ function defaultFrom(today){return addDays(today,-29);}
 function number(value){return (Number(value)||0).toLocaleString('th-TH');}
 export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toast,today}){
  let view='week',week=weekMonday(today()),lessons=[],statuses=[],report=[],
-  from=defaultFrom(today()),to=today(),detailSlot=null,details=[],teachingLogs=[],detailLimited=false;
+  from=defaultFrom(today()),to=today(),detailSlot=null,details=[],teachingLogs=[],detailLimited=false,
+  periodClock=[],clockSettings=null;
  const current=()=>today();
  const statusFor=(id,schoolDate)=>statuses.find(x=>x.timetable_id===id&&x.school_date===schoolDate);
  const activeLessons=()=>lessons.filter(x=>x.approval_status==='approved'&&x.active!==0);
@@ -54,12 +56,15 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
  }
  async function loadWeek(){
   const selectedWeek=week;
-  const [timetable,review]=await Promise.all([
+  const [timetable,review,clock]=await Promise.all([
    api('/api/my-timetable'),
-   api('/api/my-timetable/week-status?start='+encodeURIComponent(selectedWeek))
+   api('/api/my-timetable/week-status?start='+encodeURIComponent(selectedWeek)),
+   api('/api/school/period-clock')
   ]);
   if(view!=='week'||week!==selectedWeek)return;
-  lessons=timetable.items;statuses=review.items;renderWeek();
+  lessons=timetable.items;statuses=review.items;clockSettings=clock;
+  periodClock=periodClockRows(clock.first_period_start_time,Number(clock.period_duration_minutes));
+  renderWeek();
  }
  function renderWeek(){
   const valid=activeLessons(),rooms=new Set(valid.map(x=>x.classroom_id)).size;
@@ -73,7 +78,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
     <div class="period-stat"><span>✅</span><div><strong>${number(recorded)}</strong><small>รายการที่บันทึกในสัปดาห์</small></div></div>
    </div>
    <section class="card stack period-week-panel">
-    <div class="period-panel-title"><div><h3>ตารางสอนรายสัปดาห์</h3><p class="muted">คลิกวิชาในช่องคาบเพื่อเช็กชื่อนักเรียนได้ทันที</p></div>
+    <div class="period-panel-title"><div><h3>ตารางสอนรายสัปดาห์</h3><p class="muted">คลิกวิชาในช่องคาบเพื่อเช็กชื่อนักเรียนได้ทันที • รูปแบบ ${clockSettings?.period_duration_minutes||50} นาที/คาบ (ไม่รวมเวลาพัก)</p></div>
     <div class="period-week-controls"><button type="button" class="button ghost" id="periodPrevWeek" aria-label="สัปดาห์ก่อน">‹</button>
      <strong>${esc(weekTitle.format(new Date(utc(week))))} – ${esc(weekTitle.format(new Date(utc(weekEnd))))}</strong>
      <button type="button" class="button ghost" id="periodNextWeek" aria-label="สัปดาห์ถัดไป">›</button>
@@ -83,7 +88,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
     <div class="period-legend"><span><i class="period-dot done"></i> เช็กแล้ว</span><span><i class="period-dot pending"></i> ยังไม่เช็ก</span>
      <span><i class="period-dot absent"></i> มีรายการไม่เข้าคาบ</span></div>
     <div class="period-grid-scroll" role="region" aria-label="ตารางสอนรายสัปดาห์ เลื่อนดูคาบ 1 ถึง 10 ได้" tabindex="0">
-     <table class="period-week-grid"><thead><tr><th scope="col">วัน / วันที่</th>${Array.from({length:10},(_,i)=>`<th scope="col">คาบ ${i+1}</th>`).join('')}</tr></thead>
+     <table class="period-week-grid"><thead><tr><th scope="col">วัน / วันที่</th>${Array.from({length:10},(_,i)=>`<th scope="col">คาบ ${i+1}<small class="rd-lesson-time">${lessonClockLabel(i+1,i+1,periodClock)}</small></th>`).join('')}</tr></thead>
      <tbody>${cells.map(row=>`<tr><th scope="row" class="period-day period-day-${row.day_of_week}">${esc(row.dayShort)}<small>${esc(row.date.slice(8))}/${esc(row.date.slice(5,7))}</small></th>
       ${row.cells.map(cell=>cell.lesson?(()=>{
        const l=cell.lesson;
@@ -94,7 +99,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
         <button type="button" class="period-slot ${kind}" data-check-lesson="${l.id}" data-check-date="${row.date}" ${allowed?'':'disabled'}
          title="${esc(l.subject)} • ${esc(l.classroom_label)} • คาบ ${lessonPeriod(l)}">
          <strong>${esc(l.classroom_label)}</strong><span>${esc(l.subject)}</span>
-         <small>${esc(l.subject_code||'ไม่ระบุรหัส')} · คาบ ${lessonPeriod(l)}</small>
+         <small>${esc(l.subject_code||'ไม่ระบุรหัส')} · คาบ ${lessonPeriod(l)} · ${lessonClockLabel(l.period,l.end_period,periodClock)}</small>
          <em>${hasAbsent?'มีรายการไม่เข้าคาบ':hasSaved?'เช็กแล้ว':'ยังไม่เช็ก'}</em>
         </button></td>`;
       })():`<td class="period-empty"><span>–</span></td>`).join('')}</tr>`).join('')}</tbody></table></div>
