@@ -77,9 +77,9 @@ const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>showEntrySelectio
 function dateToday(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
 function timeNow(){return new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}
 function toast(message,bad=false){const el=$('#toast');el.textContent=message;el.className='toast show'+(bad?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.className='toast',4200);}
-async function api(path,{method='GET',body,auth=true}={}){
+async function api(path,{method='GET',body,auth=true,timeoutMs=12000}={}){
  if(API_BASE_URL.includes('REPLACE-WITH'))throw Error('กรุณาตั้งค่า API_BASE_URL ใน web/config.js ก่อน');
- const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),12000);
+ const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeoutMs);
  try{
   const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await response.json().catch(()=>({}));
