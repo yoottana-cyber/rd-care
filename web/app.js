@@ -19,6 +19,7 @@ import {createPortalAdmin} from './portal-admin.js';
 import {createStudentAffairs} from './student-affairs.js';
 import {createScoreRecording} from './score-recording.js';
 import {createScoreHistoryPopup} from './score-history-popup.js';
+import {createTeacherScoreMonitor} from './teacher-score-monitor.js';
 import {createBehaviorAdjustment} from './behavior-adjustment.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
 import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-ui.js';
@@ -42,6 +43,8 @@ const notificationSettings=createNotificationSettings({api,pwaTools,mount,toast,
  getAlerts:()=>state.stats?.alerts||0});
 const studentAffairs=createStudentAffairs({api,mount,safeRun,toast,rooms:()=>state.rooms});
 const scorePopup=createScoreHistoryPopup({api,toast,safeRun,escapeHtml:esc});
+const teacherScoreMonitor=createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,
+ getTab:()=>state.tab,escapeHtml:esc});
 const scoreRecorder=createScoreRecording({api,mount,safeRun,toast,rooms:()=>state.rooms,
  getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
 const behaviorAdjustment=createBehaviorAdjustment({api,mount,safeRun,toast,rooms:()=>state.rooms,
@@ -232,7 +235,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],...(['teacher','staff','admin'].includes(state.user?.role)?[['scoreMonitor','ติดตามคะแนนพฤติกรรม','📊']]:[]),['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️']]:[])];
  const sidebar=renderSidebarNavigation(navs,state.tab);
  const page=pageLocation(navs,state.tab);
  const pageIcon=navs.find(x=>x[0]===(state.tab==='periodCheckin'?'periodAttendance':state.tab))?.[2]||'✦';
@@ -357,6 +360,13 @@ async function showTab(tab){scorePopup.close();if(tab!=='lateGate')lateGate.dest
   return lateGate.load({noticeId});
  }
  if(tab==='behavior'||tab==='good')return loadBehavior();
+ if(tab==='scoreMonitor'){
+  if(!['teacher','staff','admin'].includes(state.user?.role)){
+   state.tab='dashboard';toast('เมนูนี้สำหรับครูและบุคลากรโรงเรียนเท่านั้น',true);
+   return loadDashboard();
+  }
+  return teacherScoreMonitor.load();
+ }
  if(tab==='adjustment')return behaviorAdjustment.load();
  if(tab==='alerts')return loadAlerts();
  if(tab==='admin')return loadAdmin();
@@ -392,6 +402,7 @@ function renderDashboard(){
   ['advisorCenter','🧑‍🏫','ศูนย์ครูที่ปรึกษา','ตรวจสอบงานขาดเรียน','quick-purple'],
   ['late','⏰','มาสาย','ตรวจสอบรายการมาสาย','quick-teal'],
   ['behavior','⚖️','คะแนนพฤติกรรม','บันทึกความผิดตามเกณฑ์โรงเรียน','quick-orange'],
+  ['scoreMonitor','📊','ติดตามคะแนนพฤติกรรม','ตรวจสอบข้อมูลนักเรียนทั้งโรงเรียนแบบอ่านอย่างเดียว','quick-blue'],
   ['adjustment','🌱','บันทึกการปรับพฤติกรรม','ปรับคะแนนความผิดตามเกณฑ์ที่อนุมัติ','quick-teal'],
    ['good','⭐','คะแนนความดี','บันทึกความดีแยกจากพฤติกรรม','quick-blue'],
   ['alerts','🔔','ตรวจสอบขาด','รายการรอครูตรวจสอบ','quick-pink'],
