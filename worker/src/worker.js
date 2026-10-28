@@ -694,10 +694,12 @@ async function adminRoutes(req,env,user,path){
    AND period<=? AND COALESCE(end_period,period)>=? LIMIT 1`)
    .bind(lesson.day_of_week,lesson.classroom_id,teacherId,lesson.end_period,lesson.period).first();
   if(clash)throw error(409,'ตารางสอนซ้อนกับคาบเดิมของครูหรือห้องเรียน');
-  const res=await env.DB.prepare(`INSERT INTO timetable
+  let res;
+  try{res=await env.DB.prepare(`INSERT INTO timetable
    (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject)
    VALUES(?,?,?,?,?,?,?)`)
    .bind(lesson.classroom_id,teacherId,lesson.day_of_week,lesson.period,lesson.end_period,lesson.subject_code,lesson.subject).run();
+  }catch(e){if(/TIMETABLE_OVERLAP/.test(String(e?.message||'')))throw error(409,'มีครูบันทึกตารางสอนคาบนี้แล้ว กรุณาตรวจสอบคาบซ้อน');throw e}
   await log(env.DB,user.id,'timetable_created','timetable',res.meta.last_row_id);
   return json({ok:true,id:res.meta.last_row_id},201);
  }
