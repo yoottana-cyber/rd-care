@@ -1,8 +1,7 @@
 import {validateStudentInput} from './admin-validation.js';
 import {validUsername,bangkokToday} from './core.js';
-import {passwordHash} from './password.js';
+import {passwordHash,newPasswordSalt} from './password.js';
 
-const hex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(x=>x.toString(16).padStart(2,'0')).join('');
 const fail=(status,message)=>{throw Object.assign(new Error(message),{code:status})};
 const json=(v,status=200)=>new Response(JSON.stringify(v),{status,headers:{
  'content-type':'application/json;charset=utf-8','cache-control':'no-store'
@@ -157,7 +156,7 @@ async function commitOne(env,user,raw,plan,roomId,{rosterOnly=false,traceId=''}=
    const nextUsername=student.username||linkedAccount.username;
    if(student.password){
     if(traceId)console.info('rd-import-phase',traceId,'password_hash_begin');
-    const salt=hex(16),hash=await passwordHash(student.password,salt);
+    const salt=newPasswordSalt(),hash=await passwordHash(student.password,salt);
     stmts.push(env.DB.prepare('UPDATE portal_accounts SET username=?,display_name=?,password_salt=?,password_hash=?,must_change_password=0 WHERE id=?')
      .bind(nextUsername,student.full_name,salt,hash,linkedAccount.id));
     stmts.push(env.DB.prepare('DELETE FROM portal_sessions WHERE account_id=?').bind(linkedAccount.id));
@@ -167,7 +166,7 @@ async function commitOne(env,user,raw,plan,roomId,{rosterOnly=false,traceId=''}=
    .bind(student.full_name,linkedAccount.id));
  }else if(!rosterOnly&&plan.account_action==='create'){
   if(traceId)console.info('rd-import-phase',traceId,'password_hash_begin');
-    const salt=hex(16),hash=await passwordHash(student.password,salt);
+    const salt=newPasswordSalt(),hash=await passwordHash(student.password,salt);
   stmts.push(env.DB.prepare(`INSERT INTO portal_accounts
    (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
    SELECT ?,full_name,'student',id,?,?,0,? FROM students WHERE lower(student_no)=lower(?)`)

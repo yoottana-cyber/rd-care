@@ -1,5 +1,5 @@
 import { STATUS, PERIOD_STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername, httpErrorStatus } from './core.js';
-import { passwordHash } from './password.js';
+import { passwordHash,newPasswordSalt } from './password.js';
 import { validateStudentInput, validatePersonnelInput } from './admin-validation.js';
 import { planStudentImport } from './student-import.js';
 import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } from './late-self.js';
@@ -121,7 +121,7 @@ async function setup(req,env){
  const b=await payload(req);
  const username=String(b.username||'').trim().toLowerCase(), pass=String(b.password||'');
  if(!validUsername(username)||pass.length<12||pass.length>128)throw error(400,'ชื่อผู้ใช้ 3–40 ตัว และรหัสผ่าน 12–128 ตัว');
- const salt=randomHex(16),hash=await passwordHash(pass,salt);
+ const salt=newPasswordSalt(),hash=await passwordHash(pass,salt);
  const result=await env.DB.prepare('INSERT INTO users(username,display_name,role,password_salt,password_hash) VALUES(?,?,?,?,?)')
   .bind(username,requiredText(b.display_name,100),'admin',salt,hash).run();
  await log(env.DB,result.meta.last_row_id,'initial_setup','users',result.meta.last_row_id);
@@ -679,7 +679,7 @@ async function adminRoutes(req,env,user,path){
   const b=await payload(req),username=String(b.username||'').trim().toLowerCase(), pass=String(b.password||'');
   if(!validUsername(username)||!['teacher','staff','admin'].includes(b.role)||!validateUserPassword(pass,b.role))
    throw error(400,'ชื่อผู้ใช้ไม่ถูกต้อง หรือรหัสผ่านต้องมี '+userPasswordMinimum(b.role)+'–128 ตัว และไม่ใช้เลขประจำตัวประชาชน');
-  const salt=randomHex(16),hash=await passwordHash(pass,salt);
+  const salt=newPasswordSalt(),hash=await passwordHash(pass,salt);
   const res=await env.DB.prepare('INSERT INTO users(username,display_name,role,password_salt,password_hash) VALUES(?,?,?,?,?)')
    .bind(username,requiredText(b.display_name,100),b.role,salt,hash).run();
   await log(env.DB,user.id,'user_created','users',res.meta.last_row_id);
@@ -755,7 +755,7 @@ async function adminRoutes(req,env,user,path){
   for(let i=0;i<plan.items.length;i++){
    const row=plan.items[i],raw=b.students[i];
    if(!row.create_account)continue;
-   const salt=randomHex(16);
+   const salt=newPasswordSalt();
    const hash=await passwordHash(raw.password,salt);
    stmts.push(env.DB.prepare(`INSERT INTO portal_accounts
     (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)

@@ -1,4 +1,4 @@
-import {passwordHash} from './password.js';
+import {passwordHash,newPasswordSalt} from './password.js';
 import {validUsername} from './core.js';
 
 // This is a bounded internal transport batch, not a user-facing file/record limit.
@@ -10,7 +10,7 @@ const validName=v=>!!v&&v.length<=100&&!/[\u0000-\u001f\u007f]/.test(v);
 const validStudentName=v=>!!v&&v.length<=120&&!/[\u0000-\u001f\u007f]/.test(v);
 const passwordOk=v=>typeof v==='string'&&v.length>=4&&v.length<=128&&
  !/^\d{13}$/.test(v)&&!/[\u0000-\u001f\u007f]/.test(v);
-const salt=()=>[...crypto.getRandomValues(new Uint8Array(16))].map(x=>x.toString(16).padStart(2,'0')).join('');
+const salt=newPasswordSalt;
 const statement=(db,sql,...args)=>db.prepare(sql).bind(...args);
 const respond=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{
  'content-type':'application/json; charset=utf-8','cache-control':'no-store'

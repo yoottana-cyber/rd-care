@@ -1,4 +1,4 @@
-import {passwordHash} from './password.js';
+import {passwordHash,newPasswordSalt} from './password.js';
 import {validUsername,validDate,bangkokToday} from './core.js';
 import {studentUsername} from './student-username.js';
 import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
@@ -78,7 +78,7 @@ async function changePassword(req,env,a){
  if(!stored||!secureEqual(await passwordHash(oldPass,stored.password_salt),stored.password_hash))
   fail(403,'รหัสผ่านปัจจุบันไม่ถูกต้อง');
  if(oldPass===next)fail(400,'รหัสผ่านใหม่ต้องต่างจากรหัสเดิม');
- const salt=randomHex(16),hash=await passwordHash(next,salt);
+ const salt=newPasswordSalt(),hash=await passwordHash(next,salt);
  await env.DB.batch([
   env.DB.prepare('UPDATE portal_accounts SET password_salt=?,password_hash=?,must_change_password=0 WHERE id=?')
    .bind(salt,hash,a.id),
@@ -290,7 +290,7 @@ export async function portalAdminRoutes(req,env,actor,path){
   if(password.length<4||password.length>128)
    fail(400,'รหัสผ่านต้องมีความยาว 4–128 ตัวอักษร');
   if(/^\d{13}$/.test(password))fail(400,'ห้ามใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน');
-  const salt=randomHex(16),hash=await passwordHash(password,salt);
+  const salt=newPasswordSalt(),hash=await passwordHash(password,salt);
   const result=await env.DB.prepare(`INSERT INTO portal_accounts
    (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
    VALUES(?,?,?,?,?,?,0,?)`).bind(username,displayName,role,studentId,salt,hash,actor.id).run();
@@ -338,7 +338,7 @@ export async function portalAdminRoutes(req,env,actor,path){
    ]);
    return reply({ok:true});
   }
-  const password=randomHex(16),salt=randomHex(16),hash=await passwordHash(password,salt);
+  const password=randomHex(16),salt=newPasswordSalt(),hash=await passwordHash(password,salt);
   await env.DB.batch([
    env.DB.prepare('UPDATE portal_accounts SET password_salt=?,password_hash=?,must_change_password=0 WHERE id=?')
     .bind(salt,hash,id),
