@@ -37,5 +37,17 @@ class FreshRosterSchema(unittest.TestCase):
   self.assertEqual(self.db.execute("SELECT name FROM sqlite_master WHERE name='uq_students_current_room_roll'").fetchone()[0],
    'uq_students_current_room_roll')
 
+ def test_blank_database_gets_only_rooms_and_never_demo_students(self):
+  self.db.execute("DELETE FROM classrooms WHERE id=1")
+  seed=(ROOT.parent/'classrooms_only.sql').read_text(encoding='utf-8')
+  self.db.executescript(seed)
+  self.assertEqual(self.db.execute('SELECT count(*) FROM classrooms').fetchone()[0],48)
+  self.assertEqual(self.db.execute('SELECT count(*) FROM students').fetchone()[0],0)
+  self.db.executescript(seed)
+  self.assertEqual(self.db.execute('SELECT count(*) FROM classrooms').fetchone()[0],48)
+  self.db.execute("DELETE FROM classrooms WHERE grade=6 AND room=7")
+  self.db.executescript(seed)
+  self.assertEqual(self.db.execute('SELECT count(*) FROM classrooms').fetchone()[0],47)
+
 if __name__=='__main__':
  unittest.main()
