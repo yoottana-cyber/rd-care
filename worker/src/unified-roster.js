@@ -218,5 +218,7 @@ export async function unifiedRosterReadiness(env,user){
   catch(e){issues.push(key);console.warn('Unified import readiness check failed for',key,e?.name||'DBError')}
  }
  return json({ok:issues.length===0,service:'rd-roster-import',version:'502-diagnostics-v1',
-  issues,preview_limit:25,commit_limit:1},issues.length?503:200);
+  issues,preview_limit:25,commit_limit:1,
+  ...(issues.length?{error:'import_database_not_ready',message:'ฐานข้อมูลนำเข้าไม่พร้อม: '+issues.join(', ')}:{})
+ },issues.length?503:200);
 }
