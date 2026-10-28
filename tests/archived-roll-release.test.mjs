@@ -87,12 +87,11 @@ test('unknown foreign-key relation or foreign key error never purges enrollment'
  await assert.rejects(releaseUnusedArchivedStudent(req(1),blocked,admin,1),{code:409});
  assert.equal(blocked.writes.length,0);
 });
-test('web UI offers release only for already-archived conflicts and rechecks chosen file',()=>{
- const code=readFileSync(new URL('../web/unified-import.js',import.meta.url),'utf8');
- const route=readFileSync(new URL('../worker/src/worker.js',import.meta.url),'utf8');
- assert.match(code,/student.archived\?/);
- assert.match(code,/data-release-archived/);
- assert.match(code,/onOpenConflict/);
- assert.match(code,/await preflight\(container\)/);
- assert.match(route,/releaseUnusedArchivedStudent\(/);
+test('archived student release is retired from routes and import UI, preserving identities',()=>{
+ const ui=readFileSync(new URL('../web/unified-import.js',import.meta.url),'utf8');
+ const routes=readFileSync(new URL('../worker/src/worker.js',import.meta.url),'utf8');
+ assert.doesNotMatch(ui,/data-release-archived/);
+ assert.doesNotMatch(routes,/releaseUnusedArchivedStudent\(/);
+ assert.match(ui,/onOpenConflict/);
+ assert.match(ui,/ต้องอัปเกรดสำเนาฐานข้อมูล/);
 });
