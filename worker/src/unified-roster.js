@@ -192,7 +192,8 @@ export async function unifiedRosterEndpoint(req,env,user,path){
    items:[{...plan,status:updated?'updated':'imported',
     message:updated?'อัปเดตข้อมูลเดิมแล้ว':'เพิ่มนักเรียนแล้ว'}]},201);
  }catch(e){
-  console.warn('student roster import rejected',String(e?.message||'').slice(0,180));
+  // Never log SQL bind values or identifiable student data on shared Workers.
+  console.warn('Student roster import: one record skipped after database write failed');
   return json({ok:true,imported:0,added:0,updated:0,skipped:1,accounts:0,
    items:[{...plan,status:'skipped',message:sqlStatus(e?.message)}]},200);
  }
