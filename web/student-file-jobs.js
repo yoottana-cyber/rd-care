@@ -15,6 +15,13 @@ export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRo
   if(area)area.textContent=active?
     statusText(active)+(active.status==='completed'?' • เสร็จสิ้นแล้ว':' • '+active.status)+(lastError?' • '+lastError:''):
     (lastError||'เลือก Excel/CSV หนึ่งไฟล์เพื่อเริ่มนำเข้าทั้งโรงเรียน');
+  const issuePanel=host.querySelector('#rdFileJobIssues');
+  if(issuePanel){
+   const issues=(active?.issues||[]).slice(0,100);
+   issuePanel.innerHTML=issues.length?'<strong>แถวที่ข้าม (สูงสุด 100 รายการแรก)</strong><ul>'+
+    issues.map(x=>'<li>แถว '+Number(x.source_row)+': '+esc(x.message)+'</li>').join('')+
+    '</ul>':'';
+  }
   const btn=host.querySelector('#rdFileJobUpload');
   if(btn)btn.disabled=busy;
   const resume=host.querySelector('#rdFileJobContinue');
@@ -57,7 +64,7 @@ export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRo
  async function work(){
   if(!active||busy)return;
   stop=false;busy=true;lastError='';paint();
-  let failures=0;
+  let failures=0,stalled=0;
   try{
    while(!stop){
     const latest=await refresh(active.job_id);
@@ -70,8 +77,14 @@ export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRo
      lastError='ยังอัปโหลดไม่ครบ กรุณาตรวจสอบไฟล์เดิม';break;
     }
     try{
+     const before=active.processed;
      active=await send('/api/admin/student-file-jobs/'+active.job_id+'/run',{},2);
      failures=0;
+     if(active.processed===before&&active.status!=='completed'){
+      stalled++;
+      if(stalled>=20)throw Error('งานยังถูกล็อกประมวลผลอยู่ กรุณากดทำต่ออีกครั้งภายหลัง');
+      await pause(2500);
+     }else stalled=0;
     }catch(e){
      failures++;
      // Read authoritative D1 progress after any ambiguous gateway failure.
@@ -153,6 +166,7 @@ export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRo
    '<button type="button" class="button secondary" id="rdFileJobContinue" hidden>ทำงานต่อจากที่ค้าง</button>'+
    '<button type="button" class="button secondary" id="rdFileJobPause" hidden>หยุดหลังรายการปัจจุบัน</button></div>'+
    '<p class="muted" role="status" aria-live="polite" id="rdFileJobProgress"></p>'+
+   '<div id="rdFileJobIssues" class="muted"></div>'+
    '<p class="muted">นำเข้าเฉพาะทะเบียน ไม่แก้ Username/Password • ตรวจรายการผิดแล้วข้าม • งานเก็บใน D1'+
    ' หากปิดหน้าเว็บสามารถกลับมาเลือกงานเดิมและทำต่อได้</p>'+
    '<h4>งานที่บันทึกไว้</h4><div id="rdFileJobHistory" class="stack"></div>'+
