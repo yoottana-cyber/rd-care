@@ -9,6 +9,7 @@ import {createLateGate} from './late-gate.js';
 import {readLateGateIntent} from './late-qr-intent.js';
 import {createPeriodCenter} from './period-center.js';
 import {createPwaTools} from './pwa-client.js';
+import {registerPwaUpdates} from './pwa-updates.js';
 import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
 import {createNotificationSettings} from './notification-settings.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLastLoginArea} from './auth-session.js';
@@ -925,7 +926,7 @@ function parseCsv(csv,columns=[3]){const rows=[];let row=[],col='',quoted=false;
  if(quoted)throw Error('ไฟล์ CSV มีเครื่องหมายคำพูดไม่ครบ');row.push(col);if(row.some(x=>x.trim()))rows.push(row);if(rows.some(r=>!columns.includes(r.length)))throw Error('CSV ต้องมี 3 หรือ 5 คอลัมน์ ตามไฟล์ตัวอย่าง');return rows;
 }
 async function start(){
- if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
+ registerPwaUpdates().catch(()=>{});
  // A printed gate QR is a public link. Keep its intent through fresh login or
  // a browser/PWA reload; erase only the historical expiring code from the URL.
  const scanned=readLateGateIntent(location.search);
