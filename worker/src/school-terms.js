@@ -28,7 +28,7 @@ async function overview(env,term,settings,roomId=0){
    (SELECT COUNT(*) FROM student_enrollments h JOIN students s ON s.id=h.student_id
      WHERE h.classroom_id=c.id AND s.active=1 AND h.start_date<=?
       AND (h.end_date IS NULL OR h.end_date>?)) AS students,
-   (SELECT COUNT(*) FROM timetable t WHERE t.classroom_id=c.id AND t.active=1) AS lessons
+   (SELECT COUNT(*) FROM timetable t WHERE t.classroom_id=c.id AND t.active=1 AND t.academic_year=? AND t.semester=?) AS lessons
    FROM classrooms c ORDER BY c.grade,c.room`:
   `SELECT c.id,c.grade,c.room,c.label,
     (SELECT COUNT(*) FROM school_term_roster r WHERE r.academic_year=? AND r.semester=?
@@ -36,7 +36,7 @@ async function overview(env,term,settings,roomId=0){
     (SELECT COUNT(*) FROM school_term_lessons t WHERE t.academic_year=? AND t.semester=?
        AND t.classroom_id=c.id) AS lessons
    FROM classrooms c ORDER BY c.grade,c.room`;
- const params=preview?[date,date]:[year,semester,year,semester];
+ const params=preview?[date,date,year,semester]:[year,semester,year,semester];
  const {results:rooms}=await env.DB.prepare(roomQuery).bind(...params).all();
  let students=[],lessons=[];
  if(roomId){
@@ -56,14 +56,14 @@ async function overview(env,term,settings,roomId=0){
     COALESCE(t.end_period,t.period) AS end_period,t.subject,t.subject_code,
     u.display_name AS teacher_name
     FROM timetable t JOIN users u ON u.id=t.teacher_user_id
-    WHERE t.classroom_id=? AND t.active=1 ORDER BY t.day_of_week,t.period`:
+    WHERE t.classroom_id=? AND t.active=1 AND t.academic_year=? AND t.semester=? ORDER BY t.day_of_week,t.period`:
    `SELECT t.original_timetable_id,t.day_of_week,t.period,t.end_period,t.subject,
     t.subject_code,u.display_name AS teacher_name
     FROM school_term_lessons t JOIN users u ON u.id=t.teacher_user_id
     WHERE t.academic_year=? AND t.semester=? AND t.classroom_id=?
     ORDER BY t.day_of_week,t.period`;
   const studentArgs=preview?[roomId,date,date]:[year,semester,roomId];
-  const lessonArgs=preview?[roomId]:[year,semester,roomId];
+  const lessonArgs=preview?[roomId,year,semester]:[year,semester,roomId];
   const rows=await env.DB.batch([
    env.DB.prepare(studentQuery).bind(...studentArgs),env.DB.prepare(lessonQuery).bind(...lessonArgs)
   ]);
@@ -124,7 +124,7 @@ export async function schoolTermRoutes(req,env,user,path){
      period,end_period,subject_code,subject)
     SELECT ?,?,t.id,t.classroom_id,t.teacher_user_id,t.day_of_week,t.period,
      COALESCE(t.end_period,t.period),COALESCE(t.subject_code,''),t.subject
-    FROM timetable t WHERE t.active=1`).bind(year,semester),
+    FROM timetable t WHERE t.active=1 AND t.academic_year=? AND t.semester=?`).bind(year,semester,year,semester),
    env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
     VALUES(?,'school_term_snapshot_created','school_term_snapshots',?)`)
     .bind(user.id,label(year,semester))
