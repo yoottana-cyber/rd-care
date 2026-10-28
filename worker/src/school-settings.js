@@ -8,7 +8,8 @@ export const DEFAULT_SCHOOL_SETTINGS=Object.freeze({
  school_name:'โรงเรียนรัษฎา',academic_year:2569,semester:2,
  semester_start_date:null,semester_end_date:null,
  school_start_time:'08:00',late_cutoff_time:'08:00',
- first_period_start_time:'08:30',period_duration_minutes:50
+ first_period_start_time:'08:30',period_duration_minutes:50,
+ lunch_after_period:0,lunch_break_minutes:0,between_period_break_minutes:0
 });
 const keys=Object.keys(DEFAULT_SCHOOL_SETTINGS);
 const timePattern=/^([01]\d|2[0-3]):[0-5]\d$/;
@@ -32,6 +33,8 @@ export function validateSchoolSettings(body){
   fail(400,'ต้องกำหนดวันเริ่มและสิ้นสุดภาคเรียนให้ครบ และวันสิ้นสุดต้องไม่ก่อนวันเริ่ม');
  const schoolStart=body.school_start_time,cutoff=body.late_cutoff_time;
  const firstPeriod=body.first_period_start_time,duration=body.period_duration_minutes;
+ const after=body.lunch_after_period,lunch=body.lunch_break_minutes,
+  between=body.between_period_break_minutes;
  if(typeof schoolStart!=='string'||typeof cutoff!=='string'||
   !timePattern.test(schoolStart)||!timePattern.test(cutoff))
   fail(400,'เวลาเรียนและเวลาเริ่มมาสายต้องเป็น HH:MM');
@@ -41,18 +44,25 @@ export function validateSchoolSettings(body){
   fail(400,'เวลาเริ่มคาบที่ 1 ต้องเป็นเวลาระหว่าง 05:00–18:00 น.');
  if(![40,45,50].includes(duration))
   fail(400,'เวลาเรียนหนึ่งคาบต้องเลือก 50, 45 หรือ 40 นาทีเท่านั้น');
+ if(!Number.isInteger(after)||after<0||after>9||!Number.isInteger(lunch)||
+  !Number.isInteger(between)||between<0||between>30||
+  (after===0&&lunch!==0)||(after>0&&(lunch<15||lunch>180)))
+  fail(400,'กรุณาตั้งค่าพักกลางวันหลังคาบที่ 1–9 (15–180 นาที) หรือปิดพักกลางวัน และพักระหว่างคาบ 0–30 นาที');
  const [h,m]=firstPeriod.split(':').map(Number);
- if(h*60+m+10*duration>24*60)fail(400,'ระยะเวลาคาบเรียนทั้งวันเกินเวลา 24:00 น.');
+ const totalBreaks=after>0?lunch+between*8:between*9;
+ if(h*60+m+10*duration+totalBreaks>24*60)
+  fail(400,'เวลาเรียนรวมช่วงพักเกินเวลา 24:00 น.');
  return {school_name:name,academic_year:year,semester,
   semester_start_date:start,semester_end_date:end,
   school_start_time:schoolStart,late_cutoff_time:cutoff,
-  first_period_start_time:firstPeriod,period_duration_minutes:duration};
+  first_period_start_time:firstPeriod,period_duration_minutes:duration,
+  lunch_after_period:after,lunch_break_minutes:lunch,between_period_break_minutes:between};
 }
 export async function getSchoolSettings(env){
  const result=await env.DB.prepare(
   `SELECT school_name,academic_year,semester,semester_start_date,semester_end_date,
    school_start_time,late_cutoff_time,first_period_start_time,period_duration_minutes,
-   updated_by,updated_at FROM school_settings WHERE id=1`
+   lunch_after_period,lunch_break_minutes,between_period_break_minutes,updated_by,updated_at FROM school_settings WHERE id=1`
  ).first();
  return result?{...DEFAULT_SCHOOL_SETTINGS,...result}:DEFAULT_SCHOOL_SETTINGS;
 }
@@ -85,10 +95,12 @@ export async function schoolSettingsRoutes(req,env,user,path){
  await env.DB.batch([
   env.DB.prepare(`UPDATE school_settings SET school_name=?,academic_year=?,semester=?,
    semester_start_date=?,semester_end_date=?,school_start_time=?,late_cutoff_time=?,
-   first_period_start_time=?,period_duration_minutes=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=1`)
+   first_period_start_time=?,period_duration_minutes=?,
+   lunch_after_period=?,lunch_break_minutes=?,between_period_break_minutes=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=1`)
     .bind(next.school_name,next.academic_year,next.semester,next.semester_start_date,
      next.semester_end_date,next.school_start_time,next.late_cutoff_time,
-     next.first_period_start_time,next.period_duration_minutes,user.id),
+     next.first_period_start_time,next.period_duration_minutes,next.lunch_after_period,
+     next.lunch_break_minutes,next.between_period_break_minutes,user.id),
   env.DB.prepare(`INSERT INTO school_settings_history(actor_id,previous_value,next_value)
    VALUES(?,?,?)`).bind(user.id,JSON.stringify(oldValue),JSON.stringify(next)),
   env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
