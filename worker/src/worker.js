@@ -162,7 +162,7 @@ async function getTimetable(req,env,user){
   ![1,2].includes(semester))throw error(400,'ปีการศึกษาหรือภาคเรียนไม่ถูกต้อง');
  query+=' AND t.academic_year=? AND t.semester=?';
  const args=[day,academicYear,semester];
- if(roomId){await assertRoom(env,user,roomId);query+=' AND t.classroom_id=?';args.push(roomId);}
+ if(roomId){query+=' AND t.classroom_id=?';args.push(roomId);}
  if(!isStaff(user)){
   if(url.searchParams.get('scope')==='mine'){
    query+=' AND t.teacher_user_id=?';args.push(user.id);
@@ -179,7 +179,9 @@ async function getAttendance(req,env,user){
  const q=new URL(req.url).searchParams;
  const roomId=positiveInt(q.get('classroom_id'));
  const kind=q.get('kind');const date=q.get('date')||bangkokToday();
- requireDate(date);await assertRoom(env,user,roomId,kind==='daily'?'daily':'view');
+ requireDate(date);
+ if(kind==='daily')await assertRoom(env,user,roomId,'daily');
+ else if(kind!=='period')await assertRoom(env,user,roomId,'view');
  if(kind==='daily'){
   const {results}=await env.DB.prepare(`SELECT a.student_id,a.status FROM attendance_daily a
  JOIN student_enrollments h ON h.student_id=a.student_id
@@ -191,7 +193,7 @@ async function getAttendance(req,env,user){
   const timetableId=positiveInt(q.get('timetable_id'));
   const slot=await env.DB.prepare('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=?').bind(timetableId).first();
   if(!slot||slot.classroom_id!==roomId||slot.day_of_week!==weekday(date))throw error(400,'คาบเรียนไม่สัมพันธ์กับห้องหรือวันที่');
-  if(user.role==='teacher'&&slot.teacher_user_id!==user.id)throw error(403,'ดูเช็กชื่อรายคาบได้เฉพาะวิชาของตนเอง');
+  if(!isStaff(user)&&slot.teacher_user_id!==user.id)throw error(403,'ดูเช็กชื่อรายคาบได้เฉพาะวิชาของตนเอง');
   const {results}=await env.DB.prepare(`SELECT p.student_id,
     CASE WHEN tr.student_id IS NOT NULL AND p.status='absent' THEN 'truancy' ELSE p.status END AS status
  FROM attendance_period p
@@ -711,11 +713,14 @@ async function adminRoutes(req,env,user,path){
     AND period<=? AND COALESCE(end_period,period)>=? LIMIT 1`)
    .bind(term.academic_year,term.semester,lesson.day_of_week,lesson.classroom_id,teacherId,lesson.end_period,lesson.period).first();
   if(clash)throw error(409,'ตารางสอนซ้อนกับคาบเดิมของครูหรือห้องเรียนในภาคเรียนนี้');
-  const res=await env.DB.prepare(`INSERT INTO timetable
+  let res;
+  try{
+   res=await env.DB.prepare(`INSERT INTO timetable
    (classroom_id,teacher_user_id,day_of_week,period,end_period,subject_code,subject,academic_year,semester)
    VALUES(?,?,?,?,?,?,?,?,?)`)
    .bind(lesson.classroom_id,teacherId,lesson.day_of_week,lesson.period,lesson.end_period,
     lesson.subject_code,lesson.subject,term.academic_year,term.semester).run();
+  }catch(e){if(/TIMETABLE_OVERLAP/.test(String(e?.message||'')))throw error(409,'ตารางสอนชนกับคาบที่เพิ่งบันทึก กรุณารีเฟรชแล้วตรวจคาบอีกครั้ง');throw e}
   await log(env.DB,user.id,'timetable_created','timetable',res.meta.last_row_id);
   return json({ok:true,id:res.meta.last_row_id},201);
  }
