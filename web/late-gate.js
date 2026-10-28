@@ -17,7 +17,7 @@ export function createLateGate({api,mount,toast,safeRun}){
   const statuses={pending:'รอครูเวรตรวจสอบ',verified:'ยืนยันแล้ว',rejected:'ไม่อนุมัติ'};
   mount(`<div class="stack late-qr-page">
    <header class="row between"><div><h2>📷 QR ลงชื่อมาสาย (ถาวร)</h2>
-    <p class="muted">QR แผ่นเดียวพิมพ์ติดไว้ได้ทุกวัน • หลัง 08.00 น. นักเรียนลงชื่อแล้วระบบอนุมัติและบันทึกเช็กชื่อรายวันเป็น สาย โดยอัตโนมัติ</p></div>
+    <p class="muted">QR แผ่นเดียวพิมพ์ติดไว้ได้ทุกวัน • หลัง ${esc(state.qr?.cutoff_time||'08:00')} น. นักเรียนลงชื่อแล้วระบบอนุมัติและบันทึกเช็กชื่อรายวันเป็น สาย โดยอัตโนมัติ</p></div>
     <span class="tag">วันที่ ${esc(state.date||'-')}</span></header>
    ${state.focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
     <h3>🔔 รายละเอียดแจ้งเตือนมาสาย</h3>
@@ -35,7 +35,7 @@ export function createLateGate({api,mount,toast,safeRun}){
       <div class="late-qr-print-head">
        <h2>โรงเรียนรัษฎา</h2>
        <h3>QR Code ลงชื่อมาสาย</h3>
-       <p>สำหรับนักเรียนที่มาถึงโรงเรียนหลัง 08.00 น.</p>
+       <p>สำหรับนักเรียนที่มาถึงโรงเรียนหลัง ${esc(state.qr?.cutoff_time||'08:00')} น.</p>
       </div>
       <div class="late-qr-image" id="lateQrImage">
        ${state.qr?.svg||'<div class="empty">กำลังโหลด QR Code ถาวร</div>'}
