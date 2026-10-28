@@ -142,11 +142,16 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
    safeRun(()=>save(event.currentTarget));
   });
   document.getElementById('schoolSettingsReload')?.addEventListener('click',()=>safeRun(load));
-  for(const id of ['first_period_start_time','period_duration_minutes','lunch_after_period',
+  for(const id of ['first_period_start_time','period_duration_minutes',
    'lunch_break_minutes','between_period_break_minutes']){
    document.getElementById('schoolSetting_'+id)?.addEventListener('input',updatePeriodPreview);
    document.getElementById('schoolSetting_'+id)?.addEventListener('change',updatePeriodPreview);
   }
+  document.getElementById('schoolSetting_lunch_after_period')?.addEventListener('change',event=>{
+   const lunch=document.getElementById('schoolSetting_lunch_break_minutes');
+   if(lunch)lunch.value=Number(event.target.value)===0?'0':Number(lunch.value)===0?'60':lunch.value;
+   updatePeriodPreview();
+  });
   updatePeriodPreview();
   document.querySelectorAll('[data-school-jump]').forEach(button=>
    button.addEventListener('click',()=>safeRun(()=>navigate(button.dataset.schoolJump))));
@@ -162,7 +167,6 @@ export function createSchoolSettings({api,mount,safeRun,toast,navigate}){
   if(lunchInput){
    lunchInput.readOnly=after===0;
    if(after===0)lunchInput.value='0';
-   else if(Number(lunchInput.value)===0)lunchInput.value='60';
   }
   const options={lunch_after_period:after,
    lunch_break_minutes:Number(lunchInput?.value),
