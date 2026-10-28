@@ -196,6 +196,8 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    const uncertain=preview.filter(x=>x.status==='uncertain').length;
    const pending=preview.filter(x=>['ready','update'].includes(x.status)).length;
    if(completed===selected.length&&uncertain===0){
+    // Do not retain source passwords in memory after a completed import.
+    rows=[];
     phase='เสร็จสิ้น • เพิ่ม '+added+' • อัปเดต '+updated+' • ข้าม '+skipped+
      ' รายการ (ดูเหตุผลในตาราง)';
     // Refresh school rosters only once after the entire file is processed.
