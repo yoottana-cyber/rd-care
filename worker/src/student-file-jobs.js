@@ -94,7 +94,7 @@ export async function processStudentFileJob(env,j){
  try{
   const work=(await env.DB.prepare(sql(
    'SELECT source_row,student_no,classroom,roll_no,full_name FROM student_file_import_rows',
-   "WHERE job_id=? AND state='pending' ORDER BY source_row LIMIT 6")).bind(j.id).all()).results;
+   "WHERE job_id=? AND state='pending' ORDER BY source_row LIMIT 4")).bind(j.id).all()).results;
   for(const r of work)await oneRow(env,j,r);
   await env.DB.prepare(sql(
    'UPDATE student_file_import_jobs SET lock_until=NULL,',
