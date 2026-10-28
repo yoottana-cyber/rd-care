@@ -141,6 +141,7 @@ async function commitOne(env,user,raw,plan,roomId,{rosterOnly=false,traceId=''}=
   if(plan.account_action==='update'){
    const nextUsername=student.username||linkedAccount.username;
    if(student.password){
+    if(traceId)console.info('rd-import-phase',traceId,'password_hash_begin');
     const salt=hex(16),hash=await passwordHash(student.password,salt);
     stmts.push(env.DB.prepare('UPDATE portal_accounts SET username=?,display_name=?,password_salt=?,password_hash=?,must_change_password=0 WHERE id=?')
      .bind(nextUsername,student.full_name,salt,hash,linkedAccount.id));
@@ -150,7 +151,8 @@ async function commitOne(env,user,raw,plan,roomId,{rosterOnly=false,traceId=''}=
   }else stmts.push(env.DB.prepare('UPDATE portal_accounts SET display_name=? WHERE id=?')
    .bind(student.full_name,linkedAccount.id));
  }else if(!rosterOnly&&plan.account_action==='create'){
-  const salt=hex(16),hash=await passwordHash(student.password,salt);
+  if(traceId)console.info('rd-import-phase',traceId,'password_hash_begin');
+    const salt=hex(16),hash=await passwordHash(student.password,salt);
   stmts.push(env.DB.prepare(`INSERT INTO portal_accounts
    (username,display_name,role,student_id,password_salt,password_hash,must_change_password,created_by)
    SELECT ?,full_name,'student',id,?,?,0,? FROM students WHERE lower(student_no)=lower(?)`)
@@ -160,6 +162,7 @@ async function commitOne(env,user,raw,plan,roomId,{rosterOnly=false,traceId=''}=
   .bind(user.id,currentId?'student_import_updated':'student_import_created','students',String(currentId||student.student_no)));
  if(traceId)console.info('rd-import-phase',traceId,'write_batch_begin',currentId?'update':'insert');
  await env.DB.batch(stmts); // One student per atomic D1 batch: failure skips only that row.
+ if(traceId)console.info('rd-import-phase',traceId,'write_batch_complete');
 }
 export async function unifiedRosterEndpoint(req,env,user,path){
  if(user?.role!=='admin')fail(403,'เฉพาะ Admin');
