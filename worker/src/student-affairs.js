@@ -51,7 +51,8 @@ async function recordBehavior(env,u,b,adjust=false){
  if(!student||!await eligibility(env,u,student))fail(403,'ไม่มีสิทธิ์บันทึกนักเรียนคนนี้');
  let points,category,ruleId=null,adjustId=null,ruleName='';
  if(adjust){
-  if(!staff(u))fail(403,'เฉพาะฝ่ายกิจการนักเรียน');
+  // An ordinary teacher may record a verified adjustment for a student they teach/advice.
+  // The eligibility check above and the approved rule + atomic outstanding score gate remain required.
   if(b.points!==undefined||b.category!==undefined)fail(400,'ต้องเลือกเกณฑ์ปรับพฤติกรรมที่อนุมัติแล้ว ไม่สามารถกรอกคะแนนเอง');
   adjustId=id(b.adjustment_rule_id);
   const rule=adjustId?await env.DB.prepare(
@@ -135,8 +136,8 @@ export async function sendScheduledAttendanceReminders(env){
 }
 export async function studentAffairsRoutes(req,env,u,path){
  const method=req.method;const url=new URL(req.url),q=url.searchParams;
- const ordinaryBehavior=(method==='GET'&&['/api/affairs/behavior/rules','/api/affairs/behavior/students'].includes(path))||
-  (method==='POST'&&['/api/affairs/behavior/record','/api/affairs/behavior/record/bulk'].includes(path));
+ const ordinaryBehavior=(method==='GET'&&['/api/affairs/behavior/rules','/api/affairs/behavior/students','/api/affairs/behavior/approved-adjustments'].includes(path))||
+  (method==='POST'&&['/api/affairs/behavior/record','/api/affairs/behavior/record/bulk','/api/affairs/behavior/adjust'].includes(path));
  if(!staff(u)&&!(['teacher','admin'].includes(u.role)&&ordinaryBehavior))
   fail(403,'เฉพาะครูที่ได้รับมอบหมายสิทธิ์ฝ่ายกิจการนักเรียน');
  let b=null;
@@ -253,6 +254,11 @@ export async function studentAffairsRoutes(req,env,u,path){
   }
   await log(env.DB,u.id,'affairs_behavior_rule','affairs_behavior_rules',key);
   return reply({ok:true,id:key});
+ }
+ if(method==='GET'&&path==='/api/affairs/behavior/approved-adjustments'){
+  const {results}=await env.DB.prepare(`SELECT id,name,points FROM affairs_adjustment_rules
+   WHERE active=1 ORDER BY points,id`).all();
+  return reply({items:results});
  }
  if(method==='GET'&&path==='/api/affairs/behavior/adjustment-rules'){
   const {results}=await env.DB.prepare(`SELECT id,name,points,active,updated_at
