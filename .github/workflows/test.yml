@@ -97,6 +97,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'school_settings_migration_test.py' -v
       - name: Semester snapshot FK and historical attendance invariants
         run: python3 -m unittest discover -s tests -p 'term_snapshots_migration_test.py' -v
+      - name: Timetable clash guard migration and historical FK safety
+        run: python3 -m unittest discover -s tests -p 'timetable_clash_guard_migration_test.py' -v
       - name: Teacher timetable migration and overlap validation
         run: python3 -m unittest discover -s tests -p 'teacher_timetable_migration_test.py' -v
       - name: Truancy edit and Push dispatch regression (real D1 SQL)
