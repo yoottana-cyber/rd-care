@@ -27,10 +27,18 @@ export async function onRequest({ request, env }) {
     safeHeaders.set('cache-control', 'no-store');
     return new Response(response.body, { status: response.status, headers: safeHeaders });
   } catch (error) {
-    console.error('RD Care Pages API gateway error', error);
+    // A 502 here means the Service Binding fetch rejected before the Worker
+    // could return its normal JSON error. Keep a trace ID, but never log request
+    // bodies, authorization headers, names, or student identifiers.
+    const requestId = crypto.randomUUID();
+    console.error('RD Care Pages gateway: upstream rejected',requestId,error?.name||'unknown');
     return Response.json(
-      { error: 'preview_api_unavailable', message: 'ไม่สามารถเชื่อมต่อ Workers API ได้' },
-      { status: 502, headers: { 'cache-control': 'no-store' } }
+      { error: 'service_binding_fetch_failed',
+        message: 'Cloudflare Pages ติดต่อ Worker ไม่สำเร็จ กรุณาตรวจ Worker Logs',
+        request_id: requestId },
+      { status: 502, headers: { 'cache-control': 'no-store',
+        'x-rd-gateway-error': 'service_binding_fetch_failed',
+        'x-rd-request-id': requestId } }
     );
   }
 }
