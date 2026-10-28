@@ -30,9 +30,10 @@ test('file staging excludes credentials and uses 20-row idempotent chunks',()=>{
 });
 test('one file upload from browser supports 4 and 6 columns, durable resume and per-record progress',()=>{
  const ui=source('web/student-file-jobs.js');
- assert.match(ui,/\.xlsx\|/);
- assert.match(ui,/\.csv\|/);
+ assert.match(ui,/xlsx\$/);
+ assert.match(ui,/csv\$/);
  assert.match(ui,/header==='classroom,roll_no,student_no,full_name'/);
+ assert.match(ui,/\['classroom','roll_no','student_no','full_name','username','password'\]/);
  assert.match(ui,/rows.slice\(i,i\+20\)/);
  assert.match(ui,/\/student-file-jobs/);
  assert.match(ui,/\/finish/);
