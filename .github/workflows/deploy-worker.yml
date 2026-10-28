@@ -77,6 +77,14 @@ jobs:
           RD_TRIAL_RESET_DRY_RUN: '1'
         run: node scripts/reset-trial-d1-once.mjs
 
+      - name: One-time approved reset of the exact original trial D1
+        if: >-
+          github.event_name == 'push' && github.event.head_commit.message == 'ops(dev): execute approved one-time original D1 reset'
+        working-directory: worker
+        env:
+          RD_TRIAL_RESET_CONFIRMED: 'RESET-RD-CARE-DEV-TRIAL-ALL'
+        run: node scripts/reset-trial-d1-once.mjs
+
       - name: Apply pending D1 migrations first
         working-directory: worker
         run: npx --no-install wrangler d1 migrations apply DB --remote
