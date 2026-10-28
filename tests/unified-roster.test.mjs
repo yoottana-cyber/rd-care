@@ -64,3 +64,52 @@ test('CSV parser handles quotes and comma inside name',()=>{
  const parsed=csvRows('classroom,roll_no,student_no,full_name,username,password\nม.1/1,1,STU001,"Demo, Test",stu001,Pass#1234');
  assert.equal(parsed[1][3],'Demo, Test');
 });
+
+test('existing student number updates name and roll in same room without creating a new identity',()=>{
+ const current={id:91,student_no:'S00001',classroom_id:1,roll_no:1};
+ const target={...record(1),roll_no:8,full_name:'ชื่อใหม่',username:'',password:''};
+ const out=planUnifiedRoster([target],map,[current]);
+ assert.equal(out.valid,1);
+ assert.equal(out.updated,1);
+ assert.equal(out.added,0);
+ assert.equal(out.items[0].status,'update');
+ assert.equal(out.items[0].existing_id,91);
+ assert.equal(out.items[0].account_action,'none');
+ assert.equal(JSON.stringify(out).includes('Demo-strong'),false);
+});
+test('moving classroom by spreadsheet is rejected to preserve historical attendance',()=>{
+ const target={...record(1,'ม.2/3'),username:'',password:''};
+ const out=planUnifiedRoster([target],map,[{id:10,student_no:target.student_no,classroom_id:1,roll_no:1}]);
+ assert.equal(out.items[0].status,'error');
+ assert.match(out.items[0].message,/ย้ายห้อง/);
+});
+test('invalid row does not reserve class roll or student number for later valid entry',()=>{
+ const invalid={...record(1),full_name:'',source_row:2};
+ const valid={...record(1),source_row:3};
+ const out=planUnifiedRoster([invalid,valid],map);
+ assert.deepEqual(out.items.map(i=>i.status),['error','ready']);
+ assert.equal(out.skipped,1);
+ assert.equal(out.added,1);
+});
+test('existing account can keep its password or receive an explicit replacement',()=>{
+ const old={id:55,student_no:'S00001',classroom_id:1,roll_no:1};
+ const a={id:77,username:'student00001',role:'student',student_id:55};
+ let result=planUnifiedRoster([{...record(1),username:'',password:''}],map,[old],[a]);
+ assert.equal(result.items[0].status,'update');
+ assert.equal(result.items[0].account_action,'none');
+ result=planUnifiedRoster([{...record(1),password:'NewPassword123'}],map,[old],[a]);
+ assert.equal(result.items[0].account_action,'update');
+ assert.equal(result.items[0].status,'update');
+});
+test('account username belonging to someone else is skipped rather than overwritten',()=>{
+ const item=record(1);
+ const other={id:90,username:item.username,role:'student',student_id:99};
+ const result=planUnifiedRoster([item,record(2)],map,[],[other]);
+ assert.deepEqual(result.items.map(x=>x.status),['error','ready']);
+ assert.match(result.items[0].message,/บุคคลอื่น/);
+});
+test('frontend allows empty credentials and marks conflicting rows without stopping valid ones',()=>{
+ const raw=csvRows('classroom,roll_no,student_no,full_name,username,password\nม.1/1,1,S001,ชื่อหนึ่ง,,\nม.1/1,1,S002,ชื่อสอง,,\nม.1/1,2,S003,ชื่อสาม,,');
+ const planned=prepareRows(raw,rooms);
+ assert.deepEqual(planned.map(x=>x.status),['ready','error','ready']);
+});

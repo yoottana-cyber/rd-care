@@ -14,7 +14,7 @@ export function adminMetrics(users,rooms){
 }
 const roleText={teacher:'ครูผู้สอน',staff:'กิจการนักเรียน',admin:'ผู้ดูแลระบบ'};
 export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
- reload,refreshRooms,clearStudentCache,advisorImporter,parseCsv,periodChoices}){
+ reload,refreshRooms,clearStudentCache,advisorImporter,parseCsv,periodChoices,navigate}){
  let tab='overview',editUserId=null,search='',filterRole='all',filterStatus='all';
  const users=()=>getUsers()||[],rooms=()=>getRooms()||[];
  const roomsHtml=()=>rooms().map(r=>`<option value="${r.id}">${safe(r.label)}</option>`).join('');
@@ -139,16 +139,11 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
   return `<div class="rd-settings-content"><div class="rd-settings-section-heading">
    <div><h3>ศูนย์นำเข้าข้อมูล</h3><p>แยกประเภทไฟล์และตรวจสอบความถูกต้องก่อนบันทึก</p></div></div>
    <div class="rd-settings-import-grid">
-    <section class="rd-settings-panel">${panel('🎓','นำเข้านักเรียน (CSV)','ไม่เกิน 60 คนต่อครั้ง')}
-     <form id="importStudents" class="rd-settings-form">
-      <div class="field"><label for="importStudentRoom">ห้องเรียน</label>
-       <select id="importStudentRoom" name="classroom_id" required>${roomsHtml()}</select></div>
-      <div class="field"><label for="importStudentText">ข้อมูล CSV</label>
-       <textarea id="importStudentText" name="csv" rows="8" required spellcheck="false"
-        placeholder="roll_no,student_no,full_name&#10;1,S00001,นักเรียนตัวอย่าง หนึ่ง&#10;2,S00002,นักเรียนตัวอย่าง สอง"></textarea></div>
-      <div class="rd-settings-notice">ตรวจชื่อ รหัสนักเรียน และการคุ้มครองข้อมูลส่วนบุคคลก่อนนำเข้า</div>
-      <button type="submit" class="button full" ${rooms().length?'':'disabled'}>⇩ นำเข้ารายชื่อนักเรียน</button>
-     </form></section>
+    <section class="rd-settings-panel">${panel('🎓','นำเข้าทะเบียนนักเรียน','ใช้เมนูเดียวกับศูนย์ทะเบียน ไม่มีฟอร์มซ้ำ')}
+     <p class="rd-settings-field-hint">นำเข้าจาก Excel/CSV ทั้งโรงเรียน: รายการเดิมจะอัปเดตตามเลขประจำตัวนักเรียน แถวผิดพลาดจะข้ามและแสดงเหตุผล โดยไม่ย้ายห้องหรือเปลี่ยนประวัติเช็กชื่อเอง</p>
+     <p class="rd-settings-field-hint">ตรวจความถูกต้องและการคุ้มครองข้อมูลส่วนบุคคลก่อนนำเข้า ห้ามเผยแพร่ไฟล์ที่มีข้อมูลนักเรียนหรือรหัสผ่าน</p>
+     <button type="button" class="button full" id="openStudentRosterImport">เปิดศูนย์ทะเบียนและนำเข้านักเรียน</button>
+    </section>
     <div id="advisorImportHolder" class="rd-settings-advisor-import"></div>
    </div></div>`;
  }
@@ -257,19 +252,10 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
   },'เพิ่มตารางสอนแล้ว');
  }
  function bindImports(){
-  onSubmit('importStudents',async f=>{
-   const records=parseCsv(String(f.get('csv')||'').trim());
-   if(records[0]?.join(',').toLowerCase()==='roll_no,student_no,full_name')records.shift();
-   if(records.length<1||records.length>60||records.some(r=>r.length!==3))
-    throw Error('กรุณาระบุข้อมูล 1–60 คน และให้ครบ 3 คอลัมน์');
-   await api('/api/admin/import-students',{method:'POST',body:{
-    classroom_id:Number(f.get('classroom_id')),
-    students:records.map(r=>({roll_no:Number(r[0]),student_no:r[1],full_name:r[2]}))}});
-   clearStudentCache();return true;
-  },'นำเข้านักเรียนสำเร็จ');
+  document.querySelector('#openStudentRosterImport')?.addEventListener('click',()=>navigate?.('adminStudents'));
   advisorImporter.render(document.querySelector('#advisorImportHolder'));
  }
- function render(){
+  function render(){
   mount(layout());
   document.querySelectorAll('[data-settings-go]').forEach(button=>button.addEventListener('click',()=>{
    const target=button.dataset.settingsGo;

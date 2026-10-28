@@ -63,7 +63,7 @@ test('personnel panel retains create edit role filters and correct per-row butto
   assert.match(s.html,/data-settings-user/);
  }finally{s.restore()}
 });
-test('curriculum and import panels keep original API-facing form IDs and templates',()=>{
+test('curriculum form stays and roster import uses one shared entrypoint',()=>{
  const s=setup();
  try{
   s.page.open('teaching');
@@ -72,7 +72,8 @@ test('curriculum and import panels keep original API-facing form IDs and templat
     assert.ok(s.html.includes(item),item);
   }
   s.page.open('import');
-  assert.match(s.html,/id="importStudents"/);
+  assert.match(s.html,/id="openStudentRosterImport"/);
+  assert.doesNotMatch(s.html,/id="importStudents"/);
   assert.match(s.html,/id="advisorImportHolder"/);
   assert.equal(s.imported,1);
  }finally{s.restore()}
