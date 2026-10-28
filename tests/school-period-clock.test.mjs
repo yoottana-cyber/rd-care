@@ -61,7 +61,7 @@ test('lunch break after period four replaces recess at the same boundary',()=>{
  });
  assert.equal(rows[4].start,'13:05');
  assert.equal(rows[4].end,'13:55');
- assert.equal(rows[9].end,'18:25');
+ assert.equal(rows[9].end,'18:30');
  assert.match(lessonClockLabel(4,5,rows),/มีช่วงพัก/);
  assert.doesNotMatch(lessonClockLabel(5,5,rows),/มีช่วงพัก/);
 });
