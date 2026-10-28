@@ -23,17 +23,17 @@ test('conduct and merit have independent forms without duplicate adjustment sect
  assert.match(recording,/\/api\/affairs\/behavior\/record\/bulk/);
 });
 
-test('standalone adjustment selects one pupil by number or classroom, validates allowed rules and balance',()=>{
+test('standalone adjustment selects multiple pupils by room or search with balance preview',()=>{
  const page=read('web/behavior-adjustment.js');
  for(const token of ['adjustmentSearchForm','adjustmentRoom','data-adjustment-student','adjustmentRecordForm',
-  'adjustmentRule','adjustmentReason','behavior_remaining','adjustmentMore',
+  'adjustmentRule','adjustmentReason','adjustmentToggleRoom','adjustmentClearSelected',
   '/api/affairs/behavior/approved-adjustments','/api/affairs/behavior/students',
-  '/api/affairs/behavior/adjust','scoreHistoryTables','getTab'])
+  '/api/affairs/behavior/adjust/preview','/api/affairs/behavior/adjust/bulk',
+  'scorePopup.open','getTab','adjustment-history','200'])
   assert.ok(page.includes(token),token);
- assert.match(page,/filter\(rule=>Number\(rule\.points\)>0&&Number\(rule\.points\)<=remaining\)/);
- assert.match(page,/!eligible\.some\(rule=>Number\(rule\.id\)===ruleId\)/);
- assert.doesNotMatch(page,/record\/bulk/);
- assert.doesNotMatch(page,/data-score-choice|scoreToggleRoom/);
+ assert.match(page,/!preview\.all_eligible/);
+ assert.match(page,/state\.picked\.clear\(\)/);
+ assert.doesNotMatch(page,/\?\.student\.id/);
 });
 
 test('adjustment module can initialize with no unauthorized calls or side effects',()=>{
@@ -45,7 +45,7 @@ test('adjustment module can initialize with no unauthorized calls or side effect
 
 test('teacher adjustment page remains a standalone mobile-friendly area with shared styling',()=>{
  const css=read('web/score-recording.css');
- for(const cls of ['.score-adjust-page','.score-adjust-select','.score-adjust-selected',
-  '.score-adjust-summary','.score-adjust-student-name'])
+ for(const cls of ['.score-adjust-page','.score-adjust-check','.score-adjust-preview',
+  '.score-selected-chip','.score-adjust-student-name'])
   assert.ok(css.includes(cls),cls);
 });
