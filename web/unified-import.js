@@ -94,6 +94,7 @@ export function createUnifiedImport({api,rooms,onSuccess}){
    button.hidden=!pending;
    button.disabled=busy||!pending;
    button.textContent='นำเข้าหรือดำเนินการต่อ '+pending+' รายการ';
+  }
   const status=container.querySelector('#unifiedStatus');
   if(status)status.textContent=phase;
  }
@@ -240,6 +241,6 @@ export function createUnifiedImport({api,rooms,onSuccess}){
   container.querySelector('#unifiedCancel').addEventListener('click',()=>{stopped=true;phase='กำลังหยุดหลังจบชุดที่ทำอยู่...';showPreview(container)});
   showPreview(container);
  }
- function clear(){rows=[];preview=[];filename='';completed=0;phase='';stopped=true}
+ function clear(){rows=[];preview=[];filename='';phase='';stopped=true}
  return {render,clear};
 }
