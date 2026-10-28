@@ -19,7 +19,7 @@ function fakeDb(){
     first:async()=>sql.includes('FROM students WHERE id=')?{id:56}:
      {good_total:15,behavior_deducted:8,behavior_adjusted:3},
     all:async()=>({results:sql.includes('ORDER BY c.grade')?
-     [{grade:2,student_id:56,student_no:'0015',full_name:'นักเรียนตัวอย่าง',
+     [{classroom_id:21,grade:2,student_id:56,student_no:'0015',full_name:'นักเรียนตัวอย่าง',
       classroom_label:'ม.2/1',good_total:15,behavior_deducted:8,behavior_adjusted:3,events:4}]:
      [{id:3,reason:'ตามเกณฑ์',points:-5,teacher_name:'ครู ก',score_type:'behavior'}]})
    };
@@ -41,11 +41,13 @@ test('every authenticated teacher including non-affairs may view schoolwide summ
  const body=await response.json();
  assert.equal(body.read_only,true);
  assert.equal(body.items[0].student_id,56);
+ assert.equal(body.items[0].classroom_id,21);
  assert.equal(body.items[0].behavior_remaining,5);
  assert.equal(body.items[0].good_total,15);
  assert.equal(body.items[0].behavior_adjusted,3);
  const query=env.statements.find(x=>x.sql.includes('ORDER BY c.grade'));
  assert.match(query.sql,/s\.active=1/);
+ assert.match(query.sql,/c\.id AS classroom_id/);
  assert.match(query.sql,/b\.deleted_at IS NULL/);
  assert.doesNotMatch(query.sql,/advisor_user_id=\?|teacher_user_id=\?/);
  assert.equal(query.args.length,1);
