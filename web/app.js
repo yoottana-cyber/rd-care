@@ -259,6 +259,7 @@ function chrome(content){
  <footer class="foot">RD CONNECT • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • Push ผู้ปกครองต้องเปิดรับด้วยตนเอง</footer></main>`;
 }
 function mount(content){
+ document.body.classList.remove('rd-affairs-modal-open');
  $('#app').innerHTML=chrome(content);
  bindThemeButtons();
  $$('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>safeRun(()=>showTab(btn.dataset.tab))));
