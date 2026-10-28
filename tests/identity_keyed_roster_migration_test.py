@@ -19,7 +19,15 @@ class IdentityKeyedRosterMigration(unittest.TestCase):
   for f in ("0001_initial.sql","0003_student_transfer_plans.sql",
             "0004_historical_enrollments.sql","0006_student_guardian_portal.sql",
             "0022_admin_account_archive.sql","0030_large_roster_import_lookup.sql"):
-   self.db.executescript((MIGRATIONS/f).read_text(encoding="utf8"))
+   sql=(MIGRATIONS/f).read_text(encoding="utf8")
+   if f=="0001_initial.sql":
+    # Simulate the older deployed database's embedded room/roll constraint.
+    newer=" active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1))\n);\nCREATE INDEX IF NOT EXISTS idx_students_room"
+    legacy=" active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),\n UNIQUE(classroom_id,roll_no)\n);\nCREATE INDEX IF NOT EXISTS idx_students_room"
+    if newer not in sql:
+     raise AssertionError("Expected fresh students schema was not found")
+    sql=sql.replace(newer,legacy,1)
+   self.db.executescript(sql)
   self.db.execute("INSERT INTO users(id,username,display_name,role,password_salt,password_hash) VALUES(1,'admin','Admin','admin','s','h')")
   self.db.execute("INSERT INTO classrooms(id,grade,room,label) VALUES(1,1,1,'ม.1/1')")
   self.db.execute("""INSERT INTO students(id,student_no,classroom_id,roll_no,full_name,active,deleted_at)
