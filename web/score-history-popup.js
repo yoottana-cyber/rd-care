@@ -92,10 +92,17 @@ export function createScoreHistoryPopup({api,toast,safeRun,escapeHtml}){
   overlay=document.createElement('div');
   overlay.className='rd-score-popup-overlay';
   overlay.id='rdScoreHistoryOverlay';
-  overlay.innerHTML='<section class="rd-score-popup-dialog card" role="dialog" aria-modal="true" aria-label="กำลังโหลดประวัติ" tabindex="-1"><p>กำลังโหลดประวัติคะแนน...</p></section>';
+  overlay.innerHTML='<section class="rd-score-popup-dialog card stack" role="dialog" aria-modal="true" aria-label="กำลังโหลดประวัติ" tabindex="-1">'+
+   '<div class="row between rd-score-popup-heading"><p>กำลังโหลดประวัติคะแนน...</p>'+
+   '<button type="button" class="rd-score-popup-close" id="rdScorePopupClose" aria-label="ปิดประวัติคะแนน">×</button></div></section>';
   document.body.append(overlay);
   document.body.classList.add('rd-score-popup-open');
-  overlay.querySelector('[role="dialog"]')?.focus();
+  overlay.onclick=event=>{if(event.target===overlay)close()};
+  overlay.querySelector('#rdScorePopupClose')?.addEventListener('click',close);
+  overlay.querySelector('[role="dialog"]')?.addEventListener('keydown',event=>{
+   if(event.key==='Escape'){event.preventDefault();close()}
+  });
+  overlay.querySelector('#rdScorePopupClose')?.focus();
   const current=state,requestVersion=version;
   try{
    await load(false);
