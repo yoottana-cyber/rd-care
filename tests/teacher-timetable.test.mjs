@@ -35,6 +35,7 @@ test('non-teachers may not create or read personal timetables',async()=>{
 test('owner mismatch prevents another teacher from editing',async()=>{
  let wrote=false;
  const db={prepare(sql){
+  if(sql.includes('FROM school_settings'))return {first:async()=>({academic_year:2569,semester:2})};
   if(sql.includes('FROM classrooms'))return {bind:()=>({first:async()=>({id:2})})};
   if(sql.includes('SELECT id,teacher_user_id FROM timetable'))return {bind:()=>({first:async()=>({id:9,teacher_user_id:4})})};
   if(sql.includes('UPDATE')||sql.includes('INSERT'))wrote=true;
@@ -50,8 +51,9 @@ test('new teacher timetable is activated immediately without admin approval',asy
  const sqlUsed=[];
  const db={prepare(sql){
   sqlUsed.push(sql);
+  if(sql.includes('FROM school_settings'))return {first:async()=>({academic_year:2569,semester:2})};
   if(sql.includes('SELECT id FROM classrooms WHERE id'))return {bind:()=>({first:async()=>({id:2})})};
-  if(sql.includes('SELECT id FROM timetable')&&sql.includes('active=1'))return {bind:()=>({first:async()=>null})};
+  if(sql.includes('FROM timetable t')&&sql.includes('active=1'))return {bind:()=>({first:async()=>null})};
   if(sql.includes('INSERT INTO timetable'))return {bind:()=>({run:async()=>({meta:{last_row_id:34}})})};
   if(sql.includes('INSERT INTO audit_logs'))return {bind:()=>({run:async()=>({meta:{changes:1}})})};
   throw Error('Unexpected SQL: '+sql);
@@ -61,7 +63,7 @@ test('new teacher timetable is activated immediately without admin approval',asy
  }),{DB:db},{id:7,role:'teacher'},'/api/my-timetable');
  assert.equal(response.status,201);
  assert.deepEqual((await response.json()).approval_status,'approved');
- assert.ok(sqlUsed.some(s=>s.includes("VALUES(?,?,?,?,?,?,?,1,'approved')")),'new timetable should be usable immediately');
+ assert.ok(sqlUsed.some(s=>s.includes("VALUES(?,?,?,?,?,?,?,1,'approved',?,?)")),'new timetable should be usable immediately');
 });
 
 test('conflicting teacher-created timeslots cannot be activated',async()=>{
