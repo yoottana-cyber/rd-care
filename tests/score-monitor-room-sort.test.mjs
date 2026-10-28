@@ -66,7 +66,7 @@ test('teacher screen offers room filtering, independent sort and order selectors
  const ui=source('web/teacher-score-monitor.js'),api=source('worker/src/teacher-score-monitor.js');
  for(const field of ['scoreMonitorGrade','scoreMonitorRoom','scoreMonitorSort','scoreMonitorSortOrder',
   'good_total','behavior_deducted','behavior_remaining','state.roomId=0',
-  "state.sortBy='roster'","state.sortOrder=event.target.value","scorePopup.open"])
+  "sortBy:'roster'","state.sortOrder=event.target.value","scorePopup.open"])
   assert.ok(ui.includes(field),field);
  assert.match(ui,/state\.roomId=Number\(event\.target\.value\);render\(\)/);
  assert.match(ui,/availableScoreMonitorRooms\(state\.items,state\.grade\)/);
