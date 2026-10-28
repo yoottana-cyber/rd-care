@@ -7,7 +7,8 @@ import {join} from 'node:path';
 import {EXPECTED_DB_NAME,EXPECTED_DB_ID,MARKER,isLegacyStudents,planTrialTableDrops}
  from './trial-db-reset-plan.mjs';
 
-if(process.env.RD_TRIAL_RESET_CONFIRMED!=='RESET-RD-CARE-DEV-TRIAL-ALL'){
+const dryRun=process.env.RD_TRIAL_RESET_DRY_RUN==='1';
+if(!dryRun&&process.env.RD_TRIAL_RESET_CONFIRMED!=='RESET-RD-CARE-DEV-TRIAL-ALL'){
  throw Error('Reset confirmation environment missing; database untouched');
 }
 const config=readFileSync('wrangler.toml','utf8');
@@ -70,7 +71,12 @@ for(const file of readdirSync('migrations').filter(x=>/^\d{4}_.+\.sql$/.test(x))
 allow.add('d1_migrations');
 if(allow.size<20)throw Error('Schema allowlist unexpectedly small; refusing reset');
 // Plan BEFORE any write: unknown tables/foreign-key cycles must not be destroyed.
-planTrialTableDrops(schema,allow);
+const proposal=planTrialTableDrops(schema,allow);
+if(dryRun){
+ console.log('DRY RUN ONLY: verified exact D1 UUID; planned '+proposal.length+' dependency-safe table drops.');
+ console.log('Last table:',proposal.at(-1));
+ process.exit(0);
+}
 // Create an in-database marker to make retries recover if interrupted.
 if(!marker){
  wrangler('d1','execute',EXPECTED_DB_NAME,'--remote','--yes',
