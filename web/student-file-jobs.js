@@ -102,7 +102,9 @@ export function createStudentFileJobUi({api,rooms,csvRows,prepareRows,readXlsxRo
   }else throw Error('รองรับเฉพาะ .xlsx และ .csv');
   const header=raw[0]?.map(x=>String(x).trim().toLowerCase()).join(',');
   if(header==='classroom,roll_no,student_no,full_name'){
-   raw=raw.map(row=>{const extra=[...row,'',''];extra.source_row=row.source_row;return extra});
+   raw=raw.map((row,index)=>{const extra=index===0?
+    ['classroom','roll_no','student_no','full_name','username','password']:[...row,'',''];
+    extra.source_row=row.source_row;return extra});
   }
   const prepared=prepareRows(raw,typeof rooms==='function'?rooms():rooms);
   return prepared.map(r=>({
