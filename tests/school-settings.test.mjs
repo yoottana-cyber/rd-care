@@ -134,7 +134,7 @@ test('admin navigation, mobile PWA and printable QR reflect the settings without
  assert.match(page,/\/api\/admin\/school-settings/);
  assert.match(page,/data-school-jump="studentAffairs"/);
  assert.match(gate,/state\.qr\?\.cutoff_time/);
- assert.match(shell,/rd-care-shell-v80/);
+ assert.match(shell,/rd-care-shell-v81/);
  assert.match(shell,/school-settings\.js/);
  assert.match(html,/school-settings\.css/);
  const client=createSchoolSettings({api:async()=>{},mount:()=>{},safeRun:fn=>fn(),toast:()=>{},navigate:()=>{}});
