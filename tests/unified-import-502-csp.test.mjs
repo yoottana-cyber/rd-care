@@ -6,7 +6,10 @@ const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('roster readiness verifies schema without returning student or account records',async()=>{
  const queries=[];
- const env={DB:{prepare(sql){queries.push(sql);return {all:async()=>({results:[]})}}}};
+ const env={DB:{prepare(sql){queries.push(sql);return {
+  all:async()=>({results:[]}),
+  first:async()=>({table_sql:null,has_live_roll_index:0})
+ }}}};
  const response=await unifiedRosterReadiness(env,{id:5,role:'admin'});
  const result=await response.json();
  assert.equal(response.status,200);
@@ -22,10 +25,13 @@ test('roster readiness verifies schema without returning student or account reco
  assert.equal('students' in result,false);
 });
 test('roster readiness rejects teachers and gives admins only schema category names',async()=>{
- const DB={prepare(sql){return {all:async()=>{
-  if(sql.includes('student_enrollments'))throw Error('confidential database error');
-  return {results:[]};
- }}}};
+ const DB={prepare(sql){return {
+  all:async()=>{
+   if(sql.includes('student_enrollments'))throw Error('confidential database error');
+   return {results:[]};
+  },
+  first:async()=>({table_sql:null,has_live_roll_index:0})
+ }}};
  await assert.rejects(()=>unifiedRosterReadiness({DB},{id:12,role:'teacher'}),{code:403});
  const response=await unifiedRosterReadiness({DB},{id:5,role:'admin'});
  const result=await response.json();
