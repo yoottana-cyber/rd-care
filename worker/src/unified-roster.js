@@ -98,7 +98,7 @@ export async function identityKeyedRosterReady(db){
    AND name='uq_students_current_room_roll') AS has_live_roll_index`).first();
  const definition=String(schema?.table_sql||'');
  return !!definition&&
-  !/\\bUNIQUE\\s*\\(\\s*classroom_id\\s*,\\s*roll_no\\s*\\)/i.test(definition)&&
+  !/\bUNIQUE\s*\(\s*classroom_id\s*,\s*roll_no\s*\)/i.test(definition)&&
   Number(schema?.has_live_roll_index)===1;
 }
 
