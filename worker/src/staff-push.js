@@ -1,4 +1,5 @@
 // Encrypted Web Push: event topics, dates and lesson/arrival times only.
+import {notificationEnabled} from './notification-policy.js';
 // Names, student IDs and reasons are never sent to the device lock screen.
 const err=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
@@ -237,6 +238,18 @@ export async function sendStudentDirectMessagePush(device,env,messageId){
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
  },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }
+// Score changes contain no student name, incident detail or penalty on the
+// lock screen. The recipient must authenticate before seeing personal history.
+export async function sendScoreChangePush(device,env,audience){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ if(!['student','guardian'].includes(audience))throw Error('Invalid score recipient');
+ const body=await encryptPriorityPush(device,{kind:'score_change',audience});
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'3600',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
 // Legacy payload-free push for older administrative notices.
 export async function sendGenericPush(endpoint,env){
  if(!allowedEndpoint(endpoint))throw Error('Push endpoint not permitted');
@@ -257,6 +270,7 @@ async function deliverOne(env,entry,device,eventInfo){
 }
 export async function deliverAdvisorPush(env){
  if(!env.DB||!vapidReady(env))return {processed:0,enabled:false};
+ if(!await notificationEnabled(env,'review_advisor'))return {processed:0,enabled:false};
  const {results:events}=await env.DB.prepare(`SELECT o.id AS outbox_id,c.advisor_user_id,c.advisor2_user_id
   FROM notification_outbox o JOIN attendance_alerts a ON a.id=o.alert_id
   JOIN timetable t ON t.id=a.timetable_id JOIN classrooms c ON c.id=t.classroom_id

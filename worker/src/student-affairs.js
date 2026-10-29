@@ -1,3 +1,4 @@
+import {notificationEnabled} from './notification-policy.js';
 import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
@@ -100,6 +101,7 @@ async function recordBehavior(env,u,b,adjust=false){
  return reply({ok:true,id:insert.meta.last_row_id,points,category,rule_name:ruleName},201);
 }
 async function notifyOne(env,room,date,kind,actorId=null){
+ if(!await notificationEnabled(env,'daily_reminder_advisor'))return {room:room.label,state:'disabled'};
  // Unique room/day/type makes both cron replay and repeated manual POST idempotent.
  if(room.complete||room.students===0||!(room.advisor_user_id||room.advisor2_user_id))return {room:room.label,state:'not_needed'};
  const claim=await env.DB.prepare(`INSERT OR IGNORE INTO affairs_attendance_reminders(classroom_id,school_date,kind,actor_id)

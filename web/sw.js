@@ -1,6 +1,6 @@
 // RD CONNECT offline app shell. This cache contains only public static assets,
 // never authenticated responses, student records, or arbitrary same-origin URLs.
-const CACHE='rd-care-shell-v115';
+const CACHE='rd-care-shell-v116';
 const CACHE_PREFIX='rd-care-shell-';
 const ASSETS=[
  './','./index.html','./app.css','./theme.css','./login.css','./login-route.js',
@@ -15,7 +15,7 @@ const ASSETS=[
  './vendor/qr-scanner.min.js','./vendor/qr-scanner-worker.min.js','./student-affairs.js',
  './student-affairs.css','./affairs-attendance-table.js','./criteria-table.js','./criteria-excel-import.js','./guardian-push.js','./portal-admin.js',
  './portal-table.js','./portal-batch.js','./portal-roster-import.js',
- './unified-import.js','./student-statistics.js','./student-statistics.css','./advisor-import.js','./admin-settings.js',
+ './unified-import.js','./student-statistics.js','./student-statistics.css','./advisor-import.js','./admin-settings.js','./admin-notification-policy.js',
  './admin-settings.css','./csv-encoding.js','./template-xlsx.js',
  './score-recording.js','./score-recording.css','./score-history.js',
  './score-history-popup.js','./behavior-adjustment.js',
@@ -96,6 +96,8 @@ self.addEventListener('push',event=>{
  const test=metadata?.kind==='push_test';
  const pupilNotice=metadata?.kind==='pupil_notice'&&metadata.audience==='student';
  const studentMessage=metadata?.kind==='student_message'&&metadata.audience==='student';
+ const scoreNotice=metadata?.kind==='score_change'&&
+  ['student','guardian'].includes(metadata.audience);
  const messageId=Number(metadata?.messageId);
  const validMessageId=Number.isSafeInteger(messageId)&&messageId>0;
  const dailyReminder=metadata?.kind==='daily_attendance_reminder'&&metadata.audience==='advisor';
@@ -108,7 +110,9 @@ self.addEventListener('push',event=>{
  const arrival=/^\d{2}:\d{2}$/.test(String(metadata?.arrival||''))?metadata.arrival:'';
  const type=late?'late':review?'attendance_review':'truancy';
  const studentKind=['late','truancy'].includes(metadata?.noticeKind)?metadata.noticeKind:null;
- const link=studentMessage&&validMessageId?
+ const link=scoreNotice?
+  './?login='+metadata.audience+'&score_notice=1':
+  studentMessage&&validMessageId?
   './?login=student&student_message='+messageId:
   pupilNotice&&hasId&&studentKind?
    './?login=student&pupil_notice='+studentKind+'&notice_id='+id:
@@ -129,7 +133,8 @@ self.addEventListener('push',event=>{
   review?'RD CONNECT • แจ้งขาดรายคาบรอตรวจสอบ':
   test?'RD CONNECT • ทดสอบการแจ้งเตือน':
   pupilNotice?'RD CONNECT • มีข้อมูลการเข้าเรียนใหม่':
-  studentMessage?'RD CONNECT • ข้อความจากโรงเรียน':'RD CONNECT • โรงเรียนรัษฎา';
+  studentMessage?'RD CONNECT • ข้อความจากโรงเรียน':
+  scoreNotice?'RD CONNECT • มีข้อมูลการดูแลนักเรียนใหม่':'RD CONNECT • โรงเรียนรัษฎา';
  const details=late?
   [date&&'วันที่ '+date,arrival&&'เวลา '+arrival+' น.'].filter(Boolean).join(' • '):
   [date&&'วันที่ '+date,validPeriod&&'คาบ '+period,subject&&'วิชา '+subject].filter(Boolean).join(' • ');
@@ -139,6 +144,7 @@ self.addEventListener('push',event=>{
   review?'มีเรื่องขาดรายคาบรอตรวจสอบ'+(details?' • '+details:'')+' แตะเพื่อเปิดรายการ':
   pupilNotice?'มีข้อมูลการเข้าเรียนให้ตรวจสอบในแอป RD CONNECT':
   studentMessage?'มีข้อความใหม่จากโรงเรียน กรุณาเข้าสู่ระบบเพื่ออ่าน':
+  scoreNotice?'แตะเพื่อเข้าสู่บัญชีและตรวจสอบข้อมูลของตนเอง':
   test?'การแจ้งเตือนทดสอบจาก RD CONNECT (ไม่มีเหตุการณ์นักเรียน)':
   'มีรายการใหม่ให้ตรวจสอบในระบบ RD CONNECT';
  event.waitUntil(self.registration.showNotification(title,{
@@ -150,6 +156,7 @@ self.addEventListener('push',event=>{
       review?'rd-care-attendance-review'+(hasId?'-'+id:''):
       pupilNotice?'rd-care-student-'+studentKind+'-'+id:
       studentMessage?'rd-care-student-message-'+messageId:
+      scoreNotice?'rd-care-score-change-'+metadata.audience+'-'+Date.now():
       test?'rd-care-push-test':'rd-care-school-notices',
   renotify:false,requireInteraction:urgent,
   ...(urgent?{vibrate:[180,100,180]}:{}),
@@ -175,8 +182,9 @@ self.addEventListener('notificationclick',event=>{
   const safeGuardian=['truancy','late'].includes(portalKind)&&/^\d{1,15}$/.test(id||'');
   const safeStudent=['truancy','late'].includes(studentKind)&&/^\d{1,15}$/.test(id||'')&&q.get('login')==='student';
   const safeStudentMessage=/^\d{1,15}$/.test(q.get('student_message')||'')&&q.get('login')==='student';
+  const safeScoreNotice=q.get('score_notice')==='1'&&['student','guardian'].includes(q.get('login'));
   if(value.origin===home.origin&&value.pathname===home.pathname&&
-    (!value.search||safeStaff||safeGuardian||safeStudent||safeStudentMessage))target=value;
+    (!value.search||safeStaff||safeGuardian||safeStudent||safeStudentMessage||safeScoreNotice))target=value;
  }catch{}
  event.waitUntil((async()=>{
   const clientsList=await self.clients.matchAll({type:'window',includeUncontrolled:true});

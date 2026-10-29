@@ -2,6 +2,7 @@
 // Opt-in, relationship-verified truancy alerts for staff advisors and guardians.
 // Push carries only an encrypted event reference and non-identifying lesson summary.
 import {validPushSubscription,sendPriorityPush,sendPushTest,diagnoseVapid} from './staff-push.js';
+import {notificationEnabled} from './notification-policy.js';
 const fail=(status,message)=>{throw Object.assign(new Error(message),{code:status})};
 const reply=(data)=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
@@ -176,8 +177,8 @@ export async function deliverTruancyPush(env){
     AND l.student_id=? LIMIT 30`).bind(event.student_id).all();
   // Place the advisor first, then guardians. Send small waves concurrently so
   // many subscribed devices never block a parent behind unrelated deliveries.
-  const targets=[...staff.map(d=>({type:'advisor',device:d})),
-    ...guardians.map(d=>({type:'guardian',device:d}))];
+  const targets=[...(await notificationEnabled(env,'truancy_advisor')?staff:[]).map(d=>({type:'advisor',device:d})),
+    ...(await notificationEnabled(env,'truancy_guardian')?guardians:[]).map(d=>({type:'guardian',device:d}))];
   async function sendTarget({type,device}){
    await env.DB.prepare(`INSERT OR IGNORE INTO truancy_push_deliveries
      (event_id,generation,recipient_type,subscription_id)

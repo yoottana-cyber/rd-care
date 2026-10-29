@@ -149,3 +149,33 @@
 [data-theme="dark"] .rd-settings-feature p,[data-theme="dark"] .rd-settings-panel-head p,[data-theme="dark"] .rd-settings-section-heading p{color:#b6c9d6}
 [data-theme="dark"] .rd-settings-status.off{color:#ffdde3;background:#683a4a}
 @media(prefers-reduced-motion:reduce){.rd-settings-tabs button{transition:none}}
+
+/* Schoolwide Push switches – state is saved immediately and audit logged. */
+.rd-admin-notifications .rd-settings-panel{padding:20px;display:grid;gap:18px}
+.rd-admin-push-overview{border:1px solid #d5eadd;background:#f0faf4;border-radius:14px;padding:15px 18px}
+.rd-admin-push-overview strong{font-size:16px;color:#17694b}
+.rd-admin-push-overview p{font-size:12px;line-height:1.6;color:#627a70;margin:6px 0 0}
+.rd-admin-push-group{border:1px solid #dfebe6;border-radius:14px;padding:15px;background:#fff}
+.rd-admin-push-group h4{color:#245845;font-size:15px;margin:0 0 8px}
+.rd-admin-push-item{display:flex;justify-content:space-between;align-items:center;gap:18px;
+ padding:13px 3px;border-top:1px solid #eef3ef;cursor:pointer}
+.rd-admin-push-item>span:first-child{display:grid;gap:4px;min-width:0}
+.rd-admin-push-item strong{font-size:13px;color:#23483b;line-height:1.5}
+.rd-admin-push-hint{font:10px/1.5 monospace;color:#83948b;letter-spacing:.2px}
+.rd-admin-push-switch{position:relative;display:inline-flex;align-items:center;flex:0 0 49px;height:28px}
+.rd-admin-push-switch input{position:absolute;inset:0;opacity:0;cursor:pointer;z-index:1}
+.rd-admin-push-switch-track{background:#cedbd3;width:49px;height:28px;border-radius:99px;transition:background .15s}
+.rd-admin-push-switch-track:after{content:'';position:absolute;top:4px;left:4px;width:20px;height:20px;
+ background:#fff;border-radius:50%;box-shadow:0 2px 5px #0002;transition:transform .15s}
+.rd-admin-push-switch input:checked+.rd-admin-push-switch-track{background:#13875e}
+.rd-admin-push-switch input:checked+.rd-admin-push-switch-track:after{transform:translateX(21px)}
+.rd-admin-push-switch input:focus-visible+.rd-admin-push-switch-track{outline:3px solid #f2c14f;outline-offset:3px}
+.rd-admin-push-switch input:disabled+.rd-admin-push-switch-track{opacity:.55}
+.rd-admin-push-footnote{font-size:12px;color:#6e7c73;line-height:1.7}
+[data-theme="dark"] .rd-admin-push-overview{background:#204437;border-color:#426957}
+[data-theme="dark"] .rd-admin-push-overview strong,[data-theme="dark"] .rd-admin-push-group h4{color:#c8f5db}
+[data-theme="dark"] .rd-admin-push-group{background:#233b30;border-color:#466353}
+[data-theme="dark"] .rd-admin-push-item{border-color:#405f4d}
+[data-theme="dark"] .rd-admin-push-item strong{color:#e0f6e9}
+@media(max-width:600px){.rd-admin-notifications .rd-settings-panel{padding:12px}
+ .rd-admin-push-item{gap:9px}.rd-admin-push-hint{display:none}}

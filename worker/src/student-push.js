@@ -1,6 +1,7 @@
 // Independent opt-in Web Push for student accounts: no guardian or staff data access.
 // Dispatches only verified late QR records and active period truancy events.
 import {validPushSubscription,sendPushTest,sendStudentAttendancePush,diagnoseVapid} from './staff-push.js';
+import {notificationEnabled} from './notification-policy.js';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=data=>new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
@@ -128,6 +129,7 @@ export async function deliverStudentPush(env,{kind=null}={}){
  let delivered=0,processed=0;
  for(const type of (kind?[kind]:['truancy','late'])){
   if(!['truancy','late'].includes(type))continue;
+  if(!await notificationEnabled(env,type+'_student'))continue;
   const events=await pending(env,type);
   for(const e of events){
    const {results:devices}=await env.DB.prepare(`SELECT s.id,s.endpoint,s.p256dh,s.auth FROM student_push_subscriptions s
