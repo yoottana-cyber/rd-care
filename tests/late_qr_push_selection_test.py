@@ -15,14 +15,14 @@ def data():
  CREATE TABLE late_qr_auto_events(id INTEGER PRIMARY KEY,request_id INTEGER,student_id INTEGER,school_date TEXT,active INTEGER,created_at TEXT);
  CREATE TABLE late_self_requests(id INTEGER PRIMARY KEY,state TEXT,arrived_at TEXT);
  CREATE TABLE student_enrollments(student_id INTEGER,classroom_id INTEGER,start_date TEXT,end_date TEXT);
- CREATE TABLE classrooms(id INTEGER PRIMARY KEY,advisor_user_id INTEGER);
+ CREATE TABLE classrooms(id INTEGER PRIMARY KEY,advisor_user_id INTEGER,advisor2_user_id INTEGER);
  CREATE TABLE users(id INTEGER PRIMARY KEY,active INTEGER);
  CREATE TABLE staff_push_subscriptions(id INTEGER PRIMARY KEY,user_id INTEGER);
  CREATE TABLE guardian_push_subscriptions(id INTEGER PRIMARY KEY,guardian_account_id INTEGER);
  CREATE TABLE portal_accounts(id INTEGER PRIMARY KEY,role TEXT,active INTEGER,must_change_password INTEGER);
  CREATE TABLE guardian_student_links(guardian_account_id INTEGER,student_id INTEGER);
  CREATE TABLE late_qr_push_deliveries(event_id INTEGER,recipient_type TEXT,subscription_id INTEGER,state TEXT,attempts INTEGER);
- INSERT INTO classrooms VALUES(1,9);
+ INSERT INTO classrooms VALUES(1,9,NULL);
  INSERT INTO student_enrollments VALUES(7,1,'1900-01-01',NULL);
  INSERT INTO users VALUES(9,1);
  INSERT INTO staff_push_subscriptions VALUES(3,9);
@@ -42,6 +42,12 @@ class LatePushSelectionTests(unittest.TestCase):
  def events(self):return self.db.execute(QUERY).fetchall()
  def test_current_verified_event_with_consent_has_recipients(self):
   self.assertEqual([(r[0],r[1],r[4]) for r in self.events()],[(15,7,9)])
+ def test_second_advisor_without_primary_still_receives_late_notification(self):
+  self.db.execute("INSERT INTO users VALUES(10,1)")
+  self.db.execute("INSERT INTO staff_push_subscriptions VALUES(6,10)")
+  self.db.execute("UPDATE classrooms SET advisor_user_id=NULL,advisor2_user_id=10 WHERE id=1")
+  self.db.execute("DELETE FROM guardian_push_subscriptions")
+  self.assertEqual([(r[0],r[1],r[5]) for r in self.events()],[(15,7,10)])
  def test_revoked_or_disputed_case_cannot_send(self):
   self.db.execute("UPDATE late_qr_auto_events SET active=0 WHERE id=15")
   self.assertEqual(self.events(),[])
