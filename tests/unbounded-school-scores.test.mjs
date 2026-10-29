@@ -62,16 +62,19 @@ test('bulk student recording accepts active rule with -80 and +120 points',async
     const item={sql,args:[]};calls.push(item);
     return {bind(...args){item.args=args;return {
      first:async()=>({id:3,category,points,name:'โรงเรียนอนุมัติ',active:1}),
-     all:async()=>({results:[{id:12}]})
+     all:async()=>({results:sql.includes('FROM behavior_incidents')?
+      [{id:100,student_id:12,affairs_rule_id:3,affairs_category:category,
+       points_applied:points,warning_no:0,behavior_record_id:200}]:[{id:12}]})
     }}};
    },
-   batch:async arr=>{batches.push(arr);return arr.map(()=>({meta:{changes:1}}))}
+   batch:async arr=>{batches.push(arr);return arr.map(()=>({meta:{changes:1,last_row_id:100}}))}
   };
-  const res=await recordBehaviorBulk({DB},teacher,{student_ids:[12],rule_id:3,reason:''});
+  const permitted=category==='good'?teacher:{role:'teacher',id:8,student_affairs:1};
+  const res=await recordBehaviorBulk({DB},permitted,{student_ids:[12],rule_id:3,reason:''});
   assert.equal(res.status,201);
   assert.equal((await res.json()).points,points);
-  assert.equal(calls.find(x=>x.sql.includes('INSERT INTO behavior_records')).args[1],points);
-  assert.equal(batches[0].length,2);
+  assert.match(calls.find(x=>x.sql.includes('INSERT INTO behavior_incidents')).sql,/points_applied/);
+  assert.equal(batches[0].length,1);
  }
 });
 test('manual school criteria management accepts unrestricted signed integer points',async()=>{
