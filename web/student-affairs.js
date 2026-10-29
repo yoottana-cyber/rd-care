@@ -11,12 +11,12 @@ const formatScore=n=>Number(n)>0?'+'+Number(n):String(Number(n)||0);
 export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
   selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
-  grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:''};
+  grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:'',messageSearch:'',messageMatches:[],messageStudent:null,messageSent:[]};
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
  const frame=(body)=>{
   const tabs=[['attendance','📋','ติดตามเช็กชื่อ'],['people','👥','หัวหน้าระดับ/ที่ปรึกษา'],
-   ['rules','⭐','เกณฑ์พฤติกรรม'],['monitor','📊','ติดตามคะแนน'],['adjustments','📈','ติดตามการปรับพฤติกรรม'],['cases','📑','ภาคทัณฑ์/ทัณฑ์บน']];
+   ['rules','⭐','เกณฑ์พฤติกรรม'],['monitor','📊','ติดตามคะแนน'],['adjustments','📈','ติดตามการปรับพฤติกรรม'],['cases','📑','ภาคทัณฑ์/ทัณฑ์บน'],['messages','✉️','ส่งข้อความนักเรียน']];
   mount(`<section class="rd-affairs">
    <header class="rd-affairs-hero"><div><span>RD CONNECT • STUDENT AFFAIRS</span>
     <h2>ฝ่ายกิจการนักเรียน</h2>
@@ -41,6 +41,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   if(tab==='monitor')return monitor();
   if(tab==='adjustments')return trackAdjustments();
   if(tab==='cases')return cases();
+  if(tab==='messages')return messages();
  }
  function reminderLabel(value){return ({sent:'ส่งถึงอุปกรณ์แล้ว',no_subscription:'ยังไม่ได้สมัครรับ Push',
   failed:'ส่งไม่สำเร็จ',queued:'รอส่ง',already_queued:'เคยแจ้งแล้ว',not_needed:'เช็กชื่อครบ/ยังไม่มีครูที่ปรึกษา'})[value]||value}
@@ -460,6 +461,72 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   bind('#affairsAdjustmentGrade','change',(_,el)=>{state.adjustmentGrade=Number(el.value);return trackAdjustments(false)});
   bind('#affairsAdjustmentStatus','change',(_,el)=>{state.adjustmentStatus=el.value;return trackAdjustments(false)});
   bind('#affairsAdjustmentQuery','change',(_,el)=>{state.adjustmentQuery=el.value;return trackAdjustments(false)});
+ }
+ // One-to-one student notices; no guardians receive these messages.
+ async function messages(){
+  const result=await api('/api/affairs/messages/sent');
+  state.messageSent=result.items||[];
+  const student=state.messageStudent;
+  frame(`<section class="card stack rd-affairs-message-compose">
+   <h3>✉️ ส่งข้อความถึงนักเรียนรายบุคคล</h3>
+   <p class="muted">เชิญนักเรียนมาพบฝ่ายกิจการนักเรียน • ข้อความนี้แสดงเฉพาะบัญชีนักเรียนผู้รับเท่านั้น</p>
+   <form id="affairsMessageSearch" class="row">
+    <div class="field rd-affairs-search-wide"><label for="affairsMessageQuery">ค้นหาเลขประจำตัวหรือชื่อนักเรียน</label>
+     <input id="affairsMessageQuery" name="query" minlength="2" maxlength="70" required
+      value="${esc(state.messageSearch)}" placeholder="พิมพ์ชื่อหรือเลขประจำตัว"></div>
+    <button class="button secondary" type="submit">ค้นหา</button></form>
+   ${state.messageMatches.length?`<div class="rd-affairs-search-results">
+    ${state.messageMatches.map(x=>`<button class="rd-affairs-search-person" type="button"
+     data-affairs-msg-select="${x.id}"><strong>${esc(x.full_name)}</strong>
+     <small>${esc(x.student_no)} • ${esc(x.classroom_label)}</small></button>`).join('')}
+   </div>`:''}
+   ${student?`<div class="summary"><strong>ผู้รับ: ${esc(student.full_name)}</strong>
+    <p class="muted">${esc(student.student_no)} • ${esc(student.classroom_label)} • ส่งถึง 1 คนเท่านั้น</p></div>
+   <form id="affairsMessageCompose" class="stack">
+    <div class="field"><label for="affairsMessageSubject">หัวข้อ</label>
+     <input id="affairsMessageSubject" name="subject" required minlength="2" maxlength="80"
+      value="เชิญมาพบฝ่ายกิจการนักเรียน"></div>
+    <div class="field"><label for="affairsMessageBody">รายละเอียดสำหรับนักเรียน</label>
+     <textarea id="affairsMessageBody" name="body" minlength="5" maxlength="500" rows="4" required
+      placeholder="กรุณามาพบฝ่ายกิจการนักเรียน ในช่วงพักกลางวันของวันนี้"></textarea></div>
+    <p class="muted">Push แสดงเพียงว่ามีข้อความใหม่ • ต้องเข้าสู่ระบบนักเรียนจึงจะอ่านเนื้อหาได้</p>
+    <button type="submit" class="button">✉️ ส่งข้อความถึงนักเรียนคนนี้</button></form>`:
+    '<p class="muted">เลือกนักเรียนหนึ่งคนก่อนส่งข้อความ</p>'}
+  </section>
+  <section class="card stack rd-affairs-message-history"><h3>ประวัติข้อความที่ฉันส่ง</h3>
+   ${state.messageSent.length?state.messageSent.map(x=>`<article class="rd-affairs-message-item">
+    <strong>${esc(x.subject)}</strong><small>${esc(x.full_name)} • ${esc(x.student_no)} • ${esc(x.classroom_label||'')}</small>
+    <p>${esc(x.body)}</p><small>${esc(x.created_at)} •
+    ${x.read_at?'นักเรียนอ่านแล้ว':Number(x.push_delivered)>0?'Push ตอบรับแล้ว • ยังไม่อ่าน':'บันทึกในแอปแล้ว • ยังไม่อ่าน'}</small>
+   </article>`).join(''):'<p class="empty">ยังไม่มีประวัติส่งข้อความ</p>'}</section>`);
+  bind('#affairsMessageSearch','submit',async e=>{
+   e.preventDefault();
+   const query=String(new FormData(e.currentTarget).get('query')||'').trim();
+   state.messageSearch=query;
+   const found=await api('/api/affairs/students?query='+encodeURIComponent(query));
+   state.messageMatches=found.items||[];
+   state.messageStudent=null;await messages();
+  });
+  bind('[data-affairs-msg-select]','click',(_,el)=>{
+   state.messageStudent=state.messageMatches.find(x=>x.id===Number(el.dataset.affairsMsgSelect))||null;
+   return messages();
+  });
+  bind('#affairsMessageCompose','submit',async(e,el)=>{
+   e.preventDefault();
+   const student=state.messageStudent;
+   if(!student||!confirm('ยืนยันส่งข้อความถึง '+student.full_name+' เพียงคนเดียว?'))return;
+   const f=new FormData(el),button=el.querySelector('button[type="submit"]');
+   button.disabled=true;
+   try{
+    const result=await api('/api/affairs/messages/send',{method:'POST',body:{
+     student_id:student.id,subject:String(f.get('subject')||''),body:String(f.get('body')||'')}});
+    toast(result.push_devices>0?
+     'บันทึกข้อความแล้ว • ส่ง Push เข้าคิวสำหรับอุปกรณ์นักเรียน':
+     'บันทึกข้อความในแอปแล้ว • นักเรียนยังไม่ได้เปิดรับ Push');
+    state.messageStudent=null;state.messageMatches=[];state.messageSearch='';
+    await messages();
+   }finally{if(button.isConnected)button.disabled=false}
+  });
  }
  const studentPicker=()=>`<section class="card stack"><h3>ค้นหานักเรียน</h3>
    <form id="affairsStudentSearch" class="row">
