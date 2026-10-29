@@ -2,6 +2,7 @@ import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
 import {searchBehaviorStudents,recordBehaviorBulk} from './behavior-bulk.js';
+import {criteriaImportRoutes} from './criteria-excel-import.js';
 import {scoreImportRoutes} from './score-excel-import.js';
 import {schoolScoreMonitorSummary,schoolScoreMonitorHistory} from './teacher-score-monitor.js';
 import {previewBehaviorAdjustments,recordBehaviorAdjustmentBulk} from './adjustment-bulk.js';
@@ -254,6 +255,8 @@ export async function studentAffairsRoutes(req,env,u,path){
     FROM affairs_behavior_rules ${staff(u)?'':'WHERE active=1'} ORDER BY category,id`).all();
   return reply({items:results,category_labels:label});
  }
+ if(method==='POST'&&(path==='/api/affairs/behavior/rules/import/preview'||path==='/api/affairs/behavior/rules/import/commit'))
+  return criteriaImportRoutes(env,u,path,b);
  if(method==='POST'&&path==='/api/affairs/behavior/rules'){
   const ruleId=b.id===null||b.id===undefined?null:id(b.id);
   if(ruleId){
