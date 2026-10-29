@@ -21,12 +21,13 @@ class ScorePushMigrationTest(unittest.TestCase):
    student_id,affairs_rule_id,affairs_category,rule_points,points_applied,warning_no,reason,recorded_by)
    VALUES(101,?,'minor',-10,?,?,'Trial',1)""",(self.rule,points,warning))
   return self.db.execute('SELECT MAX(id) FROM behavior_incidents').fetchone()[0]
- def test_score_notification_created_only_for_new_deductions(self):
+ def test_warning_and_deduction_enqueue_independently(self):
   self.assertEqual(self.db.execute('SELECT COUNT(*) FROM behavior_score_push_events').fetchone()[0],0)
   warning=self.insert(0,1)
-  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM behavior_score_push_events').fetchone()[0],0)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM behavior_score_push_events').fetchone()[0],1)
   charged=self.insert(-10,0)
-  self.assertEqual(self.db.execute('SELECT incident_id FROM behavior_score_push_events').fetchone()[0],charged)
+  self.assertEqual(self.db.execute('SELECT COUNT(*) FROM behavior_score_push_events').fetchone()[0],2)
+  self.assertEqual(self.db.execute('SELECT incident_id FROM behavior_score_push_events ORDER BY incident_id DESC LIMIT 1').fetchone()[0],charged)
   self.assertEqual(self.db.execute('SELECT points FROM behavior_records ORDER BY id DESC LIMIT 1').fetchone()[0],-10)
   self.assertNotEqual(warning,charged)
   self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(),[])
