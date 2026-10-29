@@ -249,3 +249,74 @@ body.rd-affairs-modal-open{overflow:hidden}
  [data-theme="dark"] .rd-criteria-table .rd-criteria-row{border-color:#436a50;background:#243f30}
 }
 @media(max-width:420px){.rd-criteria-filters{grid-template-columns:1fr}.rd-criteria-filters .field:first-child{grid-column:auto}}
+
+/* Attendance monitoring: real tables for daily grade summary and each classroom. */
+.rd-affairs-table-scroll{max-width:100%;overflow:auto;overscroll-behavior-x:contain;
+ border:1px solid #d9e7df;border-radius:15px}
+.rd-affairs-attendance-table{border-collapse:separate;border-spacing:0;width:100%;
+ font-size:13px;line-height:1.45}
+.rd-affairs-summary-table{min-width:650px}
+.rd-affairs-rooms-table{min-width:990px}
+.rd-affairs-attendance-table th,.rd-affairs-attendance-table td{
+ border-bottom:1px solid #e5eee8;padding:12px 13px;vertical-align:middle;text-align:left}
+.rd-affairs-attendance-table thead th{position:sticky;top:0;z-index:2;
+ background:#e8f5ec;color:#21593e;font-weight:800;white-space:nowrap}
+.rd-affairs-attendance-table tbody tr:nth-child(even){background:#f8fcf9}
+.rd-affairs-attendance-table tbody tr:hover{background:#eef8f1}
+.rd-affairs-attendance-table tbody th{font-weight:800;color:#175b40;white-space:nowrap}
+.rd-affairs-attendance-table .rd-att-num{font-variant-numeric:tabular-nums;text-align:center;white-space:nowrap;font-weight:650}
+.rd-affairs-attendance-table .rd-att-good{color:#0b8554;font-weight:850}
+.rd-affairs-attendance-table .rd-att-warn{color:#a16511;font-weight:850}
+.rd-affairs-summary-table tfoot th,.rd-affairs-summary-table tfoot td{
+ background:#e9f5ed;font-weight:850;color:#145b3a;border-bottom:0}
+.rd-att-table-progress{display:flex;align-items:center;gap:9px;min-width:115px}
+.rd-att-table-progress progress{flex:1;min-width:65px;height:9px;appearance:none;
+ border:0;overflow:hidden;background:#e3ede6;border-radius:99px}
+.rd-att-table-progress progress::-webkit-progress-bar{background:#e3ede6;border-radius:99px}
+.rd-att-table-progress progress::-webkit-progress-value{background:#089663;border-radius:99px}
+.rd-att-table-progress progress::-moz-progress-bar{background:#089663;border-radius:99px}
+.rd-att-table-progress span{font-size:12px;font-variant-numeric:tabular-nums;font-weight:800;color:#186543}
+.rd-att-filters{display:grid;grid-template-columns:minmax(190px,1.75fr) repeat(3,minmax(122px,1fr));
+ gap:10px;align-items:end}
+.rd-att-filters .field{min-width:0}
+.rd-att-filters input,.rd-att-filters select{width:100%;min-width:0}
+.rd-att-table-result{display:flex;justify-content:space-between;align-items:center;
+ gap:10px;flex-wrap:wrap;font-size:12px;color:#627e6d;margin:3px 0 10px}
+.rd-att-table-result strong{color:#165c3c;font-weight:800}
+.rd-att-advisors{min-width:150px;max-width:260px;overflow-wrap:anywhere;line-height:1.5}
+.rd-att-row-unstarted{background:#fffaf1!important}
+.rd-att-row-pending{background:#fffdf8!important}
+.rd-att-row-complete{background:#f5fcf7}
+.rd-att-action-cell{min-width:154px}
+.rd-att-action-cell .rd-att-remind-btn{font-size:11px;font-weight:750;white-space:nowrap;
+ padding:8px 10px;min-height:35px}
+.rd-att-reminder-detail{display:block;margin-top:5px;font-size:11px;color:#648072}
+.rd-att-muted{font-size:12px;color:#7c8982}
+.rd-att-empty{text-align:center!important;padding:28px 12px!important;color:#738477}
+.rd-att-pagination{display:flex;align-items:center;justify-content:flex-end;
+ flex-wrap:wrap;gap:8px;margin-top:12px}
+.rd-affairs-rooms-table .rd-affairs-state{white-space:nowrap;display:inline-flex;align-items:center}
+.rd-affairs-rooms-table .rd-affairs-state.pending{background:#fff0d7;color:#996015}
+.rd-affairs-rooms-table .rd-att-row-unstarted .rd-affairs-state.pending{background:#f9e6d1;color:#a14c1e}
+[data-theme="dark"] .rd-affairs-table-scroll{border-color:#426851}
+[data-theme="dark"] .rd-affairs-attendance-table thead th{background:#254e39;color:#d4f6e1}
+[data-theme="dark"] .rd-affairs-attendance-table th,[data-theme="dark"] .rd-affairs-attendance-table td{border-color:#375c45}
+[data-theme="dark"] .rd-affairs-attendance-table tbody tr:nth-child(even){background:#234332}
+[data-theme="dark"] .rd-affairs-attendance-table tbody tr:hover{background:#28543c}
+[data-theme="dark"] .rd-affairs-attendance-table tbody th{color:#d3f4dd}
+[data-theme="dark"] .rd-affairs-summary-table tfoot th,[data-theme="dark"] .rd-affairs-summary-table tfoot td{background:#2a563e;color:#d9f6e5}
+[data-theme="dark"] .rd-att-row-unstarted,[data-theme="dark"] .rd-att-row-pending{background:#403d2b!important}
+[data-theme="dark"] .rd-att-row-complete{background:#213f30}
+[data-theme="dark"] .rd-att-table-result strong{color:#d2f5e0}
+[data-theme="dark"] .rd-att-table-progress span,[data-theme="dark"] .rd-affairs-attendance-table .rd-att-good{color:#8de3b3}
+[data-theme="dark"] .rd-affairs-attendance-table .rd-att-warn{color:#ffd28e}
+[data-theme="dark"] .rd-att-muted,[data-theme="dark"] .rd-att-reminder-detail{color:#bed3c5}
+@media(max-width:900px){.rd-att-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.rd-att-filters .field:first-child{grid-column:1/-1}}
+@media(max-width:550px){
+ .rd-att-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rd-affairs-summary-table{min-width:590px}
+ .rd-affairs-rooms-table{min-width:900px}
+ .rd-affairs-table-scroll{scrollbar-width:thin}
+ .rd-affairs-table-scroll:focus-visible{outline:3px solid #e5b440;outline-offset:2px}
+ .rd-att-table-result{align-items:flex-start}
+}
