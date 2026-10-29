@@ -8,7 +8,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 SOURCE=(ROOT/"worker/src/truancy-push.js").read_text(encoding="utf8")
 
 def real_dispatch_query():
-    match=re.search(r"SELECT e\.id,e\.generation,e\.student_id,(?:e\.school_date,)?\s*c\.advisor_user_id(?:,t\.period,t\.subject)? FROM truancy_events e[\s\S]*?ORDER BY e\.id DESC LIMIT 25",SOURCE)
+    match=re.search(r"SELECT e\.id,e\.generation,e\.student_id,(?:e\.school_date,)?\s*c\.advisor_user_id(?:,c\.advisor2_user_id)?(?:,t\.period,t\.subject)? FROM truancy_events e[\s\S]*?ORDER BY e\.id DESC LIMIT 25",SOURCE)
     if not match: raise AssertionError("Truancy dispatcher SQL not found")
     return match.group(0)
 
@@ -17,7 +17,8 @@ def database():
     db.execute("PRAGMA foreign_keys=ON")
     for file in ("0001_initial.sql","0002_notification_outbox.sql",
                  "0006_student_guardian_portal.sql","0011_staff_web_push.sql",
-                 "0013_truancy_push.sql","0014_truancy_priority_retries.sql"):
+                 "0013_truancy_push.sql","0014_truancy_priority_retries.sql",
+                 "0035_second_homeroom_advisor.sql"):
         db.executescript((ROOT/"worker/migrations"/file).read_text(encoding="utf8"))
     db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
                 VALUES(1,'advisor','Advisor','teacher','salt','hash')""")
@@ -75,6 +76,15 @@ class DispatchSelectionTests(unittest.TestCase):
         # Changing to another status, then back to truancy must get a new generation.
         self.db.execute("UPDATE truancy_events SET generation=2 WHERE id=?",(event_id,))
         self.assertEqual([row[0] for row in self.db.execute(real_dispatch_query())],[event_id])
+
+    def test_secondary_advisor_receives_truancy_push_without_primary(self):
+        self.db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
+                         VALUES(2,'advisor2','Second Advisor','teacher','salt','hash')""")
+        self.db.execute("""INSERT INTO staff_push_subscriptions(user_id,endpoint,p256dh,auth)
+                         VALUES(2,'https://fcm.googleapis.com/fcm/send/test2','key','auth')""")
+        self.db.execute("UPDATE classrooms SET advisor_user_id=NULL,advisor2_user_id=2 WHERE id=1")
+        event_id=add_event(self.db,self.today)
+        self.assertEqual([r[0] for r in self.db.execute(real_dispatch_query())],[event_id])
 
     def test_only_recent_edits_get_retried(self):
         add_event(self.db,self.today)

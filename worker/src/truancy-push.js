@@ -1,3 +1,4 @@
+// Room notifications include both advisor slots; D1 migration 0035 preserves the original primary assignment.
 // Opt-in, relationship-verified truancy alerts for staff advisors and guardians.
 // Push carries only an encrypted event reference and non-identifying lesson summary.
 import {validPushSubscription,sendPriorityPush,sendPushTest,diagnoseVapid} from './staff-push.js';
