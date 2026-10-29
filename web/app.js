@@ -16,7 +16,7 @@ import {createPwaTools} from './pwa-client.js';
 import {registerPwaUpdates} from './pwa-updates.js';
 import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
 import {createNotificationSettings} from './notification-settings.js';
-import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLastLoginArea} from './auth-session.js';
+import {readAuthSession,saveAuthSession,clearAuthSession,getLastLoginArea,setLastLoginArea,shouldRenewAuthSession,extendAuthSession} from './auth-session.js';
 import {createPortalUi} from './portal-ui.js';
 import {loginHref,resolveLoginEntrance} from './login-route.js';
 import {configureRolePwa,isInstalledPwa,preferredHomeRole,rememberHomeRole} from './pwa-role.js';
@@ -171,7 +171,7 @@ function loginPage(){
    <div class="field"><label for="username">ชื่อผู้ใช้งาน (Username)</label><input id="username" name="username" required autocomplete="username" maxlength="40" placeholder="กรอกชื่อผู้ใช้งาน"></div>
    <div class="field"><label for="password">รหัสผ่าน (Password)</label><input id="password" name="password" type="password" required autocomplete="current-password" placeholder="กรอกรหัสผ่าน"></div>
    <label class="remember-login"><input type="checkbox" id="rememberStaff" checked>
-    <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong><small>สูงสุด 30 วัน • ไม่แนะนำสำหรับคอมพิวเตอร์สาธารณะ</small></span></label>
+    <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong><small>มือถือจะต่ออายุอัตโนมัติเมื่อใช้งาน • หากไม่ใช้งานเกิน 30 วันต้องเข้าสู่ระบบใหม่</small></span></label>
    <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
   </form>
   ${!isInstalledPwa()?'<div class="login-links"><a href="./" class="button secondary full" id="staffBackToChoice">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</a></div>':''}
@@ -346,6 +346,17 @@ function bindGlobalStudentSearch(){
  });
 }
 function $$(sel){return [...document.querySelectorAll(sel)]}
+let staffRenewInFlight=false;
+async function renewStaffRememberedSession(){
+ if(staffRenewInFlight||!state.token||!shouldRenewAuthSession('rd_token',state.token))return;
+ staffRenewInFlight=true;
+ const token=state.token;
+ try{
+  const info=await api('/api/auth/keep-alive',{method:'POST',timeoutMs:15000});
+  if(state.token===token)extendAuthSession('rd_token',token,info.expires_in);
+ }catch{/* Offline/errors keep the original expiry; only an actual 401 clears it. */}
+ finally{staffRenewInFlight=false}
+}
 async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
 function roomOptions(advisorOnly=false){
  const rooms=advisorOnly&&state.user?.role==='teacher'?
@@ -989,7 +1000,7 @@ async function start(){
  }
  if(entrance===null){showEntrySelection();return}
  if(!state.token){renderLogin();return}
- try{await boot()}catch(error){
+ try{await boot();await renewStaffRememberedSession()}catch(error){
   // A broken/offline network should not erase a remembered session. Only 401 does that
   // inside api(); after connectivity returns the user can continue without re-entering credentials.
   if(!state.token)return;
@@ -998,6 +1009,12 @@ async function start(){
   $('#forgetRememberedLogin')?.addEventListener('click',()=>{clearAuthSession('rd_token');state.token='';state.user=null;renderLogin()});
  }
 }
-window.addEventListener('online',()=>toast('เชื่อมต่ออินเทอร์เน็ตแล้ว'));
+// Renew only on a personally remembered mobile login, not on every request.
+window.addEventListener('focus',()=>{void renewStaffRememberedSession()});
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='visible')void renewStaffRememberedSession();
+});
+setInterval(()=>{if(document.visibilityState==='visible')void renewStaffRememberedSession()},6*3600*1000);
+window.addEventListener('online',()=>{toast('เชื่อมต่ออินเทอร์เน็ตแล้ว');void renewStaffRememberedSession()});
 window.addEventListener('offline',()=>toast('ออฟไลน์: ระบบจะไม่บันทึกข้อมูลจนกว่าจะเชื่อมต่อ',true));
 start();

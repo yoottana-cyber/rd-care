@@ -1,4 +1,5 @@
 import {passwordHash,newPasswordSalt} from './password.js';
+import {renewRememberedSession} from './remember-session.js';
 import {validUsername,validDate,bangkokToday} from './core.js';
 import {studentUsername} from './student-username.js';
 import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
@@ -66,8 +67,8 @@ async function login(req,env){
  // never while a first-login password change is required.
  const sessionSeconds=b.remember===true?30*86400:8*3600;
  const token=randomHex(32);
- await env.DB.prepare('INSERT INTO portal_sessions(token_hash,account_id,expires_at) VALUES(?,?,?)')
-  .bind(await digest(token),a.id,unixNow()+sessionSeconds).run();
+ await env.DB.prepare('INSERT INTO portal_sessions(token_hash,account_id,expires_at,remember_device) VALUES(?,?,?,?)')
+  .bind(await digest(token),a.id,unixNow()+sessionSeconds,b.remember===true?1:0).run();
  return reply({token,account:publicAccount(a),expires_in:sessionSeconds});
 }
 async function changePassword(req,env,a){
@@ -153,6 +154,9 @@ export async function portalRoutes(req,env,path,ctx){
   return reply({ok:true});
  }
  if(req.method==='GET'&&path==='/api/portal/auth/me')return reply({account:publicAccount(a)});
+ if(req.method==='POST'&&path==='/api/portal/auth/keep-alive')
+  return reply(await renewRememberedSession(env.DB,
+   await digest((req.headers.get('authorization')||'').slice(7)),true));
  if(req.method==='POST'&&path==='/api/portal/auth/change-password')return changePassword(req,env,a);
  // Provisioned student and guardian accounts no longer require password rotation.
  if(req.method==='POST'&&path==='/api/portal/late/qr'){

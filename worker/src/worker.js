@@ -1,5 +1,6 @@
 import { STATUS, PERIOD_STATUS, isAdmin, isStaff, validDate, bangkokToday, weekday, schoolDateAllowed, validateEntries, cleanText, validUsername, httpErrorStatus } from './core.js';
 import { passwordHash,newPasswordSalt } from './password.js';
+import {renewRememberedSession} from './remember-session.js';
 import { validateStudentInput, validatePersonnelInput } from './admin-validation.js';
 import { planStudentImport } from './student-import.js';
 import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } from './late-self.js';
@@ -106,8 +107,8 @@ async function login(req,env){
  // "Remember me" is an explicit per-device choice; never extend a normal session.
  const sessionSeconds=b.remember===true?30*86400:8*3600;
  const token=randomHex(32);
- await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)')
-  .bind(await digest(token),user.id,now()+sessionSeconds).run();
+ await env.DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at,remember_device) VALUES(?,?,?,?)')
+  .bind(await digest(token),user.id,now()+sessionSeconds,b.remember===true?1:0).run();
  // The authenticated /api/auth/me response always reloads the latest Student Affairs
  // assignment from the database, including grants or revocations during a session.
  return json({token,user:{id:user.id,username:user.username,display_name:user.display_name,role:user.role},expires_in:sessionSeconds});
@@ -955,6 +956,8 @@ async function route(req,env,ctx){
   return json({ok:true});
  }
  if(req.method==='GET'&&path==='/api/auth/me')return json({user});
+ if(req.method==='POST'&&path==='/api/auth/keep-alive')
+  return json(await renewRememberedSession(env.DB,await digest((req.headers.get('authorization')||'').slice(7))));
  if(req.method==='GET'&&path==='/api/push/target')return pushTarget(req,env,user,'advisor');
  if(path.startsWith('/api/push/'))return staffPushRoutes(req,env,user,path);
  if(path.startsWith('/api/affairs/'))return studentAffairsRoutes(req,env,user,path);

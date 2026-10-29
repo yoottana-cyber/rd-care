@@ -24,7 +24,7 @@ export function saveAuthSession(name,token,expiresIn,remember){
   if(!Number.isSafeInteger(seconds)||seconds<=0||seconds>30*86400)throw Error('อายุเซสชันไม่ถูกต้อง');
   try{
    localStorage.setItem(persistentKey(name),JSON.stringify({
-    token,expiresAt:Date.now()+seconds*1000
+    token,expiresAt:Date.now()+seconds*1000,refreshedAt:Date.now()
    }));
    return;
   }catch{ /* Private browsing, storage disabled or quota exceeded: use this tab only. */ }
@@ -40,4 +40,35 @@ export function getLastLoginArea(){
 }
 export function setLastLoginArea(value){
  try{localStorage.setItem('rd_last_login_area',value)}catch{}
+}
+
+// A remembered mobile login uses rolling server-side 30-day inactivity expiry.
+// The server is authoritative; client-side renewal cannot revive expired tokens.
+const renewPeriod=20*3600*1000;
+export function isPersonalMobileDevice(){
+ try{
+  return Boolean(window.matchMedia?.('(display-mode: standalone)')?.matches||
+   window.navigator?.standalone||
+   window.matchMedia?.('(max-width: 768px)')?.matches);
+ }catch{return false}
+}
+export function shouldRenewAuthSession(name,token,now=Date.now()){
+ if(!isPersonalMobileDevice())return false;
+ try{
+  const saved=JSON.parse(localStorage.getItem(persistentKey(name))||'null');
+  return Boolean(saved&&saved.token===token&&saved.expiresAt>now&&
+   (!Number.isFinite(saved.refreshedAt)||now-saved.refreshedAt>=renewPeriod||
+    saved.expiresAt-now<2*86400*1000));
+ }catch{return false}
+}
+export function extendAuthSession(name,token,expiresIn,now=Date.now()){
+ if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))return false;
+ const seconds=Number(expiresIn);
+ if(!Number.isSafeInteger(seconds)||seconds<=0||seconds>30*86400)return false;
+ try{
+  const key=persistentKey(name),saved=JSON.parse(localStorage.getItem(key)||'null');
+  if(!saved||saved.token!==token||saved.expiresAt<=now)return false;
+  localStorage.setItem(key,JSON.stringify({...saved,expiresAt:now+seconds*1000,refreshedAt:now}));
+  return true;
+ }catch{return false}
 }

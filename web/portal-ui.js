@@ -1,6 +1,6 @@
 import {API_BASE_URL} from './config.js';
 import {bindThemeButtons} from './theme.js';
-import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea} from './auth-session.js';
+import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea,shouldRenewAuthSession,extendAuthSession,isPersonalMobileDevice} from './auth-session.js';
 import {createGuardianPush} from './guardian-push.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
 import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
@@ -26,7 +26,24 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
   {kind:pushParams.get('portal_notice'),id:Number(pushParams.get('notice_id'))}:null;
- let requestVersion=0;
+ let requestVersion=0,portalRenewInFlight=false;
+ async function renewPortalRememberedSession(){
+  if(portalRenewInFlight||!state.account||!state.token||
+   !shouldRenewAuthSession(activeTokenKey,state.token))return;
+  const token=state.token,key=activeTokenKey;
+  portalRenewInFlight=true;
+  try{
+   const info=await call('/api/portal/auth/keep-alive',{method:'POST'});
+   if(state.token===token)extendAuthSession(key,token,info.expires_in);
+  }catch{/* Offline/errors retain the current expiry. A 401 revokes locally. */}
+  finally{portalRenewInFlight=false}
+ }
+ window.addEventListener('focus',()=>{void renewPortalRememberedSession()});
+ document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')void renewPortalRememberedSession();
+ });
+ setInterval(()=>{if(document.visibilityState==='visible')void renewPortalRememberedSession()},6*3600*1000);
+ window.addEventListener('online',()=>{void renewPortalRememberedSession()});
  let lateQrToken=readLateGateIntent(location.search),lateQrReceipt=null;
  function acceptLateQr(value){
   lateQrToken=value==='gate'||/^[a-f0-9]{40}$/.test(value)?value:null;
@@ -131,9 +148,9 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
        <input id="portalPassword" name="password" type="password" required autocomplete="current-password">
        <button type="button" id="portalTogglePassword" aria-label="แสดงรหัสผ่าน" aria-pressed="false">แสดง</button>
       </div></div>
-     <label class="remember-login"><input type="checkbox" name="remember">
+     <label class="remember-login"><input type="checkbox" name="remember" ${isPersonalMobileDevice()?'checked':''}>
       <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong>
-       <small>เลือกเฉพาะมือถือหรือคอมพิวเตอร์ส่วนตัว • สูงสุด 30 วัน</small></span></label>
+       <small>บนมือถือจะต่ออายุให้อัตโนมัติเมื่อใช้งาน • ไม่ได้ใช้งานเกิน 30 วันต้องล็อกอินใหม่</small></span></label>
      <button type="submit" class="button full">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</button></form>
     <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
     ${role==='student'&&!lateQrToken?'<button type="button" id="studentLateEntry" class="button secondary full">แจ้งมาสายด้วยรหัสจากครูเวร (แบบเดิม)</button>':''}
@@ -591,6 +608,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     message('สแกน QR ลงชื่อมาสายต้องเข้าสู่ระบบด้วยบัญชีนักเรียน');return true;
    }
    rememberHomeRole(state.account.role);
+   await renewPortalRememberedSession();
    if(state.account.must_change_password)showPasswordChange();else await showDashboard();
   }catch(error){
    if(!state.token){showLogin(expectedRole||state.role);return true}
