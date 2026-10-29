@@ -33,7 +33,8 @@ test('installed PWA identity and shortcuts use RD CONNECT without changing app s
  for(const role of ['staff','student','guardian']){
   const scoped=JSON.parse(read('web/manifest-'+role+'.webmanifest'));
   assert.ok(scoped.description.includes('RD CONNECT — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา'));
-  assert.match(scoped.short_name,/RD CONNECT/);
+  assert.match(scoped.name,/RD CONNECT/);
+  assert.ok(scoped.short_name.startsWith('RD '));
  }
  assert.ok(read('web/pwa-role.js').includes('ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา'));
  assert.equal(manifest.id,'./');
