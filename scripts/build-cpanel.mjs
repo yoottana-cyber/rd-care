@@ -22,7 +22,7 @@ function argsOf(argv){
 function urlOf(value,type){
  let url;try{url=new URL(value)}catch{fail(type+' must be a valid HTTPS URL')}
  if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||
-  devHosts.has(url.hostname)||/(^|\.)example\./i.test(url.hostname)||
+  devHosts.has(url.hostname)||/(^|\.)example\./i.test(url.hostname)||/YOUR|REPLACE/i.test(url.hostname)||
   /^(localhost|127\.0\.0\.1)$/.test(url.hostname))
   fail(type+' must use the real, non-Dev production HTTPS hostname');
  if(type==='site'){
