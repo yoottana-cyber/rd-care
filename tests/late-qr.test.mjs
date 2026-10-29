@@ -50,7 +50,8 @@ test('permanent QR is printable and the duty teacher list refreshes',()=>{
 });
 test('permanent QR route uses fixed public URL, and keeps manual approval',()=>{
  const backend=readFileSync(new URL('../worker/src/late-qr.js',import.meta.url),'utf8');
- assert.match(backend,/late_qr=gate/);
+ assert.match(backend,/lateQrPublicUrl\(env\)/);
+ assert.match(backend,/url\.searchParams\.set\('late_qr',code\)/);
  assert.match(backend,/b\.token==='gate'/);
  assert.match(backend,/late_static_qr_submissions/);
  assert.match(backend,/await openGate\(env\)/);
