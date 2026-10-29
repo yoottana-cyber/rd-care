@@ -237,6 +237,18 @@ export async function sendStudentDirectMessagePush(device,env,messageId){
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
  },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }
+// Score changes contain no student name, incident detail or penalty on the
+// lock screen. The recipient must authenticate before seeing personal history.
+export async function sendScoreChangePush(device,env,audience){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ if(!['student','guardian'].includes(audience))throw Error('Invalid score recipient');
+ const body=await encryptPriorityPush(device,{kind:'score_change',audience});
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'3600',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
 // Legacy payload-free push for older administrative notices.
 export async function sendGenericPush(endpoint,env){
  if(!allowedEndpoint(endpoint))throw Error('Push endpoint not permitted');
