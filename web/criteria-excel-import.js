@@ -35,9 +35,9 @@ export function parseCriteriaExcelRows(raw,mode){
   else if(rule_id!==null&&(!Number.isSafeInteger(rule_id)||rule_id<1))error='รหัสเกณฑ์ไม่ถูกต้อง';
   else if(!Object.hasOwn(LABELS,category)||!belongs(category,mode))error='หมวดเกณฑ์ไม่ตรงกับหน้าปัจจุบัน';
   else if(name.length<2||name.length>120||/[\u0000-\u001f\u007f]/.test(name))error='ชื่อเกณฑ์ต้องมี 2–120 ตัวอักษร';
-  else if(!Number.isSafeInteger(points)||points===0||Math.abs(points)>50||
+  else if(!Number.isSafeInteger(points)||points===0||
    (mode==='good'&&points<0)||(mode==='behavior'&&points>0))
-   error='คะแนนไม่ถูกต้อง (ความดี +1 ถึง +50 / ความผิด -1 ถึง -50)';
+   error='คะแนนต้องเป็นจำนวนเต็มที่ไม่เป็นศูนย์ (ความดีเป็นบวก / ความผิดเป็นลบ)';
   else if(active===null)error='active ต้องเป็น 1 หรือ 0';
   else if(names.has(key)||(rule_id!==null&&ids.has(rule_id)))error='ชื่อหรือรหัสเกณฑ์ซ้ำในไฟล์';
   names.add(key);if(rule_id!==null)ids.add(rule_id);
