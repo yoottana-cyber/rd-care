@@ -21,8 +21,12 @@ test('push accepts browser delivery endpoints and rejects SSRF and malformed key
 test('VAPID JWT uses the endpoint origin and signs using P-256',async()=>{
  globalThis.crypto ??= webcrypto;
  const pair=createECDH('prime256v1');pair.generateKeys();
+ // ECDH can omit a leading zero byte in a 32-byte P-256 private key.
+ // Cloudflare VAPID secrets are always stored as 32-byte padded values.
+ const privateKey=pair.getPrivateKey(),private32=Buffer.alloc(32);
+ privateKey.copy(private32,32-privateKey.length);
  const env={VAPID_PUBLIC_KEY:b64(pair.getPublicKey()),
- VAPID_PRIVATE_KEY:b64(pair.getPrivateKey()),
+ VAPID_PRIVATE_KEY:b64(private32),
  VAPID_SUBJECT:'mailto:it@example.edu'};
  const authorization=await makeVapidAuthorization(endpoint,env);
  assert.match(authorization,/^vapid t=[A-Za-z0-9._-]+, k=[\w-]+$/);
