@@ -121,6 +121,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'truancy_auto_score_migration_test.py' -v
       - name: Per-period truancy school rule, history and correction (real SQLite)
         run: python3 -m unittest discover -s tests -p 'truancy_per_period_rule_migration_test.py' -v
+      - name: Tiered misconduct warnings per rule and truancy correction
+        run: python3 -m unittest discover -s tests -p 'tiered_conduct_warnings_migration_test.py' -v
       - name: Truancy edit and Push dispatch regression (real D1 SQL)
         run: python3 -m unittest discover -s tests -p 'truancy_dispatch_selection_test.py' -v
       - name: Urgent truancy alert schema and bounded retry lifecycle
