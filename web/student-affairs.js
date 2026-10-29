@@ -1,5 +1,6 @@
 import {scoreHistoryTables} from './score-history.js';
 import {createCriteriaExcelImport} from './criteria-excel-import.js';
+import {dailyAttendanceSummaryTable,attendanceRoomTable} from './affairs-attendance-table.js';
 import {criteriaTableMarkup,RULE_GROUPS} from './criteria-table.js';
 // RD CONNECT • Student Affairs workbench. Only the existing staff/admin role
 // opens this workspace; backend independently checks every action.
@@ -13,7 +14,8 @@ const formatScore=n=>Number(n)>0?'+'+Number(n):String(Number(n)||0);
 export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
   selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
-  grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:'',messageSearch:'',messageMatches:[],messageStudent:null,messageSent:[],ruleQuery:'',ruleCategory:'all',rulePageSize:'25',rulePage:1};
+  grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:'',messageSearch:'',messageMatches:[],messageStudent:null,messageSent:[],ruleQuery:'',ruleCategory:'all',rulePageSize:'25',rulePage:1,
+  roomQuery:'',roomGrade:'all',roomStatus:'all',roomPageSize:'25',roomPage:1};
  const criteria=createCriteriaExcelImport({api,toast});
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
@@ -54,7 +56,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
    api('/api/affairs/closed-days')
   ]);
   state.attendance=result;
-  const r=result.summary,settings=result.setting,days=String(settings.weekdays||'1,2,3,4,5').split(',').map(Number);
+  const settings=result.setting,days=String(settings.weekdays||'1,2,3,4,5').split(',').map(Number);
   const weekdays=['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
   const teachers=result.items.filter(x=>x.students>0);
   frame(`<section class="card stack"><div class="row between"><div><h3>ตรวจสอบการเช็กชื่อรายวัน</h3>
@@ -62,11 +64,8 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
     <button class="button secondary" id="affairsRefresh">↻ อัปเดตข้อมูล</button></div>
    <div class="field"><label for="affairsDate">วันที่ติดตาม</label>
     <input id="affairsDate" type="date" value="${esc(state.date)}" max="${bangkokToday()}"></div>
-   <div class="rd-affairs-metrics">
-    <div><span>ห้องที่มีนักเรียน</span><strong>${r.rooms}</strong></div>
-    <div class="good"><span>เช็กครบแล้ว</span><strong>${r.complete}</strong></div>
-    <div class="warn-metric"><span>ยังไม่ครบ</span><strong>${r.pending}</strong></div>
-   </div></section>
+   ${dailyAttendanceSummaryTable(teachers)}
+</section>
    <section class="card stack"><div><h3>ตั้งค่าเตือนอัตโนมัติ</h3>
     <p class="muted">ตรวจทุก 5 นาทีผ่าน Cloudflare Cron • ทำงานเฉพาะวันที่ตั้งไว้และหลังเวลาที่กำหนด • ส่งให้ครูที่ปรึกษาที่สมัครรับ Push เท่านั้น (สูงสุด 1 รอบอัตโนมัติต่อห้องต่อวัน)</p></div>
     <form id="affairsReminderSettings" class="stack">
@@ -94,33 +93,65 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
    <section class="card stack"><div class="row between"><div><h3>ติดตามรายห้องเรียน</h3>
      <p class="muted">แสดงห้องที่มีนักเรียน • การส่งแจ้งเตือนด้วยตนเองจำกัด 1 ครั้งต่อห้องต่อวัน</p></div>
     <span class="tag">${esc(thDate(state.date))}</span></div>
-    <div class="rd-affairs-attendance-grid">
-     ${teachers.map(row=>{
-      const reminder=(result.reminders||[]).find(x=>x.classroom_id===row.id);
-      return `<article class="rd-affairs-attendance-item">
-       <div class="row between"><strong>${esc(row.label)}</strong>
-        <span class="rd-affairs-state ${row.complete?'ready':'pending'}">${row.complete?'✓ ครบแล้ว':'◷ ยังไม่ครบ'}</span></div>
-       <p>ครูที่ปรึกษา: <strong>${esc([row.advisor_name,row.advisor2_name].filter(Boolean).join(' / ')||'ยังไม่กำหนด')}</strong></p>
-       <progress class="rd-affairs-progress" value="${row.checked}" max="${row.students}"
-        aria-label="การเช็กชื่อห้อง ${esc(row.label)}"></progress>
-       <p class="muted">เช็กชื่อแล้ว ${row.checked}/${row.students} คน • คงเหลือ ${row.missing} คน</p>
-       ${reminder?`<p class="muted">การเตือนล่าสุด: ${esc(reminderLabel(reminder.state))} (${reminder.delivered||0} เครื่อง)</p>`:''}
-       ${!row.complete&&(row.advisor_user_id||row.advisor2_user_id)&&state.date===bangkokToday()?
-         `<button type="button" class="button secondary full" data-affairs-remind="${row.id}"
-          ${result.reminders.some(x=>x.classroom_id===row.id&&x.kind==='manual')?'disabled':''}>
-          🔔 ${result.reminders.some(x=>x.classroom_id===row.id&&x.kind==='manual')?'แจ้งเตือนแล้ว':'แจ้งเตือนครูที่ปรึกษา'}</button>`:
-         !(row.advisor_user_id||row.advisor2_user_id)?'<span class="muted">กำหนดครูที่ปรึกษาก่อนจึงแจ้งเตือนได้</span>':''}
-      </article>`;
-     }).join('')||'<p class="empty">วันนี้ไม่พบห้องที่มีนักเรียนตามทะเบียน</p>'}
+    <div class="rd-att-filters">
+     <div class="field"><label for="affairsRoomSearch">ค้นหาห้องเรียนหรือครูที่ปรึกษา</label>
+      <input id="affairsRoomSearch" type="search" value="${esc(state.roomQuery)}"
+       placeholder="เช่น ม.2/5 หรือชื่อครู" autocomplete="off"></div>
+     <div class="field"><label for="affairsRoomGrade">ระดับชั้น</label>
+      <select id="affairsRoomGrade">
+       <option value="all">ทุกระดับชั้น</option>
+       ${[1,2,3,4,5,6].map(grade=>`<option value="${grade}" ${state.roomGrade===String(grade)?'selected':''}>ม.${grade}</option>`).join('')}
+      </select></div>
+     <div class="field"><label for="affairsRoomStatus">สถานะการเช็กชื่อ</label>
+      <select id="affairsRoomStatus">
+       ${[['all','ทุกสถานะ'],['complete','ครบแล้ว'],['pending','กำลังเช็ก'],['unstarted','ยังไม่เริ่ม']].map(([value,label])=>
+       `<option value="${value}" ${state.roomStatus===value?'selected':''}>${label}</option>`).join('')}
+      </select></div>
+     <div class="field"><label for="affairsRoomPageSize">แสดงต่อหน้า</label>
+      <select id="affairsRoomPageSize">
+       ${[['10','10 ห้อง'],['25','25 ห้อง'],['50','50 ห้อง'],['all','ทั้งหมด']].map(([value,label])=>
+       `<option value="${value}" ${state.roomPageSize===value?'selected':''}>${label}</option>`).join('')}
+      </select></div>
     </div>
+    <div id="affairsRoomTableArea"></div>
    </section>`);
   bind('#affairsDate','change',async(_,el)=>{state.date=el.value;await attendance()});
   bind('#affairsRefresh','click',attendance);
-  bind('[data-affairs-remind]','click',async(_,el)=>{
-   const room=Number(el.dataset.affairsRemind);el.disabled=true;
-   const result=await api('/api/affairs/remind',{method:'POST',body:{classroom_id:room}});
-   toast('ผลการแจ้งเตือน: '+reminderLabel(result.state));
-   await attendance();
+  const refreshRoomTable=()=>{
+   const target=document.querySelector('#affairsRoomTableArea');
+   if(target)target.innerHTML=attendanceRoomTable(teachers,result.reminders||[],{
+    date:state.date,today:bangkokToday(),query:state.roomQuery,grade:state.roomGrade,
+    status:state.roomStatus,pageSize:state.roomPageSize,page:state.roomPage});
+  };
+  refreshRoomTable();
+  bind('#affairsRoomSearch','input',(_,el)=>{
+   state.roomQuery=el.value;state.roomPage=1;refreshRoomTable();
+  });
+  bind('#affairsRoomGrade','change',(_,el)=>{
+   state.roomGrade=el.value;state.roomPage=1;refreshRoomTable();
+  });
+  bind('#affairsRoomStatus','change',(_,el)=>{
+   state.roomStatus=el.value;state.roomPage=1;refreshRoomTable();
+  });
+  bind('#affairsRoomPageSize','change',(_,el)=>{
+   state.roomPageSize=el.value;state.roomPage=1;refreshRoomTable();
+  });
+  // Delegation keeps reminders working after filters/pagination replace table rows.
+  bind('#affairsRoomTableArea','click',async e=>{
+   const button=e.target.closest('[data-affairs-remind],[data-att-page]');
+   if(!button||button.disabled)return;
+   const direction=button.dataset.attPage;
+   if(direction){
+    state.roomPage=Math.max(1,state.roomPage+(direction==='next'?1:-1));
+    refreshRoomTable();return;
+   }
+   const room=Number(button.dataset.affairsRemind);
+   button.disabled=true;
+   try{
+    const outcome=await api('/api/affairs/remind',{method:'POST',body:{classroom_id:room}});
+    toast('ผลการแจ้งเตือน: '+reminderLabel(outcome.state));
+    await attendance();
+   }finally{button.disabled=false;}
   });
   bind('#affairsReminderSettings','submit',async e=>{
    e.preventDefault();const form=e.currentTarget,f=new FormData(form);
