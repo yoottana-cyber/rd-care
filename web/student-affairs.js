@@ -1,4 +1,5 @@
 import {scoreHistoryTables} from './score-history.js';
+import {createCriteriaExcelImport} from './criteria-excel-import.js';
 // RD CONNECT • Student Affairs workbench. Only the existing staff/admin role
 // opens this workspace; backend independently checks every action.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -12,6 +13,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
   selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
   grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:'',messageSearch:'',messageMatches:[],messageStudent:null,messageSent:[]};
+ const criteria=createCriteriaExcelImport({api,toast});
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
  const frame=(body)=>{
@@ -218,6 +220,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
      <div class="row"><button type="submit" class="button">${selected?'บันทึกแก้ไขเกณฑ์':'เพิ่มเกณฑ์คะแนน'}</button>
       ${selected?'<button type="button" class="button secondary" id="affairsRuleCancel">ยกเลิกการแก้ไข</button>':''}</div>
     </form>
+    ${isAdjustment?'':`<div id="affairsCriteriaExcelArea" data-criteria-mode="${kind}">${criteria.markup(kind)}</div>`}
    </section>
    <section class="card stack"><h3>รายการ${title}</h3>
     <div class="rd-affairs-rule-grid">${items.map(rule=>`
@@ -228,6 +231,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
       ${rule.automatic?'<span class="tag">ระบบหักคะแนนอัตโนมัติ · ไม่ต้องบันทึกซ้ำ</span>':`<button type="button" class="button secondary" data-affairs-rule-edit="${rule.id}">แก้ไขเกณฑ์</button>`}
      </article>`).join('')||'<p class="empty">ยังไม่ได้ตั้งเกณฑ์ในหมวดนี้</p>'}</div>
    </section>`);
+  if(!isAdjustment)criteria.bind(kind,state.rules,()=>rules());
   bind('[data-affairs-rule-kind]','click',(_,el)=>{
    state.ruleKind=el.dataset.affairsRuleKind;state.ruleEdit=null;return rules();
   });

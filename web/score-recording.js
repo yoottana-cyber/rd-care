@@ -1,4 +1,3 @@
-import {createScoreExcelImport} from './score-excel-import.js';
 // Shared teacher entry screen: multi-room student selection for conduct and merit.
 export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,escapeHtml,scorePopup}){
  const modes={
@@ -9,7 +8,6 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  const mode=()=>getTab()==='good'?'good':'behavior';
  const selectedState=()=>modes[mode()];
  const roomLabel=()=>rooms().find(r=>Number(r.id)===Number(getRoomId()))?.label||'';
- const excel=createScoreExcelImport({api,toast,render:()=>draw()});
  const title=key=>key==='good'?'คะแนนความดี':'คะแนนพฤติกรรม';
  const actions={good:'ทำความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
   serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก',adjustment:'ปรับพฤติกรรม'};
@@ -93,9 +91,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
      ${!filtered.length?'<p class="warn">ยังไม่มีเกณฑ์คะแนนหมวดนี้ที่เปิดใช้งาน</p>':''}
     </form>
    </section>
-   ${excel.markup(key,u.rules)}
   </div>`);
-  excel.bind(key,u.rules);
   document.querySelector('#scoreRoom')?.addEventListener('change',e=>safeRun(async()=>{
    rememberDraft();setRoomId(Number(e.target.value));await load();
   }));
