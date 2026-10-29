@@ -18,7 +18,7 @@ function db(initial={}){
     return null;},
    async all(){return {results:[...prefs].map(([event_key,enabled])=>({event_key,enabled:Number(enabled)}))}},
    async run(){return {meta:{changes:1}}}};
- },async batch(stmts){const q=stmts[0];prefs.set(q.args[0],q.args[1]);return [{meta:{changes:1}},{meta:{changes:1}}]}}
+ },async batch(stmts){const q=calls.find(x=>x.sql.includes('INSERT INTO notification_preferences'));prefs.set(q.args[0],q.args[1]);return [{meta:{changes:1}},{meta:{changes:1}}]}}
 }
 test('admin sees all 11 event switches including student and guardian deduction notices',async()=>{
  const store=db({score_student:0});
