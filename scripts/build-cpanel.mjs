@@ -34,13 +34,10 @@ export async function buildCpanel(argv=process.argv.slice(2)){
  const args=argsOf(argv),site=urlOf(args['--site'],'site'),api=urlOf(args['--api'],'api');
  if(site.origin===api.origin)fail('Site and Worker must be different origins in this kit');
  const output=resolve(root,args['--out']||'dist/cpanel-production');
- if(output===root||output===source||output.startsWith(source+'/')||
-    output.startsWith(join(root,'worker')+'/')||
-    !relative(root,output)||relative(root,output).startsWith('..'+(process.platform==='win32'?'\\':'/'))||
-    isAbsolute(relative(root,output)))
-  fail('--out must be a separate output folder inside the repository, outside web/ and worker/');
- // Never allow a builder to delete the source or an existing production deployment.
- if(output===join(root,'dist')||output===join(root,'scripts'))fail('Unsafe output path');
+ // Protect all repository files. The builder may replace only a child of dist/.
+ const subpath=relative(join(root,'dist'),output);
+ if(!subpath||subpath==='..'||subpath.startsWith('..'+(process.platform==='win32'?'\\':'/'))||
+    isAbsolute(subpath))fail('--out must be a subdirectory of dist/');
  await rm(output,{recursive:true,force:true});
  await mkdir(output,{recursive:true});
  await cp(source,output,{recursive:true});
