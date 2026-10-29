@@ -2,6 +2,7 @@ import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
 import {searchBehaviorStudents,recordBehaviorBulk} from './behavior-bulk.js';
+import {ensureRecorder,incidentInsert,incidentResults} from './conduct-policy.js';
 import {criteriaImportRoutes} from './criteria-excel-import.js';
 import {schoolScoreMonitorSummary,schoolScoreMonitorHistory} from './teacher-score-monitor.js';
 import {previewBehaviorAdjustments,recordBehaviorAdjustmentBulk} from './adjustment-bulk.js';
@@ -71,6 +72,7 @@ async function recordBehavior(env,u,b,adjust=false){
    .bind(ruleId).first():null;
   if(!rule?.active)fail(400,'เลือกเกณฑ์คะแนนที่ฝ่ายกิจการนักเรียนเปิดใช้งาน');
   points=Number(rule.points);category=rule.category;ruleName=rule.name;
+  ensureRecorder(u,category);
   if(category==='good'&&points<=0||category!=='good'&&points>=0)
    fail(400,'ประเภทคะแนนไม่ตรงเกณฑ์ที่กำหนด');
  }
@@ -87,11 +89,14 @@ async function recordBehavior(env,u,b,adjust=false){
    .bind(student,points,reason,u.id,adjustId,points,points,student).run();
   if(!insert.meta.changes)fail(409,'คะแนนพฤติกรรมค้างสะสมไม่เพียงพอสำหรับเกณฑ์ปรับพฤติกรรมที่เลือก');
  }else{
-  insert=await env.DB.prepare(`INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category)
-   VALUES(?,?,?,?,?,?)`).bind(student,points,reason,u.id,ruleId,category).run();
+  const inserted=await incidentInsert(env.DB,student,{id:ruleId},reason,u.id).run();
+  if(Number(inserted?.meta?.changes)!==1)fail(409,'เกณฑ์นี้ถูกปิดใช้งาน กรุณาเลือกใหม่');
+  const [incident]=await incidentResults(env.DB,[inserted]);
+  return reply({ok:true,id:incident.id,incident_id:incident.id,
+   points:Number(incident.points_applied),warning_no:Number(incident.warning_no)||0,
+   category,rule_name:ruleName},201);
  }
- await log(env.DB,u.id,adjust?'affairs_behavior_adjusted':'affairs_behavior_recorded',
-  'behavior_records',insert.meta.last_row_id);
+ await log(env.DB,u.id,'affairs_behavior_adjusted','behavior_records',insert.meta.last_row_id);
  return reply({ok:true,id:insert.meta.last_row_id,points,category,rule_name:ruleName},201);
 }
 async function notifyOne(env,room,date,kind,actorId=null){

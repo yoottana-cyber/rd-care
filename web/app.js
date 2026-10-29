@@ -55,7 +55,7 @@ const scorePopup=createScoreHistoryPopup({api,toast,safeRun,escapeHtml:esc});
 const teacherScoreMonitor=createTeacherScoreMonitor({api,mount,safeRun,toast,scorePopup,
  getTab:()=>state.tab,escapeHtml:esc});
 const scoreRecorder=createScoreRecording({api,mount,safeRun,toast,rooms:()=>state.rooms,
- getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
+ getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,getUser:()=>state.user,escapeHtml:esc,scorePopup});
 const behaviorAdjustment=createBehaviorAdjustment({api,mount,safeRun,toast,rooms:()=>state.rooms,
  getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
 const adminStudentState={roomId:null,items:[],editId:null};

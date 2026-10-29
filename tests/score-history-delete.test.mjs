@@ -72,7 +72,7 @@ test('pagination and issuer ownership appear in active score history query',asyn
  assert.match(calls[1].sql,/FROM truancy_behavior_links/);
  assert.match(calls[1].sql,/THEN 1 ELSE 0 END AS can_delete/);
  assert.match(calls[1].sql,/LEFT JOIN affairs_adjustment_rules/);
- assert.deepEqual(calls[1].args,[9,14,11,0]);
+ assert.deepEqual(calls[1].args,[9,14,9,14,11,0]);
 });
 test('deleted records no longer contribute to merit, behavior, adjustment or parent reports',()=>{
  const ddl=source('worker/migrations/0023_behavior_record_soft_delete.sql');

@@ -1,5 +1,5 @@
 // Shared teacher entry screen: multi-room student selection for conduct and merit.
-export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,escapeHtml,scorePopup}){
+export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,getUser=()=>null,escapeHtml,scorePopup}){
  const modes={
   behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''},
   good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''}
@@ -31,14 +31,18 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  }
  function draw(){
   const key=mode(),u=modes[key],isGood=key==='good',count=u.picked.size;
-  const filtered=u.rules.filter(r=>Number(r.automatic)!==1&&(isGood?r.category==='good':r.category!=='good'));
+  const authorized=getUser()?.role==='admin'||
+   (getUser()?.role==='teacher'&&Number(getUser()?.student_affairs)===1);
+  const filtered=u.rules.filter(r=>Number(r.automatic)!==1&&
+   (isGood?r.category==='good':r.category!=='good'&&
+    (authorized||!['serious','very_serious'].includes(r.category))));
   const fromRoom=u.students.length>0&&u.students.every(x=>u.picked.has(x.id));
   const selected=[...u.picked.values()];
   const groupCount=new Set(selected.map(x=>x.classroom_id)).size;
   mount(`<div class="stack score-entry">
    <div><h2>${title(key)}</h2><p class="muted">${isGood?
     'บันทึกความดีให้หลายคนพร้อมกัน โดยคะแนนความดีแยกจากคะแนนพฤติกรรม':
-    'บันทึกความผิดตามเกณฑ์ที่โรงเรียนอนุมัติ สามารถเลือกนักเรียนจากหลายห้องพร้อมกันได้'}</p></div>
+    'บันทึกความผิดตามเกณฑ์ที่โรงเรียนอนุมัติ • เล็กน้อยเตือน 2 ครั้ง ปานกลางเตือน 1 ครั้ง • ร้ายแรงและร้ายแรงมากเฉพาะฝ่ายกิจการนักเรียน'}</p></div>
    <section class="card stack" aria-label="ค้นหาและเลือกรายชื่อนักเรียน">
     <div class="row between"><h3>1. เลือกนักเรียน</h3><span class="tag">เลือกแล้ว ${count} คน · ${groupCount} ห้อง</span></div>
     <form id="scoreSearchForm" class="score-search">
@@ -145,7 +149,10 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
     const first=u.picked.get(ids[0]);
     if(first)setFocus(u,first);
     u.picked.clear();u.reason='';
-    toast('บันทึก'+title(key)+'สำเร็จ '+Number(result.count||ids.length)+' คน');
+    const warnings=Number(result.warned)||0,deductions=Number(result.deducted)||0;
+    toast(isGood?'บันทึกคะแนนความดีสำเร็จ '+Number(result.count||ids.length)+' คน':
+     'บันทึกครบ '+Number(result.count||ids.length)+' คน • ตักเตือน '+warnings+
+     ' คน (ไม่หักคะแนน) • หักคะแนน '+deductions+' คน');
     if(getTab()===key)draw();
    }finally{if(button?.isConnected)button.disabled=false}
   }));

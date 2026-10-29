@@ -164,7 +164,7 @@ test('admin navigation, mobile PWA and printable QR reflect the settings without
  assert.match(page,/\/api\/admin\/school-settings/);
  assert.match(page,/data-school-jump="studentAffairs"/);
  assert.match(gate,/state\.qr\?\.cutoff_time/);
- assert.match(shell,/rd-care-shell-v113/);
+ assert.match(shell,/rd-care-shell-v114/);
  assert.match(shell,/school-settings\.js/);
  assert.match(shell,/period-clock\.js/);
  assert.match(page,/period_duration_minutes/);

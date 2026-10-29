@@ -26,8 +26,9 @@ export function scoreHistoryTables({items=[],mode='all',esc,readOnly=false}){
     <td><strong>${esc(row.action_name||(
      row.score_type==='adjustment'?'ปรับพฤติกรรม':
      isGood?'ทำความดี':categoryName[row.affairs_category]||'บันทึกความผิด'))}</strong>
+     ${Number(row.warning_no)>0?`<span class="tag">ตักเตือนครั้งที่ ${Number(row.warning_no)} · ไม่หักคะแนน</span>`:''}
      ${row.score_type==='adjustment'?'<span class="tag">ปรับพฤติกรรม</span>':''}</td>
-    <td class="score-history-points"><strong>${esc(fmt(row.points))}</strong></td>
+    <td class="score-history-points"><strong>${Number(row.warning_no)>0?'0 (ตักเตือน)':esc(fmt(row.points))}</strong></td>
     <td>${esc(row.reason&&row.reason!==row.action_name?row.reason:'—')}</td>
     ${isGood?`<td>${esc(row.teacher_name||'—')}</td>`:''}
     ${readOnly?'':`<td>${row.can_delete?

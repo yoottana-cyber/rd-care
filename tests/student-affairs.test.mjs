@@ -49,7 +49,9 @@ test('signed rule values are applied server-side rather than client submitted po
    return {
     first:async()=>sql.includes('FROM students s')?{id:47}:sql.includes('FROM affairs_behavior_rules')?
      {id:9,name:'มาตรฐานโรงเรียน',category:'minor',points:-4,active:1}:null,
-    run:async()=>({meta:{last_row_id:78,changes:1}})
+    run:async()=>({meta:{last_row_id:78,changes:1}}),
+    all:async()=>({results:[{id:78,student_id:47,affairs_rule_id:9,
+     affairs_category:'minor',points_applied:0,warning_no:1,behavior_record_id:null}]})
    };
   }};
  }};
@@ -58,10 +60,11 @@ test('signed rule values are applied server-side rather than client submitted po
   points:10000,category:'good',reason:'บันทึกตามระเบียบ'}),env,actor,path);
  assert.equal(res.status,201);
  const value=await res.json();
- assert.equal(value.points,-4);
+ assert.equal(value.points,0);
+ assert.equal(value.warning_no,1);
  assert.equal(value.category,'minor');
- const insert=calls.find(x=>x.sql.includes('INSERT INTO behavior_records'));
- assert.deepEqual(insert.args,[47,-4,'บันทึกตามระเบียบ',11,9,'minor']);
+ const insert=calls.find(x=>x.sql.includes('INSERT INTO behavior_incidents'));
+ assert.deepEqual(insert.args,[47,'บันทึกตามระเบียบ',11,47,9,9]);
 });
 test('PWA reminders navigate only to authorized local attendance URL after staff login',()=>{
  const sw=read('web/sw.js'),app=read('web/app.js'),router=read('web/login-route.js');

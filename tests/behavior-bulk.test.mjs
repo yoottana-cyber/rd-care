@@ -16,11 +16,14 @@ function fakeDb({authorized=[12,13],searchItems=[],scoreRule=rule}={}){
     return {
      first:async()=>sql.includes('FROM affairs_behavior_rules')?scoreRule:null,
      all:async()=>({results:sql.includes('FROM students s WHERE s.active=1')?
-      authorized.map(id=>({id})):searchItems})
+      authorized.map(id=>({id})):sql.includes('FROM behavior_incidents')?
+      authorized.map((student_id,i)=>({id:100+i,student_id,affairs_rule_id:4,
+       affairs_category:scoreRule.category,points_applied:scoreRule.points,
+       warning_no:0,behavior_record_id:200+i})):searchItems})
     };
    }};
   },
-  batch:async statements=>{batches.push(statements);return statements.map(()=>({meta:{changes:1}}));}
+  batch:async statements=>{batches.push(statements);return statements.map((x,i)=>({meta:{changes:1,last_row_id:100+i}}));}
  }};
 }
 const post=(path,body)=>new Request('https://rd-care.test'+path,
@@ -55,16 +58,19 @@ test('bulk merit recording defaults blank description to approved rule and audit
  const response=await studentAffairsRoutes(post(path,{student_ids:[12,13],rule_id:4,reason:''}),
   {DB:env.DB},user,path);
  assert.equal(response.status,201);
- assert.deepEqual(await response.json(),{ok:true,count:2,points:5,category:'good',rule_name:rule.name});
+ const result=await response.json();
+ assert.equal(result.ok,true);
+ assert.equal(result.count,2);
+ assert.equal(result.merited,2);
+ assert.equal(result.warned,0);
+ assert.equal(result.points,5);
+ assert.equal(result.rule_name,rule.name);
  assert.equal(env.batches.length,1);
- const inserts=env.calls.filter(x=>x.sql.includes('INSERT INTO behavior_records'));
- const logs=env.calls.filter(x=>x.sql.includes('INSERT INTO audit_logs'));
+ const inserts=env.calls.filter(x=>x.sql.includes('INSERT INTO behavior_incidents'));
  assert.equal(inserts.length,2);
- assert.equal(logs.length,2);
- assert.deepEqual(inserts[0].args,[12,5,rule.name,7,4,'good']);
- assert.deepEqual(inserts[1].args,[13,5,rule.name,7,4,'good']);
- assert.ok(logs.every(x=>x.sql.includes('last_insert_rowid()')));
- assert.equal(env.batches[0].length,4);
+ assert.deepEqual(inserts[0].args,[12,rule.name,7,12,4,4]);
+ assert.deepEqual(inserts[1].args,[13,rule.name,7,13,4,4]);
+ assert.equal(env.batches[0].length,2);
 });
 
 test('unauthorized room rejects entire batch before any data is written',async()=>{

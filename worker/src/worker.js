@@ -22,6 +22,7 @@ import {affairsMessageRoutes,deliverStudentMessages} from './student-direct-mess
 import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
+import {historySql} from './score-history-query.js';
 import {adminDeleteIdentity} from './admin-delete.js';
 import {adminTimetableAudit} from './timetable-audit.js';
 import {schoolTermRoutes} from './school-terms.js';
@@ -513,22 +514,8 @@ export async function listBehavior(req,env,user){
  if(!Number.isSafeInteger(limit)||limit<1||limit>200||
     !Number.isSafeInteger(offset)||offset<0||offset>100000)
   throw error(400,'รูปแบบการแบ่งหน้าประวัติไม่ถูกต้อง');
- const {results}=await env.DB.prepare(`SELECT b.id,b.points,b.reason,b.created_at,b.recorded_by,
-  b.affairs_category,${caseTypeSql('b')} AS score_type,
-  COALESCE(ar.name,adj.name,
-    CASE WHEN b.affairs_category='adjustment' THEN 'ปรับพฤติกรรม'
-     WHEN b.points>0 THEN 'ทำความดี' ELSE 'บันทึกความผิด' END) AS action_name,
-  u.display_name AS teacher_name,
-  CASE WHEN b.recorded_by=? AND NOT EXISTS (
-    SELECT 1 FROM truancy_behavior_links l WHERE l.behavior_record_id=b.id
-   ) THEN 1 ELSE 0 END AS can_delete
-  FROM behavior_records b
-  JOIN users u ON u.id=b.recorded_by
-  LEFT JOIN affairs_behavior_rules ar ON ar.id=b.affairs_rule_id
-  LEFT JOIN affairs_adjustment_rules adj ON adj.id=b.adjustment_rule_id
-  WHERE b.student_id=? AND b.deleted_at IS NULL
-  ORDER BY b.id DESC LIMIT ? OFFSET ?`)
-  .bind(user.id,stId,limit+1,offset).all();
+ const {results}=await env.DB.prepare(historySql(true))
+  .bind(user.id,stId,user.id,stId,limit+1,offset).all();
  const row=await env.DB.prepare(`SELECT ${scoreColumns('b')}
   FROM behavior_records b WHERE b.student_id=?`).bind(stId).first();
  const totals=scoreSummary(row);
@@ -538,6 +525,24 @@ export async function listBehavior(req,env,user){
 export async function deleteOwnBehavior(req,env,user,recordId){
  if(!['admin','staff','teacher'].includes(user.role))
   throw error(403,'ไม่มีสิทธิ์ลบประวัติคะแนน');
+ const rawId=Number(recordId);
+ if(Number.isSafeInteger(rawId)&&rawId<0){
+  const incidentId=-rawId;
+  const row=await env.DB.prepare(`SELECT id,recorded_by,source_timetable_id
+   FROM behavior_incidents WHERE id=? AND points_applied=0 AND deleted_at IS NULL`).bind(incidentId).first();
+  if(!row)throw error(404,'ไม่พบรายการตักเตือนหรือถูกยกเลิกแล้ว');
+  if(Number(row.recorded_by)!==Number(user.id))
+   throw error(403,'ลบได้เฉพาะการตักเตือนที่ตนเองบันทึก');
+  if(row.source_timetable_id!==null)
+   throw error(409,'การตักเตือนหนีเรียนผูกกับการเช็กชื่อ กรุณาแก้ไขสถานะรายคาบ');
+  await env.DB.batch([
+   env.DB.prepare(`UPDATE behavior_incidents SET deleted_at=CURRENT_TIMESTAMP
+    WHERE id=? AND recorded_by=? AND points_applied=0 AND deleted_at IS NULL`).bind(incidentId,user.id),
+   env.DB.prepare(`INSERT INTO audit_logs(actor_id,action,entity_type,entity_id)
+    VALUES(?,'affairs_warning_deleted','behavior_incidents',?)`).bind(user.id,String(incidentId))
+  ]);
+  return json({ok:true,deleted_id:rawId});
+ }
  const id=positiveInt(recordId);
  if(!id)throw error(400,'รายการไม่ถูกต้อง');
  const row=await env.DB.prepare(`SELECT b.id,b.recorded_by,
@@ -1025,7 +1030,7 @@ async function route(req,env,ctx){
  if(req.method==='GET'&&path==='/api/late')return listLate(req,env,user);
  if(req.method==='POST'&&path==='/api/late')return addLate(req,env,user);
  if(req.method==='GET'&&path==='/api/behavior')return listBehavior(req,env,user);
- const recordDelete=/^\/api\/behavior\/records\/(\d+)\/delete$/.exec(path);
+ const recordDelete=/^\/api\/behavior\/records\/(-?\d+)\/delete$/.exec(path);
  if(req.method==='POST'&&recordDelete)return deleteOwnBehavior(req,env,user,recordDelete[1]);
  // Never permit free-form points to bypass approved school scoring rules.
  if(req.method==='POST'&&path==='/api/behavior')
