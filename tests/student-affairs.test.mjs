@@ -67,7 +67,7 @@ test('signed rule values are applied server-side rather than client submitted po
  assert.equal(value.points,0);
  assert.equal(value.warning_no,1);
  assert.equal(value.category,'minor');
- const insert=calls.find(x=>x.sql.includes('INSERT INTO behavior_incidents'));
+ const insert=calls.find(x=>x.sql.includes('INSERT OR IGNORE INTO behavior_incidents'));
  assert.deepEqual([insert.args[0],insert.args[1],insert.args[2],...insert.args.slice(4)],
   [47,'บันทึกตามระเบียบ',11,47,9,9]);
  assert.match(insert.args[3],/^[0-9a-f-]{36}$/);
