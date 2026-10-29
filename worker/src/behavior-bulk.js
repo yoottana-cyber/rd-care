@@ -1,4 +1,4 @@
-import {ensureRecorder,commitBehaviorIncidents,behaviorRequestId,incidentSummary} from './conduct-policy.js';
+import {ensureRecorder,commitBehaviorIncidents,behaviorRequestId,selectedScoreDate,incidentSummary} from './conduct-policy.js';
 // Authorized student lookup and transactional multi-student merit/conduct recording.
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const respond=(data,status=200)=>new Response(JSON.stringify(data),
@@ -69,7 +69,8 @@ export async function recordBehaviorBulk(env,user,body){
  if(results.length!==ids.length)
   fail(403,'มีนักเรียนที่ไม่อยู่ในสิทธิ์ของครู กรุณาเลือกรายชื่อใหม่');
  const requestId=behaviorRequestId(body.request_id);
- const incidents=await commitBehaviorIncidents(env.DB,ids,rule,reason,user.id,requestId);
+ const recordedDate=selectedScoreDate(body.school_date);
+ const incidents=await commitBehaviorIncidents(env.DB,ids,rule,reason,user.id,requestId,recordedDate);
  const summary=incidentSummary(incidents);
  return respond({ok:true,...summary,request_id:requestId,
   points,category:rule.category,rule_name:rule.name},201);
