@@ -66,9 +66,9 @@ test('all-teacher history works for another classroom, but explicitly prevents e
  assert.equal(body.behavior_remaining,5);
  const detail=env.statements.find(x=>x.sql.includes('LEFT JOIN affairs_adjustment_rules'));
  assert.match(detail.sql,/b\.deleted_at IS NULL/);
- assert.match(detail.sql,/ORDER BY b\.id DESC LIMIT \? OFFSET \?/);
- assert.doesNotMatch(detail.sql,/AS can_delete/);
- assert.deepEqual(detail.args,[56,11,0]);
+ assert.match(detail.sql,/ORDER BY created_at DESC,id DESC LIMIT \? OFFSET \?/);
+ assert.match(detail.sql,/0 AS can_delete/);
+ assert.deepEqual(detail.args,[56,56,11,0]);
  assert.equal(env.statements.some(x=>/INSERT|UPDATE|DELETE/.test(x.sql)),false);
 });
 test('guardians and student users cannot read score-monitor history',async()=>{
