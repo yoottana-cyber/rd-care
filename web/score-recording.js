@@ -1,8 +1,8 @@
 // Shared teacher entry screen: multi-room student selection for conduct and merit.
 export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,getUser=()=>null,escapeHtml,scorePopup}){
  const modes={
-  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''},
-  good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:''}
+  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:'',pendingFingerprint:'',pendingRequestId:null},
+  good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:'',pendingFingerprint:'',pendingRequestId:null}
  };
  const esc=escapeHtml;
  const mode=()=>getTab()==='good'?'good':'behavior';
@@ -141,11 +141,21 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
    const ids=[...u.picked.keys()];
    if(!ids.length){toast('กรุณาเลือกนักเรียนก่อนบันทึก',true);return}
    if(!u.ruleId){toast('กรุณาเลือกเกณฑ์คะแนน',true);return}
+   // If the response is interrupted AFTER D1 commits, a second tap must
+   // reuse the same request ID rather than creating another misconduct.
+   const fingerprint=JSON.stringify([ids,Number(u.ruleId),u.reason]);
+   if(u.pendingFingerprint!==fingerprint||!u.pendingRequestId){
+    u.pendingFingerprint=fingerprint;
+    u.pendingRequestId=crypto.randomUUID();
+   }
+   const requestId=u.pendingRequestId;
    const button=document.querySelector('#scoreSubmit');
    if(button)button.disabled=true;
    try{
     const result=await api('/api/affairs/behavior/record/bulk',{method:'POST',
-     body:{student_ids:ids,rule_id:Number(u.ruleId),reason:u.reason},timeoutMs:30000});
+     body:{student_ids:ids,rule_id:Number(u.ruleId),reason:u.reason,
+      request_id:requestId},timeoutMs:30000});
+    u.pendingFingerprint='';u.pendingRequestId=null;
     const first=u.picked.get(ids[0]);
     if(first)setFocus(u,first);
     u.picked.clear();u.reason='';
