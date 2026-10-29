@@ -10,7 +10,13 @@ class FreshRosterSchema(unittest.TestCase):
   self.db=sqlite3.connect(':memory:')
   self.db.execute('PRAGMA foreign_keys=ON')
   for path in sorted(ROOT.glob('[0-9][0-9][0-9][0-9]_*.sql')):
-   self.db.executescript(path.read_text(encoding='utf-8'))
+   sql=path.read_text(encoding='utf-8')
+   # D1 executes each migration inside an implicit transaction. In local SQLite,
+   # emulate that boundary for a table rebuild with deferred foreign-key checks.
+   if path.name.startswith('0040_'):
+    self.db.executescript('BEGIN;\n'+sql+'\nCOMMIT;')
+   else:
+    self.db.executescript(sql)
   self.db.execute("INSERT INTO classrooms(id,grade,room,label) VALUES (1,1,1,'ม.1/1')")
 
  def tearDown(self):
