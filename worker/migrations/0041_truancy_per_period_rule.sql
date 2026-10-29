@@ -69,7 +69,7 @@ BEGIN
      CASE WHEN COALESCE(t.end_period,t.period)>t.period
       THEN '-'||CAST(t.end_period AS TEXT) ELSE '' END
     FROM timetable t WHERE t.id=NEW.timetable_id),
-  NEW.recorded_by,p.rule_id,'moderate'
+  NEW.recorded_by,p.rule_id,r.category
  FROM truancy_score_policy p JOIN affairs_behavior_rules r ON r.id=p.rule_id WHERE p.id=1
  AND NOT EXISTS (
   SELECT 1 FROM truancy_behavior_links l
