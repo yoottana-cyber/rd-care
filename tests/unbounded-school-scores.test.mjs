@@ -140,20 +140,26 @@ CREATE INDEX idx_behavior_student ON behavior_records(student_id,created_at);
 CREATE INDEX idx_behavior_affairs_student ON behavior_records(student_id,affairs_category,created_at);
 CREATE INDEX idx_behavior_active_student ON behavior_records(student_id,deleted_at,created_at);
 CREATE TABLE truancy_score_policy(id INTEGER PRIMARY KEY,rule_id INTEGER REFERENCES affairs_behavior_rules(id));
-CREATE TABLE truancy_behavior_links(id INTEGER PRIMARY KEY,behavior_record_id INTEGER REFERENCES behavior_records(id));
+CREATE TABLE timetable(id INTEGER PRIMARY KEY,period INTEGER NOT NULL,end_period INTEGER);
+CREATE TABLE truancy_behavior_links(
+ student_id INTEGER NOT NULL REFERENCES students(id),
+ timetable_id INTEGER NOT NULL REFERENCES timetable(id),
+ school_date TEXT NOT NULL,behavior_record_id INTEGER NOT NULL UNIQUE REFERENCES behavior_records(id),
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(student_id,timetable_id,school_date));
 CREATE TABLE score_import_receipts(id INTEGER PRIMARY KEY,rule_id INTEGER REFERENCES affairs_behavior_rules(id),behavior_record_id INTEGER REFERENCES behavior_records(id));
 CREATE TABLE affairs_criteria_import_receipts(id INTEGER PRIMARY KEY,rule_id INTEGER REFERENCES affairs_behavior_rules(id));
-CREATE TABLE period_truancy(id INTEGER PRIMARY KEY);
-CREATE TRIGGER example_score_trigger AFTER INSERT ON period_truancy
- BEGIN INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category)
- SELECT 3,-10,'หนีเรียน',1,1,'moderate'; END;
+CREATE TABLE period_truancy(student_id INTEGER,timetable_id INTEGER,school_date TEXT,recorded_by INTEGER);
+CREATE TABLE audit_logs(actor_id INTEGER,action TEXT,entity_type TEXT,entity_id TEXT);
 INSERT INTO users(id) VALUES(1);
 INSERT INTO students(id) VALUES(3);
 INSERT INTO affairs_behavior_rules(id,name,category,points) VALUES(1,'หนีเรียน','moderate',-10),(2,'ช่วยงาน','good',5);
 INSERT INTO behavior_records(id,student_id,points,reason,recorded_by,affairs_rule_id,affairs_category)
  VALUES(99,3,-10,'เดิม',1,1,'moderate'),(100,3,5,'ความดีเก่า',1,2,'good');
 INSERT INTO truancy_score_policy(id,rule_id) VALUES(1,1);
-INSERT INTO truancy_behavior_links(id,behavior_record_id) VALUES(1,99);
+INSERT INTO timetable(id,period,end_period) VALUES(17,2,2);
+INSERT INTO truancy_behavior_links(student_id,timetable_id,school_date,behavior_record_id)
+ VALUES(3,17,'2026-10-28',99);
 INSERT INTO score_import_receipts(id,rule_id,behavior_record_id) VALUES(1,2,100);
 INSERT INTO affairs_criteria_import_receipts(id,rule_id) VALUES(1,2);
 """)
@@ -171,8 +177,8 @@ c.execute("INSERT INTO affairs_behavior_rules(name,category,points) VALUES('ห�
 c.execute("INSERT INTO affairs_behavior_rules(name,category,points) VALUES('ดี','good',999)")
 c.execute("INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category) VALUES(3,-80,'ทดสอบ',1,3,'serious')")
 c.execute("INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category) VALUES(3,999,'ทดสอบ',1,4,'good')")
-c.execute("INSERT INTO period_truancy VALUES(1)")
-assert c.execute('SELECT points FROM behavior_records WHERE reason=\'หนีเรียน\'').fetchone()==(-10,)
+c.execute("INSERT INTO period_truancy(student_id,timetable_id,school_date,recorded_by) VALUES(3,17,\'2026-10-29\',1)")
+assert c.execute('SELECT points FROM behavior_records WHERE reason LIKE \'หนีเรียน วันที่ %\'').fetchone()==(-10,)
 assert c.execute('PRAGMA foreign_key_check').fetchall()==[]
 assert sorted([x[0] for x in c.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_behavior_%'")])==[
  'idx_behavior_active_student','idx_behavior_affairs_student','idx_behavior_student']
