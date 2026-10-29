@@ -18,8 +18,11 @@ export function behaviorRequestId(value){
 }
 export function selectedScoreDate(value){
  if(value===undefined||value===null||value==='')return null;
- if(typeof value!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)||
-  value<'2000-01-01'||new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value||
+ if(typeof value!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value))
+  fail(400,'วันที่บันทึกไม่ถูกต้อง');
+ const millis=Date.parse(value+'T00:00:00Z');
+ if(value<'2000-01-01'||!Number.isFinite(millis)||
+  new Date(millis).toISOString().slice(0,10)!==value||
   value>new Date(Date.now()+7*3600000).toISOString().slice(0,10))
   fail(400,'วันที่บันทึกไม่ถูกต้อง หรือเป็นวันที่ในอนาคต');
  return value;
