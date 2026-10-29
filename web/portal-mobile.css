@@ -264,3 +264,22 @@
  .rd-portal-score-cards>div{padding:12px}
  .rd-portal-score-cards strong{font-size:25px}
 }
+
+/* Student late QR: in-app camera and image fallback (scoped to student portal). */
+.rd-portal-camera{display:grid;gap:10px;padding:12px;border:1px solid #c7e5d3;
+ background:#f4fcf7;border-radius:16px}
+.rd-portal-camera[hidden]{display:none}
+.rd-portal-camera video{display:block;width:100%;max-height:60vh;aspect-ratio:4/3;
+ object-fit:cover;border-radius:12px;background:#12251c}
+.rd-portal-camera .rd-portal-help{margin:0;text-align:center}
+.rd-portal-qr-upload{display:grid;gap:8px;padding:12px 14px;border:1px dashed #84bda0;
+ background:#f3faf6;border-radius:13px;color:#166b48;font-size:13px;font-weight:750;
+ cursor:pointer}
+.rd-portal-qr-upload input{display:block;max-width:100%;font:inherit;font-weight:400;color:var(--pm-ink)}
+.rd-portal-qr-upload input::file-selector-button{margin-right:8px;border:0;border-radius:8px;
+ background:#dff3e7;color:#155c3a;padding:8px 10px;font:inherit;font-weight:700}
+.rd-portal-qr-upload:focus-within{outline:3px solid #e1b34e;outline-offset:2px}
+[data-theme="dark"] .rd-portal-camera,[data-theme="dark"] .rd-portal-qr-upload{
+ background:#20382b;border-color:#456e56;color:#e4f9ec}
+[data-theme="dark"] .rd-portal-qr-upload input::file-selector-button{
+ background:#315b43;color:#f0fff5}
