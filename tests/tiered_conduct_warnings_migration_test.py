@@ -105,4 +105,41 @@ class TieredConductRules(unittest.TestCase):
   self.assertEqual(self.total(),-10)
   self.assertEqual(self.db.execute('SELECT behavior_record_id FROM behavior_incidents WHERE source_timetable_id=2').fetchone()[0],scored)
   self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(),[])
+ def test_idempotent_retry_does_not_create_second_warning_or_deduction(self):
+  token='fedf9b9e-f119-46d8-a8e1-606197aabc12'
+  rule=self.rules['ทดสอบปานกลาง']
+  def submit(request_id,student=1):
+   self.db.execute("""INSERT OR IGNORE INTO behavior_incidents(
+    student_id,affairs_rule_id,affairs_category,rule_points,reason,recorded_by,
+    points_applied,warning_no,request_id)
+    SELECT ?,r.id,r.category,r.points,'ทดสอบความผิด',1,
+     CASE WHEN (r.category='minor' AND h.n<2) OR (r.category='moderate' AND h.n<1)
+      THEN 0 ELSE r.points END,
+     CASE WHEN (r.category='minor' AND h.n<2) OR (r.category='moderate' AND h.n<1)
+      THEN h.n+1 ELSE 0 END,?
+    FROM affairs_behavior_rules r
+    CROSS JOIN (SELECT COUNT(*) n FROM behavior_incidents i
+     WHERE i.student_id=? AND i.affairs_rule_id=? AND i.deleted_at IS NULL) h
+    WHERE r.id=? AND r.active=1 AND r.deleted_at IS NULL
+      AND r.id NOT IN (SELECT rule_id FROM truancy_score_policy)""",
+    (student,request_id,student,rule,rule))
+   return self.db.execute("""SELECT id,student_id,points_applied,warning_no
+    FROM behavior_incidents WHERE request_id=? AND student_id=?""",
+    (request_id,student)).fetchone()
+  original=submit(token)
+  self.assertEqual(original[2:],(0,1))
+  for _ in range(3):
+   self.assertEqual(submit(token),original)
+  self.assertEqual(self.db.execute(
+   'SELECT COUNT(*) FROM behavior_incidents WHERE student_id=1 AND affairs_rule_id=?',(rule,)
+  ).fetchone()[0],1)
+  self.assertEqual(self.total(),0)
+  next_token='8ff27d6a-bbee-4b1a-99bd-e2aa11b524c3'
+  scored=submit(next_token)
+  self.assertEqual(scored[2:],(-10,0))
+  self.assertEqual(self.total(),-10)
+  self.assertEqual(submit(next_token),scored)
+  self.assertEqual(self.total(),-10)
+  self.assertEqual(self.db.execute('PRAGMA foreign_key_check').fetchall(),[])
+
 if __name__=='__main__':unittest.main()
