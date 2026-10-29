@@ -43,7 +43,7 @@ test('table is accessible, color-coded, paginated, searchable and safely escaped
  assert.match(full,/data-affairs-rule-delete="5"/);
  assert.match(full,/หนีเรียนในแต่ละคาบเรียน/);
  assert.doesNotMatch(full,/data-affairs-rule-delete="10"/);
- const quick=criteriaTableMarkup(data,{mode:'behavior',category:'minor',query:' ก'});
+ const quick=criteriaTableMarkup(data,{mode:'behavior',category:'minor',query:'ความผิดเล็กน้อย ก'});
  assert.match(quick,/ความผิดเล็กน้อย ก/);
  assert.doesNotMatch(quick,/ความผิดเล็กน้อย ข/);
  const long=Array.from({length:59},(_,i)=>({id:i+50,name:'เกณฑ์ '+i,category:'minor',points:i-59,active:1}));
