@@ -23,8 +23,8 @@ test('overlap teacher or classroom, including adjacent period',()=>{
  assert.equal(lessonOverlaps(a,{...a,period:2,end_period:3,teacher_user_id:9}),true);
  assert.equal(lessonOverlaps(a,{...a,day_of_week:2}),false);
 });
-test('non-teachers may not create or read personal timetables',async()=>{
- for(const role of ['admin','staff']){
+test('admin may not use teacher-owned personal timetables',async()=>{
+ for(const role of ['admin']){
   for(const method of ['GET','POST']){
    await assert.rejects(()=>teacherTimetableRoutes(
     new Request('https://test.local/api/my-timetable',{method,body:method==='POST'?'{}':undefined}),
@@ -64,6 +64,33 @@ test('new teacher timetable is activated immediately without admin approval',asy
  assert.ok(sqlUsed.some(s=>s.includes("VALUES(?,?,?,?,?,?,?,1,'approved')")),'new timetable should be usable immediately');
 });
 
+test('Student Affairs staff can add own lessons without changing roles',async()=>{
+ const sqlUsed=[];
+ const db={prepare(sql){
+  sqlUsed.push(sql);
+  if(sql.includes('SELECT id FROM classrooms WHERE id'))return {bind:()=>({first:async()=>({id:2})})};
+  if(sql.includes('SELECT id FROM timetable')&&sql.includes('active=1'))return {bind:()=>({first:async()=>null})};
+  if(sql.includes('INSERT INTO timetable'))return {bind:()=>({run:async()=>({meta:{last_row_id:71}})})};
+  if(sql.includes('INSERT INTO audit_logs'))return {bind:()=>({run:async()=>({meta:{changes:1}})})};
+  throw Error('Unexpected SQL: '+sql);
+ }};
+ const res=await teacherTimetableRoutes(
+  new Request('https://test.local/api/my-timetable',{method:'POST',body:JSON.stringify(good)}),
+  {DB:db},{id:55,role:'staff'},'/api/my-timetable');
+ assert.equal(res.status,201);
+ assert.equal((await res.json()).id,71);
+ assert.ok(sqlUsed.some(sql=>sql.includes('INSERT INTO timetable')));
+});
+test('Student Affairs staff cannot edit a lesson owned by another teacher',async()=>{
+ const db={prepare(sql){
+  if(sql.includes('FROM classrooms'))return {bind:()=>({first:async()=>({id:2})})};
+  if(sql.includes('SELECT id,teacher_user_id FROM timetable'))return {bind:()=>({first:async()=>({id:9,teacher_user_id:4})})};
+  throw Error('Unexpected SQL: '+sql);
+ }};
+ await assert.rejects(()=>teacherTimetableRoutes(
+  new Request('https://test.local/api/my-timetable/9/update',{method:'POST',body:JSON.stringify(good)}),
+  {DB:db},{id:55,role:'staff'},'/api/my-timetable/9/update'),{code:403});
+});
 test('conflicting teacher-created timeslots cannot be activated',async()=>{
  let wrote=false;
  const db={prepare(sql){

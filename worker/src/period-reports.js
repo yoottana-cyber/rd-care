@@ -18,7 +18,7 @@ export function verifyWeekStart(value){
  return value;
 }
 export async function periodWeekStatus(req,env,user){
- if(user.role!=='teacher')fail(403,'เฉพาะครูผู้สอน');
+ if(!['teacher','staff'].includes(user.role))fail(403,'เฉพาะครูผู้สอนหรือฝ่ายกิจการนักเรียน');
  const monday=verifyWeekStart(new URL(req.url).searchParams.get('start'));
  const last=new Date(utcDate(monday)+6*86400000).toISOString().slice(0,10);
  const {results}=await env.DB.prepare(`SELECT a.timetable_id,a.school_date,COUNT(*) AS recorded,
@@ -33,7 +33,7 @@ export async function periodWeekStatus(req,env,user){
  return json({items:results,from:monday,to:last});
 }
 export async function periodCourseReport(req,env,user){
- if(user.role!=='teacher')fail(403,'เฉพาะครูผู้สอน');
+ if(!['teacher','staff'].includes(user.role))fail(403,'เฉพาะครูผู้สอนหรือฝ่ายกิจการนักเรียน');
  const q=new URL(req.url).searchParams;
  const {from,to}=dateRange(q);
  const selected=q.has('timetable_id')?asId(q.get('timetable_id')):null;

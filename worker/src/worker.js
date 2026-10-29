@@ -156,13 +156,12 @@ async function getTimetable(req,env,user){
   WHERE t.active=1 AND t.day_of_week=?`;
  const args=[day];
  if(roomId){await assertRoom(env,user,roomId);query+=' AND t.classroom_id=?';args.push(roomId);}
- if(!isStaff(user)){
-  if(url.searchParams.get('scope')==='mine'){
-   query+=' AND t.teacher_user_id=?';args.push(user.id);
-  }else{
-   query+=` AND (t.teacher_user_id=? OR c.advisor_user_id=?)`;
-   args.push(user.id,user.id);
-  }
+ // Staff may also teach: "mine" must always scope to their lessons.
+ if(url.searchParams.get('scope')==='mine'){
+  query+=' AND t.teacher_user_id=?';args.push(user.id);
+ }else if(!isStaff(user)){
+  query+=` AND (t.teacher_user_id=? OR c.advisor_user_id=?)`;
+  args.push(user.id,user.id);
  }
  query+=' ORDER BY t.period,c.grade,c.room';
  const {results}=await env.DB.prepare(query).bind(...args).all();
@@ -688,7 +687,7 @@ async function adminRoutes(req,env,user,path){
  }
  if(req.method==='POST'&&path==='/api/admin/advisor'){
   const b=await payload(req),roomId=positiveInt(b.classroom_id),teacherId=positiveInt(b.teacher_user_id);
-  const t=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='teacher' AND active=1").bind(teacherId).first();
+  const t=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role IN ('teacher','staff') AND active=1").bind(teacherId).first();
   if(!roomId||!t)throw error(400,'เลือกครูและห้องเรียนให้ถูกต้อง');
   const res=await env.DB.prepare('UPDATE classrooms SET advisor_user_id=? WHERE id=?').bind(teacherId,roomId).run();
   if(!res.meta.changes)throw error(404,'ไม่พบห้องเรียน');

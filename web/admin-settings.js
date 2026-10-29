@@ -20,6 +20,9 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
  const roomsHtml=()=>rooms().map(r=>`<option value="${r.id}">${safe(r.label)}</option>`).join('');
  const teachersHtml=()=>users().filter(u=>u.active&&u.role==='teacher')
   .map(u=>`<option value="${u.id}">${safe(u.display_name)} (@${safe(u.username)})</option>`).join('');
+ // Student Affairs users can teach without changing their account role.
+ const teachingStaffHtml=()=>users().filter(u=>u.active&&['teacher','staff'].includes(u.role))
+  .map(u=>`<option value="${u.id}">${safe(u.display_name)} (@${safe(u.username)})${u.role==='staff'?' • ฝ่ายกิจการนักเรียน':''}</option>`).join('');
  const panel=(icon,title,subtitle)=>`<div class="rd-settings-panel-head">
   <span class="rd-settings-panel-symbol" aria-hidden="true">${icon}</span>
   <div><h3>${title}</h3><p>${subtitle}</p></div></div>`;
@@ -124,7 +127,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
      <form id="addSlot" class="rd-settings-form">
       <div class="rd-settings-fields-two">
        <div class="field"><label for="slotRoom">ห้องเรียน</label><select id="slotRoom" name="classroom_id">${roomsHtml()}</select></div>
-       <div class="field"><label for="slotTeacher">ครูผู้สอน</label><select id="slotTeacher" name="teacher_user_id">${teachersHtml()}</select></div>
+       <div class="field"><label for="slotTeacher">ครูผู้สอน</label><select id="slotTeacher" name="teacher_user_id">${teachingStaffHtml()}</select></div>
        <div class="field"><label for="slotWeekday">วันสอน</label><select id="slotWeekday" name="day_of_week">
        ${['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'].map((d,i)=>`<option value="${i+1}">${d}</option>`).join('')}</select></div>
        <div class="field"><label for="slotPeriod">คาบสอน</label><select id="slotPeriod" name="period_range">

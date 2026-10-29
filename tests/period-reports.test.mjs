@@ -14,10 +14,21 @@ function database(){
   }}};
  }};
 }
-test('weekly status never leaks another role attendance rows',async()=>{
+test('weekly status still refuses admin-owned reporting view',async()=>{
  const db=database();
- await assert.rejects(()=>periodWeekStatus(request('/api/my-timetable/week-status?start=2026-10-26'),{DB:db},{id:7,role:'staff'}),{code:403});
+ await assert.rejects(()=>periodWeekStatus(request('/api/my-timetable/week-status?start=2026-10-26'),{DB:db},{id:7,role:'admin'}),{code:403});
  assert.equal(db.calls.length,0);
+});
+test('Student Affairs teaching attendance reports are scoped to own classes',async()=>{
+ const db=database();
+ const res=await periodWeekStatus(request('/api/my-timetable/week-status?start=2026-10-26'),{DB:db},{id:55,role:'staff'});
+ assert.equal(res.status,200);
+ assert.deepEqual(db.calls[0].values,[55,'2026-10-26','2026-11-01']);
+ assert.match(db.calls[0].sql,/t\.teacher_user_id=\?/);
+ const reports=database();
+ const r=await periodCourseReport(request('/api/my-timetable/report?from=2026-10-01&to=2026-10-26'),{DB:reports},{id:55,role:'staff'});
+ assert.equal(r.status,200);
+ assert.deepEqual(reports.calls[0].values,['2026-10-01','2026-10-26',55]);
 });
 test('week start must be a valid Monday; reporting dates are bounded',async()=>{
  assert.equal(verifyWeekStart('2026-10-26'),'2026-10-26');

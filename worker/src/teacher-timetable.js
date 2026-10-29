@@ -99,7 +99,7 @@ async function archiveLesson(env,user,id){
  return response({ok:true});
 }
 export async function teacherTimetableRoutes(req,env,user,path){
- if(user.role!=='teacher')fail(403,'เฉพาะบัญชีครูผู้สอนเท่านั้น');
+ if(!['teacher','staff'].includes(user.role))fail(403,'เฉพาะบัญชีครูผู้สอนหรือฝ่ายกิจการนักเรียนเท่านั้น');
  if(path==='/api/my-timetable'&&req.method==='GET')return myTimetable(env,user);
  if(path==='/api/my-timetable'&&req.method==='POST')return saveLesson(req,env,user,null);
  const edit=/^\/api\/my-timetable\/(\d+)\/(update|archive)$/.exec(path);

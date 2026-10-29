@@ -57,7 +57,7 @@ function swHarness(){
  };
  const caches={
   async open(){return cache},
-  async keys(){return ['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78','rd-care-shell-v79','rd-care-shell-v80','rd-care-shell-v81','rd-care-shell-v82','rd-care-shell-v83','rd-care-shell-v84','rd-care-shell-v85','rd-care-shell-v86','rd-care-shell-v87','rd-care-shell-v88','rd-care-shell-v89','rd-care-shell-v90','rd-care-shell-v91','rd-care-shell-v92','rd-care-shell-v93','rd-care-shell-v94','rd-care-shell-v95','rd-care-shell-v96','rd-care-shell-v97','rd-care-shell-v98','rd-care-shell-v99','rd-care-shell-v100','another-app-data']},
+  async keys(){return ['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78','rd-care-shell-v79','rd-care-shell-v80','rd-care-shell-v81','rd-care-shell-v82','rd-care-shell-v83','rd-care-shell-v84','rd-care-shell-v85','rd-care-shell-v86','rd-care-shell-v87','rd-care-shell-v88','rd-care-shell-v89','rd-care-shell-v90','rd-care-shell-v91','rd-care-shell-v92','rd-care-shell-v93','rd-care-shell-v94','rd-care-shell-v95','rd-care-shell-v96','rd-care-shell-v97','rd-care-shell-v98','rd-care-shell-v99','rd-care-shell-v100','rd-care-shell-v101','another-app-data']},
   async delete(key){deleted.push(key);return true}
  };
  const deleted=[],requested=[];
@@ -90,7 +90,7 @@ test('worker preloads shell and removes only old RD CONNECT caches, retaining un
  assert.ok(h.entries.has('https://example.test/rd-care/teacher-score-monitor.js'));
  assert.ok(h.entries.has('https://example.test/rd-care/pwa-updates.js'));
  await new Promise((resolve,reject)=>h.handlers.get('activate')({waitUntil:p=>p.then(resolve,reject)}));
- assert.deepEqual(h.deleted,['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78','rd-care-shell-v79','rd-care-shell-v80','rd-care-shell-v81','rd-care-shell-v82','rd-care-shell-v83','rd-care-shell-v84','rd-care-shell-v85','rd-care-shell-v86','rd-care-shell-v87','rd-care-shell-v88','rd-care-shell-v89','rd-care-shell-v90','rd-care-shell-v91','rd-care-shell-v92','rd-care-shell-v93','rd-care-shell-v94','rd-care-shell-v95','rd-care-shell-v96','rd-care-shell-v97','rd-care-shell-v98','rd-care-shell-v99','rd-care-shell-v100']);
+ assert.deepEqual(h.deleted,['rd-care-shell-v76','rd-care-shell-v77','rd-care-shell-v78','rd-care-shell-v79','rd-care-shell-v80','rd-care-shell-v81','rd-care-shell-v82','rd-care-shell-v83','rd-care-shell-v84','rd-care-shell-v85','rd-care-shell-v86','rd-care-shell-v87','rd-care-shell-v88','rd-care-shell-v89','rd-care-shell-v90','rd-care-shell-v91','rd-care-shell-v92','rd-care-shell-v93','rd-care-shell-v94','rd-care-shell-v95','rd-care-shell-v96','rd-care-shell-v97','rd-care-shell-v98','rd-care-shell-v99','rd-care-shell-v100','rd-care-shell-v101']);
 });
 test('worker never intercepts private API calls or unknown same-origin resources',()=>{
  const h=swHarness(),fetchHandler=h.handlers.get('fetch');

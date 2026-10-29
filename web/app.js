@@ -89,6 +89,7 @@ let adminEditUserId=null;
 const names={present:'มา',absent:'ขาด',late:'สาย',leave:'ลา'};
 const periodNames={...names,truancy:'หนีเรียน'};
 const roles={admin:'ผู้ดูแลระบบ',teacher:'ครู',staff:'ฝ่ายกิจการนักเรียน'};
+const canTeach=()=>['teacher','staff'].includes(state.user?.role);
 let toastTimer;
 let portalAdminUI=null;
 const portalUi=createPortalUi({root:$('#app'),onStaffLogin:()=>showEntrySelection(),onLegacyLateReport:()=>renderStudentLate(),
@@ -254,7 +255,7 @@ async function boot(){
 function roleName(){return roles[state.user?.role]||state.user?.role;}
 function chrome(content){
  const displayDate=new Intl.DateTimeFormat('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',year:'numeric'}).format(new Date());
- const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(state.user?.role==='teacher'?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],...(['teacher','staff','admin'].includes(state.user?.role)?[['scoreMonitor','ติดตามคะแนนพฤติกรรม','📊']]:[]),['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['studentStatistics','สถิติจำนวนนักเรียน','📊'],['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️'],['schoolSettings','ตั้งค่าระบบโรงเรียน','🏫'],['timetableAudit','ตรวจสอบตารางสอน','🔍'],['termSnapshots','ทะเบียนและตารางสอนรายภาคเรียน','📘']]:[])];
+ const navs=[['dashboard','หน้าหลัก','🏠'],['attendance','เช็กชื่อรายวัน','📅'],['periodAttendance','เช็กชื่อรายคาบ','✅'],...(canTeach()?[['myTimetable','ตารางสอนของฉัน','📚']]:[]),['advisorCenter','ศูนย์ครูที่ปรึกษา','🧑‍🏫'],...((state.user?.role==='admin'||Number(state.user?.student_affairs)===1)?[['studentAffairs','ฝ่ายกิจการนักเรียน','🏫']]:[]),['late','มาสาย','⏰'],['lateGate','QR มาสาย','📷'],['behavior','คะแนนพฤติกรรม','⚖️'],...(['teacher','staff','admin'].includes(state.user?.role)?[['scoreMonitor','ติดตามคะแนนพฤติกรรม','📊']]:[]),['adjustment','บันทึกการปรับพฤติกรรม','🌱'],['good','คะแนนความดี','⭐'],['alerts','ตรวจสอบขาด','🔎'],...(state.user?.role==='admin'?[['studentStatistics','สถิติจำนวนนักเรียน','📊'],['adminStudents','จัดการนักเรียน','🎓'],['portalStudentAccounts','บัญชีนักเรียน','🎓'],['portalGuardianAccounts','บัญชีผู้ปกครอง','👥'],['portalGuardianLinks','ความสัมพันธ์ผู้ปกครอง','🔗'],['admin','ครูและระบบ','⚙️'],['schoolSettings','ตั้งค่าระบบโรงเรียน','🏫'],['timetableAudit','ตรวจสอบตารางสอน','🔍'],['termSnapshots','ทะเบียนและตารางสอนรายภาคเรียน','📘']]:[])];
  const sidebar=renderSidebarNavigation(navs,state.tab);
  const page=pageLocation(navs,state.tab);
  const pageIcon=navs.find(x=>x[0]===(state.tab==='periodCheckin'?'periodAttendance':state.tab))?.[2]||'✦';
@@ -373,7 +374,7 @@ async function showTab(tab){scorePopup.close();if(tab!=='lateGate')lateGate.dest
  if(tab==='dashboard')return loadDashboard();
  if(tab==='notifications')return notificationSettings.load();
  if(tab==='attendance'||tab==='periodCheckin')return loadAttendance();
- if(tab==='periodAttendance')return state.user?.role==='teacher'?periodCenter.load():loadAttendance();
+ if(tab==='periodAttendance')return canTeach()?periodCenter.load():loadAttendance();
  if(tab==='myTimetable')return myTimetable.load();
  if(tab==='advisorCenter')return loadAdvisorCenter();
  if(tab==='studentAffairs'){
@@ -444,7 +445,7 @@ function renderDashboard(){
  const actions=[
   ['attendance','📅','เช็กชื่อรายวัน','สำหรับครูที่ปรึกษา','quick-purple'],
   ['periodAttendance','✅','เช็กชื่อรายคาบ','สำหรับครูผู้สอน','quick-teal'],
-  ...(state.user?.role==='teacher'?[['myTimetable','📚','ตารางสอนของฉัน','สร้างตารางสอนรายสัปดาห์','quick-blue']]:[]),
+  ...(canTeach()?[['myTimetable','📚','ตารางสอนของฉัน','สร้างตารางสอนรายสัปดาห์','quick-blue']]:[]),
   ['advisorCenter','🧑‍🏫','ศูนย์ครูที่ปรึกษา','ตรวจสอบงานขาดเรียน','quick-purple'],
   ['late','⏰','มาสาย','ตรวจสอบรายการมาสาย','quick-teal'],
   ['behavior','⚖️','คะแนนพฤติกรรม','บันทึกความผิดตามเกณฑ์โรงเรียน','quick-orange'],
@@ -498,7 +499,7 @@ async function loadAttendance(){
   if(!eligible.some(r=>r.id===roomId))roomId=eligible[0].id;
   state.roomId=roomId;state.slots=[];
  }else{
-  const response=await api('/api/timetable?date='+encodeURIComponent(date)+(state.user?.role==='teacher'?'&scope=mine':''));
+  const response=await api('/api/timetable?date='+encodeURIComponent(date)+(canTeach()?'&scope=mine':''));
   if(state.tab!==tab||state.date!==date)return;
   state.slots=response.items;
   let slot=state.slots.find(r=>r.id===state.slotId);
@@ -506,8 +507,8 @@ async function loadAttendance(){
   if(!slot){
    mount(`<section class="stack"><h2>เช็กชื่อรายคาบ</h2>
     <div class="card stack"><div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(date)}"></div>
-    <p class="warn">วันนี้ยังไม่มีคาบสอนตามตารางของคุณ ${state.user?.role==='teacher'?'กรุณาสร้างตารางสอนของตนเอง หรือเลือกวันที่มีคาบสอน':'กรุณาเลือกวันที่มีตารางสอน'}</p>
-    ${state.user?.role==='teacher'?'<button class="button" data-tab="myTimetable" type="button">+ สร้างตารางสอนของฉัน</button>':''}</div></section>`);
+    <p class="warn">วันนี้ยังไม่มีคาบสอนตามตารางของคุณ ${canTeach()?'กรุณาสร้างตารางสอนของตนเอง หรือเลือกวันที่มีคาบสอน':'กรุณาเลือกวันที่มีตารางสอน'}</p>
+    ${canTeach()?'<button class="button" data-tab="myTimetable" type="button">+ สร้างตารางสอนของฉัน</button>':''}</div></section>`);
    $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
    return;
   }
@@ -575,11 +576,11 @@ function renderAttendance(){
  const roomSelect=eligible.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
  const slotOptions=state.slots.map(t=>{
   const period=Number(t.end_period||t.period)===t.period?t.period:t.period+'-'+t.end_period;
-  return `<option value="${t.id}" ${t.id===state.slotId?'selected':''}>คาบ ${period} • ${esc(t.classroom_label)} • ${esc(t.subject_code||'')}${t.subject_code?' / ':''}${esc(t.subject)}${state.user?.role==='teacher'?'':' ('+esc(t.teacher_name)+')'}</option>`;
+  return `<option value="${t.id}" ${t.id===state.slotId?'selected':''}>คาบ ${period} • ${esc(t.classroom_label)} • ${esc(t.subject_code||'')}${t.subject_code?' / ':''}${esc(t.subject)}${canTeach()?'':' ('+esc(t.teacher_name)+')'}</option>`;
  }).join('');
  const students=state.students.map(s=>`<div class="student" data-id="${s.id}"><div><div class="student-name">${s.roll_no}. ${esc(s.full_name)}</div><div class="student-sub">รหัส ${esc(s.student_no)}</div>
  ${!daily?`<span class="daily-student-badge daily-ref-${dailyReferenceStatus(s.id)}" aria-label="สถานะเช็กชื่อรายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}">รายวัน: ${dailyReferenceStatus(s.id)==='unrecorded'?'ยังไม่บันทึก':names[dailyReferenceStatus(s.id)]}</span>`:''}</div><div class="pills">${Object.keys(daily?names:periodNames).map(status=>`<button type="button" data-student="${s.id}" data-status="${status}" class="pill ${state.statuses[s.id]===status?status:''}" aria-pressed="${state.statuses[s.id]===status}">${(daily?names:periodNames)[status]}</button>`).join('')}</div></div>`).join('');
- mount(`<section class="stack">${!daily&&state.user?.role==='teacher'?'<div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>':''}
+ mount(`<section class="stack">${!daily&&canTeach()?'<div class="period-return"><button type="button" class="button ghost" data-tab="periodAttendance">← กลับตารางสอนรายสัปดาห์</button></div>':''}
  <div><h2>${daily?'📅 เช็กชื่อรายวัน':'✅ เช็กชื่อรายคาบ'}</h2>
   <p class="muted">${daily?'สำหรับครูที่ปรึกษา • เช็กชื่อห้องที่รับผิดชอบ':'สำหรับครูผู้สอน • เลือกวิชาจากตารางสอนของตนเองได้ แม้จะไม่ใช่ครูที่ปรึกษาของห้อง'}</p></div>
  <div class="card stack">
@@ -587,7 +588,7 @@ function renderAttendance(){
  <div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" max="${dateToday()}" value="${esc(state.date)}"></div></div>`:
  `<div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(state.date)}"></div>
  <div class="field"><label for="slot">รายวิชาและคาบเรียน</label><select id="slot">${slotOptions}</select></div>
- ${state.user?.role==='teacher'?'<button type="button" class="button secondary" data-tab="myTimetable">📚 จัดการตารางสอนของฉัน</button>':''}`}
+ ${canTeach()?'<button type="button" class="button secondary" data-tab="myTimetable">📚 จัดการตารางสอนของฉัน</button>':''}`}
  </div><div class="card stack">
  ${!daily?renderDailyOverview():''}
  ${!daily?'<p class="warn">🚨 เมื่อบันทึก “หนีเรียน” จะหักคะแนนพฤติกรรมหัวข้อหนีเรียน -10 อัตโนมัติ (ไม่หักซ้ำเมื่อบันทึกเดิม) และระบบจะตรวจอุปกรณ์ของครูที่ปรึกษาและผู้ปกครองที่เปิดรับ Push แล้ว และแสดงผลตรวจสอบหลังบันทึก • การแก้ไขย้อนหลังจะส่งเหตุที่เพิ่งแก้ภายในช่วง 14 วันที่อนุญาต โปรดตรวจสอบก่อนยืนยัน</p>':''}
