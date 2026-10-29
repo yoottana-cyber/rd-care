@@ -213,7 +213,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
        `<option value="${k}" ${selected?.category===k?'selected':''}>${v}</option>`).join('')}
       </select></div>`:''}
       <div class="field"><label>${isAdjustment?'คะแนนปรับพฤติกรรม (+)':isGood?'คะแนนความดี (+)':'คะแนนความผิดที่หัก (-)'}</label>
-       <input name="points" type="number" ${isAdjustment||isGood?'min="1" max="50"':'min="-50" max="-1"'} required
+       <input name="points" type="number" ${isAdjustment?'min="1" max="50"':isGood?'min="1"':'max="-1"'} required
         value="${selected?.points||''}" placeholder="${isAdjustment?'5 หรือ 10':isGood?'5':'-5'}"></div>
      </div>
      <label class="row"><input name="active" type="checkbox" ${!selected||selected.active?'checked':''}> เปิดใช้งานเกณฑ์นี้</label>
