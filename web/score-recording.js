@@ -31,7 +31,8 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  }
  function draw(){
   const key=mode(),u=modes[key],isGood=key==='good',count=u.picked.size;
-  const authorized=getUser()?.role==='admin'||getUser()?.role==='staff'||Number(getUser()?.student_affairs)===1;
+  const authorized=getUser()?.role==='admin'||
+   (getUser()?.role==='teacher'&&Number(getUser()?.student_affairs)===1);
   const filtered=u.rules.filter(r=>Number(r.automatic)!==1&&
    (isGood?r.category==='good':r.category!=='good'&&
     (authorized||!['serious','very_serious'].includes(r.category))));
