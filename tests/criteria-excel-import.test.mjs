@@ -38,6 +38,7 @@ test('criteria Excel templates have correct first worksheet and Thai instruction
   for(const key of ['rule_id','category','name','points','active'])assert.ok(first.includes(key));
   assert.ok(!first.includes('student_no'));
   assert.ok(text.includes('Existing rules'));
+  assert.ok(!text.includes('ม.1/1')); // school criteria examples must not contain classroom catalog
   assert.ok(text.includes('คะแนนนักเรียน'));
   assert.ok(text.includes('เกณฑ์หนีเรียน')); // documented protected automatic rule
   if(mode==='good')assert.ok(text.includes('ช่วยงานโรงเรียน'));
