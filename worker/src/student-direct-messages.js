@@ -1,3 +1,4 @@
+import {notificationEnabled} from './notification-policy.js';
 import {sendStudentDirectMessagePush} from './staff-push.js';
 
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
@@ -105,6 +106,7 @@ export async function portalStudentMessages(req,env,account,path){
 }
 
 export async function deliverStudentMessages(env,{messageId=null}={}){
+ if(!await notificationEnabled(env,'student_message'))return {processed:0,delivered:0,enabled:false};
  if(!env.DB||!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_KEY||!env.VAPID_SUBJECT)
   return {processed:0,delivered:0,enabled:false};
  const [records]=await Promise.all([
