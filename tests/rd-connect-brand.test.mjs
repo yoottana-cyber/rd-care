@@ -8,12 +8,13 @@ const bytes=path=>readFileSync(new URL('../'+path,import.meta.url));
 const manifest=JSON.parse(read('web/manifest.webmanifest'));
 test('RD CONNECT name stays consistent across staff, guardian, student and browser entrypoints',()=>{
  const html=read('web/index.html'),app=read('web/app.js'),portal=read('web/portal-ui.js');
- assert.match(html,/<title>RD CONNECT \| ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา<\/title>/);
+ assert.ok(html.includes('<title>RD CONNECT — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา</title>'));
  assert.match(html,/apple-mobile-web-app-title" content="RD CONNECT"/);
  assert.match(html,/application-name" content="RD CONNECT"/);
  assert.match(html,/rd-connect\.svg/);
  for(const content of [app,portal]){
   assert.match(content,/RD CONNECT/);
+  assert.ok(content.includes('ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา'));
   assert.match(content,/โรงเรียนรัษฎา/);
   assert.match(content,/เชื่อมทุกความห่วงใย ดูแลทุกก้าวของนักเรียน/);
   assert.doesNotMatch(content,/RD Care|RD CARE/);
@@ -27,7 +28,15 @@ test('RD CONNECT name stays consistent across staff, guardian, student and brows
 });
 test('installed PWA identity and shortcuts use RD CONNECT without changing app scope',()=>{
  assert.equal(manifest.short_name,'RD CONNECT');
- assert.match(manifest.name,/RD CONNECT/);
+ assert.equal(manifest.name,'RD CONNECT — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา');
+ assert.ok(manifest.description.includes('RD CONNECT — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา'));
+ for(const role of ['staff','student','guardian']){
+  const scoped=JSON.parse(read('web/manifest-'+role+'.webmanifest'));
+  assert.ok(scoped.description.includes('RD CONNECT — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา'));
+  assert.match(scoped.name,/RD CONNECT/);
+  assert.ok(scoped.short_name.startsWith('RD '));
+ }
+ assert.ok(read('web/pwa-role.js').includes('ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา'));
  assert.equal(manifest.id,'./');
  assert.equal(manifest.start_url,'./');
  assert.equal(manifest.scope,'./');

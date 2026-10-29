@@ -83,3 +83,9 @@
  background:#f4fcf7;color:#137549;font-weight:750;text-decoration:none;font-size:12px}
 .rd-mobile-role-link{display:block;text-align:center;border-radius:12px;padding:11px;background:#e9f8f0;color:#166642;text-decoration:none;font-weight:700}
 @media(min-width:769px){.rd-push-intro{bottom:24px}}
+
+/* Let the full official RD CONNECT system title wrap without clipping on phones. */
+.rd-shell>.top .brand{min-width:0}
+.rd-shell>.top .brand>div{min-width:0}
+.rd-shell>.top .brand p{max-width:min(560px,65vw);line-height:1.55;overflow-wrap:break-word}
+@media(max-width:560px){.rd-shell>.top .brand p{max-width:calc(100vw - 118px)}}

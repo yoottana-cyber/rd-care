@@ -17,7 +17,7 @@ test('official Ratsada school crest remains valid and available locally',()=>{
 test('staff login uses Ratsada identity, school crest with local fallback, and developer credit',()=>{
  const app=read('web/app.js');
  const region=app.slice(app.indexOf('function loginPage(){'),app.indexOf('function renderLogin(){'));
- assert.match(region,/ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา/);
+ assert.match(region,/ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา/);
  assert.match(region,/src="https:\/\/www\.ratsada\.ac\.th\/images\/symbol\.png"/);
  assert.match(app,/ratsada-crest\.webp/);
  assert.match(region,/พัฒนาโดย ครูยุทธนา บุญจันทร์/);
@@ -52,7 +52,7 @@ test('login style is scoped, responsive and preserves green school identity',()=
  assert.match(css,/focus-visible/);
  const meta=read('web/index.html');
  assert.match(meta,/stylesheet" href="\.\/login\.css"/);
- assert.match(meta,/ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา/);
+ assert.match(meta,/ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา/);
 });
 test('new login assets are precached for PWA with offline crest fallback',()=>{
  const sw=read('web/sw.js');

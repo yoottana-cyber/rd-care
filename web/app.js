@@ -124,7 +124,7 @@ function entrySelectionPage(){
    <span class="brand-code">RD CONNECT • RATSADA SCHOOL</span>
    <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="150" height="140" decoding="async" fetchpriority="high">
    <h1>RD CONNECT</h1>
-   <p class="brand-system-name">ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+   <p class="brand-system-name">ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา</p>
    <p class="brand-choice-prompt">เชื่อมทุกความห่วงใย ดูแลทุกก้าวของนักเรียน</p>
    <p class="brand-choice-prompt">เลือกประเภทผู้เข้าใช้งาน</p>
   </header>
@@ -164,7 +164,7 @@ function loginPage(){
   <span class="brand-code">RD CONNECT • RATSADA SCHOOL</span>
   <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
   <h1>RD CONNECT</h1>
-  <p class="brand-system-name">ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+  <p class="brand-system-name">ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา</p>
   <p class="brand-subtitle">เชื่อมทุกความห่วงใย ดูแลทุกก้าวของนักเรียน</p>
  </header>
  <div class="login-content">
@@ -277,7 +277,7 @@ function chrome(content){
   '<div class="rd-page-mark" aria-hidden="true">'+pageIcon+'</div></header>';
  const bottom=navs.map(([id,label,ico])=>`<button class="${(state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'))?'active':''}" data-tab="${id}" type="button">${ico} ${label}</button>`).join('');
  return `<main class="shell rd-shell">
- <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>RD CONNECT</h1><p>ระบบการดูแลช่วยเหลือนักเรียน • โรงเรียนรัษฎา</p></div></div>
+ <header class="top"><div class="brand"><img class="brand-logo rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async"><div><h1>RD CONNECT</h1><p>ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา</p></div></div>
  <div class="rd-mobile-header-actions"><button type="button" data-tab="notifications" aria-label="ศูนย์แจ้งเตือน">♧</button>
  <button type="button" id="rdHeaderMenu" aria-label="เปิดเมนู">☰</button></div>
  <div class="user"><span class="rd-date-chip" aria-label="วันที่ปัจจุบัน">📅 ${esc(displayDate)}</span><span class="rd-user-avatar" aria-hidden="true">${esc((state.user.display_name||'ค').trim().charAt(0))}</span><div><strong>${esc(state.user.display_name)}</strong><br><span>${esc(roleName())}</span></div><button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button><button id="logout" class="button ghost" type="button">ออกจากระบบ</button></div></header>
@@ -295,7 +295,7 @@ function chrome(content){
  ${content}
  </div>
  </div>${mobileMarkup({navs,user:state.user,active:id=>state.tab===id||(id==='periodAttendance'&&state.tab==='periodCheckin'),pending:Number(state.stats?.alerts||0)})}
- <footer class="foot">RD CONNECT • ระบบเช็กชื่อและดูแลช่วยเหลือนักเรียน • Push ผู้ปกครองต้องเปิดรับด้วยตนเอง</footer></main>`;
+ <footer class="foot">RD CONNECT — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา • Push ผู้ปกครองต้องเปิดรับด้วยตนเอง</footer></main>`;
 }
 function mount(content){
  document.body.classList.remove('rd-affairs-modal-open');

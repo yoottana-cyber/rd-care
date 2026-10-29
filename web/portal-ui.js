@@ -120,7 +120,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
       <span class="brand-code">RD CONNECT • RATSADA SCHOOL</span>
       <img class="login-crest rd-school-crest" src="https://www.ratsada.ac.th/images/symbol.png" alt="ตราโรงเรียนรัษฎา" width="200" height="185" decoding="async" fetchpriority="high">
       <h1>RD CONNECT</h1>
-      <p class="brand-system-name">ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+      <p class="brand-system-name">ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา</p>
       <p class="brand-subtitle">เชื่อมทุกความห่วงใย ดูแลทุกก้าวของนักเรียน</p>
     </header>
     <div class="login-content">
@@ -625,7 +625,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
      <div class="rd-portal-role-links"><a href="./?login=student">🎓 นักเรียน</a><a href="./?login=guardian">👨‍👩‍👧 ผู้ปกครอง</a><a href="./?login=staff">👩‍🏫 ครู</a></div>
      <button type="button" id="portalLogout" class="rd-portal-outline rd-portal-logout">ออกจากระบบ</button>
-     <p class="rd-portal-help">RD CONNECT • ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
+     <p class="rd-portal-help">RD CONNECT • ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา</p>
      <small>พัฒนาโดย ครูยุทธนา บุญจันทร์</small>
     </section>
    </section>`);
