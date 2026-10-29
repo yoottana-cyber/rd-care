@@ -20,10 +20,9 @@ function env({rules=catalog,prior=[]}={}){
  const DB={
   prepare(sql){
    const ref={sql,args:[]};calls.push(ref);
-   return {bind(...values){ref.args=values;return {
-    all:async()=>({results:sql.includes('FROM affairs_criteria_import_receipts')?prior:
-      sql.includes('FROM affairs_behavior_rules r')?rules:[]})
-   }}};
+   const all=async()=>({results:sql.includes('FROM affairs_criteria_import_receipts')?prior:
+    sql.includes('FROM affairs_behavior_rules r')?rules:[]});
+   return {all,bind(...values){ref.args=values;return {all}}};
   },
   batch:async stmts=>{batches.push(stmts);return stmts.map(()=>({meta:{changes:1}}))}
  };
