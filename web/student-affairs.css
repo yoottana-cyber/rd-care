@@ -143,3 +143,27 @@ body.rd-affairs-modal-open{overflow:hidden}
 .rd-affairs-message-item small{color:#617b6d}
 [data-theme="dark"] .rd-affairs-message-item{background:#234234;border-color:#426853}
 [data-theme="dark"] .rd-affairs-message-compose .summary{background:#29523a}
+
+/* Excel import belongs to Student Affairs > School score criteria, not student records. */
+.rd-criteria-import-block{display:grid;gap:12px;border-top:1px solid #d9ebe0;margin-top:16px;padding-top:16px}
+.rd-criteria-import-block h4{font-size:16px;font-weight:800;color:#126342;margin:0}
+.rd-criteria-import-block>.row.between{gap:12px;flex-wrap:wrap}
+.rd-criteria-import-block input[type=file]{width:100%;padding:12px;border:1px dashed #8cc6a1;
+ border-radius:13px;background:#f5faf7;color:inherit}
+.rd-criteria-import-summary{display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:8px;padding:12px 14px;background:#e9f8ef;border-radius:13px;color:#145b39}
+.rd-criteria-import-summary strong{overflow-wrap:anywhere}
+.rd-criteria-import-tools{display:flex;align-items:center;flex-wrap:wrap;gap:7px}
+.rd-criteria-import-tools button[aria-pressed=true]{background:#087c4c;color:#fff}
+.rd-criteria-import-preview{max-height:350px;overflow:auto;border:1px solid #d6e7de;border-radius:12px}
+.rd-criteria-import-preview table{min-width:750px;width:100%}
+.rd-criteria-import-preview th{position:sticky;top:0;background:#e1f3e8;z-index:1}
+.rd-criteria-import-preview td{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+.rd-criteria-import-invalid{background:#ffefec;color:#8f3326}
+[data-theme="dark"] .rd-criteria-import-block{border-color:#3c674b}
+[data-theme="dark"] .rd-criteria-import-block h4{color:#a1edbe}
+[data-theme="dark"] .rd-criteria-import-block input[type=file]{background:#23422f;border-color:#588d6d}
+[data-theme="dark"] .rd-criteria-import-summary{background:#2b5439;color:#e0f8e7}
+[data-theme="dark"] .rd-criteria-import-preview th{background:#28523a;color:#e3f7e9}
+[data-theme="dark"] .rd-criteria-import-invalid{background:#5a302b;color:#ffe9e5}
+@media(max-width:650px){.rd-criteria-import-block #affairsCriteriaDownload{width:100%}}
