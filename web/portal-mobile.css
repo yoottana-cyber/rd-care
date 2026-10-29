@@ -295,3 +295,9 @@
 .rd-student-message .rd-portal-primary{min-height:43px}
 [data-theme="dark"] .rd-student-message{background:#214032;border-color:#3c604a}
 [data-theme="dark"] .rd-student-message-unread{background:#2c533b;border-color:#65a27b}
+
+/* Role-specific navigation: guardian has 5 views, student has 6. */
+.rd-portal-bottom.rd-portal-bottom-guardian{grid-template-columns:repeat(5,minmax(0,1fr))}
+.rd-portal-bottom.rd-portal-bottom-student{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media(max-width:420px){.rd-portal-bottom-student button{font-size:10px}
+ .rd-portal-bottom-student .rd-portal-nav-icon{font-size:23px}}
