@@ -16,3 +16,7 @@ secrets/
 private-data/
 exports/
 *.private.sql
+
+# Private production deployment settings and generated cPanel packages
+worker/wrangler.production.toml
+dist/

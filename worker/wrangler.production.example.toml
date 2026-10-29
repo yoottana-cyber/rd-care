@@ -1,0 +1,29 @@
+# Copy to wrangler.production.toml in worker/, then edit ONLY this copy.
+# This file is deliberately named .example so Dev auto-deployment ignores it.
+# Always supply --config wrangler.production.toml when targeting Production.
+name = "rd-care-api-prod"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+keep_vars = true
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+[vars]
+# Browser origin only: scheme + host (+port if nonstandard), WITHOUT /rd-connect/
+ALLOWED_ORIGINS = "https://REPLACE_WITH_SCHOOL_HOST"
+# Public school app folder, WITH trailing slash (used in printed late-QR links).
+PUBLIC_APP_URL = "https://REPLACE_WITH_SCHOOL_HOST/rd-connect/"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "rd-care-prod"
+# Must be a NEW D1 UUID from 'wrangler d1 create rd-care-prod', NEVER the Dev UUID.
+database_id = "REPLACE_WITH_NEW_PRODUCTION_D1_UUID"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+[observability.logs]
+invocation_logs = true
+head_sampling_rate = 0.1

@@ -2,6 +2,18 @@ import {autoApproveLateQr,revokeAutoLateQr} from './late-qr-auto.js';
 import {getLateCutoffTime} from './school-settings.js';
 // School gate QR check-in. Server time in Bangkok is authoritative.
 // Permanent printed QR is a public URL, NOT student authentication. Students must log in.
+// Separate Dev and Production printed QR destinations. Production sets
+// PUBLIC_APP_URL to the HTTPS hosting folder, e.g. https://care.school.ac.th/rd-connect/.
+// Without it, the existing Pages Dev URL is preserved unchanged.
+export function lateQrPublicUrl(env,code='gate'){
+ const base=env?.PUBLIC_APP_URL||'https://rd-care.pages.dev/';
+ let url;
+ try{url=new URL(base)}catch{throw new Error('PUBLIC_APP_URL is not a valid URL')}
+ if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||
+  !url.pathname.endsWith('/'))throw new Error('PUBLIC_APP_URL must be an HTTPS folder URL ending in /');
+ url.searchParams.set('late_qr',code);
+ return url.href;
+}
 const textEncoder=new TextEncoder();
 const stamp=()=>Math.floor(Date.now()/1000);
 export const schoolTime=(value=new Date())=>{
@@ -33,7 +45,7 @@ export async function lateGateStaffRoutes(req,env,user,path){
  if(path==='/api/late/qr/print'&&req.method==='GET'){
   // Stable printed QR is a public entry point, not a secret or an attendance receipt.
   // A school can print the same code once, and reuse it indefinitely.
-  const url='https://rd-care.pages.dev/?late_qr=gate';
+  const url=lateQrPublicUrl(env);
   const {default:qrcode}=await import('qrcode-generator');
   const qr=qrcode(0,'M');qr.addData(url);qr.make();
   return reply({url,svg:qr.createSvgTag({cellSize:8,margin:16,scalable:true}),permanent:true,
@@ -48,7 +60,7 @@ export async function lateGateStaffRoutes(req,env,user,path){
    env.DB.prepare('INSERT INTO late_qr_tokens(issued_by,school_date,token_hash,expires_at) VALUES(?,?,?,?)')
     .bind(user.id,day,await hashed(token),until)
   ]);
-  const url='https://rd-care.pages.dev/?late_qr='+token;
+  const url=lateQrPublicUrl(env,token);
   // SVG is generated locally in the Worker. No scanner token is sent to third parties.
   const {default:qrcode}=await import('qrcode-generator');
   const qr=qrcode(0,'M');qr.addData(url);qr.make();

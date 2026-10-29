@@ -41,7 +41,7 @@ export function createLateGate({api,mount,toast,safeRun}){
        ${state.qr?.svg||'<div class="empty">กำลังโหลด QR Code ถาวร</div>'}
       </div>
       <p class="late-qr-print-instruction">สแกนด้วยกล้องโทรศัพท์ → เข้าสู่ระบบบัญชีนักเรียน → กดยืนยันลงชื่อมาสาย</p>
-      <p class="late-qr-print-link">${esc(state.qr?.url||'https://rd-care.pages.dev/')}</p>
+      <p class="late-qr-print-link">${esc(state.qr?.url||new URL('./',location.href).href)}</p>
       <p class="late-qr-print-footer">ระบบการดูแลและช่วยเหลือนักเรียน • RD CONNECT</p>
      </div>
      <div class="late-qr-controls">
