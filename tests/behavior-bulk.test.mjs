@@ -23,7 +23,16 @@ function fakeDb({authorized=[12,13],searchItems=[],scoreRule=rule}={}){
     };
    }};
   },
-  batch:async statements=>{batches.push(statements);return statements.map((x,i)=>({meta:{changes:1,last_row_id:100+i}}));}
+  batch:async statements=>{
+   batches.push(statements);
+   const token=statements[0]?.args?.[3];
+   return statements.map((x,i)=>i===statements.length-1?{
+    success:true,results:authorized.map((student_id,j)=>({
+     id:100+j,student_id,affairs_rule_id:scoreRule.id,reason:scoreRule.name,
+     affairs_category:scoreRule.category,points_applied:scoreRule.points,
+     warning_no:0,behavior_record_id:200+j}))
+   }:{success:true,meta:{changes:4,last_row_id:900+i}});
+  }
  }};
 }
 const post=(path,body)=>new Request('https://rd-care.test'+path,
@@ -68,9 +77,14 @@ test('bulk merit recording defaults blank description to approved rule and audit
  assert.equal(env.batches.length,1);
  const inserts=env.calls.filter(x=>x.sql.includes('INSERT INTO behavior_incidents'));
  assert.equal(inserts.length,2);
- assert.deepEqual(inserts[0].args,[12,rule.name,7,12,4,4]);
- assert.deepEqual(inserts[1].args,[13,rule.name,7,13,4,4]);
- assert.equal(env.batches[0].length,2);
+ assert.deepEqual([inserts[0].args[0],inserts[0].args[1],inserts[0].args[2],...inserts[0].args.slice(4)],
+  [12,rule.name,7,12,4,4]);
+ assert.deepEqual([inserts[1].args[0],inserts[1].args[1],inserts[1].args[2],...inserts[1].args.slice(4)],
+  [13,rule.name,7,13,4,4]);
+ assert.equal(env.batches[0].length,3); // 2 inserts + receipt SELECT
+ assert.match(inserts[0].args[3],/^[0-9a-f-]{36}$/);
+ assert.equal(inserts[0].args[3],inserts[1].args[3]);
+ assert.equal(result.items[0].incident_id,100);
 });
 
 test('unauthorized room rejects entire batch before any data is written',async()=>{
