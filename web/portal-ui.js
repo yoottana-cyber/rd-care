@@ -4,6 +4,7 @@ import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea,should
 import {createGuardianPush,createPortalPush} from './guardian-push.js';
 import {offerPushIntro} from './push-intro.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
+import {createStudentLateQrScanner,lateCameraError} from './student-late-qr-scanner.js';
 import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
 import {homeScreenRole,rememberHomeRole} from './pwa-role.js';
 // Standalone student / guardian portal. It never uses staff authentication.
@@ -61,6 +62,18 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
    history.replaceState(null,'',location.pathname+'?login=student'+location.hash);
  }
  const select=s=>root.querySelector(s);
+ const lateScanner=createStudentLateQrScanner({
+  onDetected:()=>{
+   if(state.account?.role!=='student'||state.view!=='late')return;
+   acceptLateQr('gate');
+   renderDashboard();
+   message('สแกน QR ของโรงเรียนสำเร็จ กรุณากดยืนยันลงชื่อมาสาย');
+  },
+  onInvalid:()=>{
+   const status=select('#studentLateScanStatus');
+   if(status)status.textContent='QR Code นี้ไม่ใช่ QR ลงชื่อมาสายของโรงเรียน กรุณาสแกนแผ่นที่จุดครูเวร';
+  }
+ });
  const portalDate=value=>{
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return String(value||'');
   const d=new Date(value+'T00:00:00Z');
@@ -74,6 +87,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   const allowed=state.account?.role==='guardian'?['home','attendance','truancyHistory','behaviorHistory','alerts','account']:
    ['home','attendance','late','account'];
   state.view=allowed.includes(view)?view:'home';
+  if(state.view!=='late')lateScanner.stop();
   root.querySelectorAll('[data-portal-panel]').forEach(el=>{el.hidden=el.dataset.portalPanel!==state.view});
   root.querySelectorAll('[data-portal-view]').forEach(el=>{
    const active=el.dataset.portalView===state.view;
@@ -97,6 +111,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   return data;
  }
  function frame(inner,login=false){
+  lateScanner.stop(); // releasing camera when dashboard/login is rebuilt
   root.innerHTML=login?`<div class="login-wrap portal-wrap"><section class="card login-card portal-login-card">
     <header class="login-brand">
       <span class="brand-code">RD CONNECT • RATSADA SCHOOL</span>
@@ -495,7 +510,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     </section>`:''}
    ${!guardian?`<section class="rd-portal-panel" data-portal-panel="late">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">LATE ARRIVAL</span><h1>ลงชื่อมาสาย</h1>
-     <p>สแกน QR ของครูเวร แล้วลงชื่อผ่านบัญชีนักเรียนของตนเอง</p></div>
+     <p>เปิดกล้องในแอปเพื่อสแกน QR ที่จุดครูเวร แล้วกดยืนยันลงชื่อมาสาย</p></div>
     ${lateQrToken?`<section class="rd-portal-card rd-portal-qr-card">
      <span class="rd-portal-qr-icon" aria-hidden="true">◷</span><h2>ยืนยันลงชื่อมาสาย</h2>
      <p>ระบบบันทึกเวลาจากเซิร์ฟเวอร์ และอนุมัติอัตโนมัติเมื่อกดยืนยันหลังเวลาเริ่มมาสายที่โรงเรียนกำหนด</p>
@@ -507,8 +522,18 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <p class="rd-portal-help">ครูเวรสามารถแก้ไขรายการที่ผิดพลาดได้ โดยมีการบันทึกประวัติ</p>
     </section>`:`<section class="rd-portal-card rd-portal-late-hint">
      <span class="rd-portal-qr-icon" aria-hidden="true">▧</span>
-     <h2>พร้อมลงชื่อมาสาย</h2><p>สแกน QR ที่โรงเรียนจัดไว้เพื่อเปิดแบบลงชื่อมาสายโดยตรง</p>
-     <p class="rd-portal-help">ต้องสแกน QR ของโรงเรียนก่อน จึงจะแสดงปุ่มยืนยัน</p>
+     <h2>สแกน QR ลงชื่อมาสาย</h2>
+     <p>แตะปุ่มด้านล่างเพื่อเปิดกล้องหลังของมือถือ และส่องไปที่ QR ถาวรของโรงเรียน</p>
+     <button type="button" id="studentLateScanStart" class="rd-portal-primary">📷 เปิดกล้องสแกน QR</button>
+     <div id="studentLateCameraPanel" class="rd-portal-camera" hidden>
+      <video id="studentLateCameraVideo" autoplay playsinline muted aria-label="ภาพจากกล้องสำหรับสแกน QR Code"></video>
+      <p id="studentLateScanStatus" class="rd-portal-help" role="status" aria-live="polite">นำ QR Code ให้อยู่ในกรอบกล้อง</p>
+      <button type="button" id="studentLateScanStop" class="rd-portal-outline">ปิดกล้อง</button>
+     </div>
+     <label class="rd-portal-qr-upload" for="studentLateQrUpload">🖼️ หรือเลือกภาพ QR จากเครื่อง
+      <input id="studentLateQrUpload" type="file" accept="image/*" aria-label="เลือกภาพ QR Code จากเครื่อง">
+     </label>
+     <p class="rd-portal-help">ต้องอ่าน QR ของโรงเรียนสำเร็จก่อน จึงจะแสดงปุ่มยืนยันลงชื่อ</p>
     </section>`}
     ${lateQrReceipt?`<section class="rd-portal-card rd-portal-success" role="status">
      <h2>✓ ลงชื่อมาสายสำเร็จ</h2>
@@ -588,6 +613,33 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     </section>
    </section>`);
   select('#portalLogout').addEventListener('click',logout);
+  select('#studentLateScanStart')?.addEventListener('click',async()=>{
+   const panel=select('#studentLateCameraPanel'),video=select('#studentLateCameraVideo');
+   const start=select('#studentLateScanStart'),status=select('#studentLateScanStatus');
+   if(!panel||!video||!start)return;
+   panel.hidden=false;
+   if(status)status.textContent='กำลังเปิดกล้อง… กรุณาส่อง QR Code ของโรงเรียน';
+   start.disabled=true;
+   try{await lateScanner.start(video)}
+   catch(error){
+    if(status)status.textContent=lateCameraError(error);
+    panel.hidden=true;
+    message(lateCameraError(error),true);
+   }finally{if(start.isConnected)start.disabled=false}
+  });
+  select('#studentLateScanStop')?.addEventListener('click',()=>{
+   lateScanner.stop();
+   const panel=select('#studentLateCameraPanel');
+   if(panel)panel.hidden=true;
+  });
+  select('#studentLateQrUpload')?.addEventListener('change',async event=>{
+   const input=event.currentTarget,file=input.files?.[0];
+   if(!file)return;
+   input.disabled=true;
+   try{await lateScanner.scanFile(file)}
+   catch(error){message(error.message||'อ่านภาพ QR ไม่สำเร็จ',true)}
+   finally{if(input.isConnected){input.disabled=false;input.value=''}}
+  });
   select('#studentLateQrForm')?.addEventListener('submit',async event=>{
    event.preventDefault();
    const button=event.currentTarget.querySelector('button');
