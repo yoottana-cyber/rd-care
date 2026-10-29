@@ -76,7 +76,7 @@ test('bulk student recording accepts active rule with -80 and +120 points',async
   const res=await recordBehaviorBulk({DB},permitted,{student_ids:[12],rule_id:3,reason:''});
   assert.equal(res.status,201);
   assert.equal((await res.json()).points,points);
-  assert.match(calls.find(x=>x.sql.includes('INSERT INTO behavior_incidents')).sql,/points_applied/);
+  assert.match(calls.find(x=>x.sql.includes('INSERT OR IGNORE INTO behavior_incidents')).sql,/points_applied/);
   assert.equal(batches[0].length,2); // write + transactional receipt lookup
  }
 });
