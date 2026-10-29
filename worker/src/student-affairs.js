@@ -2,6 +2,7 @@ import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
 import {searchBehaviorStudents,recordBehaviorBulk} from './behavior-bulk.js';
+import {scoreImportRoutes} from './score-excel-import.js';
 import {schoolScoreMonitorSummary,schoolScoreMonitorHistory} from './teacher-score-monitor.js';
 import {previewBehaviorAdjustments,recordBehaviorAdjustmentBulk} from './adjustment-bulk.js';
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
@@ -141,7 +142,7 @@ export async function sendScheduledAttendanceReminders(env){
 export async function studentAffairsRoutes(req,env,u,path){
  const method=req.method;const url=new URL(req.url),q=url.searchParams;
  const ordinaryBehavior=(method==='GET'&&['/api/affairs/behavior/rules','/api/affairs/behavior/students','/api/affairs/behavior/approved-adjustments','/api/affairs/behavior/monitor/summary','/api/affairs/behavior/monitor/history'].includes(path))||
-  (method==='POST'&&['/api/affairs/behavior/record','/api/affairs/behavior/record/bulk','/api/affairs/behavior/adjust','/api/affairs/behavior/adjust/preview','/api/affairs/behavior/adjust/bulk'].includes(path));
+  (method==='POST'&&['/api/affairs/behavior/record','/api/affairs/behavior/record/bulk','/api/affairs/behavior/import/preview','/api/affairs/behavior/import/commit','/api/affairs/behavior/adjust','/api/affairs/behavior/adjust/preview','/api/affairs/behavior/adjust/bulk'].includes(path));
  if(!staff(u)&&!(['teacher','admin'].includes(u.role)&&ordinaryBehavior))
   fail(403,'เฉพาะครูที่ได้รับมอบหมายสิทธิ์ฝ่ายกิจการนักเรียน');
  let b=null;
@@ -304,6 +305,7 @@ export async function studentAffairsRoutes(req,env,u,path){
   return reply({ok:true,id:updated});
  }
  if(method==='POST'&&path==='/api/affairs/behavior/record')return recordBehavior(env,u,b);
+ if(method==='POST'&&(path==='/api/affairs/behavior/import/preview'||path==='/api/affairs/behavior/import/commit'))return scoreImportRoutes(env,u,path,b);
  if(method==='POST'&&path==='/api/affairs/behavior/record/bulk')return recordBehaviorBulk(env,u,b);
  if(method==='POST'&&path==='/api/affairs/behavior/adjust')return recordBehavior(env,u,b,true);
  if(method==='POST'&&path==='/api/affairs/behavior/adjust/preview')return reply(await previewBehaviorAdjustments(env,u,b));
