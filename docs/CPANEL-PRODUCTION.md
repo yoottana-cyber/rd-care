@@ -8,6 +8,7 @@
 - API: **Cloudflare Worker Production** ชื่อ `rd-care-api-prod` (ต้องสร้างใหม่)
 - ฐานข้อมูล: **Cloudflare D1 Production** ชื่อ `rd-care-prod` (ต้องสร้างใหม่)
 - Push: Web Push ของ Production พร้อม VAPID keys แยก (เก็บเป็น Secrets)
+- เมื่อเปลี่ยนโดเมน PWA ผู้ใช้ต้องติดตั้ง/เปิดสิทธิ์ Push บนโดเมนโรงเรียนใหม่ ไม่สามารถโอน subscription ของ Dev มาตรง ๆ ได้
 - ไฟล์ `functions/api/[[path]].js` ของ Pages **ใช้ไม่ได้บน cPanel**; โปรแกรมสร้างแพ็กเกจจะเปลี่ยน `config.js` เป็น Worker URL โดยตรง
 
 โครงสร้างหลังติดตั้ง: `https://care.YOUR-SCHOOL-DOMAIN.ac.th/rd-connect/` → `https://rd-care-api-prod.<ACCOUNT>.workers.dev` → `rd-care-prod`.
@@ -56,6 +57,14 @@ Copy-Item .\wrangler.production.example.toml .\wrangler.production.toml
 - `database_name = "rd-care-prod"` และ `database_id = "UUID ของ D1 ใหม่"`
 - `ALLOWED_ORIGINS = "https://care.YOUR-SCHOOL-DOMAIN.ac.th"` (**origin เท่านั้น ไม่รวม /rd-connect/**)
 - `PUBLIC_APP_URL = "https://care.YOUR-SCHOOL-DOMAIN.ac.th/rd-connect/"` (**URL เต็ม และลงท้าย / เพื่อให้ QR มาสายตรงโดเมนจริง**)
+
+ก่อนดำเนินการกับฐานข้อมูล ให้รันตัวตรวจสอบ **แบบอ่านอย่างเดียว** ว่า Config Production ไม่ชี้ฐานทดลอง:
+
+```powershell
+cd ..
+node .\\scripts\\check-production-config.mjs
+cd worker
+```
 
 ตรวจสอบว่าฐานใหม่ว่างและไม่มีรายการ Migration:
 
