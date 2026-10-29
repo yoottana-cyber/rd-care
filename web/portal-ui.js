@@ -138,7 +138,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <main class="rd-portal-content" id="portalMain" tabindex="-1">
       ${inner}<div id="portalMessage" class="rd-portal-feedback" role="status" aria-live="polite"></div>
      </main>
-     <nav class="rd-portal-bottom ${guardian?'rd-portal-bottom-guardian':'rd-portal-bottom-student'}" aria-label="เมนูหลัก">
+     <nav class="rd-portal-bottom ${state.account?.role==='guardian'?'rd-portal-bottom-guardian':'rd-portal-bottom-student'}" aria-label="เมนูหลัก">
       ${(state.account?.role==='guardian'
         ?[['home','⌂','หน้าหลัก'],['attendance','▦','มาเรียน'],['truancyHistory','!','หนีเรียน'],
           ['behaviorHistory','⭐','คะแนน'],['account','☷','บัญชี']]
