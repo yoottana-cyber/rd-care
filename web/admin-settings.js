@@ -1,10 +1,12 @@
+import {createAdminNotificationPolicy} from './admin-notification-policy.js';
 // RD CONNECT settings console. Reuses the existing school APIs and advisor-import workflow.
 const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const adminTabs=[
  {id:'overview',label:'ภาพรวม',icon:'◫'},
  {id:'people',label:'บัญชีบุคลากร',icon:'♙'},
  {id:'teaching',label:'ครูและตารางสอน',icon:'▤'},
- {id:'import',label:'นำเข้าข้อมูล',icon:'⇩'}
+ {id:'import',label:'นำเข้าข้อมูล',icon:'⇩'},
+ {id:'notifications',label:'ตั้งค่าการแจ้งเตือน',icon:'🔔'}
 ];
 export function adminMetrics(users,rooms){
  const staff=users.filter(u=>['teacher','staff'].includes(u.role));
@@ -16,6 +18,7 @@ const roleText={teacher:'ครูผู้สอน',staff:'กิจการ�
 export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
  reload,refreshRooms,clearStudentCache,advisorImporter,parseCsv,periodChoices,navigate}){
  let tab='overview',editUserId=null,search='',filterRole='all',filterStatus='all';
+ const pushPolicy=createAdminNotificationPolicy({api,toast,safeRun});
  const users=()=>getUsers()||[],rooms=()=>getRooms()||[];
  const roomsHtml=()=>rooms().map(r=>`<option value="${r.id}">${safe(r.label)}</option>`).join('');
  const teachersHtml=()=>users().filter(u=>u.active&&['teacher','staff'].includes(u.role))
@@ -36,6 +39,8 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
      <p>เพิ่มบัญชี ค้นหาและแก้ไขข้อมูล หรือจัดการสถานะผู้ใช้งาน</p>${jump('people','จัดการบุคลากร')}</article>
     <article class="rd-settings-feature"><span aria-hidden="true">📚</span><h4>โครงสร้างการสอน</h4>
      <p>กำหนดครูที่ปรึกษาและเพิ่มรายวิชาตามห้องเรียนและช่วงคาบ</p>${jump('teaching','จัดการการสอน')}</article>
+    <article class="rd-settings-feature"><span aria-hidden="true">🔔</span><h4>ตั้งค่าการแจ้งเตือน</h4>
+     <p>เลือกเปิดหรือปิด Push แยกตามประเภทเหตุการณ์และผู้รับ</p>${jump('notifications','จัดการแจ้งเตือน')}</article>
     <article class="rd-settings-feature"><span aria-hidden="true">📥</span><h4>ศูนย์นำเข้าข้อมูล</h4>
      <p>นำเข้านักเรียน CSV หรือครูที่ปรึกษาจาก Excel / CSV</p>${jump('import','นำเข้าข้อมูล')}</article>
    </div>
@@ -152,6 +157,15 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
     <div id="advisorImportHolder" class="rd-settings-advisor-import"></div>
    </div></div>`;
  }
+ const notifications=()=>`<div class="rd-settings-content rd-admin-notifications">
+  <div class="rd-settings-section-heading"><div>
+   <h3>🔔 ตั้งค่าการแจ้งเตือนทั้งโรงเรียน</h3>
+   <p>กำหนด Push ที่จะส่งถึงนักเรียน ผู้ปกครอง และครูที่ปรึกษาแยกแต่ละเหตุการณ์</p>
+  </div></div>
+  <div class="rd-settings-panel" id="rdAdminPushPolicy">
+   <p class="muted">กำลังโหลดการตั้งค่า…</p>
+  </div>
+ </div>`;
  const layout=()=>{const m=adminMetrics(users(),rooms());
   const statItems=[['◉','บัญชีทั้งหมด',m.users],['♙','ครูที่ใช้งาน',m.teachers],['▦','ห้องเรียน',m.rooms],['✓','มีครูที่ปรึกษา',m.advisors]];
   return `<section class="rd-settings">
@@ -163,7 +177,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
    <nav class="rd-settings-tabs" aria-label="หมวดตั้งค่าระบบ">
     ${adminTabs.map(t=>`<button type="button" data-settings-go="${t.id}" class="${tab===t.id?'active':''}"
       ${tab===t.id?'aria-current="page"':''}><span aria-hidden="true">${t.icon}</span>${t.label}</button>`).join('')}</nav>
-   ${tab==='people'?people():tab==='teaching'?teaching():tab==='import'?imports():overview()}
+   ${tab==='people'?people():tab==='teaching'?teaching():tab==='import'?imports():tab==='notifications'?notifications():overview()}
    </section>`;
  };
  function applyFilters(){
@@ -281,6 +295,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
   if(tab==='people')bindPeople();
   if(tab==='teaching')bindTeaching();
   if(tab==='import')bindImports();
+  if(tab==='notifications')safeRun(()=>pushPolicy.load());
  }
  return {render,open:id=>{if(adminTabs.some(t=>t.id===id))tab=id;render()}};
 }
