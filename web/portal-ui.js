@@ -27,6 +27,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
  const state={token:restoredToken,account:null,role:startRole,children:[],studentId:null,records:null,truancy:[],from:startRole==='guardian'?minusDays(today(),29):today(),to:today(),filterMode:startRole==='guardian'?'range':'today',view:'home',focus:null,focusUnavailable:false,messages:[],messageUnread:0,messageFocusId:null};
  const pushParams=new URLSearchParams(location.search);
  let studentMessageIntent=/^\d{1,15}$/.test(pushParams.get('student_message')||'')?Number(pushParams.get('student_message')):null;
+ const scoreNoticeIntent=pushParams.get('score_notice')==='1';
  let studentNoticeIntent=['late','truancy'].includes(pushParams.get('pupil_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
   {kind:pushParams.get('pupil_notice'),id:Number(pushParams.get('notice_id'))}:null;
@@ -240,6 +241,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   try{
    if(lateQrToken)state.view='late';
   else if(studentMessageIntent&&state.account?.role==='student')state.view='messages';
+  else if(scoreNoticeIntent&&state.account?.role==='guardian')state.view='behaviorHistory';
    const session=state.token;
    const [data,focused,studentFocused]=await Promise.all([
     call('/api/portal/children'),
