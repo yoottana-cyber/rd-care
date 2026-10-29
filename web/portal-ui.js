@@ -5,6 +5,7 @@ import {createGuardianPush,createPortalPush} from './guardian-push.js';
 import {offerPushIntro} from './push-intro.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
 import {createStudentLateQrScanner,lateCameraError} from './student-late-qr-scanner.js';
+import {studentMessagePanel} from './student-message-ui.js';
 import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
 import {homeScreenRole,rememberHomeRole} from './pwa-role.js';
 // Standalone student / guardian portal. It never uses staff authentication.
@@ -446,6 +447,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
        <strong>${r?count(key):'–'}</strong><span>${label}</span></div>`).join('')}
     </div>
     <p class="rd-portal-count-note">นับเฉพาะวันที่มีข้อมูลเช็กชื่อในช่วงที่เลือก (${dayRows.length} รายการ)</p>
+    ${!guardian&&state.messageUnread>0?`<button type="button" class="rd-portal-outline" data-portal-open="messages">✉️ มีข้อความใหม่จากโรงเรียน ${state.messageUnread} ฉบับ • เปิดอ่าน</button>`:''}
     <div class="rd-portal-quick-grid">
      ${guardian?`<button type="button" class="rd-portal-quick" data-portal-open="truancyHistory">
       <span class="rd-portal-quick-icon">!</span><strong>ประวัติหนีเรียน</strong><small>รายคาบย้อนหลัง</small></button>
@@ -517,6 +519,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      </section>
      <p class="rd-portal-help">ยอดคะแนนนี้เฉพาะช่วงวันที่เลือก เกณฑ์ปรับพฤติกรรมเป็นรายการต่างหากจากคะแนนความดี</p>
     </section>`:''}
+   ${!guardian?studentMessagePanel({items:state.messages,unread:state.messageUnread,focusId:state.messageFocusId}):''}
    ${!guardian?`<section class="rd-portal-panel" data-portal-panel="late">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">LATE ARRIVAL</span><h1>ลงชื่อมาสาย</h1>
      <p>เปิดกล้องในแอปเพื่อสแกน QR ที่จุดครูเวร แล้วกดยืนยันลงชื่อมาสาย</p></div>
@@ -622,6 +625,25 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     </section>
    </section>`);
   select('#portalLogout').addEventListener('click',logout);
+  async function refreshStudentInbox(){
+   if(state.account?.role!=='student')return;
+   const data=await call('/api/portal/messages');
+   state.messages=data.items||[];state.messageUnread=Number(data.unread)||0;
+   renderDashboard();
+  }
+  select('#studentMessagesRefresh')?.addEventListener('click',()=>{
+   refreshStudentInbox().catch(error=>message(error.message,true));
+  });
+  root.querySelectorAll('[data-student-message-read]').forEach(btn=>
+   btn.addEventListener('click',async()=>{
+    btn.disabled=true;
+    try{
+     await call('/api/portal/messages/'+Number(btn.dataset.studentMessageRead)+'/read',{method:'POST'});
+     await refreshStudentInbox();
+    }catch(error){message(error.message,true);if(btn.isConnected)btn.disabled=false}
+   }));
+  if(state.view==='messages'&&state.messageFocusId)
+   select('#studentMessageFocus')?.scrollIntoView({block:'center'});
   select('#studentLateScanStart')?.addEventListener('click',async()=>{
    const panel=select('#studentLateCameraPanel'),video=select('#studentLateCameraVideo');
    const start=select('#studentLateScanStart'),status=select('#studentLateScanStatus');
