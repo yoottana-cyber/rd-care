@@ -1,7 +1,8 @@
 // Read-only schoolwide score monitoring for authenticated school staff and teachers.
 // No disciplinary-case reports or write capability.
 import {bangkokToday} from './core.js';
-import {caseTypeSql,scoreColumns,scoreSummary} from './score-ledger.js';
+import {scoreColumns,scoreSummary} from './score-ledger.js';
+import {historySql} from './score-history-query.js';
 
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const reply=data=>new Response(JSON.stringify(data),{
@@ -42,18 +43,8 @@ export async function schoolScoreMonitorHistory(req,env,user){
  const student=await env.DB.prepare('SELECT id FROM students WHERE id=? AND active=1')
   .bind(studentId).first();
  if(!student)fail(404,'ไม่พบนักเรียนที่ใช้งาน');
- const {results}=await env.DB.prepare(`SELECT b.id,b.points,b.reason,b.created_at,
-  b.affairs_category,${caseTypeSql('b')} AS score_type,
-  COALESCE(ar.name,adj.name,
-   CASE WHEN b.affairs_category='adjustment' THEN 'ปรับพฤติกรรม'
-    WHEN b.points>0 THEN 'ทำความดี' ELSE 'บันทึกความผิด' END) AS action_name,
-  u.display_name AS teacher_name
-  FROM behavior_records b
-  JOIN users u ON u.id=b.recorded_by
-  LEFT JOIN affairs_behavior_rules ar ON ar.id=b.affairs_rule_id
-  LEFT JOIN affairs_adjustment_rules adj ON adj.id=b.adjustment_rule_id
-  WHERE b.student_id=? AND b.deleted_at IS NULL
-  ORDER BY b.id DESC LIMIT ? OFFSET ?`).bind(studentId,limit+1,offset).all();
+ const {results}=await env.DB.prepare(historySql(false))
+  .bind(studentId,studentId,limit+1,offset).all();
  const row=await env.DB.prepare(`SELECT ${scoreColumns('b')}
   FROM behavior_records b WHERE b.student_id=?`).bind(studentId).first();
  const scores=scoreSummary(row);
