@@ -1,5 +1,6 @@
 import {scoreHistoryTables} from './score-history.js';
 import {createCriteriaExcelImport} from './criteria-excel-import.js';
+import {criteriaTableMarkup,RULE_GROUPS} from './criteria-table.js';
 // RD CONNECT • Student Affairs workbench. Only the existing staff/admin role
 // opens this workspace; backend independently checks every action.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -12,7 +13,7 @@ const formatScore=n=>Number(n)>0?'+'+Number(n):String(Number(n)||0);
 export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
   selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
-  grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:'',messageSearch:'',messageMatches:[],messageStudent:null,messageSent:[]};
+  grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:'',messageSearch:'',messageMatches:[],messageStudent:null,messageSent:[],ruleQuery:'',ruleCategory:'all',rulePageSize:'25',rulePage:1};
  const criteria=createCriteriaExcelImport({api,toast});
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
@@ -222,20 +223,72 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
     </form>
     ${isAdjustment?'':`<div id="affairsCriteriaExcelArea" data-criteria-mode="${kind}">${criteria.markup(kind)}</div>`}
    </section>
-   <section class="card stack"><h3>รายการ${title}</h3>
-    <div class="rd-affairs-rule-grid">${items.map(rule=>`
-     <article class="rd-affairs-rule ${rule.active?'':'inactive'}">
-      <div class="row between"><strong>${esc(rule.name)}</strong><b>${formatScore(rule.points)}</b></div>
-      <p class="muted">${esc(isAdjustment?'ลดคะแนนความผิดคงเหลือ':types[rule.category])}
-       • ${rule.automatic?'หักคะแนนอัตโนมัติเมื่อครูบันทึกหนีเรียน':rule.active?'ใช้งาน':'ปิดใช้งาน'}</p>
-      ${rule.automatic?'<span class="tag">ระบบหักคะแนนอัตโนมัติ · ไม่ต้องบันทึกซ้ำ</span>':`<button type="button" class="button secondary" data-affairs-rule-edit="${rule.id}">แก้ไขเกณฑ์</button>`}
-     </article>`).join('')||'<p class="empty">ยังไม่ได้ตั้งเกณฑ์ในหมวดนี้</p>'}</div>
+   <section class="card stack rd-criteria-panel">
+    <div class="row between"><div>
+      <h3>ตาราง${title}</h3>
+      <p class="muted">แยกสีตามระดับความผิด และเรียงคะแนนจากน้อยไปมากภายในแต่ละประเภท</p>
+     </div><span class="tag">${items.length} เกณฑ์</span></div>
+    <div class="rd-criteria-filters">
+     <div class="field"><label for="affairsRuleSearch">ค้นหาชื่อหรือรหัสเกณฑ์</label>
+      <input id="affairsRuleSearch" type="search" value="${esc(state.ruleQuery)}"
+       placeholder="ค้นหาชื่อเกณฑ์หรือรหัส…" autocomplete="off"></div>
+     ${!isGood&&!isAdjustment?`<div class="field"><label for="affairsRuleCategory">ประเภทความผิด</label>
+      <select id="affairsRuleCategory"><option value="all">ทุกระดับความผิด</option>
+      ${RULE_GROUPS.map(g=>`<option value="${g.key}" ${state.ruleCategory===g.key?'selected':''}>${g.label}</option>`).join('')}
+      </select></div>`:''}
+     <div class="field"><label for="affairsRulePageSize">จำนวนต่อหน้า</label>
+      <select id="affairsRulePageSize">
+      ${[['25','25 รายการ'],['50','50 รายการ'],['100','100 รายการ'],['all','ทั้งหมด']].map(([v,l])=>
+       `<option value="${v}" ${state.rulePageSize===v?'selected':''}>${l}</option>`).join('')}
+      </select></div>
+    </div>
+    <div id="affairsRuleTableArea"></div>
    </section>`);
   if(!isAdjustment)criteria.bind(kind,state.rules,()=>rules());
-  bind('[data-affairs-rule-kind]','click',(_,el)=>{
-   state.ruleKind=el.dataset.affairsRuleKind;state.ruleEdit=null;return rules();
+  const redrawRuleTable=()=>{
+   const target=document.querySelector('#affairsRuleTableArea');
+   if(target)target.innerHTML=criteriaTableMarkup(items,{
+    mode:kind,query:state.ruleQuery,category:state.ruleCategory,
+    pageSize:state.rulePageSize,page:state.rulePage});
+  };
+  redrawRuleTable();
+  bind('#affairsRuleSearch','input',(_,el)=>{
+   state.ruleQuery=el.value;state.rulePage=1;redrawRuleTable();
   });
-  bind('[data-affairs-rule-edit]','click',(_,el)=>{state.ruleEdit=Number(el.dataset.affairsRuleEdit);return rules()});
+  bind('#affairsRuleCategory','change',(_,el)=>{
+   state.ruleCategory=el.value;state.rulePage=1;redrawRuleTable();
+  });
+  bind('#affairsRulePageSize','change',(_,el)=>{
+   state.rulePageSize=el.value;state.rulePage=1;redrawRuleTable();
+  });
+  bind('#affairsRuleTableArea','click',async(e)=>{
+   const button=e.target.closest('[data-affairs-rule-edit],[data-affairs-rule-delete],[data-criteria-page]');
+   if(!button)return;
+   if(button.dataset.criteriaPage){
+    state.rulePage+=button.dataset.criteriaPage==='next'?1:-1;
+    state.rulePage=Math.max(1,state.rulePage);redrawRuleTable();return;
+   }
+   const ruleId=Number(button.dataset.affairsRuleEdit||button.dataset.affairsRuleDelete);
+   const rule=items.find(x=>Number(x.id)===ruleId);
+   if(!rule||rule.automatic)return;
+   if(button.hasAttribute('data-affairs-rule-edit')){
+    state.ruleEdit=ruleId;await rules();
+    document.querySelector('#affairsRuleForm')?.scrollIntoView({behavior:'smooth',block:'start'});
+    document.querySelector('#affairsRuleForm input[name="name"]')?.focus({preventScroll:true});
+    return;
+   }
+   if(!confirm('ลบเกณฑ์ “'+rule.name+'” (#'+ruleId+') ออกจากรายการ?\nระบบจะปิดใช้งานเกณฑ์นี้ แต่ยังคงประวัติคะแนนนักเรียนเดิมไว้'))return;
+   button.disabled=true;
+   await api(kind==='adjustment'?'/api/affairs/behavior/adjustment-rules/delete':
+    '/api/affairs/behavior/rules/delete',{method:'POST',body:{id:ruleId}});
+   if(state.ruleEdit===ruleId)state.ruleEdit=null;
+   toast('ลบเกณฑ์ออกจากรายการแล้ว • ประวัติคะแนนเดิมยังอยู่');
+   await rules();
+  });
+  bind('[data-affairs-rule-kind]','click',(_,el)=>{
+   state.ruleKind=el.dataset.affairsRuleKind;state.ruleEdit=null;
+   state.ruleQuery='';state.ruleCategory='all';state.rulePage=1;return rules();
+  });
   bind('#affairsRuleCancel','click',()=>{state.ruleEdit=null;return rules()});
   bind('#affairsRuleForm','submit',async e=>{
    e.preventDefault();const f=new FormData(e.currentTarget);
