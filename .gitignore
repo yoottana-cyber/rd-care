@@ -16,3 +16,8 @@ secrets/
 private-data/
 exports/
 *.private.sql
+
+# PHP/MySQL school Production credentials and generated hosting packages
+php-hosting/private/config.local.php
+php-hosting/private/.env*
+dist/php-mysql-production/
