@@ -1,5 +1,6 @@
-// Cloudflare Pages preview routes /api/* through a same-origin Pages Function.
-// No CORS or API endpoint configuration is needed in the browser.
-// When migrating to the school's cPanel hosting, change this value to the
-// approved public Worker endpoint and set its exact allowed origin.
-export const API_BASE_URL = '';
+// Static school-hosting pilot: only browser assets move to the school's HTTPS host.
+// Existing Cloudflare Pages previews keep the same-origin Pages Function API.
+// This is a public Worker URL, never a password or credential.
+const SCHOOL_WORKER_API = 'https://rd-care-api-dev.yoottana.workers.dev';
+const onCloudflarePages = typeof window !== 'undefined' && /\.pages\.dev$/i.test(window.location.hostname);
+export const API_BASE_URL = onCloudflarePages ? '' : SCHOOL_WORKER_API;
