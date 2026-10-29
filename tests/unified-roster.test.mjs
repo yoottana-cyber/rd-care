@@ -138,15 +138,22 @@ test('after identity-keyed migration archived student ID remains and does not oc
  assert.equal(ready.items[0].conflict_student,null);
 });
 
-test('migration capability check rejects old table uniqueness even if new index exists',async()=>{
- function db(tableSql){
-  return {prepare(sql){return {async all(){
-   if(sql.includes("type='table'"))return {results:[{sql:tableSql}]};
-   return {results:[{name:'uq_students_current_room_roll'}]};
-  }}}};
- }
+test('roster capability check uses one metadata query and rejects legacy constraints',async()=>{
  const legacy="CREATE TABLE students(id INTEGER PRIMARY KEY, student_no TEXT UNIQUE, classroom_id INTEGER, roll_no INTEGER, UNIQUE(classroom_id,roll_no))";
  const current="CREATE TABLE students(id INTEGER PRIMARY KEY, student_no TEXT UNIQUE, classroom_id INTEGER, roll_no INTEGER)";
- assert.equal(await identityKeyedRosterReady(db(legacy)),false);
- assert.equal(await identityKeyedRosterReady(db(current)),true);
+ const check=async (tableSql,indexPresent=true)=>{
+  const queries=[];
+  const db={prepare(sql){
+   queries.push(sql);
+   return {async first(){return {table_sql:tableSql,has_live_roll_index:indexPresent?1:0}}};
+  }};
+  const ready=await identityKeyedRosterReady(db);
+  assert.equal(queries.length,1,'one D1 query per request');
+  assert.match(queries[0],/sqlite_master/);
+  return ready;
+ };
+ assert.equal(await check(legacy),false);
+ assert.equal(await check(current),true);
+ assert.equal(await check(current,false),false);
+ assert.equal(await check(''),false);
 });
