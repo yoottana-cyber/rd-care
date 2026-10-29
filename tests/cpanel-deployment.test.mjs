@@ -37,7 +37,7 @@ test('builder produces a direct-Worker upload folder including hidden .htaccess 
   assert.ok(existsSync(resolve(target,'icons','icon-192.png')));
   assert.equal(existsSync(resolve(target,'_routes.json')),false);
   const config=readFileSync(resolve(target,'config.js'),'utf8');
-  assert.match(config,/API_BASE_URL = 'https:\/\/rd-care-api-prod/); // JSON uses quotes (verify below too)
+  assert.match(config,/API_BASE_URL = "https:\/\/rd-care-api-prod/);
   assert.ok(config.includes(api));
   const html=readFileSync(resolve(target,'index.html'),'utf8');
   assert.ok(html.includes("connect-src 'self' "+api));
