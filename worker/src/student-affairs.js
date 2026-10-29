@@ -251,11 +251,23 @@ export async function studentAffairsRoutes(req,env,u,path){
  if(method==='GET'&&path==='/api/affairs/behavior/rules'){
   const {results}=await env.DB.prepare(`SELECT id,name,category,points,active,updated_at,
      CASE WHEN id=(SELECT rule_id FROM truancy_score_policy WHERE id=1) THEN 1 ELSE 0 END AS automatic
-    FROM affairs_behavior_rules ${staff(u)?'':'WHERE active=1'} ORDER BY category,id`).all();
+    FROM affairs_behavior_rules WHERE deleted_at IS NULL${staff(u)?'':' AND active=1'} ORDER BY category,id`).all();
   return reply({items:results,category_labels:label});
  }
  if(method==='POST'&&(path==='/api/affairs/behavior/rules/import/preview'||path==='/api/affairs/behavior/rules/import/commit'))
   return criteriaImportRoutes(env,u,path,b);
+ if(method==='POST'&&path==='/api/affairs/behavior/rules/delete'){
+  const ruleId=id(b.id);
+  if(!ruleId)fail(400,'กรุณาระบุเกณฑ์ที่ต้องการลบ');
+  const protectedRule=await env.DB.prepare('SELECT 1 AS protected FROM truancy_score_policy WHERE rule_id=?').bind(ruleId).first();
+  if(protectedRule)fail(409,'เกณฑ์หนีเรียนรายคาบทำงานอัตโนมัติ ไม่สามารถลบได้');
+  const result=await env.DB.prepare(`UPDATE affairs_behavior_rules SET active=0,deleted_at=CURRENT_TIMESTAMP,
+   updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`)
+   .bind(u.id,ruleId).run();
+  if(!result.meta.changes)fail(404,'ไม่พบเกณฑ์หรือเกณฑ์นี้ถูกลบไปแล้ว');
+  await log(env.DB,u.id,'affairs_behavior_rule_archived','affairs_behavior_rules',ruleId);
+  return reply({ok:true,id:ruleId,archived:true});
+ }
  if(method==='POST'&&path==='/api/affairs/behavior/rules'){
   const ruleId=b.id===null||b.id===undefined?null:id(b.id);
   if(ruleId){
@@ -269,7 +281,7 @@ export async function studentAffairsRoutes(req,env,u,path){
   let key=ruleId;
   if(ruleId){
    const result=await env.DB.prepare(`UPDATE affairs_behavior_rules SET name=?,category=?,points=?,active=?,
-    updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`).bind(name,category,points,active?1:0,u.id,ruleId).run();
+    updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`).bind(name,category,points,active?1:0,u.id,ruleId).run();
    if(!result.meta.changes)fail(404,'ไม่พบเกณฑ์คะแนน');
   }else{
    const res=await env.DB.prepare(`INSERT INTO affairs_behavior_rules(name,category,points,active,updated_by)
@@ -280,13 +292,23 @@ export async function studentAffairsRoutes(req,env,u,path){
  }
  if(method==='GET'&&path==='/api/affairs/behavior/approved-adjustments'){
   const {results}=await env.DB.prepare(`SELECT id,name,points FROM affairs_adjustment_rules
-   WHERE active=1 ORDER BY points,id`).all();
+   WHERE active=1 AND deleted_at IS NULL ORDER BY points,id`).all();
   return reply({items:results});
  }
  if(method==='GET'&&path==='/api/affairs/behavior/adjustment-rules'){
   const {results}=await env.DB.prepare(`SELECT id,name,points,active,updated_at
-   FROM affairs_adjustment_rules ORDER BY id`).all();
+   FROM affairs_adjustment_rules WHERE deleted_at IS NULL ORDER BY id`).all();
   return reply({items:results});
+ }
+ if(method==='POST'&&path==='/api/affairs/behavior/adjustment-rules/delete'){
+  const ruleId=id(b.id);
+  if(!ruleId)fail(400,'กรุณาระบุเกณฑ์ที่ต้องการลบ');
+  const result=await env.DB.prepare(`UPDATE affairs_adjustment_rules SET active=0,deleted_at=CURRENT_TIMESTAMP,
+   updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`)
+   .bind(u.id,ruleId).run();
+  if(!result.meta.changes)fail(404,'ไม่พบเกณฑ์หรือเกณฑ์นี้ถูกลบไปแล้ว');
+  await log(env.DB,u.id,'affairs_adjustment_rule_archived','affairs_adjustment_rules',ruleId);
+  return reply({ok:true,id:ruleId,archived:true});
  }
  if(method==='POST'&&path==='/api/affairs/behavior/adjustment-rules'){
   const key=b.id===null||b.id===undefined?null:id(b.id);
@@ -295,7 +317,7 @@ export async function studentAffairsRoutes(req,env,u,path){
   let updated=key;
   if(key){
    const x=await env.DB.prepare(`UPDATE affairs_adjustment_rules
-    SET name=?,points=?,active=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+    SET name=?,points=?,active=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND deleted_at IS NULL`)
     .bind(name,points,active?1:0,u.id,key).run();
    if(!x.meta.changes)fail(404,'ไม่พบเกณฑ์ปรับพฤติกรรม');
   }else{
