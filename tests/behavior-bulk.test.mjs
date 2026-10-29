@@ -75,7 +75,7 @@ test('bulk merit recording defaults blank description to approved rule and audit
  assert.equal(result.points,5);
  assert.equal(result.rule_name,rule.name);
  assert.equal(env.batches.length,1);
- const inserts=env.calls.filter(x=>x.sql.includes('INSERT INTO behavior_incidents'));
+ const inserts=env.calls.filter(x=>x.sql.includes('INSERT OR IGNORE INTO behavior_incidents'));
  assert.equal(inserts.length,2);
  assert.deepEqual([inserts[0].args[0],inserts[0].args[1],inserts[0].args[2],...inserts[0].args.slice(4)],
   [12,rule.name,7,12,4,4]);
