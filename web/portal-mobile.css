@@ -283,3 +283,15 @@
  background:#20382b;border-color:#456e56;color:#e4f9ec}
 [data-theme="dark"] .rd-portal-qr-upload input::file-selector-button{
  background:#315b43;color:#f0fff5}
+
+/* Students have five bottom shortcuts; guardian bottom bar is unchanged. */
+.rd-portal-mobile[data-role="student"] .rd-portal-bottom{grid-template-columns:repeat(5,minmax(0,1fr))}
+.rd-portal-mobile[data-role="student"] .rd-portal-bottom button{padding-inline:2px;min-width:0}
+.rd-student-inbox{display:grid;gap:14px}
+.rd-student-message{display:grid;gap:9px;padding:15px;border:1px solid #d9e9dd;border-radius:14px;background:#f9fcfa}
+.rd-student-message-unread{border-color:#a3d8b6;background:#eef9f1}
+.rd-student-message-body{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+.rd-student-message small{color:var(--pm-sub)}
+.rd-student-message .rd-portal-primary{min-height:43px}
+[data-theme="dark"] .rd-student-message{background:#214032;border-color:#3c604a}
+[data-theme="dark"] .rd-student-message-unread{background:#2c533b;border-color:#65a27b}
