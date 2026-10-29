@@ -69,7 +69,7 @@ test('signed rule values are applied server-side rather than client submitted po
  assert.equal(value.category,'minor');
  const insert=calls.find(x=>x.sql.includes('INSERT OR IGNORE INTO behavior_incidents'));
  assert.deepEqual([insert.args[0],insert.args[1],insert.args[2],...insert.args.slice(4)],
-  [47,'บันทึกตามระเบียบ',11,47,9,9]);
+  [47,'บันทึกตามระเบียบ',11,null,null,null,null,47,9,9]);
  assert.match(insert.args[3],/^[0-9a-f-]{36}$/);
 });
 test('PWA reminders navigate only to authorized local attendance URL after staff login',()=>{
