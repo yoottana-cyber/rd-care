@@ -16,34 +16,48 @@ export function behaviorRequestId(value){
   fail(400,'รหัสอ้างอิงคำขอบันทึกไม่ถูกต้อง');
  return token.toLowerCase();
 }
-export function incidentInsert(db,studentId,rule,reason,actorId,requestId){
+export function selectedScoreDate(value){
+ if(value===undefined||value===null||value==='')return null;
+ if(typeof value!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value))
+  fail(400,'วันที่บันทึกไม่ถูกต้อง');
+ const millis=Date.parse(value+'T00:00:00Z');
+ if(value<'2000-01-01'||!Number.isFinite(millis)||
+  new Date(millis).toISOString().slice(0,10)!==value||
+  value>new Date(Date.now()+7*3600000).toISOString().slice(0,10))
+  fail(400,'วันที่บันทึกไม่ถูกต้อง หรือเป็นวันที่ในอนาคต');
+ return value;
+}
+export function incidentInsert(db,studentId,rule,reason,actorId,requestId,recordedDate=null){
  return db.prepare(`INSERT OR IGNORE INTO behavior_incidents(
   student_id,affairs_rule_id,affairs_category,rule_points,reason,recorded_by,
-  points_applied,warning_no,request_id)
+  points_applied,warning_no,request_id,recorded_school_date,created_at)
  SELECT ?,r.id,r.category,r.points,?,?,
   CASE WHEN (r.category='minor' AND history.n<2) OR
             (r.category='moderate' AND history.n<1) THEN 0 ELSE r.points END,
   CASE WHEN (r.category='minor' AND history.n<2) OR
-            (r.category='moderate' AND history.n<1) THEN history.n+1 ELSE 0 END,?
+            (r.category='moderate' AND history.n<1) THEN history.n+1 ELSE 0 END,?,?,
+  CASE WHEN ? IS NULL THEN CURRENT_TIMESTAMP
+       WHEN ?=date('now','+7 hours') THEN datetime('now','+7 hours')
+       ELSE ? || ' 12:00:00' END
  FROM affairs_behavior_rules r
  CROSS JOIN (SELECT COUNT(*) AS n FROM behavior_incidents i
   WHERE i.student_id=? AND i.affairs_rule_id=? AND i.deleted_at IS NULL) history
  WHERE r.id=? AND r.active=1 AND r.deleted_at IS NULL
  AND r.id NOT IN (SELECT rule_id FROM truancy_score_policy)`)
-  .bind(studentId,reason,actorId,requestId,studentId,rule.id,rule.id);
+  .bind(studentId,reason,actorId,requestId,recordedDate,recordedDate,recordedDate,recordedDate,studentId,rule.id,rule.id);
 }
 /** D1.batch atomically inserts and selects the receipts within one transaction.
  * Trigger side effects can make meta.changes > 1 or change meta.last_row_id;
  * neither is evidence of missing or duplicated incident records.
  */
-export async function commitBehaviorIncidents(db,studentIds,rule,reason,actorId,requestId){
+export async function commitBehaviorIncidents(db,studentIds,rule,reason,actorId,requestId,recordedDate=null){
  const placeholders=studentIds.map(()=>'?').join(',');
  const receipts=db.prepare(`SELECT id,student_id,affairs_rule_id,reason,affairs_category,
-  points_applied,warning_no,behavior_record_id FROM behavior_incidents
+  points_applied,warning_no,behavior_record_id,recorded_school_date FROM behavior_incidents
   WHERE request_id=? AND student_id IN (${placeholders})`)
   .bind(requestId,...studentIds);
  const output=await db.batch([
-  ...studentIds.map(studentId=>incidentInsert(db,studentId,rule,reason,actorId,requestId)),
+  ...studentIds.map(studentId=>incidentInsert(db,studentId,rule,reason,actorId,requestId,recordedDate)),
   receipts
  ]);
  const items=output[output.length-1]?.results;
@@ -53,7 +67,8 @@ export async function commitBehaviorIncidents(db,studentIds,rule,reason,actorId,
  if(byStudent.size!==studentIds.length||studentIds.some(id=>{
   const item=byStudent.get(id);
   return !item||Number(item.affairs_rule_id)!==Number(rule.id)||
-   String(item.reason)!==reason||!Number.isSafeInteger(Number(item.id));
+   String(item.reason)!==reason||String(item.recorded_school_date||'')!==String(recordedDate||'')||
+   !Number.isSafeInteger(Number(item.id));
  }))fail(409,'รหัสคำขอถูกใช้กับรายการอื่นแล้ว กรุณาตรวจสอบก่อนบันทึก');
  return studentIds.map(id=>byStudent.get(id));
 }

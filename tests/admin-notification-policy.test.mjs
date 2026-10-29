@@ -20,16 +20,16 @@ function db(initial={}){
    async run(){return {meta:{changes:1}}}};
  },async batch(stmts){const q=calls.find(x=>x.sql.includes('INSERT INTO notification_preferences'));prefs.set(q.args[0],q.args[1]);return [{meta:{changes:1}},{meta:{changes:1}}]}}
 }
-test('admin sees all 11 event switches including student and guardian deduction notices',async()=>{
+test('admin sees all 13 event switches including student and guardian deduction notices',async()=>{
  const store=db({score_student:0});
  const response=await notificationPolicyRoutes(request('GET'),{DB:store},{role:'admin',id:1},path);
  assert.equal(response.status,200);
  const items=(await response.json()).items;
- assert.equal(items.length,11);
+ assert.equal(items.length,13);
  assert.equal(items.find(x=>x.key==='score_student').enabled,false);
  assert.equal(items.find(x=>x.key==='score_guardian').enabled,true);
  assert.equal(new Set(items.map(x=>x.key)).size,items.length);
- assert.equal(NOTIFICATION_CATEGORIES.length,11);
+ assert.equal(NOTIFICATION_CATEGORIES.length,13);
 });
 test('notification choices are strict booleans and only admin may change schoolwide policy',async()=>{
  const store=db(),env={DB:store};
@@ -49,7 +49,7 @@ test('notification choices are strict booleans and only admin may change schoolw
  assert.ok(store.calls.some(x=>x.sql.includes('INSERT INTO audit_logs')));
 });
 test('score push skips when both recipient categories disabled, and never sends for warnings',async()=>{
- const env={DB:db({score_student:0,score_guardian:0}),
+ const env={DB:db({score_student:0,score_guardian:0,warning_student:0,warning_guardian:0}),
   VAPID_PUBLIC_KEY:'x',VAPID_PRIVATE_KEY:'x',VAPID_SUBJECT:'mailto:example@test.org'};
  const res=await deliverScorePush(env);
  assert.deepEqual(res,{enabled:false,processed:0,delivered:0});

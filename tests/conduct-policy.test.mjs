@@ -42,7 +42,7 @@ test('server inserts an incident and never accepts a user-supplied score amount'
  assert.match(entry.sql,/history\.n<2/);
  assert.match(entry.sql,/history\.n<1/);
  assert.match(entry.sql,/r\.points/);
- assert.deepEqual(entry.args,[11,'คำเตือน',3,requestId,11,8,8]);
+ assert.deepEqual(entry.args,[11,'คำเตือน',3,requestId,null,null,null,null,11,8,8]);
  assert.match(entry.sql,/INSERT OR IGNORE INTO behavior_incidents/);
 });
 test('read-only and teacher score history expose warnings but never add to scores',()=>{

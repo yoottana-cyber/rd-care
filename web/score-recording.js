@@ -1,8 +1,9 @@
 // Shared teacher entry screen: multi-room student selection for conduct and merit.
+const bangkokScoreToday=()=>new Date(Date.now()+7*3600*1000).toISOString().slice(0,10);
 export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,setRoomId,getTab,getUser=()=>null,escapeHtml,scorePopup}){
  const modes={
-  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:'',pendingFingerprint:'',pendingRequestId:null},
-  good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:'',pendingFingerprint:'',pendingRequestId:null}
+  behavior:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:'',pendingFingerprint:'',pendingRequestId:null,schoolDate:bangkokScoreToday()},
+  good:{picked:new Map(),query:'',results:[],students:[],rules:[],focusId:null,focusName:'',history:[],hasMore:false,nextOffset:0,scores:{},ruleId:'',reason:'',pendingFingerprint:'',pendingRequestId:null,schoolDate:bangkokScoreToday()}
  };
  const esc=escapeHtml;
  const mode=()=>getTab()==='good'?'good':'behavior';
@@ -14,9 +15,10 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
  const studentLabel=st=>`${st.roll_no?esc(st.roll_no)+'. ':''}${esc(st.full_name)} <small>${esc(st.student_no)} · ${esc(st.classroom_label)}</small>`;
  function rememberDraft(){
   const u=selectedState();
-  const rule=document.querySelector('#scoreRule'),reason=document.querySelector('#scoreReason'),query=document.querySelector('#scoreSearch');
+  const rule=document.querySelector('#scoreRule'),reason=document.querySelector('#scoreReason'),query=document.querySelector('#scoreSearch'),date=document.querySelector('#scoreSchoolDate');
   if(rule)u.ruleId=rule.value;
   if(reason)u.reason=reason.value;
+  if(date)u.schoolDate=date.value;
   if(query)u.query=query.value;
  }
  function setFocus(u,item){
@@ -84,6 +86,10 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
       '<p class="muted">ยังไม่ได้เลือกนักเรียน สามารถติ๊กเลือกจากห้องหรือค้นหาเลขประจำตัวได้</p>'}
     </div>
     <form id="scoreForm" class="stack">
+     <div class="field"><label for="scoreSchoolDate">วันที่บันทึก${isGood?'คะแนนความดี':'ความผิด / การตักเตือน'}</label>
+      <input id="scoreSchoolDate" type="date" name="school_date" required min="2000-01-01"
+       max="${bangkokScoreToday()}" value="${esc(u.schoolDate)}">
+      <small class="muted">เลือกวันที่เกิดเหตุการณ์ได้ • ประวัติจะแสดงตามวันที่นี้ (ไม่อนุญาตวันที่ในอนาคต)</small></div>
      <div class="field"><label for="scoreRule">${isGood?'เลือกเกณฑ์ความดี':'เลือกเกณฑ์คะแนนพฤติกรรม'}</label>
       <select id="scoreRule" name="rule_id" required><option value="">เลือกเกณฑ์</option>
        ${filtered.map(rule=>`<option value="${rule.id}" ${String(rule.id)===String(u.ruleId)?'selected':''}>${esc(actions[rule.category]||rule.category)} · ${esc(rule.name)} (${Number(rule.points)>0?'+':''}${Number(rule.points)})</option>`).join('')}
@@ -141,9 +147,10 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
    const ids=[...u.picked.keys()];
    if(!ids.length){toast('กรุณาเลือกนักเรียนก่อนบันทึก',true);return}
    if(!u.ruleId){toast('กรุณาเลือกเกณฑ์คะแนน',true);return}
+   if(!u.schoolDate||u.schoolDate>bangkokScoreToday()){toast('กรุณาเลือกวันที่บันทึกที่ไม่ใช่อนาคต',true);return}
    // If the response is interrupted AFTER D1 commits, a second tap must
    // reuse the same request ID rather than creating another misconduct.
-   const fingerprint=JSON.stringify([ids,Number(u.ruleId),u.reason]);
+   const fingerprint=JSON.stringify([ids,Number(u.ruleId),u.reason,u.schoolDate]);
    if(u.pendingFingerprint!==fingerprint||!u.pendingRequestId){
     u.pendingFingerprint=fingerprint;
     u.pendingRequestId=crypto.randomUUID();
@@ -154,7 +161,7 @@ export function createScoreRecording({api,mount,safeRun,toast,rooms,getRoomId,se
    try{
     const result=await api('/api/affairs/behavior/record/bulk',{method:'POST',
      body:{student_ids:ids,rule_id:Number(u.ruleId),reason:u.reason,
-      request_id:requestId},timeoutMs:30000});
+      school_date:u.schoolDate,request_id:requestId},timeoutMs:30000});
     u.pendingFingerprint='';u.pendingRequestId=null;
     const first=u.picked.get(ids[0]);
     if(first)setFocus(u,first);

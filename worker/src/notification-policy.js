@@ -3,6 +3,8 @@
 export const NOTIFICATION_CATEGORIES=Object.freeze([
  {key:'score_student',group:'คะแนนพฤติกรรม',label:'หักคะแนนความผิด → นักเรียน'},
  {key:'score_guardian',group:'คะแนนพฤติกรรม',label:'หักคะแนนความผิด → ผู้ปกครอง'},
+ {key:'warning_student',group:'คะแนนพฤติกรรม',label:'ตักเตือนโดยยังไม่หักคะแนน → นักเรียน'},
+ {key:'warning_guardian',group:'คะแนนพฤติกรรม',label:'ตักเตือนโดยยังไม่หักคะแนน → ผู้ปกครอง'},
  {key:'truancy_student',group:'การเข้าเรียน',label:'หนีเรียน → นักเรียน'},
  {key:'truancy_guardian',group:'การเข้าเรียน',label:'หนีเรียน → ผู้ปกครอง'},
  {key:'truancy_advisor',group:'การเข้าเรียน',label:'หนีเรียน → ครูที่ปรึกษา'},
@@ -29,7 +31,8 @@ export async function notificationPolicyRoutes(req,env,user,path){
  if(req.method==='GET'){
   const {results=[]}=await env.DB.prepare('SELECT event_key,enabled,updated_at FROM notification_preferences').all();
   const map=Object.fromEntries(results.map(x=>[x.event_key,Number(x.enabled)===1]));
-  return reply({items:NOTIFICATION_CATEGORIES.map(x=>({...x,enabled:map[x.key]??true}))});
+  const defaultOn=key=>!key.startsWith('warning_');
+  return reply({items:NOTIFICATION_CATEGORIES.map(x=>({...x,enabled:map[x.key]??defaultOn(x.key)}))});
  }
  if(req.method!=='POST')fail(405,'ไม่รองรับคำขอ');
  const raw=await req.text();

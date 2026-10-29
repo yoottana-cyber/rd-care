@@ -1,6 +1,6 @@
 // RD CONNECT offline app shell. This cache contains only public static assets,
 // never authenticated responses, student records, or arbitrary same-origin URLs.
-const CACHE='rd-care-shell-v116';
+const CACHE='rd-care-shell-v117';
 const CACHE_PREFIX='rd-care-shell-';
 const ASSETS=[
  './','./index.html','./app.css','./theme.css','./login.css','./login-route.js',
@@ -96,7 +96,7 @@ self.addEventListener('push',event=>{
  const test=metadata?.kind==='push_test';
  const pupilNotice=metadata?.kind==='pupil_notice'&&metadata.audience==='student';
  const studentMessage=metadata?.kind==='student_message'&&metadata.audience==='student';
- const scoreNotice=metadata?.kind==='score_change'&&
+ const scoreNotice=['score_change','conduct_warning'].includes(metadata?.kind)&&
   ['student','guardian'].includes(metadata.audience);
  const messageId=Number(metadata?.messageId);
  const validMessageId=Number.isSafeInteger(messageId)&&messageId>0;
@@ -134,7 +134,8 @@ self.addEventListener('push',event=>{
   test?'RD CONNECT • ทดสอบการแจ้งเตือน':
   pupilNotice?'RD CONNECT • มีข้อมูลการเข้าเรียนใหม่':
   studentMessage?'RD CONNECT • ข้อความจากโรงเรียน':
-  scoreNotice?'RD CONNECT • มีข้อมูลการดูแลนักเรียนใหม่':'RD CONNECT • โรงเรียนรัษฎา';
+  scoreNotice?'RD CONNECT • '+(metadata.kind==='conduct_warning'?'มีรายการตักเตือนใหม่':'มีข้อมูลการดูแลนักเรียนใหม่'):
+  'RD CONNECT • โรงเรียนรัษฎา';
  const details=late?
   [date&&'วันที่ '+date,arrival&&'เวลา '+arrival+' น.'].filter(Boolean).join(' • '):
   [date&&'วันที่ '+date,validPeriod&&'คาบ '+period,subject&&'วิชา '+subject].filter(Boolean).join(' • ');
@@ -156,7 +157,7 @@ self.addEventListener('push',event=>{
       review?'rd-care-attendance-review'+(hasId?'-'+id:''):
       pupilNotice?'rd-care-student-'+studentKind+'-'+id:
       studentMessage?'rd-care-student-message-'+messageId:
-      scoreNotice?'rd-care-score-change-'+metadata.audience+'-'+Date.now():
+      scoreNotice?'rd-care-conduct-'+metadata.kind+'-'+metadata.audience+'-'+Date.now():
       test?'rd-care-push-test':'rd-care-school-notices',
   renotify:false,requireInteraction:urgent,
   ...(urgent?{vibrate:[180,100,180]}:{}),

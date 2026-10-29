@@ -132,10 +132,17 @@ async function records(req,env,a){
   env.DB.prepare(`SELECT school_date,arrived_at,state FROM late_records
     WHERE student_id=? AND school_date BETWEEN ? AND ?
     ORDER BY school_date DESC LIMIT 90`).bind(id,from,to),
-  env.DB.prepare(`SELECT substr(b.created_at,1,10) AS record_date,b.points,b.reason,
-    b.affairs_category,${caseTypeSql('b')} AS score_type FROM behavior_records b
+  env.DB.prepare(`SELECT record_date,points,reason,affairs_category,score_type,warning_no FROM (
+    SELECT substr(b.created_at,1,10) AS record_date,b.points,b.reason,b.affairs_category,
+     ${caseTypeSql('b')} AS score_type,0 AS warning_no,b.id AS entry_id
+    FROM behavior_records b
     WHERE b.student_id=? AND b.deleted_at IS NULL AND substr(b.created_at,1,10) BETWEEN ? AND ?
-    ORDER BY b.id DESC LIMIT 100`).bind(id,from,to),
+    UNION ALL
+    SELECT substr(i.created_at,1,10),0,i.reason,i.affairs_category,'behavior',i.warning_no,i.id
+    FROM behavior_incidents i
+    WHERE i.student_id=? AND i.deleted_at IS NULL AND i.points_applied=0
+     AND i.warning_no>0 AND substr(i.created_at,1,10) BETWEEN ? AND ?
+   ) ORDER BY record_date DESC,entry_id DESC LIMIT 100`).bind(id,from,to,id,from,to),
   env.DB.prepare(`SELECT ${scoreColumns('b')} FROM behavior_records b
     WHERE b.student_id=? AND substr(b.created_at,1,10) BETWEEN ? AND ?`).bind(id,from,to)
  ]);

@@ -240,10 +240,10 @@ export async function sendStudentDirectMessagePush(device,env,messageId){
 }
 // Score changes contain no student name, incident detail or penalty on the
 // lock screen. The recipient must authenticate before seeing personal history.
-export async function sendScoreChangePush(device,env,audience){
+export async function sendScoreChangePush(device,env,audience,{warning=false}={}){
  if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
  if(!['student','guardian'].includes(audience))throw Error('Invalid score recipient');
- const body=await encryptPriorityPush(device,{kind:'score_change',audience});
+ const body=await encryptPriorityPush(device,{kind:warning?'conduct_warning':'score_change',audience});
  const authorized=await makeVapidAuthorization(device.endpoint,env);
  return fetch(device.endpoint,{method:'POST',headers:{
   Authorization:authorized,TTL:'3600',Urgency:'normal',
