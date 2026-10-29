@@ -40,7 +40,7 @@ test('criteria Excel templates have correct first worksheet and Thai instruction
   assert.ok(!first.includes('student_no'));
   assert.ok(text.includes('Existing rules'));
   assert.ok(text.includes('คะแนนนักเรียน'));
-  assert.ok(!text.includes('หนีเรียน'));
+  assert.ok(text.includes('เกณฑ์หนีเรียน')); // documented protected automatic rule
   if(mode==='good')assert.ok(text.includes('ช่วยงานโรงเรียน'));
   else assert.ok(text.includes('แต่งกายไม่เรียบร้อย'));
  }
