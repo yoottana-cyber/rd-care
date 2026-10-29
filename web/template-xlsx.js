@@ -180,7 +180,7 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   ['rule_id','ชื่อเกณฑ์','คะแนน','หมวด'],
   ...eligibleRules.map(r=>[Number(r.id),String(r.name),Number(r.points),String(r.category)])
  ]:[['รายการห้องเรียน (ตรวจสอบให้ตรงกับระบบ)']];
- for(const [grade,count] of (isScore?[]:[[1,9],[2,9],[3,9],[4,7],[5,7],[6,7]])){
+ for(const [grade,count] of ((isScore||isCriteria)?[]:[[1,9],[2,9],[3,9],[4,7],[5,7],[6,7]])){
   for(let number=1;number<=count;number++)rooms.push(['ม.'+grade+'/'+number]);
  }
  const types='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
