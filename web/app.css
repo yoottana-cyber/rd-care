@@ -62,3 +62,24 @@
 .rd-import-table-scroll{max-height:440px;overflow:auto}
 
 .rd-import-file-links{flex-wrap:wrap}
+
+/* Mobile first-use Push invitation; never triggers browser permission without a tap. */
+.rd-push-intro{position:fixed;z-index:10000;bottom:calc(17px + env(safe-area-inset-bottom,0px));left:50%;
+ transform:translateX(-50%);width:min(490px,calc(100vw - 24px));padding:18px;
+ display:flex;align-items:flex-start;gap:13px;border-radius:20px;border:1px solid #b9e7ca;
+ background:#fff;color:#153c2b;box-shadow:0 10px 48px #0a593e40;font:inherit}
+.rd-push-intro-icon{font-size:28px;background:#e5f8eb;padding:10px;border-radius:15px}
+.rd-push-intro-body{flex:1;min-width:0}
+.rd-push-intro-body strong{font-size:16px;display:block}
+.rd-push-intro-body p{font-size:13px;line-height:1.6;margin:6px 0 11px}
+.rd-push-intro-actions{display:flex;gap:8px;flex-wrap:wrap}
+.rd-push-intro-actions button{border:1px solid #c1dfce;border-radius:12px;padding:10px 13px;
+ font-weight:750;background:#f4fcf7;color:#176644;min-height:43px;cursor:pointer}
+.rd-push-intro-actions [data-rd-push-accept]{background:#078654;color:#fff;border-color:#078654}
+.rd-push-intro-close{border:0;background:transparent;color:#335e48;padding:3px;font-size:17px;cursor:pointer}
+.rd-push-intro [data-rd-push-error]{color:#a34719;margin:9px 0 0;font-size:12px}
+.rd-portal-role-links{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin:12px 0}
+.rd-portal-role-links a{padding:9px 12px;border:1px solid #cce6d3;border-radius:999px;
+ background:#f4fcf7;color:#137549;font-weight:750;text-decoration:none;font-size:12px}
+.rd-mobile-role-link{display:block;text-align:center;border-radius:12px;padding:11px;background:#e9f8f0;color:#166642;text-decoration:none;font-weight:700}
+@media(min-width:769px){.rd-push-intro{bottom:24px}}

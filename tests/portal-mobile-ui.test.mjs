@@ -27,7 +27,8 @@ function renderFor(role,{qr=false,guardianFocus=false}={}){
  const context={
   state,lateQrToken:qr?'gate':null,lateQrReceipt:null,
   root:{querySelectorAll:()=>[]},portalPeriodMode,isInstalledPwa:()=>false,
-  frame:next=>{html=next},esc:escapeHtml,portalDate:x=>x,guardianPush:{bind(){}},
+  frame:next=>{html=next},esc:escapeHtml,portalDate:x=>x,guardianPush:{bind(){},introStatus(){},enable(){}},
+  offerPushIntro:()=>Promise.resolve(false),portalPushIntroPending:false,
   table:()=>'<div class="rd-portal-record-list"></div>',
   statusLabel:x=>x,today:()=> '2026-10-27',
   select:()=>({addEventListener(){},scrollIntoView(){}}),

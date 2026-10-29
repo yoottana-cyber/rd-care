@@ -2,6 +2,7 @@ import {API_BASE_URL} from './config.js';
 import {bindThemeButtons} from './theme.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea,shouldRenewAuthSession,extendAuthSession,isPersonalMobileDevice} from './auth-session.js';
 import {createGuardianPush} from './guardian-push.js';
+import {offerPushIntro} from './push-intro.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
 import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
 import {homeScreenRole,rememberHomeRole} from './pwa-role.js';
@@ -26,7 +27,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
   {kind:pushParams.get('portal_notice'),id:Number(pushParams.get('notice_id'))}:null;
- let requestVersion=0,portalRenewInFlight=false;
+ let requestVersion=0,portalRenewInFlight=false,portalPushIntroPending=false;
  async function renewPortalRememberedSession(){
   if(portalRenewInFlight||!state.account||!state.token||
    !shouldRenewAuthSession(activeTokenKey,state.token))return;
@@ -155,7 +156,8 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     <p class="muted">ใช้บัญชีที่โรงเรียนออกให้และต้องเปลี่ยนรหัสผ่านชั่วคราวในการเข้าใช้ครั้งแรก</p>
     ${role==='student'&&!lateQrToken?'<button type="button" id="studentLateEntry" class="button secondary full">แจ้งมาสายด้วยรหัสจากครูเวร (แบบเดิม)</button>':''}
     ${!isInstalledPwa()?`<div class="login-install"><button type="button" id="portalInstallApp" class="button secondary full">⬇️ ติดตั้งแอป RD CONNECT ${role==='guardian'?'ผู้ปกครอง':'นักเรียน'}</button><small>iPhone: Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>`:''}
-     ${!lateQrToken&&!noticeIntent&&!isInstalledPwa()?'<button type="button" id="portalBack" class="button secondary full">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</button>':''}`,true);
+     ${!lateQrToken&&!noticeIntent?'<div class="rd-portal-role-links"><a href="./?login=student">🎓 นักเรียน</a><a href="./?login=guardian">👨‍👩‍👧 ผู้ปกครอง</a><a href="./?login=staff">👩‍🏫 ครูและบุคลากร</a></div>':''}
+    ${!lateQrToken&&!noticeIntent&&!isInstalledPwa()?'<button type="button" id="portalBack" class="button secondary full">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</button>':''}`,true);
    select('#portalBack')?.addEventListener('click',onStaffLogin);
    select('#studentLateEntry')?.addEventListener('click',onLegacyLateReport);
    select('#portalTogglePassword')?.addEventListener('click',()=>{
@@ -517,6 +519,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <p>ข้อมูลส่วนตัวและการตั้งค่าระบบ</p></div>
     <section class="rd-portal-card rd-portal-profile"><span class="rd-portal-profile-avatar" aria-hidden="true">${guardian?'👨‍👩‍👧':'🎓'}</span>
      <h2>${esc(state.account.display_name)}</h2><p>${guardian?'บัญชีผู้ปกครอง':'บัญชีนักเรียน'} • โรงเรียนรัษฎา</p></section>
+    ${!guardian?`<section class="rd-portal-card"><h2>🔔 การแจ้งเตือน</h2><p class="rd-portal-help">บัญชีนักเรียนยังไม่มีบริการ Push โดยตรง ขณะนี้สามารถตรวจสอบประวัติมาสาย การมาเรียน และคะแนนจากแอปได้ตามปกติ</p></section>`:''}
     ${guardian?`<section class="rd-portal-card rd-portal-push-settings">
      <h2>🔔 การแจ้งเตือนบนมือถือ</h2>
      <p>เปิดรับการแจ้งเตือนสำหรับนักเรียนที่โรงเรียนยืนยันความสัมพันธ์แล้ว</p>
@@ -546,6 +549,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     <section class="rd-portal-card rd-portal-account-actions">
      ${!isInstalledPwa()?`<button type="button" class="rd-portal-primary" id="portalInstallApp">⬇️ ติดตั้งแอป RD CONNECT ${guardian?'ผู้ปกครอง':'นักเรียน'}</button>`:''}
      <button type="button" class="button ghost theme-switch" data-theme-toggle>เปลี่ยนธีม</button>
+     <div class="rd-portal-role-links"><a href="./?login=student">🎓 นักเรียน</a><a href="./?login=guardian">👨‍👩‍👧 ผู้ปกครอง</a><a href="./?login=staff">👩‍🏫 ครู</a></div>
      <button type="button" id="portalLogout" class="rd-portal-outline rd-portal-logout">ออกจากระบบ</button>
      <p class="rd-portal-help">RD CONNECT • ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา</p>
      <small>พัฒนาโดย ครูยุทธนา บุญจันทร์</small>
@@ -570,7 +574,18 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
    endLateQrIntent();
    renderDashboard();
   });
-  if(state.account.role==='guardian')guardianPush.bind();
+  if(state.account.role==='guardian'){
+   guardianPush.bind();
+   if(!portalPushIntroPending){
+    portalPushIntroPending=true;
+    const id=state.account.id;
+    void offerPushIntro({role:'guardian',id,
+     check:guardianPush.introStatus,
+     enable:guardianPush.enable,
+     isCurrent:()=>state.account?.role==='guardian'&&state.account.id===id&&!!state.token
+    }).catch(()=>{}).finally(()=>{portalPushIntroPending=false});
+   }
+  }
   if(state.focus)select('#pushNoticeFocus')?.scrollIntoView({block:'start'});
   bindDateFilters();
   root.querySelectorAll('[data-portal-child-picker]').forEach(control=>

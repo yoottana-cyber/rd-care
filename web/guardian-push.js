@@ -11,6 +11,13 @@ export function createGuardianPush({call,select,message}){
   const registration=await navigator.serviceWorker.ready;
   return registration.pushManager.getSubscription();
  }
+ async function introStatus(){
+  if(!supported())return {canPush:false,enabled:false,permission:'unsupported',subscribed:false};
+  const [config,sub]=await Promise.all([call('/api/portal/push/config'),subscription()]);
+  const owned=sub?await call('/api/portal/push/status',{method:'POST',body:{endpoint:sub.endpoint}}):{subscribed:false};
+  return {canPush:true,enabled:config.enabled===true,
+   permission:Notification.permission,subscribed:owned.subscribed===true};
+ }
  async function refresh(){
   const target=select('#guardianPushStatus'),enable=select('#guardianPushEnable');
   if(!target)return;
@@ -89,5 +96,5 @@ export function createGuardianPush({call,select,message}){
   });
   refresh();
  }
- return {bind,disable};
+ return {bind,disable,enable,introStatus};
 }

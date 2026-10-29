@@ -34,6 +34,8 @@ export function mobileMarkup({navs,user,active,pending=0}){
   <div class="rd-mobile-sheet-actions">
    <button type="button" id="rdMenuInstall">⬇️ ติดตั้งแอป</button>
    <button type="button" data-tab="notifications">🔔 ตั้งค่าแจ้งเตือน</button>
+   <a class="rd-mobile-role-link" href="./?login=student">🎓 เข้าระบบนักเรียน</a>
+   <a class="rd-mobile-role-link" href="./?login=guardian">👨‍👩‍👧 เข้าระบบผู้ปกครอง</a>
    <button type="button" id="rdMenuTheme">◐ เปลี่ยนธีม</button>
    <button type="button" id="rdMenuLogout">ออกจากระบบ</button>
   </div>

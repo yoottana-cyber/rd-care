@@ -13,6 +13,7 @@ import {createLateGate} from './late-gate.js';
 import {readLateGateIntent} from './late-qr-intent.js';
 import {createPeriodCenter} from './period-center.js';
 import {createPwaTools} from './pwa-client.js';
+import {offerPushIntro} from './push-intro.js';
 import {registerPwaUpdates} from './pwa-updates.js';
 import {mobileMarkup,bindMobileMenu} from './mobile-nav.js';
 import {createNotificationSettings} from './notification-settings.js';
@@ -175,6 +176,7 @@ function loginPage(){
     <span><strong>จดจำการเข้าสู่ระบบบนอุปกรณ์นี้</strong><small>มือถือจะต่ออายุอัตโนมัติเมื่อใช้งาน • หากไม่ใช้งานเกิน 30 วันต้องเข้าสู่ระบบใหม่</small></span></label>
    <button class="button full" type="submit">เข้าสู่ระบบบุคลากร</button>
   </form>
+  <div class="rd-portal-role-links"><a href="./?login=student">🎓 นักเรียน</a><a href="./?login=guardian">👨‍👩‍👧 ผู้ปกครอง</a></div>
   ${!isInstalledPwa()?'<div class="login-links"><a href="./" class="button secondary full" id="staffBackToChoice">← กลับหน้าเลือกประเภทผู้เข้าใช้งาน</a></div>':''}
   <div class="login-install"><button type="button" class="button secondary" id="loginInstallApp">⬇️ ติดตั้งแอป RD CONNECT ครู</button>
    <small>iPhone: ใช้ Safari → แชร์ → เพิ่มไปยังหน้าจอโฮม</small></div>
@@ -193,7 +195,7 @@ function renderLogin(){
    const data=await api('/api/auth/login',{method:'POST',auth:false,body:{username:$('#username').value,password:$('#password').value,remember}});
    state.token=data.token;state.user=data.user;
    saveAuthSession('rd_token',data.token,data.expires_in,remember);setLastLoginArea('staff');rememberHomeRole('staff');
-   await boot();toast('เข้าสู่ระบบสำเร็จ');
+   await boot();welcomeStaffPush();toast('เข้าสู่ระบบสำเร็จ');
   }finally{if(button.isConnected)button.disabled=false}
  }));
  $('#loginInstallApp')?.addEventListener('click',()=>safeRun(()=>pwaTools.install()));
@@ -229,6 +231,15 @@ function renderStudentLate(){
    toast('ส่งคำขอมาสายแล้ว รอครูเวรตรวจสอบ');
   }finally{if(button.isConnected)button.disabled=false}
  }));
+}
+function welcomeStaffPush(){
+ if(!state.token||!state.user)return;
+ const id=state.user.id;
+ void offerPushIntro({role:'staff',id,
+  check:pwaTools.check,
+  enable:pwaTools.enable,
+  isCurrent:()=>!!state.token&&state.user?.id===id
+ }).catch(()=>{});
 }
 async function boot(){
  const [me,rooms]=await Promise.all([api('/api/auth/me'),api('/api/classrooms')]);state.user=me.user;state.rooms=rooms.items;
@@ -1001,7 +1012,7 @@ async function start(){
  }
  if(entrance===null){showEntrySelection();return}
  if(!state.token){renderLogin();return}
- try{await boot();await renewStaffRememberedSession()}catch(error){
+ try{await boot();await renewStaffRememberedSession();welcomeStaffPush()}catch(error){
   // A broken/offline network should not erase a remembered session. Only 401 does that
   // inside api(); after connectivity returns the user can continue without re-entering credentials.
   if(!state.token)return;
