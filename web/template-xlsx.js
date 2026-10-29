@@ -60,11 +60,22 @@ function sheet(rows,widths,freeze=true){
 export function buildExampleXlsx(kind='students',scoreRules=[]){
  const isAdvisor=kind==='advisors',isPortal=kind==='portal',isRoster=kind==='roster';
  const isScore=kind==='score-good'||kind==='score-behavior',isGoodScore=kind==='score-good';
+ const isCriteria=kind==='criteria-good'||kind==='criteria-behavior',isGoodCriteria=kind==='criteria-good';
  const eligibleRules=isScore&&Array.isArray(scoreRules)?
   scoreRules.filter(x=>x?.active&&Number(x.automatic)!==1&&
    (isGoodScore?x.category==='good':x.category!=='good')):[];
  const exampleRule=eligibleRules.length?Number(eligibleRules[0].id):0;
- const students=isScore?[
+ const students=isCriteria?(isGoodCriteria?[
+  ['rule_id','category','name','points','active'],
+  ['','good','มีจิตอาสาช่วยงานโรงเรียน',5,1],
+  ['','good','เก็บสิ่งของส่งคืนเจ้าของ',3,1]
+ ]:[
+  ['rule_id','category','name','points','active'],
+  ['','minor','ไม่ปฏิบัติตามระเบียบการแต่งกาย',-5,1],
+  ['','moderate','ผิดระเบียบระดับปานกลาง (ตัวอย่าง)',-10,1],
+  ['','serious','ผิดระเบียบระดับร้ายแรง (ตัวอย่าง)',-20,1],
+  ['','very_serious','ผิดระเบียบระดับร้ายแรงมาก (ตัวอย่าง)',-30,1]
+ ]):isScore?[
   ['student_no','rule_id','reason'],
   ['000001',exampleRule,'ตัวอย่างเท่านั้น กรุณาแทนเลขประจำตัวนักเรียนจริงก่อนนำเข้า'],
   ['000002',exampleRule,'']
@@ -89,7 +100,21 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   ['ม.2/3',2,'STU9002','นักเรียนตัวอย่าง สอง','student002','Student#5678'],
   ['ม.3/2',3,'STU9003','นักเรียนตัวอย่าง สาม','student003','Student#9012']
  ];
- const instructions=isScore?[
+ const instructions=isCriteria?[
+  ['RD CONNECT — นำเข้าเกณฑ์คะแนนโรงเรียน '+(isGoodCriteria?'ความดี':'ความผิด'),'วิธีกรอก / ข้อกำหนด'],
+  ['Criteria','แผ่นงานแรกเท่านั้น แถวแรกต้องมี 5 คอลัมน์ตามไฟล์ตัวอย่าง ห้ามเพิ่มแถวเหนือหัวตาราง'],
+  ['rule_id','เว้นว่างเพื่อเพิ่มรายการใหม่; ระบุรหัส ID จากแผ่น Existing rules เพื่ออัปเดตรายการเดิม'],
+  ['category',isGoodCriteria?'ใช้ good เท่านั้น':'ใช้ minor (เล็กน้อย), moderate (ปานกลาง), serious (ร้ายแรง), very_serious (ร้ายแรงมาก)'],
+  ['name','ชื่อเกณฑ์ 2–120 ตัวอักษร ไม่ซ้ำกันในหมวดเดียวกัน'],
+  ['points',isGoodCriteria?'คะแนนความดีเป็นเลขบวก 1 ถึง 50':'คะแนนความผิดเป็นเลขลบ -1 ถึง -50'],
+  ['active','1 = เปิดใช้งาน; 0 = ปิดใช้งาน (บันทึกเป็นตัวเลข)'],
+  ['การนำเข้า','ระบบตรวจทุกรายการก่อนบันทึก และแยกเพิ่มใหม่/อัปเดตเกณฑ์เดิม'],
+  ['รายการเดิม','Existing rules แสดง ID และเกณฑ์ปัจจุบันของหมวดนี้ ณ เวลาที่ดาวน์โหลด'],
+  ['ข้อยกเว้น','เกณฑ์หนีเรียน -10 แบบอัตโนมัติถูกคุ้มครอง ไม่อนุญาตแก้ผ่านไฟล์'],
+  ['คะแนนนักเรียน','นำเข้าเฉพาะเกณฑ์โรงเรียน ไม่บันทึกหรือแก้ไขคะแนนนักเรียนรายบุคคล'],
+  ['การป้องกันซ้ำ','นำเข้าใหม่ที่ชื่อ+หมวดตรงเกณฑ์เดิม ระบบตีความเป็นการอัปเดต ไม่เพิ่มเกณฑ์ซ้ำ'],
+  ['ตัวอย่าง','ข้อมูลในแผ่น Criteria เป็นตัวอย่าง กรุณาทบทวนคะแนนและชื่อก่อนกดยืนยัน']
+ ]:isScore?[
   ['RD CONNECT — ตัวอย่างนำเข้า'+(isGoodScore?'คะแนนความดี':'คะแนนความผิด'),'คำอธิบาย'],
   ['Sheet1','ใช้ตารางในแผ่นงานแรกเท่านั้น แถวแรกเป็นหัวตาราง ห้ามเพิ่มแถวเหนือหัวตาราง'],
   ['student_no','เลขประจำตัวนักเรียน (รูปแบบข้อความ เพื่อรักษาเลข 0 นำหน้า)'],
@@ -146,7 +171,12 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   ['การนำเข้า','เลือกหลายห้องในไฟล์เดียว RD Care ตรวจทั้งไฟล์แล้วนำเข้าเป็นชุด'],
   ['ความปลอดภัย','ใช้ข้อมูลสมมติเท่านั้น ห้ามส่งไฟล์รหัสผ่านลงกลุ่มสาธารณะ']
  ];
- const rooms=isScore?[
+ const rooms=isCriteria?[
+  ['rule_id','category','name','points','active'],
+  ...(Array.isArray(scoreRules)?scoreRules:[])
+   .filter(r=>Number(r?.automatic)!==1&&(isGoodCriteria?r.category==='good':r.category!=='good'))
+   .map(r=>[Number(r.id),r.category,String(r.name),Number(r.points),Number(r.active)?1:0])
+ ]:isScore?[
   ['rule_id','ชื่อเกณฑ์','คะแนน','หมวด'],
   ...eligibleRules.map(r=>[Number(r.id),String(r.name),Number(r.points),String(r.category)])
  ]:[['รายการห้องเรียน (ตรวจสอบให้ตรงกับระบบ)']];
@@ -165,7 +195,7 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
  const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-  '<sheets><sheet name="'+(isScore?'Score Import':isPortal?'Portal Accounts':isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="'+(isScore?'Rules':'Rooms')+'" sheetId="3" r:id="rId3"/></sheets></workbook>';
+  '<sheets><sheet name="'+(isCriteria?'Criteria':isScore?'Score Import':isPortal?'Portal Accounts':isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="'+(isCriteria?'Existing rules':isScore?'Rules':'Rooms')+'" sheetId="3" r:id="rId3"/></sheets></workbook>';
  const bookRelations='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
   [1,2,3].map(n=>'<Relationship Id="rId'+n+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+n+'.xml"/>').join('')+
@@ -184,9 +214,9 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   '[Content_Types].xml':types,'_rels/.rels':relations,
   'xl/workbook.xml':workbook,'xl/_rels/workbook.xml.rels':bookRelations,
   'xl/styles.xml':styles,
-  'xl/worksheets/sheet1.xml':sheet(students,isScore?[25,16,64]:isRoster?[17,14,22,40]:isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
+  'xl/worksheets/sheet1.xml':sheet(students,isCriteria?[16,20,61,15,14]:isScore?[25,16,64]:isRoster?[17,14,22,40]:isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
   'xl/worksheets/sheet2.xml':sheet(instructions,[49,83]),
-  'xl/worksheets/sheet3.xml':sheet(rooms,isScore?[16,50,16,25]:[32])
+  'xl/worksheets/sheet3.xml':sheet(rooms,isCriteria?[16,20,56,15,14]:isScore?[16,50,16,25]:[32])
  });
 }
 export function downloadStudentExampleXlsx(){
@@ -238,6 +268,20 @@ export function downloadScoreImportExampleXlsx(mode,rules=[]){
  const link=document.createElement('a');
  link.href=url;
  link.download=mode==='good'?'RD_CONNECT_Import_Good_Deeds.xlsx':'RD_CONNECT_Import_Misconduct.xlsx';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+
+export function buildCriteriaExampleXlsx(mode,rules=[]){
+ if(!['good','behavior'].includes(mode))throw Error('Invalid criteria import mode');
+ return buildExampleXlsx(mode==='good'?'criteria-good':'criteria-behavior',rules);
+}
+export function downloadCriteriaExampleXlsx(mode,rules=[]){
+ const bytes=buildCriteriaExampleXlsx(mode,rules);
+ const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
+ const link=document.createElement('a');
+ link.href=url;
+ link.download=mode==='good'?'RD_CONNECT_Good_Criteria_Template.xlsx':'RD_CONNECT_Misconduct_Criteria_Template.xlsx';
  document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
