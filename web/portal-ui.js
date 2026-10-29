@@ -138,7 +138,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      <main class="rd-portal-content" id="portalMain" tabindex="-1">
       ${inner}<div id="portalMessage" class="rd-portal-feedback" role="status" aria-live="polite"></div>
      </main>
-     <nav class="rd-portal-bottom" aria-label="เมนูหลัก">
+     <nav class="rd-portal-bottom ${guardian?'rd-portal-bottom-guardian':'rd-portal-bottom-student'}" aria-label="เมนูหลัก">
       ${(state.account?.role==='guardian'
         ?[['home','⌂','หน้าหลัก'],['attendance','▦','มาเรียน'],['truancyHistory','!','หนีเรียน'],
           ['behaviorHistory','⭐','คะแนน'],['account','☷','บัญชี']]
@@ -455,6 +455,9 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
       <span class="rd-portal-quick-icon">!</span><strong>ประวัติหนีเรียน</strong><small>รายคาบย้อนหลัง</small></button>
      <button type="button" class="rd-portal-quick" data-portal-open="behaviorHistory">
       <span class="rd-portal-quick-icon">⭐</span><strong>คะแนนพฤติกรรม</strong><small>ความดีและการปรับพฤติกรรม</small></button>`:''}
+     ${!guardian?`<button type="button" class="rd-portal-quick" data-portal-open="behaviorHistory">
+      <span class="rd-portal-quick-icon">⭐</span><strong>คะแนนพฤติกรรม</strong>
+      <small>ประวัติการตักเตือน ความผิดและความดี</small></button>`:''}
      <button type="button" class="rd-portal-quick" data-portal-open="attendance">
       <span class="rd-portal-quick-icon">▦</span><strong>ประวัติการมาเรียน</strong><small>รายวันและรายคาบ</small></button>
      <button type="button" class="rd-portal-quick" data-portal-open="${guardian?'alerts':'late'}">
