@@ -236,10 +236,14 @@ export async function portalAdminRoutes(req,env,actor,path){
    env.DB.prepare("SELECT COUNT(*) AS n FROM portal_accounts WHERE role='student'"),
    env.DB.prepare("SELECT COUNT(*) AS n FROM portal_accounts WHERE role='guardian'"),
    env.DB.prepare('SELECT COUNT(*) AS n FROM guardian_student_links'),
-   env.DB.prepare(`SELECT COUNT(*) AS n FROM students s WHERE s.active=1 AND NOT EXISTS (
-    SELECT 1 FROM guardian_student_links l JOIN portal_accounts a
-    ON a.id=l.guardian_account_id AND a.role='guardian' AND a.active=1
-    WHERE l.student_id=s.id)`)
+   // Build the active guardian-linked student ID set just once. The previous
+   // correlated NOT EXISTS scanned active guardian accounts per pupil under D1.
+   // l.student_id is NOT NULL in the schema, making NOT IN null-safe here.
+   env.DB.prepare(`SELECT COUNT(*) AS n FROM students s
+    WHERE s.active=1 AND s.id NOT IN (
+     SELECT l.student_id FROM guardian_student_links l
+     JOIN portal_accounts a ON a.id=l.guardian_account_id
+     WHERE a.role='guardian' AND a.active=1)`)
   ]);
   return reply({student_accounts:students.results?.[0]?.n||0,
    guardian_accounts:guardians.results?.[0]?.n||0,

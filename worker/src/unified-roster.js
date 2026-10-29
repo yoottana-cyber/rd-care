@@ -90,11 +90,16 @@ export function planUnifiedRoster(rows,roomMap,existingStudents=[],existingAccou
 // A legacy database can also have the new index after migration 0032 while
 // retaining the old table-level room/roll UNIQUE constraint. Check BOTH.
 export async function identityKeyedRosterReady(db){
- const table=await db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='students'").all();
- const definition=String(table.results?.[0]?.sql||'');
- if(!definition||/\bUNIQUE\s*\(\s*classroom_id\s*,\s*roll_no\s*\)/i.test(definition))return false;
- const indices=await db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='uq_students_current_room_roll'").all();
- return (indices.results||[]).length>0;
+ // One metadata query per request instead of two. Check both capabilities:
+ // legacy databases can retain the inline UNIQUE constraint after indexing.
+ const schema=await db.prepare(`SELECT
+  (SELECT sql FROM sqlite_master WHERE type='table' AND name='students') AS table_sql,
+  EXISTS(SELECT 1 FROM sqlite_master WHERE type='index'
+   AND name='uq_students_current_room_roll') AS has_live_roll_index`).first();
+ const definition=String(schema?.table_sql||'');
+ return !!definition&&
+  !/\bUNIQUE\s*\(\s*classroom_id\s*,\s*roll_no\s*\)/i.test(definition)&&
+  Number(schema?.has_live_roll_index)===1;
 }
 
 async function body(req){
