@@ -6,7 +6,7 @@ const ios=()=>/iPad|iPhone|iPod/i.test(navigator.userAgent);
 const storageKey=(role,id)=>'rd-push-intro-v1:'+role+':'+id+':'+(standalone()?'app':'web');
 
 export function shouldOfferPushIntro({role,id,storage=localStorage,isMobile=mobile}){
- if(!['staff','guardian'].includes(role)||!id||!isMobile())return false;
+ if(!['staff','guardian','student'].includes(role)||!id||!isMobile())return false;
  try{return storage.getItem(storageKey(role,id))!=='seen'}catch{return true}
 }
 export async function offerPushIntro({role,id,check,enable,isCurrent=()=>true}){
@@ -19,7 +19,7 @@ export async function offerPushIntro({role,id,check,enable,isCurrent=()=>true}){
  const needsInstall=ios()&&!standalone();
  if(state.subscribed||state.permission==='denied'||
   (!state.enabled&&!needsInstall)||(!state.canPush&&!needsInstall))return false;
- const label=role==='guardian'?'ผู้ปกครอง':'ครูและบุคลากร';
+ const label=role==='guardian'?'ผู้ปกครอง':role==='student'?'นักเรียน':'ครูและบุคลากร';
  const el=document.createElement('section');
  el.dataset.rdPushIntro=role;
  el.className='rd-push-intro';

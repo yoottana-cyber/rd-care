@@ -27,7 +27,7 @@ function renderFor(role,{qr=false,guardianFocus=false}={}){
  const context={
   state,lateQrToken:qr?'gate':null,lateQrReceipt:null,
   root:{querySelectorAll:()=>[]},portalPeriodMode,isInstalledPwa:()=>false,
-  frame:next=>{html=next},esc:escapeHtml,portalDate:x=>x,guardianPush:{bind(){},introStatus(){},enable(){}},
+  frame:next=>{html=next},esc:escapeHtml,portalDate:x=>x,guardianPush:{bind(){},introStatus(){},enable(){}},studentPush:{bind(){},introStatus(){},enable(){}},
   offerPushIntro:()=>Promise.resolve(false),portalPushIntroPending:false,
   table:()=>'<div class="rd-portal-record-list"></div>',
   statusLabel:x=>x,today:()=> '2026-10-27',
@@ -52,6 +52,9 @@ test('student portal renders thumb-friendly navigation, quick cards, QR form and
  assert.match(html,/data-portal-open="attendance"/);
  assert.match(html,/ประวัติมาสาย/);
  assert.doesNotMatch(html,/id="guardianPushEnable"/);
+ assert.match(html,/id="studentPushEnable"/);
+ assert.match(html,/id="studentPushDisable"/);
+ assert.match(html,/id="studentPushTest"/);
 });
 test('guardian portal retains verified guardian Push controls and focus on linked event',()=>{
  const html=renderFor('guardian',{guardianFocus:true});
@@ -65,6 +68,7 @@ test('guardian portal retains verified guardian Push controls and focus on linke
  assert.match(html,/id="pushNoticeFocus"/);
  assert.match(html,/รายละเอียดนี้แสดงสำหรับบัญชีที่ได้รับสิทธิ์เท่านั้น/);
  assert.doesNotMatch(html,/id="studentLateQrForm"/);
+ assert.doesNotMatch(html,/id="studentPushEnable"/);
  assert.doesNotMatch(html,/data-portal-panel="late"/);
 });
 test('mobile student/guardian login keeps role-specific password visibility and original auth',()=>{

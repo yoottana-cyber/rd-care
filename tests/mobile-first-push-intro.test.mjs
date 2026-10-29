@@ -14,7 +14,7 @@ test('first mobile visit offers staff and guardian Push consent only once per ac
  storage.setItem('rd-push-intro-v1:staff:71:web','seen');
  assert.equal(shouldOfferPushIntro({...options,role:'staff'}),false);
  assert.equal(shouldOfferPushIntro({...options,role:'guardian'}),true);
- assert.equal(shouldOfferPushIntro({...options,role:'student'}),false);
+ assert.equal(shouldOfferPushIntro({...options,role:'student'}),true);
  assert.equal(shouldOfferPushIntro({...options,role:'guardian',isMobile:()=>false}),false);
 });
 test('permission request happens only in the direct click activation, not on app boot',()=>{

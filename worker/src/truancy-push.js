@@ -19,6 +19,8 @@ export async function guardianPushRoutes(req,env,account,path){
   if(!link)fail(403,'โรงเรียนยังไม่ยืนยันนักเรียนในความดูแล');
   const otherStaff=await env.DB.prepare('SELECT id FROM staff_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).first();
   if(otherStaff)fail(409,'อุปกรณ์นี้ยังสมัคร Push ด้วยบัญชีครู กรุณาออกจากระบบครูก่อน');
+  const studentOther=await env.DB.prepare('SELECT id FROM student_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).first();
+  if(studentOther)fail(409,'อุปกรณ์นี้สมัคร Push ด้วยบัญชีนักเรียนอยู่ กรุณาปิด Push เดิมก่อน');
   const old=await env.DB.prepare('SELECT guardian_account_id FROM guardian_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).first();
   if(old&&old.guardian_account_id!==account.id)fail(409,'อุปกรณ์ผูกกับบัญชีผู้ปกครองอื่น');
   if(!old){

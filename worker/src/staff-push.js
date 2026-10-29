@@ -81,6 +81,8 @@ export async function staffPushRoutes(req,env,user,path){
   const current=await env.DB.prepare('SELECT id,user_id FROM staff_push_subscriptions WHERE endpoint=?')
    .bind(subscription.endpoint).first();
   if(current&&current.user_id!==user.id)throw err(409,'อุปกรณ์นี้ผูกกับบัญชีอื่น กรุณาออกจากระบบเดิมและปิดแจ้งเตือนก่อน');
+  const portalOther=await env.DB.prepare('SELECT id FROM student_push_subscriptions WHERE endpoint=?').bind(subscription.endpoint).first();
+  if(portalOther)throw err(409,'อุปกรณ์นี้สมัครแจ้งเตือนด้วยบัญชีนักเรียนอยู่ กรุณาปิด Push เดิมก่อน');
   if(!current){
    const count=await env.DB.prepare('SELECT COUNT(*) AS total FROM staff_push_subscriptions WHERE user_id=?').bind(user.id).first();
    if(Number(count?.total||0)>=5)throw err(429,'สมัครรับแจ้งเตือนได้สูงสุด 5 อุปกรณ์ต่อบัญชี');
@@ -200,11 +202,24 @@ export async function sendAttendanceReviewPush(device,env,eventInfo){
 }
 export async function sendPushTest(device,env,audience){
  if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
- if(!['advisor','guardian'].includes(audience))throw Error('Invalid push audience');
+ if(!['advisor','guardian','student'].includes(audience))throw Error('Invalid push audience');
  const body=await encryptPriorityPush(device,{kind:'push_test',audience});
  const authorized=await makeVapidAuthorization(device.endpoint,env);
  return fetch(device.endpoint,{method:'POST',headers:{
   Authorization:authorized,TTL:'300',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
+// Generic private student notice. No incident type or student identity appears
+// in the Push payload or lock-screen text; the incident lookup is authorized.
+export async function sendStudentAttendancePush(device,env,{kind,eventId}){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ if(!['late','truancy'].includes(kind)||!Number.isSafeInteger(eventId)||eventId<1)
+  throw Error('Invalid student attendance notification');
+ const body=await encryptPriorityPush(device,{kind:'student_notice',audience:'student',noticeKind:kind,eventId});
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'1200',Urgency:'normal',
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
  },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }

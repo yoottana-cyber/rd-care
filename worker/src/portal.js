@@ -3,6 +3,7 @@ import {renewRememberedSession} from './remember-session.js';
 import {validUsername,validDate,bangkokToday} from './core.js';
 import {studentUsername} from './student-username.js';
 import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
+import {studentPushRoutes,studentPushTarget,deliverStudentPush} from './student-push.js';
 import {submitStudentLateQr} from './late-qr.js';
 import {deliverLateQrPush} from './late-qr-push.js';
 import {pushTarget} from './push-target.js';
@@ -163,10 +164,15 @@ export async function portalRoutes(req,env,path,ctx){
   const result=await submitStudentLateQr(req,env,a);
   // Send only after a committed successful record; do not block the student's receipt.
   if(result.ok&&ctx?.waitUntil)
-   ctx.waitUntil(deliverLateQrPush(env).catch(err=>console.warn('RD QR Push',err?.name||'failure')));
+   ctx.waitUntil(Promise.allSettled([
+    deliverLateQrPush(env),
+    deliverStudentPush(env,{kind:'late'})
+   ]));
   return result;
  }
  if(req.method==='GET'&&path==='/api/portal/push/target')return pushTarget(req,env,a,'guardian');
+ if(req.method==='GET'&&path==='/api/portal/student-push/target')return studentPushTarget(req,env,a);
+ if(path.startsWith('/api/portal/student-push/'))return studentPushRoutes(req,env,a,path);
  if(path.startsWith('/api/portal/push/'))return guardianPushRoutes(req,env,a,path);
  if(req.method==='GET'&&path==='/api/portal/truancy'){
    const q=new URL(req.url).searchParams,from=q.get('from'),to=q.get('to');

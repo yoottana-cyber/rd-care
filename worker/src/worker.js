@@ -17,6 +17,7 @@ import {staffPushRoutes,deliverAdvisorPush} from './staff-push.js';
 import {lateGateStaffRoutes} from './late-qr.js';
 import {deliverLateQrPush} from './late-qr-push.js';
 import {deliverTruancyPush,advisorTruancyItems,truancyPushReadiness} from './truancy-push.js';
+import {deliverStudentPush} from './student-push.js';
 import {pushTarget} from './push-target.js';
 import {studentAffairsRoutes,sendScheduledAttendanceReminders} from './student-affairs.js';
 import {scoreColumns,scoreSummary,caseTypeSql} from './score-ledger.js';
@@ -1000,7 +1001,8 @@ async function route(req,env,ctx){
   // Scheduled cron also retries the internal advisor outbox.
   if(result.ok&&ctx?.waitUntil)ctx.waitUntil(Promise.all([
    deliverAdvisorPush(env).catch(e=>console.warn('RD advisor push',e?.name)),
-   deliverTruancyPush(env).catch(e=>console.warn('RD truancy push',e?.name))
+   deliverTruancyPush(env).catch(e=>console.warn('RD truancy push',e?.name)),
+   deliverStudentPush(env,{kind:'truancy'}).catch(e=>console.warn('RD student truancy push',e?.name))
   ]));
   return result;
  }
@@ -1032,6 +1034,7 @@ export default {
   ctx.waitUntil(Promise.all([
    deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
    deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
+   deliverStudentPush(env).catch(e=>console.warn('RD scheduled student push',e?.name)),
    sendScheduledAttendanceReminders(env).catch(e=>console.warn('RD scheduled daily attendance reminder',e?.name)),
     deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name)),
     cleanupStudentFileJobs(env).catch(e=>console.warn('RD student import cleanup',e?.name))
