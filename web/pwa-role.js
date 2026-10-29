@@ -54,7 +54,7 @@ export function configureRolePwa(search='',doc=document){
  if(!icon){icon=doc.createElement('link');icon.setAttribute('rel','icon');icon.setAttribute('type','image/png');head.appendChild(icon)}
  icon.setAttribute('href',selection?.icon||'./icons/icon-192.png');
  if(doc.documentElement)doc.documentElement.dataset.rdPwaRole=role||'choice';
- doc.title=selection?selection.name+' | โรงเรียนรัษฎา':
-  'RD CONNECT | ระบบการดูแลและช่วยเหลือนักเรียนโรงเรียนรัษฎา';
+ doc.title=selection?selection.name+' — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา':
+  'RD CONNECT — ระบบสารสนเทศเพื่อการติดตาม ดูแล และส่งเสริมนักเรียน โรงเรียนรัษฎา';
  return role;
 }
