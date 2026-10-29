@@ -3,7 +3,7 @@ import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
 import {searchBehaviorStudents,recordBehaviorBulk} from './behavior-bulk.js';
-import {ensureRecorder,commitBehaviorIncidents,behaviorRequestId} from './conduct-policy.js';
+import {ensureRecorder,commitBehaviorIncidents,behaviorRequestId,selectedScoreDate} from './conduct-policy.js';
 import {criteriaImportRoutes} from './criteria-excel-import.js';
 import {schoolScoreMonitorSummary,schoolScoreMonitorHistory} from './teacher-score-monitor.js';
 import {previewBehaviorAdjustments,recordBehaviorAdjustmentBulk} from './adjustment-bulk.js';
@@ -92,7 +92,7 @@ async function recordBehavior(env,u,b,adjust=false){
  }else{
   const requestId=behaviorRequestId(b.request_id);
   const [incident]=await commitBehaviorIncidents(env.DB,[student],
-   {id:ruleId},reason,u.id,requestId);
+   {id:ruleId},reason,u.id,requestId,selectedScoreDate(b.school_date));
   return reply({ok:true,id:incident.id,incident_id:incident.id,request_id:requestId,
    points:Number(incident.points_applied),warning_no:Number(incident.warning_no)||0,
    category,rule_name:ruleName},201);
