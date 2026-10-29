@@ -38,7 +38,7 @@ test('server inserts an incident and never accepts a user-supplied score amount'
  }};
  const requestId='e4f4bace-96a5-4b4b-9c6a-4fb45c0f7c43';
  incidentInsert(db,11,{id:8},'คำเตือน',3,requestId);
- assert.match(entry.sql,/INSERT INTO behavior_incidents/);
+ assert.match(entry.sql,/INSERT OR IGNORE INTO behavior_incidents/);
  assert.match(entry.sql,/history\.n<2/);
  assert.match(entry.sql,/history\.n<1/);
  assert.match(entry.sql,/r\.points/);
@@ -79,8 +79,8 @@ test('receipt verification handles D1 triggers that report changes > 1 and unexp
  assert.deepEqual(records.map(r=>r.id),[12,13]);
  assert.deepEqual(records.map(r=>r.points_applied),[0,-10]);
  assert.equal(seen.length,3);
- assert.match(seen[2].sql,/WHERE request_id=\? AND student_id IN/);
- assert.deepEqual(seen[2].args,[token,5,6]);
+ assert.match(seen.find(x=>x.sql.startsWith('SELECT id,student_id')).sql,/WHERE request_id=\? AND student_id IN/);
+ assert.deepEqual(seen.find(x=>x.sql.startsWith('SELECT id,student_id')).args,[token,5,6]);
 });
 test('no success is reported when receipt rows are missing or wrong despite successful writes',async()=>{
  const token='e4f4bace-96a5-4b4b-9c6a-4fb45c0f7c43';
