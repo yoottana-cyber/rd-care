@@ -11,11 +11,13 @@ function setup({role='staff',id=7,primary=8,secondary=null,owner=8}={}){
   prepare(sql){
    const item={sql,args:[]};statements.push(item);
    return {bind(...args){item.args=args;return {
+    sql,params:args,
     async first(){
      if(sql.includes('FROM sessions s JOIN users u'))
       return {id,role,active:1,display_name:'ผู้ใช้ทดสอบ'};
      if(sql.includes('SELECT advisor_user_id,advisor2_user_id FROM classrooms'))
       return {advisor_user_id:primary,advisor2_user_id:secondary};
+     if(sql.includes('SELECT id FROM timetable WHERE classroom_id=? AND teacher_user_id=? AND active=1'))return owner===id?{id:5}:null;
      if(sql.includes('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable'))
       return {id:5,classroom_id:2,teacher_user_id:owner,day_of_week:weekday(date)};
      if(sql.includes('FROM period_teaching_logs WHERE timetable_id'))return null;
