@@ -36,7 +36,7 @@ test('admin settings summary counts rooms and active staff accurately',()=>{
  assert.deepEqual(adminMetrics(teachers,rooms),{
   users:3,teachers:1,rooms:2,advisors:1,inactive:1
  });
- assert.deepEqual(adminTabs.map(t=>t.id),['overview','people','teaching','import']);
+ assert.deepEqual(adminTabs.map(t=>t.id),['overview','people','teaching','import','notifications']);
 });
 test('full admin redesign shows summary cards and clean navigation',()=>{
  const s=setup();
