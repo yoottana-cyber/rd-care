@@ -106,3 +106,26 @@ body.rd-score-popup-open{overflow:hidden}
  .score-adjust-page .score-student-row{padding:9px 7px}
  .score-adjust-page .score-chip-history{padding:5px 7px}
 }
+
+/* School-approved score imports: Excel preview and resumable, idempotent batches. */
+.score-excel-import{max-width:1100px}
+.score-excel-import h3{margin:0}
+.score-excel-import .row.between{flex-wrap:wrap;gap:12px}
+.score-excel-import input[type=file]{max-width:100%;width:100%;border:1px dashed #8cbba1;
+ border-radius:12px;padding:12px;background:#f5fbf7;color:inherit}
+.score-excel-summary{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+ gap:6px 16px;border-radius:12px;background:#e9f8ef;color:#165c3c;padding:12px 15px}
+.score-excel-summary strong{overflow-wrap:anywhere}
+.score-excel-controls{align-items:center;flex-wrap:wrap;gap:8px}
+.score-excel-controls button[aria-pressed=true]{background:#087e4e;color:white}
+.score-excel-preview{max-height:350px;overflow:auto;border-radius:12px;border:1px solid #dce6e2}
+.score-excel-preview table{min-width:760px;width:100%}
+.score-excel-preview th{position:sticky;top:0;z-index:1;background:#dff3e8}
+.score-excel-preview td{vertical-align:top;white-space:normal;overflow-wrap:anywhere}
+.score-excel-preview td small{display:block;color:#6a8076;margin-top:4px}
+.score-excel-bad{background:#fff1ee;color:#8e352a}
+[data-theme="dark"] .score-excel-import input[type=file]{background:#243f2f;border-color:#58856b}
+[data-theme="dark"] .score-excel-summary{background:#235239;color:#d9f8e4}
+[data-theme="dark"] .score-excel-preview th{background:#2d553b;color:#ecfff1}
+[data-theme="dark"] .score-excel-bad{background:#4c2d2b;color:#ffddda}
+@media(max-width:620px){.score-excel-import #scoreExcelExample{width:100%}}
