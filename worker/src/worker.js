@@ -68,8 +68,11 @@ async function currentUser(req,env){
  return u;
 }
 async function userRoomAccess(env,user,roomId,kind='view'){
- if(isStaff(user))return true;
- if(user.role!=='teacher')return false;
+ // Administration retains school-wide supervision, but Student Affairs staff
+ // must never gain school-wide check-in permissions from their staff role.
+ if(isAdmin(user))return true;
+ if(kind==='view'&&user.role==='staff')return true;
+ if(!['teacher','staff'].includes(user.role))return false;
  const room=await env.DB.prepare('SELECT advisor_user_id,advisor2_user_id FROM classrooms WHERE id=?').bind(roomId).first();
  if(!room)return false;
  if(kind==='daily')return room.advisor_user_id===user.id||room.advisor2_user_id===user.id;
@@ -184,7 +187,7 @@ async function getAttendance(req,env,user){
   const timetableId=positiveInt(q.get('timetable_id'));
   const slot=await env.DB.prepare('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=? AND active=1').bind(timetableId).first();
   if(!slot||slot.classroom_id!==roomId||slot.day_of_week!==weekday(date))throw error(400,'คาบเรียนไม่สัมพันธ์กับห้องหรือวันที่');
-  if(user.role==='teacher'&&slot.teacher_user_id!==user.id)throw error(403,'ดูเช็กชื่อรายคาบได้เฉพาะวิชาของตนเอง');
+  if(!isAdmin(user)&&slot.teacher_user_id!==user.id)throw error(403,'ดูเช็กชื่อรายคาบได้เฉพาะวิชาของตนเอง');
   const {results}=await env.DB.prepare(`SELECT p.student_id,
     CASE WHEN tr.student_id IS NOT NULL AND p.status='absent' THEN 'truancy' ELSE p.status END AS status
  FROM attendance_period p
@@ -233,7 +236,7 @@ async function writeAttendance(req,env,user){
   const tId=positiveInt(b.timetable_id);
   slot=await env.DB.prepare('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=? AND active=1').bind(tId).first();
   if(!slot||slot.classroom_id!==roomId||slot.day_of_week!==weekday(date))throw error(400,'คาบเรียนหรือวันเรียนไม่ตรงกับตารางสอน');
-  if(!isStaff(user)&&slot.teacher_user_id!==user.id)throw error(403,'ครูไม่มีสิทธิ์บันทึกคาบเรียนนี้');
+  if(!isAdmin(user)&&slot.teacher_user_id!==user.id)throw error(403,'ครูไม่มีสิทธิ์บันทึกคาบเรียนนี้');
  }
  for(const e of b.entries){
   if(kind==='daily'){
