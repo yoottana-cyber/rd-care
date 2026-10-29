@@ -46,7 +46,7 @@ export function normalizeCriteriaRows(body){
 async function criteriaCatalog(env){
  const {results}=await env.DB.prepare(`SELECT r.id,r.name,r.category,r.points,r.active,
   CASE WHEN r.id=(SELECT rule_id FROM truancy_score_policy WHERE id=1) THEN 1 ELSE 0 END AS automatic
-  FROM affairs_behavior_rules r ORDER BY r.id`).all();
+  FROM affairs_behavior_rules r WHERE r.deleted_at IS NULL ORDER BY r.id`).all();
  return results||[];
 }
 function validateRows(rows,mode,catalog){
@@ -115,7 +115,7 @@ export async function criteriaImportRoutes(env,user,path,body){
   if(row.target_rule_id){
    stmts.push(env.DB.prepare(`UPDATE affairs_behavior_rules
     SET name=?,category=?,points=?,active=?,updated_by=?,updated_at=CURRENT_TIMESTAMP
-    WHERE id=? AND id NOT IN (SELECT rule_id FROM truancy_score_policy)`)
+    WHERE id=? AND deleted_at IS NULL AND id NOT IN (SELECT rule_id FROM truancy_score_policy)`)
     .bind(row.name,row.category,row.points,row.active,user.id,row.target_rule_id));
   }else{
    stmts.push(env.DB.prepare(`INSERT INTO affairs_behavior_rules(name,category,points,active,updated_by)
