@@ -15,7 +15,25 @@ export async function deliverScorePush(env){
   JOIN behavior_records b ON b.id=i.behavior_record_id AND b.deleted_at IS NULL
   WHERE i.points_applied<0 AND i.deleted_at IS NULL
    AND e.created_at>=datetime('now','-1 day')
-  ORDER BY e.incident_id DESC LIMIT 30`).all();
+   AND (
+    (?=1 AND e.created_at >= (SELECT updated_at FROM notification_preferences WHERE event_key='score_student')
+      AND EXISTS(SELECT 1 FROM student_push_subscriptions s
+        JOIN portal_accounts a ON a.id=s.student_account_id AND a.student_id=i.student_id
+          AND a.role='student' AND a.active=1 AND a.must_change_password=0
+        WHERE NOT EXISTS(SELECT 1 FROM behavior_score_push_deliveries d
+         WHERE d.incident_id=i.id AND d.recipient_type='student' AND d.subscription_id=s.id
+         AND (d.state='delivered' OR d.attempts>=3))))
+    OR
+    (?=1 AND e.created_at >= (SELECT updated_at FROM notification_preferences WHERE event_key='score_guardian')
+      AND EXISTS(SELECT 1 FROM guardian_push_subscriptions s
+        JOIN portal_accounts a ON a.id=s.guardian_account_id AND a.role='guardian'
+          AND a.active=1 AND a.must_change_password=0
+        JOIN guardian_student_links l ON l.guardian_account_id=a.id AND l.student_id=i.student_id
+        WHERE NOT EXISTS(SELECT 1 FROM behavior_score_push_deliveries d
+         WHERE d.incident_id=i.id AND d.recipient_type='guardian' AND d.subscription_id=s.id
+         AND (d.state='delivered' OR d.attempts>=3))))
+   )
+  ORDER BY e.incident_id DESC LIMIT 30`).bind(studentOn?1:0,guardianOn?1:0).all();
  let delivered=0,processed=0;
  for(const event of events){
   const targets=[];
