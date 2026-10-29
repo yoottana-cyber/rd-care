@@ -1,4 +1,5 @@
 // Encrypted Web Push: event topics, dates and lesson/arrival times only.
+import {notificationEnabled} from './notification-policy.js';
 // Names, student IDs and reasons are never sent to the device lock screen.
 const err=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
@@ -269,6 +270,7 @@ async function deliverOne(env,entry,device,eventInfo){
 }
 export async function deliverAdvisorPush(env){
  if(!env.DB||!vapidReady(env))return {processed:0,enabled:false};
+ if(!await notificationEnabled(env,'review_advisor'))return {processed:0,enabled:false};
  const {results:events}=await env.DB.prepare(`SELECT o.id AS outbox_id,c.advisor_user_id,c.advisor2_user_id
   FROM notification_outbox o JOIN attendance_alerts a ON a.id=o.alert_id
   JOIN timetable t ON t.id=a.timetable_id JOIN classrooms c ON c.id=t.classroom_id
