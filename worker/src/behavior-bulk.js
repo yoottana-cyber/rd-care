@@ -1,3 +1,4 @@
+import {ensureRecorder,incidentInsert,incidentResults,incidentSummary} from './conduct-policy.js';
 // Authorized student lookup and transactional multi-student merit/conduct recording.
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
 const respond=(data,status=200)=>new Response(JSON.stringify(data),
@@ -48,6 +49,7 @@ export async function recordBehaviorBulk(env,user,body){
   .bind(ruleId).first():null;
  if(!rule?.active||!['good','minor','moderate','serious','very_serious'].includes(rule.category))
   fail(400,'กรุณาเลือกเกณฑ์คะแนนที่เปิดใช้งาน');
+ ensureRecorder(user,rule.category);
  const points=Number(rule.points);
  if(!Number.isSafeInteger(points)||points===0||
    (rule.category==='good'&&points<0)||(rule.category!=='good'&&points>0))
@@ -66,18 +68,11 @@ export async function recordBehaviorBulk(env,user,body){
   .bind(...ids,...(restricted?[user.id,user.id]:[])).all();
  if(results.length!==ids.length)
   fail(403,'มีนักเรียนที่ไม่อยู่ในสิทธิ์ของครู กรุณาเลือกรายชื่อใหม่');
- const statements=[];
- for(const studentId of ids){
-  statements.push(env.DB.prepare(`INSERT INTO behavior_records
-   (student_id,points,reason,recorded_by,affairs_rule_id,affairs_category)
-   VALUES(?,?,?,?,?,?)`).bind(studentId,points,reason,user.id,rule.id,rule.category));
-  // The batch executes sequentially in one D1 transaction. Capture the ID of
-  // the preceding behavior insert before adding the audit row.
-  statements.push(env.DB.prepare(`INSERT INTO audit_logs
-   (actor_id,action,entity_type,entity_id)
-   VALUES(?,'affairs_behavior_recorded','behavior_records',CAST(last_insert_rowid() AS TEXT))`)
-   .bind(user.id));
- }
- await env.DB.batch(statements);
- return respond({ok:true,count:ids.length,points,category:rule.category,rule_name:rule.name},201);
+ const statements=ids.map(studentId=>incidentInsert(env.DB,studentId,rule,reason,user.id));
+ const written=await env.DB.batch(statements);
+ if(written.some(x=>Number(x?.meta?.changes)!==1))
+  fail(409,'ไม่สามารถบันทึกเหตุการณ์ความผิดได้ครบทุกรายการ');
+ const incidents=await incidentResults(env.DB,written);
+ const summary=incidentSummary(incidents);
+ return respond({ok:true,...summary,points,category:rule.category,rule_name:rule.name},201);
 }
