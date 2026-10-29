@@ -1,7 +1,7 @@
 // One occurrence per student and approved rule. D1 executes each INSERT in a
 // batch transaction, so warning numbers are computed from the current ledger.
 export const warningAllowance=category=>category==='minor'?2:category==='moderate'?1:0;
-export const affairsRecorder=user=>['admin','staff'].includes(user?.role)||
+export const affairsRecorder=user=>user?.role==='admin'||
  (user?.role==='teacher'&&Number(user?.student_affairs)===1);
 export const seriousConduct=category=>['serious','very_serious'].includes(category);
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
