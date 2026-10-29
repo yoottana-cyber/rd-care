@@ -51,6 +51,7 @@ export function createCriteriaExcelImport({api,toast}){
   behavior:{filename:'',rows:[],preview:[],importId:null,busy:false,done:0,status:'',page:1,filter:'all',completed:false}
  };
  let currentRules=[];
+ let currentRefresh=async()=>{};
  const state=mode=>states[mode];
  function markup(mode){
   if(!['good','behavior'].includes(mode))return '';
@@ -107,7 +108,7 @@ export function createCriteriaExcelImport({api,toast}){
   // A different category may have become active while the file was processed.
   if(target.dataset.criteriaMode!==mode)return;
   target.innerHTML=markup(mode);
-  bind(mode,currentRules);
+  bind(mode,currentRules,currentRefresh);
  }
  async function loadFile(mode,file){
   if(!file||state(mode).busy)return;
@@ -164,6 +165,7 @@ export function createCriteriaExcelImport({api,toast}){
  }
  function bind(mode,rules,refresh){
   currentRules=rules||currentRules;
+  if(typeof refresh==='function')currentRefresh=refresh;
   document.querySelector('#affairsCriteriaDownload')?.addEventListener('click',()=>
    downloadCriteriaExampleXlsx(mode,currentRules));
   document.querySelector('#affairsCriteriaFile')?.addEventListener('change',e=>{
