@@ -4,6 +4,7 @@ import {validUsername,validDate,bangkokToday} from './core.js';
 import {studentUsername} from './student-username.js';
 import {guardianPushRoutes,guardianTruancyItems} from './truancy-push.js';
 import {studentPushRoutes,studentPushTarget,deliverStudentPush} from './student-push.js';
+import {portalStudentMessages} from './student-direct-messages.js';
 import {submitStudentLateQr} from './late-qr.js';
 import {deliverLateQrPush} from './late-qr-push.js';
 import {pushTarget} from './push-target.js';
@@ -170,6 +171,8 @@ export async function portalRoutes(req,env,path,ctx){
    ]));
   return result;
  }
+ if(path==='/api/portal/messages'||path.startsWith('/api/portal/messages/'))
+  return portalStudentMessages(req,env,a,path);
  if(req.method==='GET'&&path==='/api/portal/push/target')return pushTarget(req,env,a,'guardian');
  if(req.method==='GET'&&path==='/api/portal/student-push/target')return studentPushTarget(req,env,a);
  if(path.startsWith('/api/portal/student-push/'))return studentPushRoutes(req,env,a,path);
