@@ -5,6 +5,7 @@ import {createGuardianPush,createPortalPush} from './guardian-push.js';
 import {offerPushIntro} from './push-intro.js';
 import {readLateGateIntent,rememberLateGateIntent,clearLateGateIntent} from './late-qr-intent.js';
 import {createStudentLateQrScanner,lateCameraError} from './student-late-qr-scanner.js';
+import {studentMessagePanel} from './student-message-ui.js';
 import {checkedPortalPeriod,portalPeriodMode} from './portal-date-range.js';
 import {homeScreenRole,rememberHomeRole} from './pwa-role.js';
 // Standalone student / guardian portal. It never uses staff authentication.
@@ -23,8 +24,9 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   restoredToken=readAuthSession('rd_portal_token');
   if(restoredToken)activeTokenKey='rd_portal_token';
  }
- const state={token:restoredToken,account:null,role:startRole,children:[],studentId:null,records:null,truancy:[],from:startRole==='guardian'?minusDays(today(),29):today(),to:today(),filterMode:startRole==='guardian'?'range':'today',view:'home',focus:null,focusUnavailable:false};
+ const state={token:restoredToken,account:null,role:startRole,children:[],studentId:null,records:null,truancy:[],from:startRole==='guardian'?minusDays(today(),29):today(),to:today(),filterMode:startRole==='guardian'?'range':'today',view:'home',focus:null,focusUnavailable:false,messages:[],messageUnread:0,messageFocusId:null};
  const pushParams=new URLSearchParams(location.search);
+ let studentMessageIntent=/^\d{1,15}$/.test(pushParams.get('student_message')||'')?Number(pushParams.get('student_message')):null;
  let studentNoticeIntent=['late','truancy'].includes(pushParams.get('pupil_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
   {kind:pushParams.get('pupil_notice'),id:Number(pushParams.get('notice_id'))}:null;
@@ -85,7 +87,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
  const statusLabel=value=>thaiStatus[value]||({verified:'ยืนยันแล้ว',pending:'รอตรวจสอบ',rejected:'ไม่อนุมัติ'}[value])||value||'—';
  function setPortalView(view,scroll=false){
   const allowed=state.account?.role==='guardian'?['home','attendance','truancyHistory','behaviorHistory','alerts','account']:
-   ['home','attendance','late','account'];
+   ['home','attendance','late','messages','account'];
   state.view=allowed.includes(view)?view:'home';
   if(state.view!=='late')lateScanner.stop();
   root.querySelectorAll('[data-portal-panel]').forEach(el=>{el.hidden=el.dataset.portalPanel!==state.view});
@@ -139,7 +141,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
       ${(state.account?.role==='guardian'
         ?[['home','⌂','หน้าหลัก'],['attendance','▦','มาเรียน'],['truancyHistory','!','หนีเรียน'],
           ['behaviorHistory','⭐','คะแนน'],['account','☷','บัญชี']]
-        :[['home','⌂','หน้าหลัก'],['attendance','▦','การมาเรียน'],['late','◷','มาสาย'],['account','☷','บัญชี']]).map(([id,icon,label])=>`<button type="button" data-portal-view="${id}" aria-label="${label}">
+        :[['home','⌂','หน้าหลัก'],['attendance','▦','การมาเรียน'],['late','◷','มาสาย'],['messages','✉','ข้อความ'],['account','☷','บัญชี']]).map(([id,icon,label])=>`<button type="button" data-portal-view="${id}" aria-label="${label}">
          <span class="rd-portal-nav-icon" aria-hidden="true">${icon}</span><span>${label}</span>
         </button>`).join('')}
      </nav>
@@ -155,7 +157,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
  function showLogin(role=state.role){
   if(lateQrToken)role='student';
   if(noticeIntent)role='guardian';
-  if(studentNoticeIntent)role='student';
+  if(studentNoticeIntent||studentMessageIntent)role='student';
   state.role=role;state.view='home';state.from=today();state.to=state.from;state.filterMode='today';requestVersion++;
   state.account=null;state.children=[];state.records=null;
   frame(`<h2 class="login-heading">เข้าสู่ระบบ${role==='student'?'นักเรียน':'ผู้ปกครอง'}</h2>
@@ -237,6 +239,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
  async function showDashboard(){
   try{
    if(lateQrToken)state.view='late';
+  else if(studentMessageIntent&&state.account?.role==='student')state.view='messages';
    const session=state.token;
    const [data,focused,studentFocused]=await Promise.all([
     call('/api/portal/children'),
@@ -271,6 +274,10 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     studentNoticeIntent=null;
     history.replaceState(null,'',location.pathname+'?login=student'+location.hash);
    }
+   if(studentMessageIntent&&state.account?.role==='student'){
+    state.messageFocusId=studentMessageIntent;studentMessageIntent=null;
+    history.replaceState(null,'',location.pathname+'?login=student'+location.hash);
+   }
    if(!state.children.some(s=>s.id===state.studentId))state.studentId=state.children[0]?.id||null;
    if(state.studentId)await loadRecords();else renderDashboard();
   }catch(error){if(!state.token){showLogin(state.role);return}frame('<p class="warn">ไม่สามารถโหลดข้อมูลที่ได้รับสิทธิ์</p><button class="button secondary full" id="portalRetry">ลองอีกครั้ง</button>');message(error.message,true);select('#portalRetry').addEventListener('click',showDashboard)}
@@ -281,16 +288,19 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
   state.records=null;
   if(!studentId){renderDashboard();return}
   try{
-   const [records,notices]=await Promise.all([
+   const [records,notices,inbox]=await Promise.all([
     call('/api/portal/records?student_id='+studentId+
      '&from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)),
     state.account?.role==='guardian'?
      call('/api/portal/truancy?from='+encodeURIComponent(from)+'&to='+encodeURIComponent(to)):
-     Promise.resolve({items:[]})
+     Promise.resolve({items:[]}),
+    state.account?.role==='student'?call('/api/portal/messages'):Promise.resolve({items:[],unread:0})
    ]);
    if(version!==requestVersion||studentId!==state.studentId||from!==state.from||to!==state.to)return;
    state.truancy=(notices.items||[]).filter(e=>Number(e.student_id)===Number(studentId));
-   state.records=records;renderDashboard();
+   state.records=records;
+   state.messages=inbox.items||[];state.messageUnread=Number(inbox.unread)||0;
+   renderDashboard();
   }catch(error){
    if(version!==requestVersion)return;
    if(!state.token){showLogin(state.role);return}
@@ -437,6 +447,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
        <strong>${r?count(key):'–'}</strong><span>${label}</span></div>`).join('')}
     </div>
     <p class="rd-portal-count-note">นับเฉพาะวันที่มีข้อมูลเช็กชื่อในช่วงที่เลือก (${dayRows.length} รายการ)</p>
+    ${!guardian&&state.messageUnread>0?`<button type="button" class="rd-portal-outline" data-portal-open="messages">✉️ มีข้อความใหม่จากโรงเรียน ${state.messageUnread} ฉบับ • เปิดอ่าน</button>`:''}
     <div class="rd-portal-quick-grid">
      ${guardian?`<button type="button" class="rd-portal-quick" data-portal-open="truancyHistory">
       <span class="rd-portal-quick-icon">!</span><strong>ประวัติหนีเรียน</strong><small>รายคาบย้อนหลัง</small></button>
@@ -508,6 +519,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      </section>
      <p class="rd-portal-help">ยอดคะแนนนี้เฉพาะช่วงวันที่เลือก เกณฑ์ปรับพฤติกรรมเป็นรายการต่างหากจากคะแนนความดี</p>
     </section>`:''}
+   ${!guardian?studentMessagePanel({items:state.messages,unread:state.messageUnread,focusId:state.messageFocusId}):''}
    ${!guardian?`<section class="rd-portal-panel" data-portal-panel="late">
     <div class="rd-portal-page-title"><span class="rd-portal-kicker">LATE ARRIVAL</span><h1>ลงชื่อมาสาย</h1>
      <p>เปิดกล้องในแอปเพื่อสแกน QR ที่จุดครูเวร แล้วกดยืนยันลงชื่อมาสาย</p></div>
@@ -613,6 +625,25 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
     </section>
    </section>`);
   select('#portalLogout').addEventListener('click',logout);
+  async function refreshStudentInbox(){
+   if(state.account?.role!=='student')return;
+   const data=await call('/api/portal/messages');
+   state.messages=data.items||[];state.messageUnread=Number(data.unread)||0;
+   renderDashboard();
+  }
+  select('#studentMessagesRefresh')?.addEventListener('click',()=>{
+   refreshStudentInbox().catch(error=>message(error.message,true));
+  });
+  root.querySelectorAll('[data-student-message-read]').forEach(btn=>
+   btn.addEventListener('click',async()=>{
+    btn.disabled=true;
+    try{
+     await call('/api/portal/messages/'+Number(btn.dataset.studentMessageRead)+'/read',{method:'POST'});
+     await refreshStudentInbox();
+    }catch(error){message(error.message,true);if(btn.isConnected)btn.disabled=false}
+   }));
+  if(state.view==='messages'&&state.messageFocusId)
+   select('#studentMessageFocus')?.scrollIntoView({block:'center'});
   select('#studentLateScanStart')?.addEventListener('click',async()=>{
    const panel=select('#studentLateCameraPanel'),video=select('#studentLateCameraVideo');
    const start=select('#studentLateScanStart'),status=select('#studentLateScanStatus');
@@ -709,7 +740,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
      message('บัญชีที่จดจำไว้เป็นคนละประเภท กรุณาเข้าสู่ระบบ'+(expectedRole==='guardian'?'ผู้ปกครอง':'นักเรียน'),true);
      return true;
     }
-   if(studentNoticeIntent&&state.account.role!=='student'){
+   if((studentNoticeIntent||studentMessageIntent)&&state.account.role!=='student'){
     state.token='';clearAuthSession(activeTokenKey);showLogin('student');
     message('กรุณาเข้าสู่ระบบนักเรียนเพื่อดูรายละเอียดการแจ้งเตือน');return true;
    }

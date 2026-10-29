@@ -223,6 +223,20 @@ export async function sendStudentAttendancePush(device,env,{kind,eventId}){
   'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
  },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
 }
+// Encrypted one-to-one student message trigger. Never include subject, body,
+// student identity, recipient or sender in the notification payload.
+export async function sendStudentDirectMessagePush(device,env,messageId){
+ if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
+ if(!Number.isSafeInteger(messageId)||messageId<1)throw Error('Invalid student message ID');
+ const body=await encryptPriorityPush(device,{
+  kind:'student_message',audience:'student',messageId
+ });
+ const authorized=await makeVapidAuthorization(device.endpoint,env);
+ return fetch(device.endpoint,{method:'POST',headers:{
+  Authorization:authorized,TTL:'3600',Urgency:'normal',
+  'Content-Encoding':'aes128gcm','Content-Type':'application/octet-stream'
+ },body,signal:typeof AbortSignal.timeout==='function'?AbortSignal.timeout(8000):undefined});
+}
 // Legacy payload-free push for older administrative notices.
 export async function sendGenericPush(endpoint,env){
  if(!allowedEndpoint(endpoint))throw Error('Push endpoint not permitted');

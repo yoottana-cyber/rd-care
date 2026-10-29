@@ -1,6 +1,6 @@
 // RD CONNECT offline app shell. This cache contains only public static assets,
 // never authenticated responses, student records, or arbitrary same-origin URLs.
-const CACHE='rd-care-shell-v107';
+const CACHE='rd-care-shell-v108';
 const CACHE_PREFIX='rd-care-shell-';
 const ASSETS=[
  './','./index.html','./app.css','./theme.css','./login.css','./login-route.js',
@@ -11,7 +11,7 @@ const ASSETS=[
  './mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js',
  './auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js',
  './run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js',
- './portal-date-range.js','./portal-mobile.css','./student-late-qr-scanner.js',
+ './portal-date-range.js','./portal-mobile.css','./student-message-ui.js','./student-late-qr-scanner.js',
  './vendor/qr-scanner.min.js','./vendor/qr-scanner-worker.min.js','./student-affairs.js',
  './student-affairs.css','./guardian-push.js','./portal-admin.js',
  './portal-table.js','./portal-batch.js','./portal-roster-import.js',
@@ -95,6 +95,9 @@ self.addEventListener('push',event=>{
  const review=metadata?.kind==='attendance_review'&&metadata.audience==='advisor';
  const test=metadata?.kind==='push_test';
  const pupilNotice=metadata?.kind==='pupil_notice'&&metadata.audience==='student';
+ const studentMessage=metadata?.kind==='student_message'&&metadata.audience==='student';
+ const messageId=Number(metadata?.messageId);
+ const validMessageId=Number.isSafeInteger(messageId)&&messageId>0;
  const dailyReminder=metadata?.kind==='daily_attendance_reminder'&&metadata.audience==='advisor';
  const room=Number(metadata?.classroomId),validRoom=Number.isSafeInteger(room)&&room>0;
  const staff=metadata?.audience==='advisor';
@@ -105,7 +108,9 @@ self.addEventListener('push',event=>{
  const arrival=/^\d{2}:\d{2}$/.test(String(metadata?.arrival||''))?metadata.arrival:'';
  const type=late?'late':review?'attendance_review':'truancy';
  const studentKind=['late','truancy'].includes(metadata?.noticeKind)?metadata.noticeKind:null;
- const link=pupilNotice&&hasId&&studentKind?
+ const link=studentMessage&&validMessageId?
+  './?login=student&student_message='+messageId:
+  pupilNotice&&hasId&&studentKind?
    './?login=student&pupil_notice='+studentKind+'&notice_id='+id:
   dailyReminder&&validRoom&&date?
    './?tab=attendance&classroom_id='+room+'&date='+date:
@@ -123,7 +128,8 @@ self.addEventListener('push',event=>{
   urgent?'RD CONNECT • แจ้งเรื่องหนีเรียน':
   review?'RD CONNECT • แจ้งขาดรายคาบรอตรวจสอบ':
   test?'RD CONNECT • ทดสอบการแจ้งเตือน':
-  pupilNotice?'RD CONNECT • มีข้อมูลการเข้าเรียนใหม่':'RD CONNECT • โรงเรียนรัษฎา';
+  pupilNotice?'RD CONNECT • มีข้อมูลการเข้าเรียนใหม่':
+  studentMessage?'RD CONNECT • ข้อความจากโรงเรียน':'RD CONNECT • โรงเรียนรัษฎา';
  const details=late?
   [date&&'วันที่ '+date,arrival&&'เวลา '+arrival+' น.'].filter(Boolean).join(' • '):
   [date&&'วันที่ '+date,validPeriod&&'คาบ '+period,subject&&'วิชา '+subject].filter(Boolean).join(' • ');
@@ -132,6 +138,7 @@ self.addEventListener('push',event=>{
   urgent?'มีการบันทึกหนีเรียน'+(details?' • '+details:'')+' แตะเพื่อดูรายละเอียด':
   review?'มีเรื่องขาดรายคาบรอตรวจสอบ'+(details?' • '+details:'')+' แตะเพื่อเปิดรายการ':
   pupilNotice?'มีข้อมูลการเข้าเรียนให้ตรวจสอบในแอป RD CONNECT':
+  studentMessage?'มีข้อความใหม่จากโรงเรียน กรุณาเข้าสู่ระบบเพื่ออ่าน':
   test?'การแจ้งเตือนทดสอบจาก RD CONNECT (ไม่มีเหตุการณ์นักเรียน)':
   'มีรายการใหม่ให้ตรวจสอบในระบบ RD CONNECT';
  event.waitUntil(self.registration.showNotification(title,{
@@ -142,6 +149,7 @@ self.addEventListener('push',event=>{
       urgent?'rd-care-priority-review'+(hasId?'-'+id:''):
       review?'rd-care-attendance-review'+(hasId?'-'+id:''):
       pupilNotice?'rd-care-student-'+studentKind+'-'+id:
+      studentMessage?'rd-care-student-message-'+messageId:
       test?'rd-care-push-test':'rd-care-school-notices',
   renotify:false,requireInteraction:urgent,
   ...(urgent?{vibrate:[180,100,180]}:{}),
@@ -166,8 +174,9 @@ self.addEventListener('notificationclick',event=>{
    ((tab==='advisorCenter'||tab==='lateGate')&&!id&&!kind);
   const safeGuardian=['truancy','late'].includes(portalKind)&&/^\d{1,15}$/.test(id||'');
   const safeStudent=['truancy','late'].includes(studentKind)&&/^\d{1,15}$/.test(id||'')&&q.get('login')==='student';
+  const safeStudentMessage=/^\d{1,15}$/.test(q.get('student_message')||'')&&q.get('login')==='student';
   if(value.origin===home.origin&&value.pathname===home.pathname&&
-    (!value.search||safeStaff||safeGuardian||safeStudent))target=value;
+    (!value.search||safeStaff||safeGuardian||safeStudent||safeStudentMessage))target=value;
  }catch{}
  event.waitUntil((async()=>{
   const clientsList=await self.clients.matchAll({type:'window',includeUncontrolled:true});

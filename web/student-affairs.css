@@ -135,3 +135,11 @@ body.rd-affairs-modal-open{overflow:hidden}
 }
 [data-theme="dark"] .rd-affairs-modal-dialog{background:#193429;color:#e5f6e9}
 [data-theme="dark"] .rd-affairs-modal-x{background:#254838;border-color:#426550;color:#e6f8ed}
+
+.rd-affairs-message-compose .summary{border-radius:12px;padding:12px;background:#edf9f0}
+.rd-affairs-message-history{gap:12px}
+.rd-affairs-message-item{display:grid;gap:6px;padding:13px;border:1px solid #dcece3;border-radius:12px;background:#f7fbf9}
+.rd-affairs-message-item p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.rd-affairs-message-item small{color:#617b6d}
+[data-theme="dark"] .rd-affairs-message-item{background:#234234;border-color:#426853}
+[data-theme="dark"] .rd-affairs-message-compose .summary{background:#29523a}

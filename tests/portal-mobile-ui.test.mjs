@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import {portalPeriodMode} from '../web/portal-date-range.js';
+import {studentMessagePanel} from '../web/student-message-ui.js';
 const source=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const portal=source('web/portal-ui.js');
 const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -26,7 +27,7 @@ function renderFor(role,{qr=false,guardianFocus=false}={}){
  };
  const context={
   state,lateQrToken:qr?'gate':null,lateQrReceipt:null,
-  root:{querySelectorAll:()=>[]},portalPeriodMode,isInstalledPwa:()=>false,
+  root:{querySelectorAll:()=>[]},portalPeriodMode,studentMessagePanel,isInstalledPwa:()=>false,
   frame:next=>{html=next},esc:escapeHtml,portalDate:x=>x,guardianPush:{bind(){},introStatus(){},enable(){}},studentPush:{bind(){},introStatus(){},enable(){}},
   offerPushIntro:()=>Promise.resolve(false),portalPushIntroPending:false,
   table:()=>'<div class="rd-portal-record-list"></div>',
