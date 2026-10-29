@@ -57,9 +57,18 @@ function sheet(rows,widths,freeze=true){
   '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+frozen+
   '<cols>'+columns+'</cols><sheetData>'+data+'</sheetData></worksheet>';
 }
-export function buildExampleXlsx(kind='students'){
+export function buildExampleXlsx(kind='students',scoreRules=[]){
  const isAdvisor=kind==='advisors',isPortal=kind==='portal',isRoster=kind==='roster';
- const students=isRoster?[
+ const isScore=kind==='score-good'||kind==='score-behavior',isGoodScore=kind==='score-good';
+ const eligibleRules=isScore&&Array.isArray(scoreRules)?
+  scoreRules.filter(x=>x?.active&&Number(x.automatic)!==1&&
+   (isGoodScore?x.category==='good':x.category!=='good')):[];
+ const exampleRule=eligibleRules.length?Number(eligibleRules[0].id):0;
+ const students=isScore?[
+  ['student_no','rule_id','reason'],
+  ['000001',exampleRule,'ตัวอย่างเท่านั้น กรุณาแทนเลขประจำตัวนักเรียนจริงก่อนนำเข้า'],
+  ['000002',exampleRule,'']
+ ]:isRoster?[
   ['classroom','roll_no','student_no','full_name'],
   ['ม.1/1',1,'000001','นักเรียนตัวอย่าง หนึ่ง'],
   ['ม.1/1',2,'000002','นักเรียนตัวอย่าง สอง'],
@@ -80,7 +89,19 @@ export function buildExampleXlsx(kind='students'){
   ['ม.2/3',2,'STU9002','นักเรียนตัวอย่าง สอง','student002','Student#5678'],
   ['ม.3/2',3,'STU9003','นักเรียนตัวอย่าง สาม','student003','Student#9012']
  ];
- const instructions=isRoster?[
+ const instructions=isScore?[
+  ['RD CONNECT — ตัวอย่างนำเข้า'+(isGoodScore?'คะแนนความดี':'คะแนนความผิด'),'คำอธิบาย'],
+  ['Sheet1','ใช้ตารางในแผ่นงานแรกเท่านั้น แถวแรกเป็นหัวตาราง ห้ามเพิ่มแถวเหนือหัวตาราง'],
+  ['student_no','เลขประจำตัวนักเรียน (รูปแบบข้อความ เพื่อรักษาเลข 0 นำหน้า)'],
+  ['rule_id','รหัสเกณฑ์คะแนนจริงจากแผ่น Rules และต้องเป็นหมวด'+(isGoodScore?'ความดี':'ความผิด')],
+  ['reason','รายละเอียดเพิ่มเติม เว้นว่างได้ ระบบจะใช้ชื่อเกณฑ์คะแนน (สูงสุด 300 ตัวอักษร)'],
+  ['การคำนวณคะแนน','ระบบดึงคะแนนจากเกณฑ์ที่ฝ่ายกิจการกำหนด ไม่รับคะแนนที่กรอกเอง'],
+  ['ตรวจสอบข้อมูล','ระบบตรวจนักเรียน เกณฑ์ สิทธิ์ครู และแสดงตัวอย่างก่อนบันทึก'],
+  ['ความซ้ำ','เลขนักเรียน + รหัสเกณฑ์ห้ามซ้ำกันภายในไฟล์เดียว'],
+  ['แบ่งชุด','หากมีหลายรายการ ระบบจะส่งเป็นชุดเล็ก และสามารถดำเนินการต่อได้หากเน็ตสะดุด'],
+  ['คำเตือน','เลขนักเรียน 000001 และ 000002 เป็นตัวอย่าง ห้ามกดนำเข้าโดยไม่แทนข้อมูลจริง'],
+  ['ประวัติ','บันทึกใหม่ตามวันที่ทำรายการ ไม่แก้ไขคะแนนเดิม และไม่แก้คะแนนปรับพฤติกรรม']
+ ]:isRoster?[
   ['RD CONNECT — ตัวอย่างนำเข้าทะเบียนนักเรียนจากไฟล์เดียว','คำอธิบาย'],
   ['Students','คอลัมน์ 4 ช่องในแถวแรก ห้ามเพิ่มแถวเหนือหัวตาราง'],
   ['classroom','ห้องเรียน เช่น ม.1/1 ต้องตรงกับห้องที่มีในระบบ'],
@@ -125,8 +146,11 @@ export function buildExampleXlsx(kind='students'){
   ['การนำเข้า','เลือกหลายห้องในไฟล์เดียว RD Care ตรวจทั้งไฟล์แล้วนำเข้าเป็นชุด'],
   ['ความปลอดภัย','ใช้ข้อมูลสมมติเท่านั้น ห้ามส่งไฟล์รหัสผ่านลงกลุ่มสาธารณะ']
  ];
- const rooms=[['รายการห้องเรียน (ตรวจสอบให้ตรงกับระบบ)']];
- for(const [grade,count] of [[1,9],[2,9],[3,9],[4,7],[5,7],[6,7]]){
+ const rooms=isScore?[
+  ['rule_id','ชื่อเกณฑ์','คะแนน','หมวด'],
+  ...eligibleRules.map(r=>[Number(r.id),String(r.name),Number(r.points),String(r.category)])
+ ]:[['รายการห้องเรียน (ตรวจสอบให้ตรงกับระบบ)']];
+ for(const [grade,count] of (isScore?[]:[[1,9],[2,9],[3,9],[4,7],[5,7],[6,7]])){
   for(let number=1;number<=count;number++)rooms.push(['ม.'+grade+'/'+number]);
  }
  const types='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
@@ -141,7 +165,7 @@ export function buildExampleXlsx(kind='students'){
   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
  const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-  '<sheets><sheet name="'+(isPortal?'Portal Accounts':isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="Rooms" sheetId="3" r:id="rId3"/></sheets></workbook>';
+  '<sheets><sheet name="'+(isScore?'Score Import':isPortal?'Portal Accounts':isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="'+(isScore?'Rules':'Rooms')+'" sheetId="3" r:id="rId3"/></sheets></workbook>';
  const bookRelations='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
   [1,2,3].map(n=>'<Relationship Id="rId'+n+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+n+'.xml"/>').join('')+
@@ -160,9 +184,9 @@ export function buildExampleXlsx(kind='students'){
   '[Content_Types].xml':types,'_rels/.rels':relations,
   'xl/workbook.xml':workbook,'xl/_rels/workbook.xml.rels':bookRelations,
   'xl/styles.xml':styles,
-  'xl/worksheets/sheet1.xml':sheet(students,isRoster?[17,14,22,40]:isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
+  'xl/worksheets/sheet1.xml':sheet(students,isScore?[25,16,64]:isRoster?[17,14,22,40]:isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
   'xl/worksheets/sheet2.xml':sheet(instructions,[49,83]),
-  'xl/worksheets/sheet3.xml':sheet(rooms,[32])
+  'xl/worksheets/sheet3.xml':sheet(rooms,isScore?[16,50,16,25]:[32])
  });
 }
 export function downloadStudentExampleXlsx(){
@@ -200,6 +224,20 @@ export function downloadStudentRosterExampleXlsx(){
  const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
  const link=document.createElement('a');
  link.href=url;link.download='RD_CONNECT_Student_Roster_Template.xlsx';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
+
+export function buildScoreImportExampleXlsx(mode,rules=[]){
+ if(!['good','behavior'].includes(mode))throw Error('Invalid score mode');
+ return buildExampleXlsx(mode==='good'?'score-good':'score-behavior',rules);
+}
+export function downloadScoreImportExampleXlsx(mode,rules=[]){
+ const bytes=buildScoreImportExampleXlsx(mode,rules);
+ const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
+ const link=document.createElement('a');
+ link.href=url;
+ link.download=mode==='good'?'RD_CONNECT_Import_Good_Deeds.xlsx':'RD_CONNECT_Import_Misconduct.xlsx';
  document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
