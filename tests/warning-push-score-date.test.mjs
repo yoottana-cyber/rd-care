@@ -45,6 +45,18 @@ test('request retry date mismatch is rejected even with same UUID and student',a
  const okay=await commitBehaviorIncidents(db,[17],{id:8},reason,3,req,'2026-10-15');
  assert.equal(okay[0].id,11);
 });
+test('authorized student and guardian history includes warning records with selected school date',()=>{
+ const backend=read('worker/src/portal.js');
+ const ui=read('web/portal-ui.js');
+ assert.match(backend,/FROM behavior_incidents i/);
+ assert.match(backend,/i\.points_applied=0/);
+ assert.match(backend,/i\.warning_no>0/);
+ assert.match(backend,/\.bind\(id,from,to,id,from,to\)/);
+ assert.match(ui,/ตักเตือนครั้งที่/);
+ assert.match(ui,/scoreNoticeIntent/);
+ assert.match(ui,/\['home','attendance','behaviorHistory','late'/);
+ assert.match(ui,/data-portal-panel="behaviorHistory"/);
+});
 test('admin can separately enable student and guardian warnings, without changing score switches',()=>{
  const catalog=NOTIFICATION_CATEGORIES.map(x=>x.key);
  assert.equal(catalog.length,13);
