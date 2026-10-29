@@ -9,7 +9,7 @@ class TieredConductRules(unittest.TestCase):
   for f in sorted(ROOT.glob('[0-9][0-9][0-9][0-9]_*.sql')):
    sql=f.read_text(encoding='utf8')
    self.db.executescript('BEGIN;\n'+sql+'\nCOMMIT;' if f.name.startswith('0040_') else sql)
-  self.db.execute("""INSERT INTO users(id,username,display_name,role,password_salt,password_hash)
+  self.db.execute("""INSERT OR IGNORE INTO users(id,username,display_name,role,password_salt,password_hash)
    VALUES(1,'teacher','Teacher','teacher','s','h')""")
   self.db.execute("INSERT INTO classrooms(id,grade,room,label) VALUES(111,1,1,'ม.1/1')")
   for st in (1,2):
