@@ -23,7 +23,8 @@ test('guardian Push requires an explicit opt-in',()=>{
  assert.match(portal,/id="guardianPushEnable"/);
  assert.match(portal,/โรงเรียนยืนยันความสัมพันธ์แล้ว/);
  assert.match(guardian,/Notification.requestPermission\(\)/);
- assert.match(guardian,/\/api\/portal\/push\/subscribe/);
+ assert.match(guardian,/\/api\/portal\/push/);
+ assert.match(guardian,/call\(base\+'\/subscribe'/);
 });
 test('import screens continue to warn about data permissions and PDPA',()=>{
  const importer=readFileSync(new URL('../web/unified-import.js',import.meta.url),'utf8');

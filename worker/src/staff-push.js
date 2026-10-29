@@ -216,7 +216,7 @@ export async function sendStudentAttendancePush(device,env,{kind,eventId}){
  if(!allowedEndpoint(device.endpoint))throw Error('Push endpoint not permitted');
  if(!['late','truancy'].includes(kind)||!Number.isSafeInteger(eventId)||eventId<1)
   throw Error('Invalid student attendance notification');
- const body=await encryptPriorityPush(device,{kind:'student_notice',audience:'student',noticeKind:kind,eventId});
+ const body=await encryptPriorityPush(device,{kind:'pupil_notice',audience:'student',noticeKind:kind,eventId});
  const authorized=await makeVapidAuthorization(device.endpoint,env);
  return fetch(device.endpoint,{method:'POST',headers:{
   Authorization:authorized,TTL:'1200',Urgency:'normal',

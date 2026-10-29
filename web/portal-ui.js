@@ -24,9 +24,9 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
  }
  const state={token:restoredToken,account:null,role:startRole,children:[],studentId:null,records:null,truancy:[],from:startRole==='guardian'?minusDays(today(),29):today(),to:today(),filterMode:startRole==='guardian'?'range':'today',view:'home',focus:null,focusUnavailable:false};
  const pushParams=new URLSearchParams(location.search);
- let studentNoticeIntent=['late','truancy'].includes(pushParams.get('student_notice'))&&
+ let studentNoticeIntent=['late','truancy'].includes(pushParams.get('pupil_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
-  {kind:pushParams.get('student_notice'),id:Number(pushParams.get('notice_id'))}:null;
+  {kind:pushParams.get('pupil_notice'),id:Number(pushParams.get('notice_id'))}:null;
  let noticeIntent=['late','truancy'].includes(pushParams.get('portal_notice'))&&
   /^\d{1,15}$/.test(pushParams.get('notice_id')||'')?
   {kind:pushParams.get('portal_notice'),id:Number(pushParams.get('notice_id'))}:null;

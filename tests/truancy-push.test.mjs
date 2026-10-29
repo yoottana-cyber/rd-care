@@ -23,6 +23,7 @@ function db({linked=true,staffDevice=false,owner=null}={}){
     async first(){
      if(sql.includes('FROM guardian_student_links WHERE guardian_account_id'))return linked?{ok:1}:null;
      if(sql.includes('FROM staff_push_subscriptions WHERE endpoint'))return staffDevice?{id:3}:null;
+     if(sql.includes('FROM student_push_subscriptions WHERE endpoint'))return null;
      if(sql.includes('FROM guardian_push_subscriptions WHERE endpoint=? AND guardian_account_id=?'))return owner===8?{id:9}:null;
      if(sql.includes('SELECT guardian_account_id FROM guardian_push_subscriptions WHERE endpoint'))return owner?{guardian_account_id:owner}:null;
      if(sql.includes('COUNT(*) AS total'))return {total:0};

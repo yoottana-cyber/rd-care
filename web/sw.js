@@ -93,7 +93,7 @@ self.addEventListener('push',event=>{
   (metadata.audience==='advisor'||metadata.audience==='guardian');
  const review=metadata?.kind==='attendance_review'&&metadata.audience==='advisor';
  const test=metadata?.kind==='push_test';
- const studentNotice=metadata?.kind==='student_notice'&&metadata.audience==='student';
+ const pupilNotice=metadata?.kind==='pupil_notice'&&metadata.audience==='student';
  const dailyReminder=metadata?.kind==='daily_attendance_reminder'&&metadata.audience==='advisor';
  const room=Number(metadata?.classroomId),validRoom=Number.isSafeInteger(room)&&room>0;
  const staff=metadata?.audience==='advisor';
@@ -104,8 +104,8 @@ self.addEventListener('push',event=>{
  const arrival=/^\d{2}:\d{2}$/.test(String(metadata?.arrival||''))?metadata.arrival:'';
  const type=late?'late':review?'attendance_review':'truancy';
  const studentKind=['late','truancy'].includes(metadata?.noticeKind)?metadata.noticeKind:null;
- const link=studentNotice&&hasId&&studentKind?
-   './?login=student&student_notice='+studentKind+'&notice_id='+id:
+ const link=pupilNotice&&hasId&&studentKind?
+   './?login=student&pupil_notice='+studentKind+'&notice_id='+id:
   dailyReminder&&validRoom&&date?
    './?tab=attendance&classroom_id='+room+'&date='+date:
   hasId&&(late||urgent||review)
@@ -122,7 +122,7 @@ self.addEventListener('push',event=>{
   urgent?'RD CONNECT • แจ้งเรื่องหนีเรียน':
   review?'RD CONNECT • แจ้งขาดรายคาบรอตรวจสอบ':
   test?'RD CONNECT • ทดสอบการแจ้งเตือน':
-  studentNotice?'RD CONNECT • มีข้อมูลการเข้าเรียนใหม่':'RD CONNECT • โรงเรียนรัษฎา';
+  pupilNotice?'RD CONNECT • มีข้อมูลการเข้าเรียนใหม่':'RD CONNECT • โรงเรียนรัษฎา';
  const details=late?
   [date&&'วันที่ '+date,arrival&&'เวลา '+arrival+' น.'].filter(Boolean).join(' • '):
   [date&&'วันที่ '+date,validPeriod&&'คาบ '+period,subject&&'วิชา '+subject].filter(Boolean).join(' • ');
@@ -130,7 +130,7 @@ self.addEventListener('push',event=>{
   late?'มีการลงชื่อมาสาย'+(details?' • '+details:'')+' แตะเพื่อดูรายการ':
   urgent?'มีการบันทึกหนีเรียน'+(details?' • '+details:'')+' แตะเพื่อดูรายละเอียด':
   review?'มีเรื่องขาดรายคาบรอตรวจสอบ'+(details?' • '+details:'')+' แตะเพื่อเปิดรายการ':
-  studentNotice?'มีข้อมูลการเข้าเรียนให้ตรวจสอบในแอป RD CONNECT':
+  pupilNotice?'มีข้อมูลการเข้าเรียนให้ตรวจสอบในแอป RD CONNECT':
   test?'การแจ้งเตือนทดสอบจาก RD CONNECT (ไม่มีเหตุการณ์นักเรียน)':
   'มีรายการใหม่ให้ตรวจสอบในระบบ RD CONNECT';
  event.waitUntil(self.registration.showNotification(title,{
@@ -140,7 +140,7 @@ self.addEventListener('push',event=>{
       late?'rd-care-late-arrival'+(hasId?'-'+id:''):
       urgent?'rd-care-priority-review'+(hasId?'-'+id:''):
       review?'rd-care-attendance-review'+(hasId?'-'+id:''):
-      studentNotice?'rd-care-student-'+studentKind+'-'+id:
+      pupilNotice?'rd-care-student-'+studentKind+'-'+id:
       test?'rd-care-push-test':'rd-care-school-notices',
   renotify:false,requireInteraction:urgent,
   ...(urgent?{vibrate:[180,100,180]}:{}),
@@ -156,7 +156,7 @@ self.addEventListener('notificationclick',event=>{
   const q=value.searchParams;
   const tab=q.get('tab'),kind=q.get('notice_kind'),id=q.get('notice_id');
   const portalKind=q.get('portal_notice');
-  const studentKind=q.get('student_notice');
+  const studentKind=q.get('pupil_notice');
   const safeDaily=tab==='attendance'&&/^\d{1,8}$/.test(q.get('classroom_id')||'')&&
    /^\d{4}-\d{2}-\d{2}$/.test(q.get('date')||'');
   const safeStaff=safeDaily||tab==='notifications'||

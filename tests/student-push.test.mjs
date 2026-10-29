@@ -81,6 +81,6 @@ test('student Push uses a separate opt-in subscription and delivery ledger',()=>
  assert.match(dispatch,/student_id=\?/);
  assert.match(server,/deliverStudentPush\(env/);
  assert.match(portal,/studentPushRoutes\(req,env,a,path\)/);
- assert.match(sw,/studentNotice/);
+ assert.match(sw,/pupilNotice/);
  assert.match(sw,/มีข้อมูลการเข้าเรียนให้ตรวจสอบ/);
 });
