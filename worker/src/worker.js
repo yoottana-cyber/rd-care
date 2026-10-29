@@ -236,6 +236,8 @@ async function writeAttendance(req,env,user){
   const tId=positiveInt(b.timetable_id);
   slot=await env.DB.prepare('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=? AND active=1').bind(tId).first();
   if(!slot||slot.classroom_id!==roomId||slot.day_of_week!==weekday(date))throw error(400,'คาบเรียนหรือวันเรียนไม่ตรงกับตารางสอน');
+  // This explicit lesson-owner guard also applies to Student Affairs staff;
+  // their supervisory role is not a blanket right to submit check-ins.
   if(!isAdmin(user)&&slot.teacher_user_id!==user.id)throw error(403,'ครูไม่มีสิทธิ์บันทึกคาบเรียนนี้');
  }
  for(const e of b.entries){
