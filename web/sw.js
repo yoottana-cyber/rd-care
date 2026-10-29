@@ -1,6 +1,6 @@
 // RD CONNECT offline app shell. This cache contains only public static assets,
 // never authenticated responses, student records, or arbitrary same-origin URLs.
-const CACHE='rd-care-shell-v108';
+const CACHE='rd-care-shell-v109';
 const CACHE_PREFIX='rd-care-shell-';
 const ASSETS=[
  './','./index.html','./app.css','./theme.css','./login.css','./login-route.js',
@@ -17,7 +17,7 @@ const ASSETS=[
  './portal-table.js','./portal-batch.js','./portal-roster-import.js',
  './unified-import.js','./student-statistics.js','./student-statistics.css','./advisor-import.js','./admin-settings.js',
  './admin-settings.css','./csv-encoding.js','./template-xlsx.js',
- './score-recording.js','./score-recording.css','./score-history.js',
+ './score-recording.js','./score-excel-import.js','./score-recording.css','./score-history.js',
  './score-history-popup.js','./behavior-adjustment.js',
  './teacher-score-monitor.js','./teacher-score-monitor.css',
  './school-settings.js','./school-settings.css','./term-snapshots.js','./timetable-audit.js',
