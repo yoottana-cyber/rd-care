@@ -13,7 +13,7 @@ function setup({owner=7,advisor=7,existingNote='หัวข้อเดิม',
     sql,params:args,
     async first(){
      if(sql.includes('FROM sessions s'))return {id:7,role:'teacher',display_name:'ครูทดสอบ',active:1};
-     if(sql.includes('SELECT advisor_user_id FROM classrooms'))return {advisor_user_id:advisor};
+     if(sql.includes('SELECT advisor_user_id,advisor2_user_id FROM classrooms'))return {advisor_user_id:advisor,advisor2_user_id:null};
      if(sql.includes('SELECT id FROM timetable WHERE classroom_id=? AND teacher_user_id=? AND active=1'))return {id:5};
      if(sql.includes('SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable'))return {id:5,classroom_id:2,teacher_user_id:owner,day_of_week:weekday(today)};
      if(sql.includes('FROM period_teaching_logs WHERE timetable_id=? AND school_date=?'))return existingNote?{note:existingNote,updated_at:'2026-10-26 07:00:00'}:null;

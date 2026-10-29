@@ -41,7 +41,7 @@ test('dashboard teacher alert badge only counts advisor-owned classes, not every
  const query=statements.find(item=>item.sql.includes('FROM attendance_alerts al'));
  assert.ok(query);
  assert.match(query.sql,/c\.advisor_user_id=\?/);
- assert.deepEqual(query.args,[date,2,4,7]);
+ assert.deepEqual(query.args,[date,2,4,7,7]);
  assert.match(query.sql,/NOT EXISTS\(SELECT 1 FROM attendance_daily d/);
 });
 test('staff dashboard retains school-wide task counts',async()=>{

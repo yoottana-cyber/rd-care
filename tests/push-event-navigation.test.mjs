@@ -26,7 +26,7 @@ test('push target access is limited by guardian relation and teacher advisory ro
  await pushTarget(request('late',9),{DB:db},{role:'teacher',id:7},'advisor');
  assert.match(db.calls[1].sql,/c\.advisor_user_id/);
  assert.match(db.calls[1].sql,/e\.active=1/);
- assert.deepEqual(db.calls[1].args,[9,'teacher',7]);
+ assert.deepEqual(db.calls[1].args,[9,'teacher',7,7]);
 });
 test('revoked, missing or unauthorized event never returns detail',async()=>{
  const db=mockDb(null);

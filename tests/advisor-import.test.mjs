@@ -43,7 +43,7 @@ test('existing active teacher may be assigned to a vacant room without resetting
 test('existing username cannot be hijacked and a full room is not silently overwritten',()=>{
  const users=[{username:'teacher_demo01',display_name:'ครูตัวอย่าง หนึ่ง',role:'admin',active:1}];
  assert.match(planAdvisorImport([row()],roomMap,users).items[0].message,/ไม่ใช่บัญชีครู/);
- assert.match(planAdvisorImport([row('ม.3/2')],roomMap).items[0].message,/มีครูที่ปรึกษาแล้ว/);
+ assert.match(planAdvisorImport([row('ม.3/2')],roomMap).items[0].message,/มีครูที่ปรึกษาครบ 2 คนแล้ว/);
  const teacher=[{username:'teacher_demo01',display_name:'ครูตัวอย่าง หนึ่ง',role:'teacher',active:1}];
  assert.match(planAdvisorImport([row()],roomMap,teacher).items[0].message,/เว้น Password ว่าง/);
  assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','')],roomMap,[{...teacher[0],display_name:'ครูคนอื่น'}]).items[0].message,/ชื่อไม่ตรง/);
