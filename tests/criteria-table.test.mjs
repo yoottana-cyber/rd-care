@@ -43,7 +43,7 @@ test('table is accessible, color-coded, paginated, searchable and safely escaped
  assert.match(full,/data-affairs-rule-delete="5"/);
  assert.match(full,/หนีเรียนในแต่ละคาบเรียน/);
  assert.doesNotMatch(full,/data-affairs-rule-delete="10"/);
- const quick=criteriaTableMarkup(data,{mode:'behavior',category:'minor',query:'ก'});
+ const quick=criteriaTableMarkup(data,{mode:'behavior',category:'minor',query:' ก'});
  assert.match(quick,/ความผิดเล็กน้อย ก/);
  assert.doesNotMatch(quick,/ความผิดเล็กน้อย ข/);
  const long=Array.from({length:59},(_,i)=>({id:i+50,name:'เกณฑ์ '+i,category:'minor',points:i-59,active:1}));
@@ -74,7 +74,7 @@ test('adjustment criteria use the same safe archiving, not permanent deletion',a
  const response=await studentAffairsRoutes(post(path,{id:18}),x,actor,path);
  assert.deepEqual(await response.json(),{ok:true,id:18,archived:true});
  assert.match(x.calls.find(y=>y.sql.includes('UPDATE affairs_adjustment_rules')).sql,/active=0,deleted_at=CURRENT_TIMESTAMP/);
- assert.ok(x.calls.some(y=>y.sql.includes('affairs_adjustment_rule_archived')));
+ assert.ok(x.calls.some(y=>y.sql.includes('INSERT INTO audit_logs')&&y.args.includes('affairs_adjustment_rule_archived')));
 });
 test('unauthorized teachers cannot delete school rules',async()=>{
  for(const path of ['/api/affairs/behavior/rules/delete','/api/affairs/behavior/adjustment-rules/delete']){
