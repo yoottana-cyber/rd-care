@@ -27,6 +27,8 @@ import {adminDeleteIdentity} from './admin-delete.js';
 import {adminTimetableAudit} from './timetable-audit.js';
 import {schoolTermRoutes} from './school-terms.js';
 import {schoolSettingsRoutes} from './school-settings.js';
+import {notificationPolicyRoutes} from './notification-policy.js';
+import {deliverScorePush} from './score-push.js';
 
 const encoder = new TextEncoder();
 const now = () => Math.floor(Date.now() / 1000);
@@ -666,6 +668,7 @@ async function dashboard(req,env,user){
 async function adminRoutes(req,env,user,path){
  requireRole(user,['admin']);
  if(path==='/api/admin/timetable/audit')return adminTimetableAudit(req,env,user);
+ if(path==='/api/admin/notification-preferences')return notificationPolicyRoutes(req,env,user,path);
  if(path==='/api/admin/school-settings')return schoolSettingsRoutes(req,env,user,path);
  if(path==='/api/admin/term-snapshots')return schoolTermRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
@@ -983,7 +986,14 @@ async function route(req,env,ctx){
  if(req.method==='GET'&&path==='/api/push/target')return pushTarget(req,env,user,'advisor');
  if(path.startsWith('/api/push/'))return staffPushRoutes(req,env,user,path);
  if(path.startsWith('/api/affairs/messages/'))return affairsMessageRoutes(req,env,user,path,ctx);
- if(path.startsWith('/api/affairs/'))return studentAffairsRoutes(req,env,user,path);
+ if(path.startsWith('/api/affairs/')){
+  const result=await studentAffairsRoutes(req,env,user,path);
+  if(req.method==='POST'&&
+   ['/api/affairs/behavior/record','/api/affairs/behavior/record/bulk'].includes(path)&&
+   result.ok&&result.status===201&&ctx?.waitUntil)
+   ctx.waitUntil(deliverScorePush(env).catch(e=>console.warn('RD conduct Push',e?.name||'network')));
+  return result;
+ }
  if(path.startsWith('/api/late/qr/'))return lateGateStaffRoutes(req,env,user,path);
  if(req.method==='GET'&&path==='/api/school/period-clock'){
   requireRole(user,['teacher','staff','admin']);
@@ -1014,7 +1024,8 @@ async function route(req,env,ctx){
   if(result.ok&&ctx?.waitUntil)ctx.waitUntil(Promise.all([
    deliverAdvisorPush(env).catch(e=>console.warn('RD advisor push',e?.name)),
    deliverTruancyPush(env).catch(e=>console.warn('RD truancy push',e?.name)),
-   deliverStudentPush(env,{kind:'truancy'}).catch(e=>console.warn('RD student truancy push',e?.name))
+   deliverStudentPush(env,{kind:'truancy'}).catch(e=>console.warn('RD student truancy push',e?.name)),
+   deliverScorePush(env).catch(e=>console.warn('RD truancy score Push',e?.name))
   ]));
   return result;
  }
@@ -1047,6 +1058,7 @@ export default {
    deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
    deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
    deliverStudentPush(env).catch(e=>console.warn('RD scheduled student push',e?.name)),
+   deliverScorePush(env).catch(e=>console.warn('RD scheduled score push',e?.name)),
    deliverStudentMessages(env).catch(e=>console.warn('RD scheduled student messages',e?.name)),
    sendScheduledAttendanceReminders(env).catch(e=>console.warn('RD scheduled daily attendance reminder',e?.name)),
     deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name)),
