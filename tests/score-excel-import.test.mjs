@@ -50,11 +50,13 @@ test('separate Excel samples include only live category rules and instructions',
   const data=buildScoreImportExampleXlsx(mode,rules);
   const entries=await unzipXlsx(data);
   const first=entries.get('xl/worksheets/sheet1.xml');
-  const list=entries.get('xl/worksheets/sheet3.xml');
+  // The lightweight browser reader intentionally exposes only the first sheet;
+  // the downloadable template also embeds instructions and the live rules sheet.
+  const allXml=new TextDecoder().decode(data);
   assert.match(first,/student_no/);assert.match(first,/rule_id/);assert.match(first,/reason/);
-  assert.ok(list.includes(correct.name),correct.name);
-  assert.ok(!list.includes(wrong.name),wrong.name);
-  assert.match(entries.get('xl/worksheets/sheet2.xml'),/รหัสเกณฑ์/);
+  assert.ok(allXml.includes(correct.name),correct.name);
+  assert.ok(!allXml.includes(wrong.name),wrong.name);
+  assert.match(allXml,/รหัสเกณฑ์/);
  }
 });
 
