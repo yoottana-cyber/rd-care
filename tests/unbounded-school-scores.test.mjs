@@ -67,14 +67,17 @@ test('bulk student recording accepts active rule with -80 and +120 points',async
        points_applied:points,warning_no:0,behavior_record_id:200}]:[{id:12}]})
     }}};
    },
-   batch:async arr=>{batches.push(arr);return arr.map(()=>({meta:{changes:1,last_row_id:100}}))}
+   batch:async arr=>{batches.push(arr);return arr.map((item,index)=>index===arr.length-1?
+    {success:true,results:[{id:100,student_id:12,affairs_rule_id:3,
+     reason:'โรงเรียนอนุมัติ',affairs_category:category,points_applied:points,
+     warning_no:0,behavior_record_id:200}]}:{success:true,meta:{changes:4,last_row_id:200}})}
   };
   const permitted=category==='good'?teacher:{role:'teacher',id:8,student_affairs:1};
   const res=await recordBehaviorBulk({DB},permitted,{student_ids:[12],rule_id:3,reason:''});
   assert.equal(res.status,201);
   assert.equal((await res.json()).points,points);
   assert.match(calls.find(x=>x.sql.includes('INSERT INTO behavior_incidents')).sql,/points_applied/);
-  assert.equal(batches[0].length,1);
+  assert.equal(batches[0].length,2); // write + transactional receipt lookup
  }
 });
 test('manual school criteria management accepts unrestricted signed integer points',async()=>{
