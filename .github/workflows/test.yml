@@ -1,6 +1,7 @@
 name: Check RD CONNECT
 on:
   push:
+    branches: [main]
   pull_request:
 jobs:
   test:
