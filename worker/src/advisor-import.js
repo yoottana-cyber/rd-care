@@ -1,5 +1,5 @@
 import {validUsername} from './core.js';
-import {passwordHash} from './password.js';
+import {passwordHash,newPasswordSalt} from './password.js';
 import {validateUserPassword} from './user-password-policy.js';
 
 const fail=(code,message)=>{throw Object.assign(new Error(message),{code})};
@@ -7,14 +7,13 @@ const reply=(data,status=200)=>new Response(JSON.stringify(data),{
  status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}
 });
 const text=v=>typeof v==='string'?v.trim():'';
-const hex=bytes=>[...crypto.getRandomValues(new Uint8Array(bytes))].map(b=>b.toString(16).padStart(2,'0')).join('');
 function validate(raw,rooms,accounts){
  const roomLabel=text(raw?.classroom),name=text(raw?.full_name),username=text(raw?.username).toLowerCase();
  const pwd=raw?.password;
  const room=rooms.get(roomLabel);
  let message='',mode='';
  if(!room)message='ไม่พบห้องเรียน '+roomLabel;
- else if(room.advisor_user_id)message='ห้อง '+roomLabel+' มีครูที่ปรึกษาแล้ว กรุณาตรวจสอบ/เปลี่ยนในเมนูครูและระบบ';
+ else if(room.advisor_user_id&&room.advisor2_user_id)message='ห้อง '+roomLabel+' มีครูที่ปรึกษาครบ 2 คนแล้ว';
  else if(!name||name.length>100||/[\u0000-\u001f\u007f\ufffd]/.test(name))message='ชื่อ–สกุลครูไม่ถูกต้อง';
  else if(!validUsername(username))message='Username ต้องมี 3–40 ตัว (อังกฤษ/ตัวเลข/จุด/ขีด)';
  else if(roomLabel.includes('\ufffd'))message='ชื่อห้องมีอักขระเสียหาย กรุณาบันทึกเป็น CSV UTF-8';
@@ -37,13 +36,24 @@ function validate(raw,rooms,accounts){
 }
 export function planAdvisorImport(rows,roomMap,existingUsers=[]){
  const accounts=new Map(existingUsers.map(user=>[String(user.username).toLowerCase(),user]));
- const seenRooms=new Set(),seenUsers=new Set();
+ const slotCounts=new Map(),roomUsers=new Map(),seenUsers=new Set();
  const items=rows.map((raw,index)=>{
   const result=validate(raw,roomMap,accounts);
   if(!result.source_row)result.source_row=index+2;
-  if(seenRooms.has(result.room))result.message||='ห้องเรียนซ้ำในไฟล์';
+  const room=roomMap.get(result.room);
+  const previous=slotCounts.get(result.room)||0;
+  const occupied=(room?.advisor_user_id?1:0)+(room?.advisor2_user_id?1:0);
+  result.slot=occupied+previous+1;
+  if(result.slot>2)result.message||='ห้องนี้มีครูที่ปรึกษาครบ 2 คนแล้ว';
+  const assigned=roomUsers.get(result.room)||new Set();
+  if(assigned.has(result.username)||(
+   accounts.get(result.username)?.id&&
+   [room?.advisor_user_id,room?.advisor2_user_id].includes(accounts.get(result.username).id)))
+   result.message||='ครูคนนี้เป็นที่ปรึกษาของห้องนี้แล้ว';
   if(seenUsers.has(result.username))result.message||='Username ซ้ำในไฟล์ (กรุณาผูกห้องเพิ่มเติมแยกครั้ง)';
-  seenRooms.add(result.room);seenUsers.add(result.username);
+  slotCounts.set(result.room,previous+1);
+  assigned.add(result.username);roomUsers.set(result.room,assigned);
+  seenUsers.add(result.username);
   result.status=result.message?'error':'ready';
   return result;
  });
@@ -62,7 +72,7 @@ export async function advisorImportEndpoint(req,env,user,path){
  if(rows.length<1||rows.length>(commit?5:50))
   fail(400,commit?'บันทึกชุดละไม่เกิน 5 ครู':'ตรวจครั้งละไม่เกิน 50 ครู');
  const [roomData,userData]=await env.DB.batch([
-  env.DB.prepare('SELECT id,label,advisor_user_id FROM classrooms'),
+  env.DB.prepare('SELECT id,label,advisor_user_id,advisor2_user_id FROM classrooms'),
   env.DB.prepare("SELECT id,username,display_name,role,active FROM users")
  ]);
  const roomMap=new Map(roomData.results.map(r=>[r.label,r]));
@@ -74,11 +84,12 @@ export async function advisorImportEndpoint(req,env,user,path){
  for(let i=0;i<rows.length;i++){
   const item=plan.items[i],row=rows[i],room=roomMap.get(item.room);
   if(item.mode==='create'){
-   const salt=hex(16),hash=await passwordHash(row.password,salt);
+   const salt=newPasswordSalt(),hash=await passwordHash(row.password,salt);
    statements.push(env.DB.prepare("INSERT INTO users(username,display_name,role,password_salt,password_hash) VALUES(?,?,'teacher',?,?)")
     .bind(item.username,item.full_name,salt,hash));
   }
-  statements.push(env.DB.prepare("UPDATE classrooms SET advisor_user_id=(SELECT id FROM users WHERE username=? AND role='teacher' AND active=1) WHERE id=? AND advisor_user_id IS NULL")
+  const col=item.slot===1?'advisor_user_id':'advisor2_user_id';
+  statements.push(env.DB.prepare("UPDATE classrooms SET "+col+"=(SELECT id FROM users WHERE username=? AND role='teacher' AND active=1) WHERE id=? AND "+col+" IS NULL")
    .bind(item.username,room.id));
   statements.push(env.DB.prepare("INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,'advisor_bulk_assigned','classrooms',?)")
    .bind(user.id,String(room.id)));

@@ -361,7 +361,7 @@ async function renewStaffRememberedSession(){
 async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
 function roomOptions(advisorOnly=false){
  const rooms=advisorOnly&&state.user?.role==='teacher'?
-  state.rooms.filter(r=>r.advisor_user_id===state.user.id):state.rooms;
+  state.rooms.filter(r=>(r.advisor_user_id===state.user.id||r.advisor2_user_id===state.user.id)):state.rooms;
  return rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
@@ -491,7 +491,7 @@ async function loadAttendance(){
  const kind=state.kind,tab=state.tab,date=state.date;
  let roomId=state.roomId;
  if(kind==='daily'){
-  const eligible=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
+  const eligible=state.rooms.filter(r=>state.user?.role!=='teacher'||(r.advisor_user_id===state.user?.id||r.advisor2_user_id===state.user?.id));
   if(!eligible.length){
    mount('<section class="card stack"><h2>เช็กชื่อรายวัน</h2><p class="warn">ยังไม่ได้รับมอบหมายเป็นครูที่ปรึกษา จึงยังไม่สามารถเช็กชื่อรายวันได้ แต่สามารถสร้างตารางสอนและเช็กชื่อรายคาบของห้องที่สอนได้</p></section>');
    return;
@@ -572,7 +572,7 @@ function renderDailyOverview(){
 }
 function renderAttendance(){
  const daily=state.kind==='daily';
- const eligible=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
+ const eligible=state.rooms.filter(r=>state.user?.role!=='teacher'||(r.advisor_user_id===state.user?.id||r.advisor2_user_id===state.user?.id));
  const roomSelect=eligible.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
  const slotOptions=state.slots.map(t=>{
   const period=Number(t.end_period||t.period)===t.period?t.period:t.period+'-'+t.end_period;
@@ -725,7 +725,7 @@ async function loadAdvisorCenter(){
    state.roomId=Number(focus.classroom_id);
   }catch{toast('รายการแจ้งเตือนถูกแก้ไขหรือบัญชีนี้ไม่มีสิทธิ์ดู',true)}
  }
- const advisory=state.rooms.filter(r=>state.user?.role!=='teacher'||r.advisor_user_id===state.user?.id);
+ const advisory=state.rooms.filter(r=>state.user?.role!=='teacher'||(r.advisor_user_id===state.user?.id||r.advisor2_user_id===state.user?.id));
  if(!advisory.length){
   mount('<section class="card stack"><h2>🧑‍🏫 ศูนย์งานครูที่ปรึกษา</h2><p class="warn">ยังไม่มีห้องที่ได้รับมอบหมายเป็นครูที่ปรึกษา สามารถติดต่อผู้ดูแลระบบเพื่อผูกห้องเรียนได้</p></section>');
   return;
@@ -777,7 +777,7 @@ async function loadAdvisorCenter(){
 }
 async function loadAlerts(){
  const allowed=state.user?.role==='teacher'?
-   state.rooms.filter(r=>r.advisor_user_id===state.user.id):state.rooms;
+   state.rooms.filter(r=>(r.advisor_user_id===state.user.id||r.advisor2_user_id===state.user.id)):state.rooms;
  if(!allowed.length){
   mount('<section class="card stack"><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">บัญชีนี้ยังไม่ได้รับมอบหมายเป็นครูที่ปรึกษา จึงไม่มีรายการตรวจสอบในส่วนนี้</p></section>');
   return;

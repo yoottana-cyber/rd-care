@@ -69,10 +69,10 @@ async function currentUser(req,env){
 async function userRoomAccess(env,user,roomId,kind='view'){
  if(isStaff(user))return true;
  if(user.role!=='teacher')return false;
- const room=await env.DB.prepare('SELECT advisor_user_id FROM classrooms WHERE id=?').bind(roomId).first();
+ const room=await env.DB.prepare('SELECT advisor_user_id,advisor2_user_id FROM classrooms WHERE id=?').bind(roomId).first();
  if(!room)return false;
- if(kind==='daily')return room.advisor_user_id===user.id;
- if(kind==='view' && room.advisor_user_id===user.id)return true;
+ if(kind==='daily')return room.advisor_user_id===user.id||room.advisor2_user_id===user.id;
+ if(kind==='view' && (room.advisor_user_id===user.id||room.advisor2_user_id===user.id))return true;
  const timetable=await env.DB.prepare('SELECT id FROM timetable WHERE classroom_id=? AND teacher_user_id=? AND active=1 LIMIT 1').bind(roomId,user.id).first();
  return !!timetable;
 }
@@ -131,9 +131,9 @@ async function setup(req,env){
 async function classrooms(env,user){
  const q=isStaff(user)?'SELECT * FROM classrooms ORDER BY grade,room':
   `SELECT DISTINCT c.* FROM classrooms c LEFT JOIN timetable t ON t.classroom_id=c.id AND t.teacher_user_id=? AND t.active=1
-   WHERE c.advisor_user_id=? OR t.id IS NOT NULL ORDER BY c.grade,c.room`;
+   WHERE (c.advisor_user_id=? OR c.advisor2_user_id=?) OR t.id IS NOT NULL ORDER BY c.grade,c.room`;
  const stmt=env.DB.prepare(q);
- const {results}=await (isStaff(user)?stmt:stmt.bind(user.id,user.id)).all();
+ const {results}=await (isStaff(user)?stmt:stmt.bind(user.id,user.id,user.id)).all();
  return json({items:results});
 }
 async function getStudents(req,env,user){
@@ -160,8 +160,8 @@ async function getTimetable(req,env,user){
  if(url.searchParams.get('scope')==='mine'){
   query+=' AND t.teacher_user_id=?';args.push(user.id);
  }else if(!isStaff(user)){
-  query+=` AND (t.teacher_user_id=? OR c.advisor_user_id=?)`;
-  args.push(user.id,user.id);
+  query+=` AND (t.teacher_user_id=? OR c.advisor_user_id=? OR c.advisor2_user_id=?)`;
+  args.push(user.id,user.id,user.id);
  }
  query+=' ORDER BY t.period,c.grade,c.room';
  const {results}=await env.DB.prepare(query).bind(...args).all();
@@ -557,8 +557,8 @@ async function listAlerts(req,env,user){
  const roomId=positiveInt(q.get('classroom_id'));
  await assertRoom(env,user,roomId,'view');
  if(!isStaff(user)){
-  const room=await env.DB.prepare('SELECT advisor_user_id FROM classrooms WHERE id=?').bind(roomId).first();
-  if(room?.advisor_user_id!==user.id)throw error(403,'เฉพาะครูที่ปรึกษาของห้องนี้เท่านั้น');
+  const room=await env.DB.prepare('SELECT advisor_user_id,advisor2_user_id FROM classrooms WHERE id=?').bind(roomId).first();
+  if(room?.advisor_user_id!==user.id&&room?.advisor2_user_id!==user.id)throw error(403,'เฉพาะครูที่ปรึกษาของห้องนี้เท่านั้น');
  }
  const {results}=await env.DB.prepare(`SELECT a.id,a.school_date,a.state,h.roll_no,s.full_name,t.period,t.subject
   FROM attendance_alerts a JOIN students s ON s.id=a.student_id JOIN timetable t ON t.id=a.timetable_id
@@ -578,8 +578,8 @@ async function reviewAlert(req,env,user,id){
  if(!record)throw error(404,'ไม่พบรายการ');
  await assertRoom(env,user,record.classroom_id);
  if(!isStaff(user)){
-  const room=await env.DB.prepare('SELECT advisor_user_id FROM classrooms WHERE id=?').bind(record.classroom_id).first();
-  if(room?.advisor_user_id!==user.id)throw error(403,'เฉพาะครูที่ปรึกษา');
+  const room=await env.DB.prepare('SELECT advisor_user_id,advisor2_user_id FROM classrooms WHERE id=?').bind(record.classroom_id).first();
+  if(room?.advisor_user_id!==user.id&&room?.advisor2_user_id!==user.id)throw error(403,'เฉพาะครูที่ปรึกษา');
  }
  if(record.state!=='pending_review')throw error(409,'รายการนี้ได้รับการตรวจสอบแล้ว');
  // Reject a stale confirmation even if the daily register changed after the
@@ -615,8 +615,8 @@ async function reviewAlert(req,env,user,id){
 }
 async function dashboard(req,env,user){
  const date=new URL(req.url).searchParams.get('date')||bangkokToday();requireDate(date);
- const scope=isStaff(user)?{query:'',args:[]}:await env.DB.prepare(`SELECT id FROM classrooms WHERE advisor_user_id=? OR id IN
- (SELECT classroom_id FROM timetable WHERE teacher_user_id=? AND active=1)`).bind(user.id,user.id).all();
+ const scope=isStaff(user)?{query:'',args:[]}:await env.DB.prepare(`SELECT id FROM classrooms WHERE advisor_user_id=? OR advisor2_user_id=? OR id IN
+ (SELECT classroom_id FROM timetable WHERE teacher_user_id=? AND active=1)`).bind(user.id,user.id,user.id).all();
  const ids=isStaff(user)?null:scope.results.map(x=>x.id);
  if(ids?.length===0)return json({rooms:0,students:0,daily:0,period:0,absent_period:0,alerts:0,late:0,daily_statuses:{present:0,absent:0,late:0,leave:0},daily_trend:[]});
  const filter=ids?` AND c.id IN (${ids.map(()=>'?').join(',')})`:'';
@@ -627,7 +627,7 @@ async function dashboard(req,env,user){
   env.DB.prepare('SELECT COUNT(*) total FROM attendance_daily d JOIN student_enrollments h ON h.student_id=d.student_id AND h.start_date<=d.school_date AND (h.end_date IS NULL OR h.end_date>d.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE d.school_date=?'+filter).bind(date,...a),
   env.DB.prepare('SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=?'+filter).bind(date,...a),
   env.DB.prepare("SELECT COUNT(*) total FROM attendance_period p JOIN student_enrollments h ON h.student_id=p.student_id AND h.start_date<=p.school_date AND (h.end_date IS NULL OR h.end_date>p.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE p.school_date=? AND p.status='absent'"+filter).bind(date,...a),
-  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN student_enrollments h ON h.student_id=al.student_id AND h.start_date<=al.school_date AND (h.end_date IS NULL OR h.end_date>al.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE al.school_date=? AND al.state='pending_review' AND NOT EXISTS(SELECT 1 FROM attendance_daily d WHERE d.student_id=al.student_id AND d.school_date=al.school_date AND d.status='absent')"+filter+(isStaff(user)?'':" AND c.advisor_user_id=?")).bind(date,...a,...(isStaff(user)?[]:[user.id])),
+  env.DB.prepare("SELECT COUNT(*) total FROM attendance_alerts al JOIN student_enrollments h ON h.student_id=al.student_id AND h.start_date<=al.school_date AND (h.end_date IS NULL OR h.end_date>al.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE al.school_date=? AND al.state='pending_review' AND NOT EXISTS(SELECT 1 FROM attendance_daily d WHERE d.student_id=al.student_id AND d.school_date=al.school_date AND d.status='absent')"+filter+(isStaff(user)?'':" AND (c.advisor_user_id=? OR c.advisor2_user_id=?)")).bind(date,...a,...(isStaff(user)?[]:[user.id,user.id])),
   env.DB.prepare('SELECT COUNT(*) total FROM late_records l JOIN student_enrollments h ON h.student_id=l.student_id AND h.start_date<=l.school_date AND (h.end_date IS NULL OR h.end_date>l.school_date) JOIN classrooms c ON c.id=h.classroom_id WHERE l.school_date=?'+filter).bind(date,...a),
   env.DB.prepare("SELECT d.school_date day,d.status,COUNT(*) total FROM attendance_daily d"+
     " JOIN student_enrollments h ON h.student_id=d.student_id AND h.start_date<=d.school_date"+
@@ -686,10 +686,21 @@ async function adminRoutes(req,env,user,path){
   return json({ok:true,id:res.meta.last_row_id},201);
  }
  if(req.method==='POST'&&path==='/api/admin/advisor'){
-  const b=await payload(req),roomId=positiveInt(b.classroom_id),teacherId=positiveInt(b.teacher_user_id);
-  const t=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role IN ('teacher','staff') AND active=1").bind(teacherId).first();
-  if(!roomId||!t)throw error(400,'เลือกครูและห้องเรียนให้ถูกต้อง');
-  const res=await env.DB.prepare('UPDATE classrooms SET advisor_user_id=? WHERE id=?').bind(teacherId,roomId).run();
+  const b=await payload(req),roomId=positiveInt(b.classroom_id);
+  const first=b.teacher_user_id===null?null:positiveInt(b.teacher_user_id);
+  const second=b.teacher2_user_id===undefined?undefined:b.teacher2_user_id===null?null:positiveInt(b.teacher2_user_id);
+  if(!roomId||b.teacher_user_id!==null&&!first||b.teacher2_user_id!==undefined&&b.teacher2_user_id!==null&&!second||
+    first&&second&&first===second||second&&!first)
+   throw error(400,'เลือกครูที่ปรึกษาได้ 1 หรือ 2 คน และต้องไม่ซ้ำกัน');
+  const ids=[first,second].filter(Number.isSafeInteger);
+  if(ids.length){
+   const verified=await env.DB.prepare("SELECT COUNT(*) AS total FROM users WHERE id IN ("+ids.map(()=>'?').join(',')+") AND role IN ('teacher','staff') AND active=1").bind(...ids).first();
+   if(Number(verified?.total)!==ids.length)throw error(400,'เลือกบัญชีครูที่ใช้งานอยู่');
+  }
+  const withSecond=second!==undefined;
+  const sql=withSecond?'UPDATE classrooms SET advisor_user_id=?,advisor2_user_id=? WHERE id=?':
+   'UPDATE classrooms SET advisor_user_id=? WHERE id=?';
+  const res=await env.DB.prepare(sql).bind(...(withSecond?[first,second,roomId]:[first,roomId])).run();
   if(!res.meta.changes)throw error(404,'ไม่พบห้องเรียน');
   await log(env.DB,user.id,'advisor_assigned','classrooms',roomId);
   return json({ok:true});
@@ -697,7 +708,7 @@ async function adminRoutes(req,env,user,path){
  if(req.method==='POST'&&path==='/api/admin/timetable'){
   const b=await payload(req),lesson=validateLesson({...b,subject_code:b.subject_code||'ไม่ระบุ'});
   const teacherId=positiveInt(b.teacher_user_id);
-  const t=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='teacher' AND active=1").bind(teacherId).first();
+  const t=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role IN ('teacher','staff') AND active=1").bind(teacherId).first();
   const c=await env.DB.prepare('SELECT id FROM classrooms WHERE id=?').bind(lesson.classroom_id).first();
   if(!t||!c)throw error(400,'ไม่พบครูหรือห้องเรียน');
   const clash=await env.DB.prepare(`SELECT id FROM timetable WHERE active=1 AND day_of_week=?

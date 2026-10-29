@@ -221,18 +221,18 @@ async function deliverOne(env,entry,device,eventInfo){
  if(response.ok)return {delivered:true};
  if(response.status===404||response.status===410){
   await env.DB.prepare('DELETE FROM staff_push_subscriptions WHERE id=? AND user_id=?')
-   .bind(device.id,entry.recipient_id).run();
+   .bind(device.id,device.user_id).run();
   return {expired:true};
  }
  return {failed:true,status:response.status};
 }
 export async function deliverAdvisorPush(env){
  if(!env.DB||!vapidReady(env))return {processed:0,enabled:false};
- const {results:events}=await env.DB.prepare(`SELECT o.id AS outbox_id,c.advisor_user_id AS recipient_id
+ const {results:events}=await env.DB.prepare(`SELECT o.id AS outbox_id,c.advisor_user_id,c.advisor2_user_id
   FROM notification_outbox o JOIN attendance_alerts a ON a.id=o.alert_id
   JOIN timetable t ON t.id=a.timetable_id JOIN classrooms c ON c.id=t.classroom_id
-  JOIN users u ON u.id=c.advisor_user_id AND u.active=1
-  WHERE o.state='pending' AND o.audience='advisor' AND o.event_type='attendance_review_requested'
+  WHERE (c.advisor_user_id IS NOT NULL OR c.advisor2_user_id IS NOT NULL)
+   AND o.state='pending' AND o.audience='advisor' AND o.event_type='attendance_review_requested'
     AND o.created_at>=datetime('now','-1 day') AND a.state='pending_review'
     AND NOT EXISTS(SELECT 1 FROM attendance_daily d
       WHERE d.student_id=a.student_id AND d.school_date=a.school_date AND d.status='absent')
@@ -244,8 +244,8 @@ export async function deliverAdvisorPush(env){
    JOIN timetable t ON t.id=a.timetable_id
    WHERE o.id=? AND o.state='pending' AND a.state='pending_review'`).bind(event.outbox_id).first();
   if(!detail)continue;
-  const {results:devices}=await env.DB.prepare('SELECT id,endpoint,p256dh,auth FROM staff_push_subscriptions WHERE user_id=? ORDER BY id LIMIT 5')
-   .bind(event.recipient_id).all();
+  const {results:devices}=await env.DB.prepare('SELECT p.id,p.user_id,p.endpoint,p.p256dh,p.auth FROM staff_push_subscriptions p JOIN users u ON u.id=p.user_id AND u.active=1 WHERE p.user_id IN (?,?) ORDER BY p.id LIMIT 10')
+   .bind(event.advisor_user_id||0,event.advisor2_user_id||0).all();
   for(const device of devices){
    await env.DB.prepare(`INSERT OR IGNORE INTO staff_push_deliveries(outbox_id,subscription_id,state)
     VALUES(?,?,'pending')`).bind(event.outbox_id,device.id).run();

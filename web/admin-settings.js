@@ -9,7 +9,7 @@ export const adminTabs=[
 export function adminMetrics(users,rooms){
  const staff=users.filter(u=>['teacher','staff'].includes(u.role));
  return {users:users.length,teachers:staff.filter(u=>u.role==='teacher'&&u.active).length,
-  rooms:rooms.length,advisors:rooms.filter(r=>r.advisor_user_id).length,
+  rooms:rooms.length,advisors:rooms.filter(r=>r.advisor_user_id||r.advisor2_user_id).length,
   inactive:staff.filter(u=>!u.active).length};
 }
 const roleText={teacher:'ครูผู้สอน',staff:'กิจการนักเรียน',admin:'ผู้ดูแลระบบ'};
@@ -18,7 +18,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
  let tab='overview',editUserId=null,search='',filterRole='all',filterStatus='all';
  const users=()=>getUsers()||[],rooms=()=>getRooms()||[];
  const roomsHtml=()=>rooms().map(r=>`<option value="${r.id}">${safe(r.label)}</option>`).join('');
- const teachersHtml=()=>users().filter(u=>u.active&&u.role==='teacher')
+ const teachersHtml=()=>users().filter(u=>u.active&&['teacher','staff'].includes(u.role))
   .map(u=>`<option value="${u.id}">${safe(u.display_name)} (@${safe(u.username)})</option>`).join('');
  // Student Affairs users can teach without changing their account role.
  const teachingStaffHtml=()=>users().filter(u=>u.active&&['teacher','staff'].includes(u.role))
@@ -119,9 +119,11 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
      <form id="assignAdvisor" class="rd-settings-form">
       <div class="field"><label for="advisorRoom">ห้องเรียน</label>
        <select id="advisorRoom" name="classroom_id" required>${roomsHtml()}</select></div>
-      <div class="field"><label for="advisorTeacher">ครูที่ปรึกษา</label>
-       <select id="advisorTeacher" name="teacher_user_id" required>${teachersHtml()}</select></div>
-      <p class="rd-settings-field-hint">ตรวจสอบห้องและครูที่รับผิดชอบก่อนบันทึก</p>
+      <div class="field"><label for="advisorTeacher">ครูที่ปรึกษาคนที่ 1</label>
+       <select id="advisorTeacher" name="teacher_user_id" required><option value="">เลือกครูคนที่ 1</option>${teachersHtml()}</select></div>
+      <div class="field"><label for="advisorTeacher2">ครูที่ปรึกษาคนที่ 2 (ไม่บังคับ)</label>
+       <select id="advisorTeacher2" name="teacher2_user_id"><option value="">ไม่มีคนที่ 2</option>${teachersHtml()}</select></div>
+      <p class="rd-settings-field-hint">แต่ละห้องกำหนดได้ 1–2 คน โดยไม่ลบครูที่ปรึกษาเดิม</p>
       <button class="button full" type="submit" ${disabled?'disabled':''}>บันทึกครูที่ปรึกษา</button></form></section>
     <section class="rd-settings-panel">${panel('▤','เพิ่มตารางสอนรายคาบ','ตั้งรายวิชา ผู้สอน วัน และช่วงคาบ')}
      <form id="addSlot" class="rd-settings-form">
@@ -240,9 +242,19 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
   },'สร้างบัญชีสำเร็จ');
  }
  function bindTeaching(){
+  const roomSelect=document.querySelector('#advisorRoom');
+  const firstSelect=document.querySelector('#advisorTeacher');
+  const secondSelect=document.querySelector('#advisorTeacher2');
+  const syncAdvisors=()=>{
+   const room=rooms().find(r=>r.id===Number(roomSelect?.value));
+   if(firstSelect)firstSelect.value=String(room?.advisor_user_id||'');
+   if(secondSelect)secondSelect.value=String(room?.advisor2_user_id||'');
+  };
+  roomSelect?.addEventListener('change',syncAdvisors);syncAdvisors();
   onSubmit('assignAdvisor',async f=>{
    await api('/api/admin/advisor',{method:'POST',body:{
-    classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id'))}});
+    classroom_id:Number(f.get('classroom_id')),teacher_user_id:Number(f.get('teacher_user_id')),
+    teacher2_user_id:f.get('teacher2_user_id')?Number(f.get('teacher2_user_id')):null}});
    await refreshRooms();return true;
   },'บันทึกครูที่ปรึกษาสำเร็จ');
   onSubmit('addSlot',async f=>{

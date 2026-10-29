@@ -14,7 +14,7 @@ export async function pushTarget(req,env,actor,audience){
  if(kind==='attendance_review'&&audience==='guardian')fail(403,'ไม่มีสิทธิ์');
  const scope=audience==='guardian'
   ?'EXISTS(SELECT 1 FROM guardian_student_links g WHERE g.guardian_account_id=? AND g.student_id=e.student_id)'
-  :"(? IN ('staff','admin') OR c.advisor_user_id=?)";
+  :"(? IN ('staff','admin') OR (c.advisor_user_id=? OR c.advisor2_user_id=?))";
  const sql=kind==='truancy'?`SELECT e.id,e.school_date,e.student_id,s.full_name,
    c.id AS classroom_id,c.label AS classroom_label,t.period,t.subject,
    NULL AS arrived_at,NULL AS reason
@@ -44,7 +44,7 @@ export async function pushTarget(req,env,actor,audience){
      AND h.start_date<=e.school_date AND (h.end_date IS NULL OR h.end_date>e.school_date)
    JOIN classrooms c ON c.id=h.classroom_id
    WHERE e.id=? AND e.active=1 AND ${scope}`;
- const args=audience==='guardian'?[id,actor.id]:[id,actor.role,actor.id];
+ const args=audience==='guardian'?[id,actor.id]:[id,actor.role,actor.id,actor.id];
  const item=await env.DB.prepare(sql).bind(...args).first();
  if(!item)fail(404,'รายการถูกแก้ไขหรือคุณไม่มีสิทธิ์ดูรายละเอียด');
  return new Response(JSON.stringify({kind,...item}),{headers:{

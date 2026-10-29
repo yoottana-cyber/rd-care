@@ -96,16 +96,16 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
       return `<article class="rd-affairs-attendance-item">
        <div class="row between"><strong>${esc(row.label)}</strong>
         <span class="rd-affairs-state ${row.complete?'ready':'pending'}">${row.complete?'✓ ครบแล้ว':'◷ ยังไม่ครบ'}</span></div>
-       <p>ครูที่ปรึกษา: <strong>${esc(row.advisor_name||'ยังไม่กำหนด')}</strong></p>
+       <p>ครูที่ปรึกษา: <strong>${esc([row.advisor_name,row.advisor2_name].filter(Boolean).join(' / ')||'ยังไม่กำหนด')}</strong></p>
        <progress class="rd-affairs-progress" value="${row.checked}" max="${row.students}"
         aria-label="การเช็กชื่อห้อง ${esc(row.label)}"></progress>
        <p class="muted">เช็กชื่อแล้ว ${row.checked}/${row.students} คน • คงเหลือ ${row.missing} คน</p>
        ${reminder?`<p class="muted">การเตือนล่าสุด: ${esc(reminderLabel(reminder.state))} (${reminder.delivered||0} เครื่อง)</p>`:''}
-       ${!row.complete&&row.advisor_user_id&&state.date===bangkokToday()?
+       ${!row.complete&&(row.advisor_user_id||row.advisor2_user_id)&&state.date===bangkokToday()?
          `<button type="button" class="button secondary full" data-affairs-remind="${row.id}"
           ${result.reminders.some(x=>x.classroom_id===row.id&&x.kind==='manual')?'disabled':''}>
           🔔 ${result.reminders.some(x=>x.classroom_id===row.id&&x.kind==='manual')?'แจ้งเตือนแล้ว':'แจ้งเตือนครูที่ปรึกษา'}</button>`:
-         !row.advisor_user_id?'<span class="muted">กำหนดครูที่ปรึกษาก่อนจึงแจ้งเตือนได้</span>':''}
+         !(row.advisor_user_id||row.advisor2_user_id)?'<span class="muted">กำหนดครูที่ปรึกษาก่อนจึงแจ้งเตือนได้</span>':''}
       </article>`;
      }).join('')||'<p class="empty">วันนี้ไม่พบห้องที่มีนักเรียนตามทะเบียน</p>'}
     </div>
@@ -153,11 +153,15 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
      </form>`).join('')}
     </div></section>
     <section class="card stack"><h3>จัดการครูที่ปรึกษาประจำห้อง</h3>
-     <p class="muted">การแก้ไขนี้ปรับข้อมูลครูที่ปรึกษาที่ใช้กับเช็กชื่อรายวันและ Push ตามระบบเดิม</p>
+     <p class="muted">ห้องหนึ่งกำหนดครูที่ปรึกษาได้ 1–2 คน ทั้งสองคนเช็กชื่อรายวันและรับ Push ได้ด้วยบัญชีเดิม</p>
      <div class="rd-affairs-people-grid">
       ${p.rooms.map(room=>`<form class="rd-affairs-person" data-affairs-advisor="${room.id}">
-       <strong>${esc(room.label)}</strong><select name="teacher_user_id" aria-label="ครูที่ปรึกษาห้อง ${esc(room.label)}">
-        ${option(room.advisor_user_id)}</select><button class="button secondary" type="submit">บันทึกครูที่ปรึกษา</button>
+       <strong>${esc(room.label)}</strong>
+        <label>คนที่ 1<select name="teacher_user_id" aria-label="ครูที่ปรึกษาคนที่ 1 ห้อง ${esc(room.label)}">
+         ${option(room.advisor_user_id)}</select></label>
+        <label>คนที่ 2 (ไม่บังคับ)<select name="teacher2_user_id" aria-label="ครูที่ปรึกษาคนที่ 2 ห้อง ${esc(room.label)}">
+         ${option(room.advisor2_user_id,'ไม่มีคนที่ 2')}</select></label>
+        <button class="button secondary" type="submit">บันทึกครูที่ปรึกษา</button>
       </form>`).join('')}
      </div></section>`);
   bind('[data-affairs-head]','submit',async(e,el)=>{
@@ -166,8 +170,8 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
    toast('บันทึกหัวหน้าระดับแล้ว');await people();
   });
   bind('[data-affairs-advisor]','submit',async(e,el)=>{
-   e.preventDefault();const value=new FormData(el).get('teacher_user_id');
-   await api('/api/affairs/advisor',{method:'POST',body:{classroom_id:Number(el.dataset.affairsAdvisor),teacher_user_id:value?Number(value):null}});
+   e.preventDefault();const f=new FormData(el),value=f.get('teacher_user_id'),value2=f.get('teacher2_user_id');
+   await api('/api/affairs/advisor',{method:'POST',body:{classroom_id:Number(el.dataset.affairsAdvisor),teacher_user_id:value?Number(value):null,teacher2_user_id:value2?Number(value2):null}});
    toast('บันทึกครูที่ปรึกษาแล้ว');await people();
   });
  }

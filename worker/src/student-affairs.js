@@ -16,14 +16,15 @@ const label={good:'ทำความดี',minor:'ความผิดเล�
 const timeBangkok=()=>new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Bangkok',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date());
 const log=(db,user,action,type,entity)=>db.prepare('INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,?,?,?)').bind(user,action,type,String(entity)).run();
 const roomRows=async (env,date)=>{
- const {results}=await env.DB.prepare(`SELECT c.id,c.grade,c.label,c.advisor_user_id,u.display_name AS advisor_name,
+ const {results}=await env.DB.prepare(`SELECT c.id,c.grade,c.label,c.advisor_user_id,c.advisor2_user_id,u.display_name AS advisor_name,u2.display_name AS advisor2_name,
   COUNT(s.id) AS students,COUNT(d.student_id) AS checked
  FROM classrooms c LEFT JOIN users u ON u.id=c.advisor_user_id AND u.active=1
+ LEFT JOIN users u2 ON u2.id=c.advisor2_user_id AND u2.active=1
  LEFT JOIN student_enrollments h ON h.classroom_id=c.id AND h.start_date<=?
   AND (h.end_date IS NULL OR h.end_date>?)
  LEFT JOIN students s ON s.id=h.student_id AND s.active=1
  LEFT JOIN attendance_daily d ON d.student_id=s.id AND d.school_date=?
- GROUP BY c.id,c.grade,c.label,c.advisor_user_id,u.display_name ORDER BY c.grade,c.room`)
+ GROUP BY c.id,c.grade,c.label,c.advisor_user_id,c.advisor2_user_id,u.display_name,u2.display_name ORDER BY c.grade,c.room`)
  .bind(date,date,date).all();
  return results.map(r=>({...r,students:Number(r.students)||0,checked:Number(r.checked)||0,
   complete:Number(r.students)>0&&Number(r.checked)>=Number(r.students),
@@ -32,9 +33,10 @@ const roomRows=async (env,date)=>{
 const settings=async env=>(await env.DB.prepare('SELECT * FROM affairs_settings WHERE id=1').first())||{auto_enabled:0,reminder_time:'08:30',weekdays:'1,2,3,4,5'};
 async function roster(env){
  const [teachers,rooms,heads]=await Promise.all([
-  env.DB.prepare("SELECT id,display_name,active FROM users WHERE role='teacher' ORDER BY display_name").all(),
-  env.DB.prepare(`SELECT c.id,c.label,c.grade,c.advisor_user_id,u.display_name AS advisor_name
-   FROM classrooms c LEFT JOIN users u ON u.id=c.advisor_user_id ORDER BY c.grade,c.room`).all(),
+  env.DB.prepare("SELECT id,display_name,active FROM users WHERE role IN ('teacher','staff') ORDER BY display_name").all(),
+  env.DB.prepare(`SELECT c.id,c.label,c.grade,c.advisor_user_id,c.advisor2_user_id,u.display_name AS advisor_name,u2.display_name AS advisor2_name
+   FROM classrooms c LEFT JOIN users u ON u.id=c.advisor_user_id
+   LEFT JOIN users u2 ON u2.id=c.advisor2_user_id ORDER BY c.grade,c.room`).all(),
   env.DB.prepare(`SELECT h.grade,h.teacher_user_id,u.display_name AS teacher_name
     FROM affairs_grade_heads h JOIN users u ON u.id=h.teacher_user_id ORDER BY h.grade`).all()
  ]);
@@ -44,9 +46,9 @@ async function eligibility(env,u,student){
  if(staff(u)||u.role==='admin')return env.DB.prepare('SELECT id FROM students WHERE id=? AND active=1').bind(student).first();
  if(u.role!=='teacher')return null;
  return env.DB.prepare(`SELECT s.id FROM students s WHERE s.id=? AND s.active=1 AND
-  (EXISTS(SELECT 1 FROM classrooms c WHERE c.id=s.classroom_id AND c.advisor_user_id=?)
+  (EXISTS(SELECT 1 FROM classrooms c WHERE c.id=s.classroom_id AND (c.advisor_user_id=? OR c.advisor2_user_id=?))
    OR EXISTS(SELECT 1 FROM timetable t WHERE t.classroom_id=s.classroom_id AND t.teacher_user_id=? AND t.active=1))`)
-  .bind(student,u.id,u.id).first();
+  .bind(student,u.id,u.id,u.id).first();
 }
 async function recordBehavior(env,u,b,adjust=false){
  const student=id(b.student_id);
@@ -93,22 +95,22 @@ async function recordBehavior(env,u,b,adjust=false){
 }
 async function notifyOne(env,room,date,kind,actorId=null){
  // Unique room/day/type makes both cron replay and repeated manual POST idempotent.
- if(room.complete||room.students===0||!room.advisor_user_id)return {room:room.label,state:'not_needed'};
+ if(room.complete||room.students===0||!(room.advisor_user_id||room.advisor2_user_id))return {room:room.label,state:'not_needed'};
  const claim=await env.DB.prepare(`INSERT OR IGNORE INTO affairs_attendance_reminders(classroom_id,school_date,kind,actor_id)
   VALUES(?,?,?,?)`).bind(room.id,date,kind,actorId).run();
  if(claim.meta.changes===0)return {room:room.label,state:'already_queued'};
  const reminderId=claim.meta.last_row_id;
  let delivered=0,attempted=0;
- const d=await env.DB.prepare(`SELECT p.id,p.endpoint,p.p256dh,p.auth FROM staff_push_subscriptions p
-  JOIN users u ON u.id=p.user_id AND u.active=1 AND u.role='teacher'
-  WHERE p.user_id=? ORDER BY p.id LIMIT 5`).bind(room.advisor_user_id).all();
+ const d=await env.DB.prepare(`SELECT p.id,p.user_id,p.endpoint,p.p256dh,p.auth FROM staff_push_subscriptions p
+  JOIN users u ON u.id=p.user_id AND u.active=1 AND u.role IN ('teacher','staff')
+  WHERE p.user_id IN (?,?) ORDER BY p.id LIMIT 10`).bind(room.advisor_user_id||0,room.advisor2_user_id||0).all();
  for(const device of d.results||[]){
   attempted++;
   try{
    const response=await sendDailyAttendanceReminderPush(device,env,{classroomId:room.id,date});
    if(response.ok)delivered++;
    else if([404,410].includes(response.status))
-    await env.DB.prepare('DELETE FROM staff_push_subscriptions WHERE id=? AND user_id=?').bind(device.id,room.advisor_user_id).run();
+    await env.DB.prepare('DELETE FROM staff_push_subscriptions WHERE id=? AND user_id=?').bind(device.id,device.user_id).run();
   }catch(e){console.warn('RD CONNECT attendance reminder push failed',e?.name||'network')}
  }
  const state=delivered?'sent':attempted?'failed':'no_subscription';
@@ -124,7 +126,7 @@ export async function sendScheduledAttendanceReminders(env){
  if(timeBangkok()<setting.reminder_time)return {state:'not_due'};
  const skipped=await env.DB.prepare('SELECT school_date FROM affairs_non_school_days WHERE school_date=?').bind(day).first();
  if(skipped)return {state:'closed_school_day'};
- const rows=(await roomRows(env,day)).filter(x=>x.missing>0&&x.advisor_user_id);
+ const rows=(await roomRows(env,day)).filter(x=>x.missing>0&&(x.advisor_user_id||x.advisor2_user_id));
  // Each 5-min scheduled trigger processes a bounded group; remaining rooms continue on next trigger.
  const pending=[];
  for(const room of rows){
@@ -170,13 +172,22 @@ export async function studentAffairsRoutes(req,env,u,path){
   return reply({items:results});
  }
  if(method==='POST'&&path==='/api/affairs/advisor'){
-  const room=id(b.classroom_id),teacher=b.teacher_user_id===null?null:id(b.teacher_user_id);
-  if(!room||!(teacher||b.teacher_user_id===null))fail(400,'เลือกห้องเรียนและครูที่ปรึกษาให้ถูกต้อง');
-  if(teacher){
-   const check=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='teacher' AND active=1").bind(teacher).first();
-   if(!check)fail(400,'ต้องเป็นบัญชีครูที่เปิดใช้งาน');
+  const room=id(b.classroom_id);
+  const first=b.teacher_user_id===null?null:id(b.teacher_user_id);
+  const second=b.teacher2_user_id===undefined?undefined:b.teacher2_user_id===null?null:id(b.teacher2_user_id);
+  if(!room||b.teacher_user_id!==null&&!first||
+   b.teacher2_user_id!==undefined&&b.teacher2_user_id!==null&&!second||
+   first&&second&&first===second||second&&!first)
+   fail(400,'เลือกครูที่ปรึกษาได้ 1 หรือ 2 คน ห้ามซ้ำกัน');
+  const ids=[first,second].filter(Number.isSafeInteger);
+  if(ids.length){
+   const check=await env.DB.prepare("SELECT COUNT(*) AS n FROM users WHERE id IN ("+ids.map(()=>'?').join(',')+") AND role IN ('teacher','staff') AND active=1").bind(...ids).first();
+   if(Number(check?.n)!==ids.length)fail(400,'ต้องเป็นบัญชีครูที่ใช้งานอยู่');
   }
-  const change=await env.DB.prepare('UPDATE classrooms SET advisor_user_id=? WHERE id=?').bind(teacher,room).run();
+  const both=second!==undefined;
+  const sql=both?'UPDATE classrooms SET advisor_user_id=?,advisor2_user_id=? WHERE id=?':
+   'UPDATE classrooms SET advisor_user_id=? WHERE id=?';
+  const change=await env.DB.prepare(sql).bind(...(both?[first,second,room]:[first,room])).run();
   if(!change.meta.changes)fail(404,'ไม่พบห้องเรียน');
   await log(env.DB,u.id,'affairs_advisor_assigned','classrooms',room);return reply({ok:true});
  }

@@ -9,7 +9,7 @@ import {buildAdvisorExampleXlsx} from '../web/template-xlsx.js';
 const roomMap=new Map([
  ['ม.1/1',{id:1,label:'ม.1/1',advisor_user_id:null}],
  ['ม.2/3',{id:2,label:'ม.2/3',advisor_user_id:null}],
- ['ม.3/2',{id:3,label:'ม.3/2',advisor_user_id:7}]
+ ['ม.3/2',{id:3,label:'ม.3/2',advisor_user_id:7,advisor2_user_id:8}]
 ]);
 const row=(classroom='ม.1/1',username='teacher_demo01',password='StrongPassword#1234')=>({
  classroom,full_name:'ครูตัวอย่าง หนึ่ง',username,password,source_row:2
@@ -40,7 +40,7 @@ test('existing active teacher may be assigned to a vacant room without resetting
  assert.equal(plan.ready,true);
  assert.equal(plan.items[0].mode,'link');
 });
-test('existing username cannot be hijacked and no room advisor silently overwritten',()=>{
+test('existing username cannot be hijacked and a full room is not silently overwritten',()=>{
  const users=[{username:'teacher_demo01',display_name:'ครูตัวอย่าง หนึ่ง',role:'admin',active:1}];
  assert.match(planAdvisorImport([row()],roomMap,users).items[0].message,/ไม่ใช่บัญชีครู/);
  assert.match(planAdvisorImport([row('ม.3/2')],roomMap).items[0].message,/มีครูที่ปรึกษาแล้ว/);
@@ -48,10 +48,17 @@ test('existing username cannot be hijacked and no room advisor silently overwrit
  assert.match(planAdvisorImport([row()],roomMap,teacher).items[0].message,/เว้น Password ว่าง/);
  assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','')],roomMap,[{...teacher[0],display_name:'ครูคนอื่น'}]).items[0].message,/ชื่อไม่ตรง/);
 });
-test('rejects duplicate rooms, short teacher passwords, and national ID passwords',()=>{
- const roomDup=planAdvisorImport([row(),row()],roomMap);
- assert.equal(roomDup.ready,false);
- assert.match(roomDup.items[1].message,/ซ้ำ/);
+test('supports two distinct advisors per room but rejects duplicates, third advisor, and invalid passwords',()=>{
+ const pair=planAdvisorImport([row(),row('ม.1/1','teacher_demo02','AnotherSecurePass1')],roomMap);
+ assert.equal(pair.ready,true);
+ assert.deepEqual(pair.items.map(x=>x.slot),[1,2]);
+ const third=planAdvisorImport([row(),row('ม.1/1','teacher_demo02','AnotherSecurePass1'),
+  row('ม.1/1','teacher_demo03','AnotherSecurePass2')],roomMap);
+ assert.equal(third.ready,false);
+ assert.match(third.items[2].message,/ครบ 2 คน/);
+ const duplicate=planAdvisorImport([row(),row()],roomMap);
+ assert.equal(duplicate.ready,false);
+ assert.match(duplicate.items[1].message,/ซ้ำ|แล้ว/);
  const usersDup=planAdvisorImport([row(),row('ม.2/3')],roomMap);
  assert.equal(usersDup.ready,false);
  assert.match(usersDup.items[1].message,/Username ซ้ำ/);
@@ -105,4 +112,19 @@ test('UI displays one-click Excel/CSV template, secure preview and safe chunked 
  assert.match(app,/advisorImporter\.clear/);
  const sw=readFileSync(new URL('../web/sw.js',import.meta.url),'utf8');
  assert.match(sw,/advisor-import\.js/);assert.match(sw,/advisor-all-rooms-import\.csv/);
+});
+
+test('a previously assigned primary advisor is preserved when importing the second',()=>{
+ const teachers=[{id:22,username:'second_teacher',display_name:'ครูตัวอย่าง หนึ่ง',role:'teacher',active:1}];
+ const rooms=new Map([['ม.1/1',{id:1,label:'ม.1/1',advisor_user_id:19,advisor2_user_id:null}]]);
+ const plan=planAdvisorImport([row('ม.1/1','second_teacher','')],rooms,teachers);
+ assert.equal(plan.ready,true);
+ assert.equal(plan.items[0].slot,2);
+ assert.equal(plan.items[0].mode,'link');
+});
+test('front-end accepts two advisor rows in one room without changing file headers',()=>{
+ const raw=csvRows('classroom,full_name,username,password\nม.1/1,ครูหนึ่ง,teacher001,Pass1234\nม.1/1,ครูสอง,teacher002,Pass5678');
+ const result=prepareAdvisorRows(raw,[{label:'ม.1/1'}]);
+ assert.equal(result.length,2);
+ assert.equal(result.every(x=>x.status==='ready'),true);
 });

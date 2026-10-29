@@ -71,7 +71,8 @@ export function buildExampleXlsx(kind='students'){
  ]:isAdvisor?[
   ['classroom','full_name','username','password'],
   ['ม.1/1','ครูตัวอย่าง หนึ่ง','teacher001','Teacher#1234'],
-  ['ม.2/3','ครูตัวอย่าง สอง','teacher002','Teacher#5678'],
+  ['ม.1/1','ครูตัวอย่าง สอง','teacher002','Teacher#5678'],
+  ['ม.2/3','ครูตัวอย่าง สาม','teacher003','Teacher#9012'],
   ['ม.3/2','ครูตัวอย่าง สาม','teacher003','Teacher#9012']
  ]:[
   ['classroom','roll_no','student_no','full_name','username','password'],

@@ -11,7 +11,7 @@ export function prepareAdvisorRows(raw,rooms){
  if(!Array.isArray(raw)||!raw.length||raw[0].map(x=>String(x??'').trim().toLowerCase()).join(',')!==HEADER)
   throw Error('หัวตารางต้องเป็น '+HEADER);
  const labels=new Set(rooms.map(r=>r.label));
- const byRoom=new Set(),byUser=new Set();
+ const byRoom=new Map(),byUser=new Set();
  const rows=raw.slice(1).map((cells,index)=>{
   const values=cells.map(v=>String(v??''));
   const [classroom='',full_name='',user='',password='']=values;
@@ -26,9 +26,9 @@ export function prepareAdvisorRows(raw,rooms){
   else if(item.password&&item.password.length<4)message='รหัสผ่านครูใหม่ต้องมีอย่างน้อย 4 ตัว';
   else if(item.password.length>128)message='รหัสผ่านยาวเกิน 128 ตัว';
   else if(/^\d{13}$/.test(item.password))message='ห้ามใช้เลขบัตรประชาชนเป็นรหัสผ่าน';
-  else if(byRoom.has(item.classroom))message='ห้องซ้ำในไฟล์';
+  else if((byRoom.get(item.classroom)||0)>=2)message='ห้องนี้มีครูที่ปรึกษาเกิน 2 คน';
   else if(byUser.has(item.username))message='Username ซ้ำในไฟล์ ให้ผูกห้องเพิ่มเติมแยกครั้ง';
-  byRoom.add(item.classroom);byUser.add(item.username);
+  byRoom.set(item.classroom,(byRoom.get(item.classroom)||0)+1);byUser.add(item.username);
   return {values:item,message,status:message?'error':'ready'};
  });
  if(!rows.length)throw Error('ไม่มีรายชื่อครูที่ปรึกษาหลังหัวตาราง');
@@ -46,7 +46,7 @@ export function createAdvisorImport({api,rooms,onSuccess}){
   const errors=preview.filter(x=>x.status==='error').length;
   const done=preview.filter(x=>x.status==='imported').length;
   target.innerHTML=preview.length?'<p class="summary"><strong>'+esc(filename)+'</strong> • '+preview.length+
-   ' ห้อง • มีปัญหา '+errors+' • บันทึกแล้ว '+done+'</p>'+
+   ' รายการ • มีปัญหา '+errors+' • บันทึกแล้ว '+done+'</p>'+
    '<div class="table-wrap" style="max-height:420px;overflow:auto"><table class="table"><thead><tr>'+
    '<th>แถว</th><th>ห้อง</th><th>ชื่อครูที่ปรึกษา</th><th>Username</th><th>การดำเนินการ</th><th>ผลตรวจ</th></tr></thead><tbody>'+
    preview.map(x=>'<tr><td>'+x.source_row+'</td><td>'+esc(x.room)+'</td><td>'+esc(x.full_name)+'</td><td>'+esc(x.username)+
@@ -94,7 +94,7 @@ export function createAdvisorImport({api,rooms,onSuccess}){
     }
    }
    phase=preview.some(r=>r.status==='error')?'พบข้อมูลที่ต้องแก้ไข ก่อนนำเข้าครูที่ปรึกษา':
-    'ตรวจสอบผ่านทั้งหมด '+currentRows.length+' ห้อง พร้อมยืนยันนำเข้า';
+    'ตรวจสอบผ่านทั้งหมด '+currentRows.length+' รายการ พร้อมยืนยันนำเข้า';
   }catch(e){
    for(const row of currentRows)row.password='';
    currentRows=[];preview=[];phase=e.message;
@@ -102,7 +102,7 @@ export function createAdvisorImport({api,rooms,onSuccess}){
  }
  async function commit(container){
   if(busy||!preview.length||preview.some(x=>x.status!=='ready'))return;
-  if(!confirm('ยืนยันสร้างบัญชีครู/ผูกครูที่ปรึกษา '+currentRows.length+' ห้อง?'))return;
+  if(!confirm('ยืนยันสร้างบัญชีครู/ผูกครูที่ปรึกษา '+currentRows.length+' รายการ?'))return;
   busy=true;committed=0;
   try{
    for(const group of batches(currentRows,5)){
@@ -113,13 +113,13 @@ export function createAdvisorImport({api,rooms,onSuccess}){
      currentRows[i].password='';
     }
     committed+=group.length;
-    phase='บันทึกแล้ว '+committed+' / '+currentRows.length+' ห้อง';
+    phase='บันทึกแล้ว '+committed+' / '+currentRows.length+' รายการ';
     draw(container);
    }
-   phase='นำเข้าครูที่ปรึกษาสำเร็จ '+committed+' ห้อง';
+   phase='นำเข้าครูที่ปรึกษาสำเร็จ '+committed+' รายการ';
    await onSuccess?.();
   }catch(e){
-   phase='บันทึกแล้ว '+committed+' ห้อง และหยุดเนื่องจาก: '+e.message+
+   phase='บันทึกแล้ว '+committed+' รายการ และหยุดเนื่องจาก: '+e.message+
     ' กรุณาตรวจรายชื่อครูและห้องที่บันทึกสำเร็จก่อนนำเข้าไฟล์ที่เหลือ (อย่ากดนำเข้าทั้งไฟล์ซ้ำ)';
   }finally{
    for(const row of currentRows)row.password='';
@@ -138,7 +138,7 @@ export function createAdvisorImport({api,rooms,onSuccess}){
    '<option value="utf-8">UTF-8</option><option value="windows-874">Windows-874 / TIS-620</option></select></div>'+
    '<div class="field"><label>หรือวางข้อมูล CSV</label><textarea name="csv" rows="4" placeholder="classroom,full_name,username,password"></textarea></div>'+
    '<p class="muted">ครูใหม่: กรอก Password อย่างน้อย 4 ตัว (แนะนำให้ยาวและไม่ซ้ำ) • ครูที่มีบัญชีแล้ว: ชื่อและ Username ต้องตรงกับระบบและเว้น Password ว่าง • ไม่เปลี่ยนรหัสผ่านครูเดิม</p>'+
-   '<div class="warn">ห้องที่มีครูที่ปรึกษาอยู่แล้วจะถูกปฏิเสธ ไม่เขียนทับการมอบหมายเดิม • หนึ่งห้องต่อหนึ่งครูที่ปรึกษา • หนึ่ง Username ต่อไฟล์</div>'+
+   '<div class="warn">หนึ่งห้องมีครูที่ปรึกษาได้ 1 หรือ 2 คน • ใส่ห้องซ้ำ 2 แถวเพื่อกำหนด 2 คน • ครูเดิมไม่ถูกเขียนทับ • ใช้ Username ต่างกันในไฟล์</div>'+
    '<button class="button full" type="submit">ตรวจสอบทั้งไฟล์ก่อนนำเข้า</button></form>'+
    '<div id="advisorImportStatus" role="status" aria-live="polite" class="muted"></div>'+
    '<div id="advisorImportPreview"></div>'+

@@ -88,8 +88,8 @@ export async function guardianTruancyItems(env,account,range=null){
  return results;
 }
 export async function advisorTruancyItems(env,user){
- const scope=['admin','staff'].includes(user.role)?'':' AND c.advisor_user_id=?';
- const args=['admin','staff'].includes(user.role)?[]:[user.id];
+ const scope=['admin','staff'].includes(user.role)?'':' AND (c.advisor_user_id=? OR c.advisor2_user_id=?)';
+ const args=['admin','staff'].includes(user.role)?[]:[user.id,user.id];
  const {results}=await env.DB.prepare(`SELECT e.id,e.school_date,t.classroom_id,t.period,t.subject,c.label AS classroom_label,s.full_name
  FROM truancy_events e JOIN timetable t ON t.id=e.timetable_id
  JOIN classrooms c ON c.id=t.classroom_id JOIN students s ON s.id=e.student_id AND s.active=1
@@ -104,12 +104,12 @@ export async function truancyPushReadiness(env,roomId,studentIds){
  const count=studentIds.length;
  if(!count)return {events:0,advisorDevices:0,guardianDevices:0,ready:false,reason:'no_events'};
  const enabled=ready(env);
- const room=await env.DB.prepare(`SELECT c.advisor_user_id FROM classrooms c WHERE c.id=?`)
+ const room=await env.DB.prepare(`SELECT c.advisor_user_id,c.advisor2_user_id FROM classrooms c WHERE c.id=?`)
    .bind(roomId).first();
  const [advisor,guardians]=await Promise.all([
-  room?.advisor_user_id?env.DB.prepare(`SELECT COUNT(*) AS total
+  room?.advisor_user_id||room?.advisor2_user_id?env.DB.prepare(`SELECT COUNT(*) AS total
     FROM staff_push_subscriptions p JOIN users u ON u.id=p.user_id AND u.active=1
-    WHERE p.user_id=?`).bind(room.advisor_user_id).first():Promise.resolve({total:0}),
+    WHERE p.user_id IN (?,?)`).bind(room.advisor_user_id||0,room.advisor2_user_id||0).first():Promise.resolve({total:0}),
   env.DB.prepare(`SELECT COUNT(DISTINCT ps.id) AS total
     FROM guardian_push_subscriptions ps
     JOIN portal_accounts a ON a.id=ps.guardian_account_id AND a.role='guardian'
@@ -128,7 +128,7 @@ export async function truancyPushReadiness(env,roomId,studentIds){
 export async function deliverTruancyPush(env){
  if(!env.DB||!ready(env))return {enabled:false,processed:0,delivered:0};
  const {results:events}=await env.DB.prepare(`SELECT e.id,e.generation,e.student_id,e.school_date,
-  c.advisor_user_id,t.period,t.subject FROM truancy_events e
+  c.advisor_user_id,c.advisor2_user_id,t.period,t.subject FROM truancy_events e
  JOIN period_truancy tr ON tr.student_id=e.student_id
    AND tr.timetable_id=e.timetable_id AND tr.school_date=e.school_date
  JOIN attendance_period p ON p.student_id=e.student_id
@@ -138,9 +138,9 @@ export async function deliverTruancyPush(env){
     AND date('now','+7 hours')
    AND e.updated_at>=datetime('now','-1 day')
    AND (
-    (c.advisor_user_id IS NOT NULL AND EXISTS(
+    ((c.advisor_user_id IS NOT NULL OR c.advisor2_user_id IS NOT NULL) AND EXISTS(
       SELECT 1 FROM staff_push_subscriptions s JOIN users u ON u.id=s.user_id AND u.active=1
-      WHERE s.user_id=c.advisor_user_id AND NOT EXISTS(
+      WHERE s.user_id IN (c.advisor_user_id,c.advisor2_user_id) AND NOT EXISTS(
        SELECT 1 FROM truancy_push_deliveries d
        WHERE d.event_id=e.id AND d.generation=e.generation
          AND d.recipient_type='advisor' AND d.subscription_id=s.id
@@ -163,9 +163,9 @@ export async function deliverTruancyPush(env){
  ORDER BY e.id DESC LIMIT 25`).all();
  let delivered=0,failed=0;
  for(const event of events){
-  const {results:staff}=event.advisor_user_id?await env.DB.prepare(`SELECT s.id,s.endpoint,s.p256dh,s.auth
+  const {results:staff}=event.advisor_user_id||event.advisor2_user_id?await env.DB.prepare(`SELECT s.id,s.endpoint,s.p256dh,s.auth
    FROM staff_push_subscriptions s JOIN users u ON u.id=s.user_id AND u.active=1
-   WHERE s.user_id=? LIMIT 5`).bind(event.advisor_user_id).all():{results:[]};
+   WHERE s.user_id IN (?,?) LIMIT 10`).bind(event.advisor_user_id||0,event.advisor2_user_id||0).all():{results:[]};
   const {results:guardians}=await env.DB.prepare(`SELECT ps.id,ps.endpoint,ps.p256dh,ps.auth
    FROM guardian_push_subscriptions ps JOIN portal_accounts a ON a.id=ps.guardian_account_id
    JOIN guardian_student_links l ON l.guardian_account_id=a.id

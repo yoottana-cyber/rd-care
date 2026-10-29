@@ -4,7 +4,7 @@ import {sendLateArrivalPush} from './staff-push.js';
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
 export async function deliverLateQrPush(env){
  if(!env.DB||!ready(env))return {enabled:false,processed:0,delivered:0};
- const {results:events}=await env.DB.prepare(`SELECT e.id,e.student_id,e.school_date,r.arrived_at,c.advisor_user_id
+ const {results:events}=await env.DB.prepare(`SELECT e.id,e.student_id,e.school_date,r.arrived_at,c.advisor_user_id,c.advisor2_user_id
  FROM late_qr_auto_events e
  JOIN late_self_requests r ON r.id=e.request_id AND r.state='verified'
  JOIN student_enrollments h ON h.student_id=e.student_id
@@ -15,7 +15,7 @@ export async function deliverLateQrPush(env){
   AND (
    EXISTS(SELECT 1 FROM staff_push_subscriptions ps
     JOIN users u ON u.id=ps.user_id AND u.active=1
-    WHERE ps.user_id=c.advisor_user_id AND NOT EXISTS(
+    WHERE ps.user_id IN (c.advisor_user_id,c.advisor2_user_id) AND NOT EXISTS(
       SELECT 1 FROM late_qr_push_deliveries d
       WHERE d.event_id=e.id AND d.recipient_type='advisor' AND d.subscription_id=ps.id
       AND (d.state='delivered' OR d.attempts>=3)))
@@ -30,10 +30,10 @@ export async function deliverLateQrPush(env){
  ORDER BY e.id DESC LIMIT 25`).all();
  let delivered=0,failed=0;
  for(const event of events){
-  const {results:staff}=event.advisor_user_id?
+  const {results:staff}=event.advisor_user_id||event.advisor2_user_id?
    await env.DB.prepare(`SELECT ps.id,ps.endpoint,ps.p256dh,ps.auth
     FROM staff_push_subscriptions ps JOIN users u ON u.id=ps.user_id AND u.active=1
-    WHERE ps.user_id=? LIMIT 5`).bind(event.advisor_user_id).all():{results:[]};
+    WHERE ps.user_id IN (?,?) LIMIT 10`).bind(event.advisor_user_id||0,event.advisor2_user_id||0).all():{results:[]};
   const {results:guardians}=await env.DB.prepare(`SELECT ps.id,ps.endpoint,ps.p256dh,ps.auth
    FROM guardian_push_subscriptions ps
    JOIN portal_accounts a ON a.id=ps.guardian_account_id AND a.role='guardian'
