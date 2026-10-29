@@ -31,9 +31,9 @@ export function normalizeCriteriaRows(body){
   if(input_rule_id!==null&&!validId(input_rule_id))error='rule_id ต้องเป็นรหัสเกณฑ์เดิม หรือเว้นว่างเพื่อเพิ่มใหม่';
   else if(!categories.has(category)||!matchMode(category,body.mode))error='ประเภทเกณฑ์ไม่ตรงกับหน้าความผิด/ความดี';
   else if(name.length<2||name.length>120||/[\u0000-\u001f\u007f]/.test(name))error='ชื่อเกณฑ์ต้องมี 2–120 ตัวอักษร';
-  else if(!Number.isSafeInteger(points)||points===0||Math.abs(points)>50||
+  else if(!Number.isSafeInteger(points)||points===0||
    (category==='good'&&points<0)||(category!=='good'&&points>0))
-   error='คะแนนความดีต้องเป็น +1 ถึง +50 และความผิด -1 ถึง -50';
+   error='คะแนนต้องเป็นจำนวนเต็มไม่เป็นศูนย์ (ความดีเป็นบวก / ความผิดเป็นลบ)';
   else if(active===null)error='active ต้องเป็น 1 (เปิดใช้งาน) หรือ 0 (ปิดใช้งาน)';
   const nameKey=category+':'+normName(name);
   if(!error&&(seenNames.has(nameKey)||(input_rule_id!==null&&seenIds.has(input_rule_id))))

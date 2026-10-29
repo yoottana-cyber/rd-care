@@ -263,9 +263,9 @@ export async function studentAffairsRoutes(req,env,u,path){
    if(protectedRule)fail(409,'เกณฑ์หนีเรียน -10 ทำงานอัตโนมัติ แก้ไขจากเมนูนี้ไม่ได้');
   }
   const name=text(b.name,120),category=String(b.category||''),points=Number(b.points),active=b.active!==false;
-  if(!categories.includes(category)||!Number.isInteger(points)||Math.abs(points)>50||points===0||
+  if(!categories.includes(category)||!Number.isSafeInteger(points)||points===0||
     (category==='good'&&points<0)||(category!=='good'&&points>0))
-   fail(400,'ประเภทหรือค่าคะแนนไม่ถูกต้อง (1–50 คะแนนตามประเภท)');
+   fail(400,'คะแนนต้องเป็นจำนวนเต็มไม่เป็นศูนย์ (ความดีเป็นบวก / ความผิดเป็นลบ)');
   let key=ruleId;
   if(ruleId){
    const result=await env.DB.prepare(`UPDATE affairs_behavior_rules SET name=?,category=?,points=?,active=?,

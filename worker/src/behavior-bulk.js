@@ -49,7 +49,7 @@ export async function recordBehaviorBulk(env,user,body){
  if(!rule?.active||!['good','minor','moderate','serious','very_serious'].includes(rule.category))
   fail(400,'กรุณาเลือกเกณฑ์คะแนนที่เปิดใช้งาน');
  const points=Number(rule.points);
- if(!Number.isSafeInteger(points)||Math.abs(points)>50||points===0||
+ if(!Number.isSafeInteger(points)||points===0||
    (rule.category==='good'&&points<0)||(rule.category!=='good'&&points>0))
   fail(400,'ประเภทและจำนวนคะแนนไม่ตรงเกณฑ์');
  if(body.reason!==undefined&&body.reason!==null&&typeof body.reason!=='string')

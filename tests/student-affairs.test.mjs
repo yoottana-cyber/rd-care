@@ -34,7 +34,7 @@ test('staff rules reject unsupported categories and inconsistent positive/negati
   {name:'x',category:'minor',points:5},
   {name:'x',category:'good',points:-5},
   {name:'x',category:'extreme',points:-5},
-  {name:'x',category:'serious',points:-99},
+  {name:'x',category:'serious',points:-99.5},
   {name:'x',category:'moderate',points:0}
  ]){
   await assert.rejects(()=>studentAffairsRoutes(req(path,'POST',rule),env,actor,path),{code:400});
