@@ -2,7 +2,7 @@ import {bangkokToday,validDate,weekday} from './core.js';
 import {sendDailyAttendanceReminderPush} from './staff-push.js';
 import {scoreColumns,scoreSummary} from './score-ledger.js';
 import {searchBehaviorStudents,recordBehaviorBulk} from './behavior-bulk.js';
-import {ensureRecorder,incidentInsert,incidentResults} from './conduct-policy.js';
+import {ensureRecorder,commitBehaviorIncidents,behaviorRequestId} from './conduct-policy.js';
 import {criteriaImportRoutes} from './criteria-excel-import.js';
 import {schoolScoreMonitorSummary,schoolScoreMonitorHistory} from './teacher-score-monitor.js';
 import {previewBehaviorAdjustments,recordBehaviorAdjustmentBulk} from './adjustment-bulk.js';
@@ -89,10 +89,10 @@ async function recordBehavior(env,u,b,adjust=false){
    .bind(student,points,reason,u.id,adjustId,points,points,student).run();
   if(!insert.meta.changes)fail(409,'คะแนนพฤติกรรมค้างสะสมไม่เพียงพอสำหรับเกณฑ์ปรับพฤติกรรมที่เลือก');
  }else{
-  const inserted=await incidentInsert(env.DB,student,{id:ruleId},reason,u.id).run();
-  if(Number(inserted?.meta?.changes)!==1)fail(409,'เกณฑ์นี้ถูกปิดใช้งาน กรุณาเลือกใหม่');
-  const [incident]=await incidentResults(env.DB,[inserted]);
-  return reply({ok:true,id:incident.id,incident_id:incident.id,
+  const requestId=behaviorRequestId(b.request_id);
+  const [incident]=await commitBehaviorIncidents(env.DB,[student],
+   {id:ruleId},reason,u.id,requestId);
+  return reply({ok:true,id:incident.id,incident_id:incident.id,request_id:requestId,
    points:Number(incident.points_applied),warning_no:Number(incident.warning_no)||0,
    category,rule_name:ruleName},201);
  }
