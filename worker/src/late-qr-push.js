@@ -1,6 +1,7 @@
 // Push delivery for verified late QR arrivals. Subscriptions are opt-in;
 // alerts carry an encrypted event reference, date and arrival time (no identity).
 import {sendLateArrivalPush} from './staff-push.js';
+import {notificationEnabled} from './notification-policy.js';
 const ready=env=>Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY&&env.VAPID_SUBJECT);
 export async function deliverLateQrPush(env){
  if(!env.DB||!ready(env))return {enabled:false,processed:0,delivered:0};
@@ -40,8 +41,8 @@ export async function deliverLateQrPush(env){
      AND a.active=1 AND a.must_change_password=0
    JOIN guardian_student_links g ON g.guardian_account_id=a.id
    WHERE g.student_id=? LIMIT 30`).bind(event.student_id).all();
-  const targets=[...staff.map(device=>({type:'advisor',device})),
-   ...guardians.map(device=>({type:'guardian',device}))];
+  const targets=[...(await notificationEnabled(env,'late_advisor')?staff:[]).map(device=>({type:'advisor',device})),
+   ...(await notificationEnabled(env,'late_guardian')?guardians:[]).map(device=>({type:'guardian',device}))];
   async function sendOne({type,device}){
    await env.DB.prepare(`INSERT OR IGNORE INTO late_qr_push_deliveries
      (event_id,recipient_type,subscription_id) VALUES(?,?,?)`)
