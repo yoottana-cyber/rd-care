@@ -1,5 +1,34 @@
 # RD CONNECT — DirectAdmin Node.js + MariaDB (Migration-only)
 
+## Consolidated Batch 1 + Batch 2 (offline school APIs + D1 migration preparation)
+
+The combined application/data groundwork has been added to this
+**experimental** branch. See [`BATCH_1_2_GUIDE.md`](./BATCH_1_2_GUIDE.md)
+for the single ZIP upload, test command, private D1 export method and
+explicit remaining work.
+
+- Batch 1: token-backed, scoped **read-only** school and portal service,
+  plus an unexposed GET-only HTTP adapter. **Not full API parity.**
+- Batch 2: private local D1 SQL→JSONL exporter, manifest SHA/count
+  validation, MariaDB source/target FK load plan, and read-only
+  row-count/FK reconciliation. **Not a live data importer.**
+- From a freshly downloaded branch ZIP, upload the full contents of
+  `node-hosting/` into the existing DirectAdmin Node test app.
+  Do not overwrite secret environment settings or copy private data.
+- Run `check:batch12` once in DirectAdmin → Run JS Script.
+  It runs the offline API and data-integrity regression suites.
+  With no private D1 export manifest configured, its **EXPECTED**
+  exit code is **2** (`BATCH 2 SOURCE PENDING`). This is an
+  intentional **NO-GO**, not a failure of the tests.
+- `check:go-live` from Release Pack 3 remains intentionally NO-GO
+  until full functional parity, authorized migration and backup
+  restoration/reconciliation are verified.
+
+No public APIs are enabled; `src/http-handler.cjs` and
+`app.js` remain unchanged. No current Cloudflare D1 data,
+`ratsadaa_connect`, `ratsadaa_trgtest`, DNS or live PWA is changed.
+Do not merge this branch into `main`.
+
 ## Release Pack 3 — Pre-launch readiness, backup and rollback
 
 The school selected the consolidated **pre-launch package** instead of
