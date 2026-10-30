@@ -74,7 +74,8 @@ def export_dump(dump_file, output_dir):
                     sha = hashlib.sha256()
                     count = 0
                     with (destination / filename).open("wb") as output:
-                        for data in connection.execute("SELECT * FROM " + quoted):
+                        ordered_cols = ",".join('"' + col + '"' for col in columns)
+                        for data in connection.execute("SELECT " + ordered_cols + " FROM " + quoted):
                             record = json.dumps({
                                 columns[i]: safe_value(value)
                                 for i, value in enumerate(data)
