@@ -41,7 +41,8 @@
     "check:lab-timetable-http-contract": "node scripts/check-lab-timetable-http-contract.cjs",
     "check:go-live": "node scripts/check-go-live-readiness.cjs",
     "check:batch12": "node scripts/check-batch12.cjs",
-    "check:d1-migration-plan": "node scripts/check-d1-migration-plan.cjs"
+    "check:d1-migration-plan": "node scripts/check-d1-migration-plan.cjs",
+    "check:d1-reconciliation": "node scripts/check-d1-reconciliation.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
