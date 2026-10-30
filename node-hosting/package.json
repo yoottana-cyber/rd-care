@@ -4,11 +4,15 @@
   "version": "0.0.1",
   "description": "Migration-only scaffold for DirectAdmin/CloudLinux Node.js and MariaDB; not production-ready",
   "type": "commonjs",
-  "engines": {"node": ">=22 <27"},
+  "engines": {
+    "node": ">=22 <27"
+  },
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "test": "node --test test/*.test.cjs"
+    "test": "node --test test/*.test.cjs",
+    "check:db": "node scripts/check-db.cjs",
+    "inspect:d1": "node scripts/inspect-d1-schema.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
