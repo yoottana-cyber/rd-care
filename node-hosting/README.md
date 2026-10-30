@@ -611,6 +611,64 @@ The existing `ratsadaa_connect` remains on its tested baseline of
 0 triggers. Do not merge staging into main or switch the live Cloudflare
 PWA yet.
 
+## Stage 7.3: Create and verify a separate, empty MariaDB trigger laboratory
+
+The source-derived first three trigger candidates passed **static review** in
+stage 7.2. This is not permission to install SQL on the real RD CONNECT
+staging DB. We need a **different** disposable MariaDB database to test
+MariaDB syntax, guardian-role changes and overlapping timetable concurrent
+writes. This step checks only a brand-new EMPTY database, without any SQL
+DDL or actual school/student records.
+
+### A. Create lab only in DirectAdmin (do not use phpMyAdmin SQL importer)
+
+DirectAdmin → MySQL Management → Create New Database:
+- Database *suffix*: `trgtest`, so the full database name is
+  **`ratsadaa_trgtest`**.
+- Create a distinct database user with a strong random password, granting
+  access only to the new test database. Do not reuse the
+  `ratsadaa_connect` database user or password.
+- Leave this new database completely EMPTY: **0 tables, 0 views, 0 triggers**.
+- If DirectAdmin creates a different full name, STOP; do not point this
+  script at `ratsadaa_connect` or edit scripts to weaken the safety guard.
+
+### B. Add separate test-only settings to the staged Node.js app
+
+DirectAdmin → Setup Node.js App → `rd-connect-node-stage` →
+Environment Variables:
+- `RD_TRIGGER_LAB_DB_HOST`: same database host as the school MariaDB,
+  copied privately from `RD_DB_HOST`.
+- `RD_TRIGGER_LAB_DB_PORT`: normally `3306`, or same as `RD_DB_PORT`.
+- `RD_TRIGGER_LAB_DB_NAME`: exactly `ratsadaa_trgtest`.
+- `RD_TRIGGER_LAB_DB_USER`: the **new** test-only DB username.
+- `RD_TRIGGER_LAB_DB_PASSWORD`: its **new** password.
+
+DO NOT change any existing `RD_DB_*` variables. Never send DB passwords
+through chat, commit them to GitHub or copy them into JS files.
+
+### C. Upload and run read-only guard
+
+From the staging GitHub branch upload only:
+- `node-hosting/package.json` → `package.json`
+- `node-hosting/scripts/check-trigger-lab.cjs` →
+  `scripts/check-trigger-lab.cjs`
+
+DirectAdmin → Setup Node.js App → Run JS Script →
+**`check:trigger-lab`**.
+
+Expected: `returncode: 0` and
+`STEP 7.3 OK: separate empty MariaDB trigger lab is available (read-only)`.
+The script strictly requires the full DB name `ratsadaa_trgtest`,
+refuses `ratsadaa_connect` and nonempty lab databases, queries
+only `SELECT DATABASE()` and `information_schema`, and logs no
+hostnames, users or passwords. The existing app/Login, D1 and MariaDB
+`ratsadaa_connect` are unchanged.
+
+Next, create and import a **schema-only, no-data** clone into this
+separate lab after explicit verification. Only then can MariaDB trigger
+DDL and two-connection concurrency tests begin. MariaDB DDL is not
+rolled back by `ROLLBACK`; work solely in a disposable database.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
