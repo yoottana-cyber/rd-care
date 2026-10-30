@@ -721,6 +721,69 @@ API becomes available because the schema is installed. The public Login
 endpoints remain 501, and `/api/health` remains
 `migration_not_ready`.
 
+## Stage 7.5: Install + test the FIRST guardian-link INSERT guard in a disposable DB only
+
+Prerequisite: `verify:trigger-lab-schema` returned code 0:
+`ratsadaa_trgtest` contains 63 EMPTY tables, 119 foreign keys,
+0 triggers and no real school data. This is a separate database with
+separate `RD_TRIGGER_LAB_DB_*` credentials.
+
+Only ONE trigger is installed in this stage:
+`guardian_link_role_guard` (BEFORE INSERT on `guardian_student_links`).
+It requires an existing portal account with `role='guardian'` and uses
+MariaDB's `SIGNAL SQLSTATE '45000'` to reject a student-account link.
+This is *not* the timetable migration and does *not* yet protect updates
+to `guardian_student_links` or role changes in `portal_accounts`.
+All later trigger work will still require proper authorization and
+concurrent-write tests.
+
+**Upload only these four new/changed files** under the existing
+`/home/ratsadaa/rd-connect-node-stage` root:
+- `package.json`
+- `src/lab-guardian-guard.cjs`
+- `scripts/install-lab-guardian-guard.cjs`
+- `scripts/check-lab-guardian-guard.cjs`
+
+The installer additionally requires the existing
+`scripts/verify-trigger-lab-schema.cjs`,
+`scripts/check-trigger-lab.cjs` and `scripts/check-db.cjs`.
+**Do not import** any SQL file or run the old 7.2 draft in phpMyAdmin.
+
+**A. One-time installation (DDL cannot be undone by ROLLBACK).**
+In DirectAdmin → Setup Node.js App → `rd-connect-node-stage` →
+Environment Variables, add:
+`RD_TRIGGER_LAB_ALLOW_DDL=INSTALL_GUARDIAN_DDL_ON_TEST_DB_7_5`.
+Do not change the existing `RD_DB_*` or `RD_TRIGGER_LAB_DB_*` credentials.
+Run **`install:lab-guardian-guard`** in Run JS Script.
+
+Before doing any DDL it refuses wrong database name, non-InnoDB
+tables, mismatched 63-table/119-FK schema, any installed trigger, or
+any existing rows in all 63 tables. This makes it impossible to
+intentionally run the installer against the school's `ratsadaa_connect`
+through its normal configured database connection. If it fails:
+**STOP, do not retry blindly**. A DDL operation might already have
+committed; inspect the *lab* trigger inventory first.
+If it succeeds, expect `STEP 7.5 INSTALL OK` and exactly 1 trigger.
+Then **remove** `RD_TRIGGER_LAB_ALLOW_DDL` from the environment.
+
+**B. Synthetic-only test (ROLLBACK).**
+Run `check:lab-guardian-guard`. This test confirms the installed
+trigger metadata, lab schema, and initial emptiness, then inserts a
+fake teacher, classroom, student, student portal and guardian portal
+inside a transaction. Linking the student portal as guardian must be
+rejected with SQLSTATE 45000; linking a guardian must succeed.
+The entire transaction is rolled back and account/roster/link
+emptiness is verified. Expect `STEP 7.5 TEST OK` and
+`ROLLBACK VERIFIED`.
+
+After this stage, `verify:trigger-lab-schema` from stage 7.4 will
+**intentionally fail**, because it expects 0 triggers. Use
+`check:lab-guardian-guard` for the new lab baseline of 1 trigger.
+Do not install this on `ratsadaa_connect`, modify Cloudflare D1,
+open a public Login API, import real school records, or merge into main.
+The known guardian UPDATE and role-change bypasses must be addressed
+before considering this rule production-ready.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
