@@ -11,6 +11,11 @@ function getLabConfig(env=process.env){
  const name=env.RD_TRIGGER_LAB_DB_NAME;
  if(name!==LAB_DATABASE||name===env.RD_DB_NAME||name===EXPECTED_STAGING_DATABASE)
   throw Error('lab_database_name_required');
+ // Laboratory must never reuse staging credentials; no real school access.
+ if(env.RD_DB_USER&&env.RD_TRIGGER_LAB_DB_USER===env.RD_DB_USER)
+  throw Error('lab_user_must_be_separate');
+ if(env.RD_DB_PASSWORD&&env.RD_TRIGGER_LAB_DB_PASSWORD===env.RD_DB_PASSWORD)
+  throw Error('lab_password_must_be_separate');
  const port=Number(env.RD_TRIGGER_LAB_DB_PORT||3306);
  if(!Number.isInteger(port)||port<1||port>65535)throw Error('lab_port_invalid');
  const host=env.RD_TRIGGER_LAB_DB_HOST;
