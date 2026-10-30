@@ -68,6 +68,13 @@ const STEPS=Object.freeze([
   markers:['PUSH DISPATCH LAB OK','RECEIPT INTEGRITY OK','ROLLBACK VERIFIED','LAB UNCHANGED']
  }),
  Object.freeze({
+  name:'AUTH_PORTAL_READ_ROLLBACK',
+  script:'check-lab-auth-read-journey.cjs',
+  expected:0,
+  markers:['AUTH + READ LAB OK','ACCESS CONTROL OK','SESSION ISOLATION OK',
+   'ROLLBACK VERIFIED','LAB UNCHANGED']
+ }),
+ Object.freeze({
   name:'RELEASE_NO_GO_GUARD',
   script:'check-go-live-readiness.cjs',
   expected:2,
