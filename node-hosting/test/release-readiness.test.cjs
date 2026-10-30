@@ -27,7 +27,8 @@ test('staging DB mismatch and any temporary install/write flags fail closed',()=
   RD_TRIGGER_LAB_DB_NAME:'ratsadaa_connect'}),/release_lab_aliases_staging/);
  for(const key of ['RD_TRIGGER_LAB_ALLOW_DDL','RD_TRIGGER_LAB_ALLOW_RACE',
   'RD_TRIGGER_LAB_ALLOW_LOCK','RD_TRIGGER_LAB_ALLOW_WRITE',
-  'RD_TRIGGER_LAB_ALLOW_RETRY']){
+  'RD_TRIGGER_LAB_ALLOW_RETRY','RD_TRIGGER_LAB_ALLOW_ATTENDANCE',
+  'RD_TRIGGER_LAB_ALLOW_PERIOD','RD_TRIGGER_LAB_ALLOW_PUSH_QUEUE']){
   assert.throws(()=>assertStagingEnvironment({...env,[key]:'TEST'}),/release_temporary_test_flag_present/);
  }
 });
