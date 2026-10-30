@@ -20,7 +20,8 @@
     "check:auth-http": "node scripts/check-auth-http.cjs",
     "check:auth-http-db": "node scripts/check-auth-http-db.cjs",
     "check:https-transport": "node scripts/check-https-transport.cjs",
-    "check:https-auth-gate": "node scripts/check-https-auth-gate.cjs"
+    "check:https-auth-gate": "node scripts/check-https-auth-gate.cjs",
+    "check:trigger-preflight": "node scripts/check-trigger-preflight.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
