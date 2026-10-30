@@ -26,7 +26,10 @@ const ACTIVE_EVENT=`SELECT e.id,e.generation,e.student_id
  JOIN attendance_period p ON p.student_id=e.student_id AND
   p.timetable_id=e.timetable_id AND p.school_date=e.school_date
   AND p.status='absent'
- WHERE e.id=? AND e.active=1 LIMIT 1 FOR UPDATE`;
+ WHERE e.id=? AND e.active=1
+ AND e.school_date BETWEEN DATE_SUB(DATE(UTC_TIMESTAMP()+INTERVAL 7 HOUR),INTERVAL 14 DAY)
+  AND DATE(UTC_TIMESTAMP()+INTERVAL 7 HOUR)
+ LIMIT 1 FOR UPDATE`;
 const QUEUE_ADVISORS=`INSERT IGNORE INTO truancy_push_deliveries
  (event_id,generation,recipient_type,subscription_id,state)
  SELECT e.id,e.generation,'advisor',s.id,'pending'
@@ -85,7 +88,9 @@ const CURRENT=`EXISTS(SELECT 1 FROM truancy_events e
  JOIN attendance_period p ON p.student_id=e.student_id AND
   p.timetable_id=e.timetable_id AND p.school_date=e.school_date
   AND p.status='absent'
- WHERE e.id=? AND e.generation=? AND e.active=1)`;
+ WHERE e.id=? AND e.generation=? AND e.active=1
+ AND e.school_date BETWEEN DATE_SUB(DATE(UTC_TIMESTAMP()+INTERVAL 7 HOUR),INTERVAL 14 DAY)
+  AND DATE(UTC_TIMESTAMP()+INTERVAL 7 HOUR))`;
 const verified={
  advisor:`EXISTS(SELECT 1 FROM truancy_events e
  JOIN timetable t ON t.id=e.timetable_id
