@@ -20,6 +20,9 @@ This folder is a **fail-closed scaffold** for an isolated school-hosting migrati
 | `package.json` | CommonJS app + mysql2 |
 | `.env.example` | Placeholder environment variable names only |
 | `mysql/0000_migration_ledger.sql` | Migration ledger only; not the school schema |
+| `scripts/check-db.cjs` | Explicit **read-only** MariaDB connection check; no startup connection |
+| `scripts/inspect-d1-schema.cjs` | Offline schema-only D1 export inventory; refuses files containing INSERT data |
+| `test/migration-preflight.test.cjs` | Tests for safe read-only connectivity and schema inspection |
 
 ## Local smoke test
 
@@ -31,6 +34,35 @@ npm start
 ```
 
 Then open `http://127.0.0.1:3000/api/health` (expected 503). Stop with Ctrl+C. Nothing is written to any database.
+
+## Stage 0: verify MariaDB access (separate empty TEST database)
+
+1. In DirectAdmin create a **new, empty staging** MariaDB database and a restricted test database user. Do not select the database used by any current school website.
+2. In the staging Node.js app's **Environment Variables** editor set `RD_DB_HOST`, `RD_DB_PORT`, `RD_DB_NAME`, `RD_DB_USER`, and `RD_DB_PASSWORD`. Do not share credentials in chat, screenshots or GitHub.
+3. Install dependencies (`npm install`) using the Node.js Selector and open its activated terminal.
+4. Run this explicit command **only in the staging application root**:
+
+```sh
+npm run check:db
+```
+
+Expected: `RD CONNECT MariaDB staging: connection OK (read-only SELECT 1).`. The script makes **one read-only SELECT**, closes its connections, never prints secrets and does not create tables or write rows. A failure prints a safe error category. The HTTP app still responds `503 migration_not_ready`.
+
+For investigating the actual D1 schema, run this command **on your own computer** inside the existing `worker` directory (Wrangler login required):
+
+```sh
+npx wrangler d1 export rd-care-dev --remote --no-data --output=rd-connect-schema-only.sql
+```
+
+**Caution:** A Cloudflare D1 export may temporarily block database requests. Schedule it outside school usage. This export contains **schema only, not student records**.
+
+Then run from the `node-hosting` directory on the same computer:
+
+```sh
+npm run inspect:d1 -- ../worker/rd-connect-schema-only.sql
+```
+
+The inspector reports table/index/trigger/view counts, executes **no SQL**, and rejects exports containing INSERT statements. Its report is an inventory, **not a MySQL conversion**; SQLite triggers, partial indexes and permissions must be ported and tested before any real-data import.
 
 ## DirectAdmin trial setup
 
@@ -44,7 +76,7 @@ Use a **separate staging subdomain** with HTTPS and a newly created MySQL databa
 - Use hosting-provided `PORT`; do not hardcode a public port.
 - Install NPM dependencies via the Node.js selector. Check Passenger log if startup fails.
 
-Credentials must be entered only through the host's secure environment editor, not copied to GitHub or chat. Do not add credentials before the API and MySQL schema have been reviewed.
+Credentials must be entered only through the host's secure environment editor, not copied to GitHub or chat. Credentials for the **new empty staging database** may be set to run the explicit read-only check above; do not import real student data while the schema and API are incomplete.
 
 **Do not switch the school website's PHP 7.4 or modify the existing Cloudflare Dev Worker/D1.**
 
