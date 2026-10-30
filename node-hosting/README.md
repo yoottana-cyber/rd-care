@@ -1,5 +1,32 @@
 # RD CONNECT — DirectAdmin Node.js + MariaDB (Migration-only)
 
+## Release Pack 3 — Pre-launch readiness, backup and rollback
+
+The school selected the consolidated **pre-launch package** instead of
+continuing one tiny step at a time. See
+[`RELEASE_RUNBOOK.md`](./RELEASE_RUNBOOK.md) for the GO/NO-GO decision
+criteria, data migration prerequisites, cutover sequence, and the
+critical difference between rollback *before* versus *after* the
+new MariaDB accepts real school writes.
+
+The read-only `check:go-live` script is registered in
+`package.json` and checks the isolated staging DB inventory,
+staging HTTP closure, missing production modules and lingering test
+permissions. It does not make the migration ready.
+**Expected current result: exit code 2 and `RELEASE READINESS NO_GO`.**
+Exit code 1 means an unsafe or unknown baseline.
+Exit code 0 is intentionally not available until the missing APIs,
+D1 data migration, backup restoration and release checks are
+implemented and independently verified.
+
+From this branch upload these **three files** to the existing
+DirectAdmin Node test directory:
+`package.json`, `src/release-readiness.cjs`,
+`scripts/check-go-live-readiness.cjs`.
+Then run `check:go-live` via DirectAdmin → Setup Node.js App →
+Run JS Script **without adding any new environment flag**.
+Do not add real student records or change `main` or live URLs.
+
 ## Not production-ready
 
 This folder is a **fail-closed scaffold** for an isolated school-hosting migration. It does **not** implement any of the existing RD CONNECT login, enrollment, attendance, QR, behavior, merit, admin or Push APIs yet.
