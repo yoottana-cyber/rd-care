@@ -478,6 +478,64 @@ concurrency-safe login limits, secret handling, and password-hash upgrade
 are in place, evaluate tightly restricted HTTPS auth testing in a separate
 environment, then role-based authorization and business-rule trigger parity.
 
+## Stage 6.8: Opt-in, one-shot HTTPS authentication transaction (TEST only)
+
+Precondition: stages 6.2–6.7 passed, including rollback, password
+compatibility, and the HTTPS transport probe. Public Login is still
+HTTP 501, and the real RD CONNECT Cloudflare PWA/D1 must remain unchanged.
+
+The staging-only `POST /api/migration/auth-probe` is **disabled by default**.
+When explicitly enabled with all three correct environment settings below,
+it runs the **synthetic** HTTP Login/Me/Logout → MariaDB integration check
+used in stage 6.6, within a transaction, and verifies a full rollback.
+The probe does not accept user data, does not log passwords or tokens, and
+does not expose the real Login routes. It requires a 32-byte random
+hexadecimal secret sent in `X-RD-HTTPS-Probe-Secret`, expires no more than
+one hour after the current time, and permits at most one authorized
+execution per Node.js process restart.
+
+**Upload to `/home/ratsadaa/rd-connect-node-stage/`:**
+- `package.json`
+- `src/http-handler.cjs`
+- `src/https-auth-probe.cjs`
+- `scripts/check-https-auth-gate.cjs`
+
+The older `scripts/check-auth-http-db.cjs` and supporting auth code must
+already be in place from the previous stages. DO NOT update the live PWA.
+
+**Phase A — Verify the disabled-by-default gate before using secrets.**
+With **no new env vars set**, DirectAdmin → Setup Node.js App →
+Run JS Script → `check:https-auth-gate` must return code 0 and
+`STEP 6.8 GATE OK`. This checks all guards using an in-memory fake pool
+and deliberately makes NO database connections. Restart the staging Node.js
+app after uploading the new handler. Anonymous GET / POST to the new
+route should return HTTP 404 `not_found` with the probe disabled.
+The real Login routes must remain HTTP 501.
+
+**Phase B — Briefly enable one POST using a secret, only after Phase A.**
+Generate a fresh 64-character random hex string LOCALLY and enter it only
+in DirectAdmin's staging environment editor as
+`RD_AUTH_HTTPS_PROBE_SECRET`. Set `RD_AUTH_HTTPS_PROBE_ENABLE=1`.
+Also set `RD_AUTH_HTTPS_PROBE_UNTIL` to the Unix epoch seconds 10–20 minutes
+in the future (and never more than one hour). Restart the staging app.
+Do not store any of these secrets in GitHub, a URL/query string, any chat,
+screenshots or application source code. Use one same-origin HTTPS POST
+with header `X-RD-HTTPS-Probe-Secret` and **no body**. E.g. from the
+school administrator's local PowerShell after generating `$secret`:
+`Invoke-RestMethod -Uri 'https://ratsada.ac.th/web/rd-connect-node-test/api/migration/auth-probe' -Method POST -Headers @{'X-RD-HTTPS-Probe-Secret'=$secret}`.
+Expected HTTP 200 response includes
+`{"ok":true,"check":"https_auth_transaction","rollback_verified":true,"login_enabled":false,"migration_ready":false}`
+(with a `roles_verified` array).
+On failure (HTTP 503), STOP; don't retry until the cause is reviewed.
+
+**Immediately after the single test**, set
+`RD_AUTH_HTTPS_PROBE_ENABLE=0`, delete the secret and expiry env
+variables, then restart the staging app. Check that the probe returns
+HTTP 404. This feature is not a production endpoint or approval to import
+real staff, student, or guardian accounts. All ten missing business-rule
+triggers, stronger password hashing, hardened auth and authorization,
+and migration parity must be completed before production cutover.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
