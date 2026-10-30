@@ -1131,6 +1131,91 @@ Next work: design concurrency-safe timetable write coordination and
 period-range validation. Do not copy these race-prone triggers directly
 into school `ratsadaa_connect`.
 
+## Stage 7.11 — Validate MariaDB advisory lock coordination and period ranges (NO DATA WRITES)
+
+Stage 7.10 ran two real concurrent timetable INSERT attempts in the
+isolated `ratsadaa_trgtest`, returning `LOCK_WAIT_TIMEOUT` on
+**both** same-room and same-teacher variants. Neither INSERT was accepted
+during the test, but neither failure was a direct timetable business
+rule rejection. The fixture was deleted, both transactions rolled
+back, 63 tables empty, 5 test triggers remained.
+
+**Stage 7.11 tests a proposed coordination mechanism**, not a
+production-ready API. MariaDB's
+`GET_LOCK(name, timeout)` and `RELEASE_LOCK(name)` are
+*named, session-scoped advisory locks*, independent of transaction
+COMMIT/ROLLBACK. They can coordinate application callers that
+**all agree on the same names**, but do not prevent a bypassing
+writer from inserting directly. Per the MariaDB documentation, these
+locks must be explicitly released before a pooled connection is
+returned; they are not automatically released at COMMIT.
+
+The new `src/timetable-write-coordination.cjs` defines:
+- strict validation: day 1–7, start period 1–10,
+  inclusive end period from start to 10, positive integer teacher
+  and classroom IDs, active flag 0 or 1.
+- `overlaps()` with inclusive periods for same teacher OR room
+  on same weekday, active schedules only.
+- stable, lexicographically sorted, DB-namespaced lock names
+  for each teacher/day and classroom/day, which reduces
+  cross-resource deadlock risk for cooperating writers.
+- `acquireNamedLocks` / `releaseNamedLocks` including cleanup
+  after failed partial acquisition; conflicting GET_LOCK requests
+  return busy, not timetable overlap. Lock-release errors must not
+  be ignored and pooled connections must be discarded on failure.
+- `classifyTimetableDbError` keeps
+  `TIMETABLE_OVERLAP` distinct from InnoDB 1205 (lock timeout)
+  and 1213 (deadlock). Future retries must start a new transaction,
+  use a bounded policy and recheck business constraints.
+
+**No production timetable code calls these functions yet.**
+An important next step is to wrap every INSERT, UPDATE, DELETE,
+and multi-row timetable write in the new lock protocol, holding
+the connection and locks across the entire transaction until
+successful COMMIT or a full ROLLBACK. A lock-only test cannot
+certify the safety of future concurrent writes.
+
+### Upload and test with DirectAdmin
+
+Download the staging GitHub branch and upload **three** files from
+`node-hosting/` into the existing test Node app
+`/home/ratsadaa/rd-connect-node-stage/`:
+
+1. `package.json` → `package.json`
+2. `src/timetable-write-coordination.cjs` →
+   `src/timetable-write-coordination.cjs`
+3. `scripts/check-lab-timetable-locks.cjs` →
+   `scripts/check-lab-timetable-locks.cjs`
+
+The script uses ONLY `RD_TRIGGER_LAB_DB_*` credentials, refuses
+`ratsadaa_connect`, checks exactly five known triggers and all
+63 tables empty. It opens two separate MariaDB connections and
+acquires/releases session-level named locks for fake, randomly chosen
+teacher/room IDs **without INSERT, UPDATE, DELETE or DDL**.
+It verifies:
+- same-teacher and same-room weekday locks exclude the other session;
+- a different weekday remains independently accessible;
+- once locks are released, the second session can acquire them;
+- invalid day/start/end period examples are rejected offline;
+- all locks are released, 63 tables still empty, 5 triggers unchanged.
+
+In DirectAdmin → Setup Node.js App → Environment Variables:
+remove any old `RD_TRIGGER_LAB_ALLOW_DDL` and
+`RD_TRIGGER_LAB_ALLOW_RACE` entries. Add **temporarily**
+`RD_TRIGGER_LAB_ALLOW_LOCK=RUN_LAB_TIMETABLE_LOCK_7_11`.
+This flag enables only this manual diagnostic; it never enables a
+public API. Run `check:lab-timetable-locks` once through
+Run JS Script. Expect `returncode: 0`,
+`STEP 7.11 LOCKS OK`, `PERIOD VALIDATION OK`,
+`LAB DATA UNCHANGED`, and `NOT INTEGRATED`.
+Remove `RD_TRIGGER_LAB_ALLOW_LOCK` afterward.
+
+If it fails, do not weaken test DB isolation or reuse school DB
+credentials; inspect the reported fail-closed category. This stage
+does not create a trigger, open Login or migrate real school data.
+The original Cloudflare D1 and Node staging `ratsadaa_connect`
+are unchanged.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
