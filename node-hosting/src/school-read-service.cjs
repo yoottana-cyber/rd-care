@@ -75,7 +75,7 @@ async function roster(conn,user,roomId,date){
 }
 async function dailyAttendance(conn,user,roomId,date){
  if(!validDate(date))fail(400,'invalid_date');
- const room=await assertRoom(conn,user,roomId);
+ const room=await assertRoom(conn,user,roomId,'daily');
  const [rows]=await conn.execute(
   `SELECT s.id AS student_id,s.student_no,s.full_name,h.roll_no,
       d.status,d.recorded_by,d.updated_at
@@ -87,6 +87,46 @@ async function dailyAttendance(conn,user,roomId,date){
    ORDER BY h.roll_no,s.student_no LIMIT 120`,
   [date,room.id,date,date]);
  return {school_date:date,items:rows};
+}
+async function periodAttendance(conn,user,roomId,date,timetableId){
+ if(!validDate(date))fail(400,'invalid_date');
+ // Reading period attendance does not grant access to another teacher's
+ // lesson just because the actor advises the same classroom.
+ const room=await assertRoom(conn,user,roomId,'view');
+ const id=asId(timetableId);
+ if(!id)fail(400,'invalid_timetable');
+ const [slots]=await conn.execute(
+  'SELECT id,classroom_id,teacher_user_id,day_of_week FROM timetable WHERE id=? AND active=1 LIMIT 1',[id]);
+ const slot=slots[0];
+ const weekday=((new Date(date+'T00:00:00Z').getUTCDay()+6)%7)+1;
+ if(!slot||Number(slot.classroom_id)!==Number(room.id)||
+  Number(slot.day_of_week)!==weekday)fail(400,'invalid_timetable');
+ if(user.role!=='admin'&&Number(slot.teacher_user_id)!==Number(user.id))
+  fail(403,'forbidden');
+ const [items]=await conn.execute(
+  `SELECT p.student_id,
+    CASE WHEN tr.student_id IS NOT NULL AND p.status='absent'
+       THEN 'truancy' ELSE p.status END AS status
+   FROM attendance_period p
+   LEFT JOIN period_truancy tr ON tr.student_id=p.student_id
+     AND tr.timetable_id=p.timetable_id AND tr.school_date=p.school_date
+   JOIN student_enrollments h ON h.student_id=p.student_id
+   WHERE p.timetable_id=? AND p.school_date=? AND h.classroom_id=?
+     AND h.start_date<=p.school_date
+     AND (h.end_date IS NULL OR h.end_date>p.school_date)`,
+  [id,date,room.id]);
+ const [daily]=await conn.execute(
+  `SELECT d.student_id,d.status FROM attendance_daily d
+   JOIN student_enrollments h ON h.student_id=d.student_id
+   WHERE h.classroom_id=? AND d.school_date=? AND h.start_date<=d.school_date
+     AND (h.end_date IS NULL OR h.end_date>d.school_date)`,
+  [room.id,date]);
+ const [notes]=await conn.execute(
+  'SELECT note,updated_at FROM period_teaching_logs WHERE timetable_id=? AND school_date=? LIMIT 1',
+  [id,date]);
+ return {items,daily_items:daily,daily_date:date,daily_read_only:true,
+  teaching_note:notes[0]?.note||'',
+  teaching_note_updated_at:notes[0]?.updated_at||null};
 }
 async function teacherTimetable(conn,user){
  if(user.kind!=='staff')fail(403,'forbidden');
@@ -175,4 +215,4 @@ async function portalBehavior(conn,user,studentId,from,to){
  return {student_id:id,items:entries};
 }
 module.exports={asId,validDate,dateRange,trustedSession,assertRoom,listRooms,roster,
- dailyAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior};
+ dailyAttendance,periodAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior};
