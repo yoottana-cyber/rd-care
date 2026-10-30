@@ -107,4 +107,4 @@ function planAttendance(body,{actor,room,slot,enrolled,today=bangkokToday()}={})
  return result;
 }
 module.exports={DAILY,PERIOD,weekday,bangkokToday,requireWriteDate,
- allowedDaily,allowedPeriod,validateRoster,planAttendance};
+ requireStaff,allowedDaily,allowedPeriod,validateRoster,planAttendance};
