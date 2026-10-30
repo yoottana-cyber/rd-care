@@ -12,7 +12,8 @@
     "start": "node app.js",
     "test": "node --test test/*.test.cjs",
     "check:db": "node scripts/check-db.cjs",
-    "inspect:d1": "node scripts/inspect-d1-schema.cjs"
+    "inspect:d1": "node scripts/inspect-d1-schema.cjs",
+    "verify:schema": "node scripts/verify-schema.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
