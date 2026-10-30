@@ -24,7 +24,9 @@
     "check:trigger-preflight": "node scripts/check-trigger-preflight.cjs",
     "check:trigger-draft": "node scripts/check-trigger-draft.cjs",
     "check:trigger-lab": "node scripts/check-trigger-lab.cjs",
-    "verify:trigger-lab-schema": "node scripts/verify-trigger-lab-schema.cjs"
+    "verify:trigger-lab-schema": "node scripts/verify-trigger-lab-schema.cjs",
+    "install:lab-guardian-guard": "node scripts/install-lab-guardian-guard.cjs",
+    "check:lab-guardian-guard": "node scripts/check-lab-guardian-guard.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
