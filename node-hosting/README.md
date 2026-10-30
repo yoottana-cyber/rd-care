@@ -29,6 +29,7 @@ This folder is a **fail-closed scaffold** for an isolated school-hosting migrati
 | `src/staging-auth-http.cjs` | Unexposed HTTP JSON adapter for six Login/Me/Logout routes; no public listener |
 | `scripts/check-auth-http.cjs` | Offline in-process HTTP contract test; no DB, no network socket |
 | `scripts/check-auth-http-db.cjs` | Isolated in-process HTTP → auth service → MariaDB integration test; rolls back all rows |
+| `scripts/check-https-transport.cjs` | Offline test of new static transport-only probe and closed public Login routes |
 | `scripts/check-password-compat.cjs` | Offline, synthetic test of original Worker password formats; no DB access |
 | `scripts/check-auth-service.cjs` | Transaction-only real MariaDB test across teacher/student/guardian fake accounts; ROLLBACK |
 | `scripts/inspect-d1-schema.cjs` | Offline schema-only D1 export inventory; refuses files containing INSERT data |
@@ -436,6 +437,46 @@ is **not** permission to expose it to the internet. Production auth still
 needs concurrency-safe rate limiting, password-hash upgrades, hardened
 session expiry/refresh, thorough authorization tests, recovery, monitoring,
 and business-rule trigger parity.
+
+## Stage 6.7: check actual HTTPS transport without exposing authentication
+
+The public staging HTTP handler now supports **only** one new, static,
+unprivileged GET route: `/api/migration/transport`. It returns HTTP 200
+with `{"ok":true,"check":"transport_only","login_enabled":false,"migration_ready":false}`.
+It does **not** look up a password, connect to MariaDB, read a school record,
+expose secrets or assert the app is ready.
+
+**Files to update on school staging:**
+- `package.json`
+- `src/http-handler.cjs`
+- `scripts/check-https-transport.cjs`
+
+1. Use DirectAdmin → Setup Node.js App → Run JS Script to select
+   `check:https-transport`. Expected `returncode: 0` and
+   `STEP 6.7 LOCAL OK`. The script only verifies the locally loaded
+   HTTP routing; it does NOT test the real HTTPS connection.
+2. **Restart** the `rd-connect-node-stage` Node.js app, so Passenger
+   loads the new `src/http-handler.cjs`.
+3. In a browser, open
+   `https://ratsada.ac.th/web/rd-connect-node-test/api/migration/transport`.
+   Expected HTTP 200 with the exact JSON above (shows HTTPS termination and
+   Passenger route work from that browser).
+4. Open `https://ratsada.ac.th/web/rd-connect-node-test/api/health`.
+   Expected HTTP 503 JSON `migration_not_ready` (intentional).
+5. Open `https://ratsada.ac.th/web/rd-connect-node-test/api/auth/login`
+   and `https://ratsada.ac.th/web/rd-connect-node-test/api/portal/auth/login`.
+   A browser GET must return HTTP 501 `endpoint_not_migrated`.
+   Do **not** enter real usernames or passwords in requests.
+
+A failed or different status is a reason to stop and inspect the
+application path/Passenger deployment, not to activate Login. The existing
+`/web/rd-connect/` frontend, Cloudflare Worker/D1 and student accounts
+are completely untouched.
+
+**Next step (not yet enabled):** Only after test-user isolation,
+concurrency-safe login limits, secret handling, and password-hash upgrade
+are in place, evaluate tightly restricted HTTPS auth testing in a separate
+environment, then role-based authorization and business-rule trigger parity.
 
 ## DirectAdmin trial setup
 
