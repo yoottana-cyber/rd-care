@@ -810,15 +810,16 @@ atomic locking policy before importing real data.
 
 ### Files
 
-Upload five files from `node-hosting/` to
+Upload **four new/updated files** from `node-hosting/` to
 `/home/ratsadaa/rd-connect-node-stage/`:
 
 - `package.json`
 - `src/lab-guardian-update-guards.cjs`
 - `scripts/install-lab-guardian-update-guards.cjs`
 - `scripts/check-lab-guardian-updates.cjs`
-- The previous `src/lab-guardian-guard.cjs` must remain in place,
-  **do not replace or remove it**.
+
+The previously uploaded `src/lab-guardian-guard.cjs` must remain in place;
+**do not replace or remove it**.
 
 The lab DB must still have 63 empty InnoDB tables, 119 foreign keys,
 and **exactly 1** installed trigger from stage 7.5.
