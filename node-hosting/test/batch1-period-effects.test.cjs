@@ -23,7 +23,7 @@ test('truancy is stored as absent plus linked score and post-commit push require
  assert.ok(out.per_student[0].steps.includes('conduct_score_ensure_or_restore_linked_record'));
  assert.ok(out.per_student[0].steps.includes('push_student_post_commit'));
  assert.equal(out.requires_truancy_score_and_push_parity,true);
- assert.equal(JSON.stringify(out).includes('-10'),false);
+ assert.equal(Object.prototype.hasOwnProperty.call(out.per_student[0],'points'),false);
 });
 test('correcting truancy revokes only its linked score, not the goodness ledger',()=>{
  const {body,options}=make(['present','leave']);
