@@ -85,7 +85,7 @@ async function verifyMutation(conn,fixture,today){
  );
  need(Number(audit)===1,'audit_missing');
 }
-async function dryTransaction(conn,env,today,{throwAfterFirst=false}={}){
+async function dryTransaction(conn,env,today,{throwAfterFirst=false,now=new Date()}={}){
  await conn.beginTransaction();
  let aborted=false;
  try{
@@ -98,14 +98,14 @@ async function dryTransaction(conn,env,today,{throwAfterFirst=false}={}){
    let errorObserved=false;
    try{
     await applyDailyInOpenTransaction(conn,data,{actor:f.actor,env,
-     now:new Date(),onStep:stage=>{
+     now,onStep:stage=>{
       if(stage==='daily_upsert')throw Error('lab_daily_injected_failure');
      }});
    }catch(e){errorObserved=e?.message==='lab_daily_injected_failure'}
    need(errorObserved,'injected_error_not_observed');
   }else{
    const out=await applyDailyInOpenTransaction(conn,data,{
-    actor:f.actor,env,now:new Date()
+    actor:f.actor,env,now
    });
    need(out.rows===2&&out.absence_followups_resolved===1&&
     out.requires_rollback===true,'write_contract_mismatch');
@@ -129,9 +129,10 @@ async function run({env=process.env,driver,log=console.log,warn=console.error}={
   conn=await pool.getConnection();
   await inspectSet(conn,5);
   await assertEmpty(conn);
-  const today=bangkokToday();
-  await dryTransaction(conn,env,today);
-  await dryTransaction(conn,env,today,{throwAfterFirst:true});
+  const now=new Date();
+  const today=bangkokToday(now);
+  await dryTransaction(conn,env,today,{now});
+  await dryTransaction(conn,env,today,{throwAfterFirst:true,now});
   await assertEmpty(conn);
   await inspectSet(conn,5);
   ok=true;
