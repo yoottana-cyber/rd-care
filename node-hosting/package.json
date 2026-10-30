@@ -29,7 +29,8 @@
     "check:lab-guardian-guard": "node scripts/check-lab-guardian-guard.cjs",
     "install:lab-guardian-updates": "node scripts/install-lab-guardian-update-guards.cjs",
     "check:lab-guardian-updates": "node scripts/check-lab-guardian-updates.cjs",
-    "check:lab-guardian-race": "node scripts/check-lab-guardian-race.cjs"
+    "check:lab-guardian-race": "node scripts/check-lab-guardian-race.cjs",
+    "check:lab-guardian-reverse-race": "node scripts/check-lab-guardian-reverse-race.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
