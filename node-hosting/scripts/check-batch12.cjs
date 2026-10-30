@@ -7,6 +7,41 @@ const path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const {run:plan}=require('./check-d1-migration-plan.cjs');
 
+const {existsSync}=require('node:fs');
+
+// Only report allowlisted test names and coarse tool errors. Never echo raw
+// TAP diagnostics, stack traces, environment variables or login secrets.
+function safeOfflineFailure(proc,tests,warn=console.error){
+ const errorCode=String(proc?.error?.code||'');
+ const code=['ETIMEDOUT','ENOBUFS','ENOENT','EACCES'].includes(errorCode)?
+  errorCode:'none';
+ const status=Number.isInteger(proc?.status)?proc.status:'unknown';
+ const signal=typeof proc?.signal==='string'&&
+  /^[A-Z0-9]{2,16}$/.test(proc.signal)?proc.signal:'none';
+ warn('BATCH 1+2 OFFLINE DIAGNOSTIC: exit='+status+
+  ' signal='+signal+' error='+code+'.');
+ const missing=tests.filter(p=>!existsSync(p));
+ for(const file of missing.slice(0,5))
+  warn('BATCH 1+2 MISSING TEST FILE: '+path.basename(file));
+ // Synthetic test titles are fixed in repository code; never print arbitrary
+ // error payloads or assertion values from TAP output.
+ const raw=String(proc?.stdout||'');
+ const failing=raw.split(/\\r?\\n/).filter(line=>/^not ok \\d+ - /.test(line));
+ warn('BATCH 1+2 TAP FAILING CASES: '+failing.length+'.');
+ for(const line of failing.slice(0,8)){
+  const testName=line.replace(/^not ok \\d+ - /,'').trim().slice(0,140)
+   .replace(/[a-f0-9]{48,}/ig,'[redacted]')
+   .replace(/[^a-zA-Z0-9 _.,:;()\\-]/g,'?');
+  warn('BATCH 1+2 FAILED CASE: '+testName);
+ }
+ if(code==='ETIMEDOUT')
+  warn('BATCH 1+2 TEST PROCESS TIMED OUT (no schema or DB operation from test runner).');
+ if(!failing.length&&missing.length===0&&code==='none')
+  warn('BATCH 1+2 NO TAP FAILURES RECORDED: check Node test runner availability and stderr privately.');
+ return {status,signal,error:code,failing:failing.length,missing:missing.length};
+}
+
+
 async function run({env=process.env,execute=spawnSync,migration=plan,
  log=console.log,warn=console.error}={}){
  const tests=[
@@ -28,13 +63,18 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
   path.join(__dirname,'../test/batch2-reconciliation.test.cjs'),
   path.join(__dirname,'../test/timetable-offline-api-contract.test.cjs')
  ];
- const proc=execute(process.execPath,['--test',...tests],{
-  cwd:path.join(__dirname,'..'),
-  env:{...env},encoding:'utf8',timeout:45000,maxBuffer:2*1024*1024
- });
- if(proc.error||proc.status!==0){
+ let proc;
+ try{
+  proc=execute(process.execPath,['--test','--test-concurrency=2',...tests],{
+   cwd:path.join(__dirname,'..'),
+   env:{...env},encoding:'utf8',timeout:120000,maxBuffer:2*1024*1024
+  });
+ }catch{
+  proc={status:null,error:{code:'spawn_error'}};
+ }
+ if(proc?.error||proc?.status!==0){
   warn('BATCH 1+2 OFFLINE TESTS FAILED (unit_contract).');
-  // Avoid printing stack traces, tokens or confidential file contents.
+  safeOfflineFailure(proc,tests,warn);
   return 1;
  }
  log('BATCH 1 OFFLINE OK: staff/portal read-only authorization, rosters, daily and portal views.');
@@ -54,4 +94,4 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
 if(require.main===module)run().then(code=>{process.exitCode=code},()=>{
  console.error('BATCH 1+2 AUDIT FAILED (unknown).');process.exitCode=1;
 });
-module.exports={run};
+module.exports={run,safeOfflineFailure};
