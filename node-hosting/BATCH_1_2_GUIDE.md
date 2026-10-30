@@ -40,6 +40,52 @@ and protection when attendance already exists; older stage-7
 generic INSERT/UPDATE/DELETE prototypes are **not a drop-in
 replacement** for those D1 business rules.
 
+## Batch 1 continuation — attendance and original timetable parity
+
+The consolidated offline test command also covers these NEW, unexposed
+modules:
+
+- `src/attendance-write-contract.cjs`: validates exact complete-room
+  attendance payload (1–100 students), advisor 1 or advisor 2
+  authorization for **daily** check-in, timetable ownership and
+  weekday for **period** check-in, Bangkok date window (today back
+  through 14 days), valid statuses, and optional teaching notes.
+  Truancy remains a distinct period status; daily absence cannot
+  be labeled truancy. The module **refuses all database mutation**
+  until the original D1 outbox, behavior score and Push side effects
+  are fully ported and tested.
+- `src/timetable-d1-parity.cjs`: enforces original Worker teacher
+  timetable rules: a required subject code (<=30 chars), subject
+  name (<=120), period 1–10 with at most two consecutive periods,
+  strict teacher ownership (including student-affairs teaching
+  account), and no update/archive after period attendance history
+  exists. Archiving preserves the row instead of physically DELETE.
+  It is not connected to the previous generic stage-7 lab writer,
+  which did **not** have these requirements.
+- `src/school-read-service.cjs` now mirrors original semantics for
+  GET `/api/attendance?kind=daily`: **only recorded statuses** are
+  returned (missing = not yet checked). Room roster with NULL statuses
+  remains a separate convenience view. Period GET validates lesson
+  owner, room and weekday, reports explicit truancy status, and
+  provides read-only daily check-in reference plus optional teaching
+  note. Daily GET requires advisor or admin, NOT just any teacher
+  with an active timetable in the room.
+- `src/staging-school-http.cjs` keeps portal attendance separate
+  from staff attendance and is still an **in-process** prototype.
+  Passenger returns 501 on ALL unported school routes.
+- `test/batch1-attendance-write.test.cjs`,
+  `test/batch1-timetable-parity.test.cjs` and added read-service
+  regressions are included in `check:batch12`. These are tests of
+  deliberately disabled write contracts, NOT proof of working
+  real-data check-in or Push.
+
+**No changes are needed to Cloudflare D1 or school MariaDB.**
+No student attendance entries were created in this continuation.
+A production writer will need an atomic transaction spanning
+attendance, audit, truancy score and notification outbox rules;
+the SQL trigger parity and notification background processing must
+be validated before any public GET or POST routes are enabled.
+
 ## What Batch 2 actually implements
 
 New **private/offline local source exporter**, **dry-run import
