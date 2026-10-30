@@ -86,6 +86,67 @@ attendance, audit, truancy score and notification outbox rules;
 the SQL trigger parity and notification background processing must
 be validated before any public GET or POST routes are enabled.
 
+## Latest continuation — daily attendance atomic MariaDB laboratory
+
+New files:
+- `src/lab-daily-attendance-transaction.cjs` — isolated daily writer
+  receiving a server-trusted synthetic teacher actor. It re-reads the
+  classroom, both advisor positions, and the effective-date enrolled
+  student roster **inside the caller's transaction**. It rejects
+  incomplete, repeated, cross-room or invalid daily statuses; only
+  records `present/absent/late/leave`.
+- `scripts/check-lab-daily-attendance-rollback.cjs` — one-command
+  MariaDB transaction exercise in isolated `ratsadaa_trgtest`.
+  Creates a fake advisor, room, two students, enrollment rows, two
+  synthetic timetable slots, two pending-review alerts and two
+  distinct notification-outbox events **inside an uncommitted
+  transaction**. One event is pending, the other already delivered.
+  The writer UPSERTs daily attendance for both fake students and
+  resolves pending-review alerts for the absent student, **cancelling
+  only pending notifications**. The delivered event stays delivered.
+  One `attendance_saved` audit entry is asserted. The script then
+  ROLLBACKs the entire transaction and checks that **all 63 tables
+  remain empty** and all five triggers remain intact. A second
+  synthetic transaction injects a failure after the first student
+  update, then ROLLBACKs and again verifies emptiness.
+- `test/batch1-lab-daily-attendance.test.cjs` — opt-in guards,
+  SQL ordering, two-advisor authorization, exact roster and injected
+  failure checks, automatically included in `check:batch12`.
+
+The **real SQL lab** is disabled unless explicitly opted in with a
+temporary environment variable. Do not change the existing
+`RD_DB_*` staging credentials. The separate
+`RD_TRIGGER_LAB_DB_*` credentials must still point only to
+`ratsadaa_trgtest`.
+
+To run the real lab once (after refreshing the branch ZIP and
+uploading `node-hosting/` to the existing *test* app):
+1. Confirm no prior `RD_TRIGGER_LAB_ALLOW_WRITE/DDL/RACE/LOCK/RETRY`
+   flags are present.
+2. Temporarily set:
+   `RD_TRIGGER_LAB_ALLOW_ATTENDANCE=RUN_LAB_DAILY_ATTENDANCE_ROLLBACK_B1`
+3. In DirectAdmin Run JS Script, run:
+   `check:lab-daily-attendance`
+4. Expect `returncode: 0`, `BATCH 1 LAB DAILY OK`,
+   `OUTBOX PARITY OK`, `ROLLBACK VERIFIED`,
+   `LAB UNCHANGED`.
+5. Remove `RD_TRIGGER_LAB_ALLOW_ATTENDANCE` immediately afterward.
+
+On unexpected error, **do not bypass the lab guards**.
+Inspect the lab state if the rollback or emptiness confirmation
+failed. This file **never COMMITs**, creates no school records
+in `ratsadaa_connect`, and does not enable any public HTTP route.
+`check:batch12` still does only offline tests when the lab opt-in
+is unset.
+
+**Important limitations:** This is the first transactional daily
+attendance prototype, not full attendance deployment. No HTTP POST
+can call it, no real school user is authenticated through it, no
+Push is delivered, and period attendance/truancy scoring plus
+behavior warnings/outbox generation are **still blocked** until
+full D1-equivalent concurrency and side effects are ported.
+The release decision stays **NO-GO**.
+
 ## What Batch 2 actually implements
 
 New **private/offline local source exporter**, **dry-run import
