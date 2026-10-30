@@ -37,7 +37,8 @@
     "check:lab-timetable-locks": "node scripts/check-lab-timetable-locks.cjs",
     "check:lab-timetable-locked-inserts": "node scripts/check-lab-timetable-locked-inserts.cjs",
     "check:lab-timetable-locked-updates": "node scripts/check-lab-timetable-locked-updates.cjs",
-    "check:lab-timetable-retries": "node scripts/check-lab-timetable-retries.cjs"
+    "check:lab-timetable-retries": "node scripts/check-lab-timetable-retries.cjs",
+    "check:lab-timetable-http-contract": "node scripts/check-lab-timetable-http-contract.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
