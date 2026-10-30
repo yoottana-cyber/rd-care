@@ -23,7 +23,8 @@
     "check:https-auth-gate": "node scripts/check-https-auth-gate.cjs",
     "check:trigger-preflight": "node scripts/check-trigger-preflight.cjs",
     "check:trigger-draft": "node scripts/check-trigger-draft.cjs",
-    "check:trigger-lab": "node scripts/check-trigger-lab.cjs"
+    "check:trigger-lab": "node scripts/check-trigger-lab.cjs",
+    "verify:trigger-lab-schema": "node scripts/verify-trigger-lab-schema.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
