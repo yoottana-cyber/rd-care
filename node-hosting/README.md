@@ -1216,6 +1216,98 @@ does not create a trigger, open Login or migrate real school data.
 The original Cloudflare D1 and Node staging `ratsadaa_connect`
 are unchanged.
 
+## Stage 7.12: Real coordinated INSERT transactions on a disposable trigger lab
+
+Stage 7.11 passed: per-classroom/day and per-teacher/day
+`GET_LOCK` calls were exclusive, different weekdays did not
+interfere, and all advisory locks were released. The old stage 7.10
+concurrent raw timetable INSERTs failed with lock wait timeouts, NOT
+`TIMETABLE_OVERLAP` business rule errors. **This stage integrates the
+coordination prototype with a real MariaDB INSERT transaction** on the
+isolated `ratsadaa_trgtest`.
+
+### Algorithm to test
+
+The new `src/timetable-locked-insert.cjs` implements a prototype
+`coordinatedInsert` function:
+1. Validate teacher, classroom, weekday, period (1–10), end period
+   (start–10), active and non-empty subject *before* opening a
+   transaction or acquiring locks.
+2. GET_LOCK for both stable names (one teacher/day, one room/day),
+   sorted globally to avoid inconsistent lock order.
+3. BEGIN a new transaction **after** acquiring both locks.
+4. SELECT existing active timetable overlaps in the same weekday,
+   teacher or room, with inclusive period ranges.
+5. If an overlap exists: return a distinct
+   `TIMETABLE_OVERLAP` error after ROLLBACK.
+   Otherwise INSERT a row and COMMIT.
+6. RELEASE_LOCK **only after COMMIT/ROLLBACK**, even after an exception.
+
+The new diagnostic creates **fake** teachers and classrooms and
+temporarily **COMMITs** them so two MariaDB connections can see them.
+It tests BOTH:
+- same room with different teachers: first INSERT (periods 1–2)
+  holds the lock, second session reports BUSY (no SQL write);
+  once first COMMITs and releases, the second session's overlapping
+  period 2–3 is refused as a real business-rule overlap.
+- same teacher with two different classrooms: periods 4–5 and 5–6,
+  with the same expected BUSY-then-OVERLAP sequence.
+- a non-overlapping adjacent lesson (period 3) is committed
+  successfully after the first period 1–2 lesson.
+
+The test thus commits **three synthetic timetable rows** (2 base
+lessons and one adjacent). The cleanup explicitly deletes
+these rows by **fake classroom IDs**, then the two fake classrooms
+and fake teachers by their exact IDs. Finally the script checks
+that **all 63 test tables are empty** and that all five installed
+triggers remain. **It must not run while another process is using
+the lab.** A sudden process interruption can leave synthetic
+fixture rows or lessons. If cleanup fails or is not reported,
+STOP and inspect the isolated lab before retrying, and do NOT
+run mass DELETE queries.
+
+The test **does not** install triggers, modify the staging
+`ratsadaa_connect`, change Cloudflare D1, touch actual teacher or
+student accounts, or open public Login routes. No production route
+uses `coordinatedInsert` yet. **All timetable writers including
+UPDATE, DELETE and bulk operations must follow the same lock
+protocol**; the current step is NOT production-ready.
+
+### DirectAdmin procedure
+
+Download the staging branch and upload **three files** from
+`node-hosting/` to
+`/home/ratsadaa/rd-connect-node-stage/`:
+- `package.json`
+- `src/timetable-locked-insert.cjs`
+- `scripts/check-lab-timetable-locked-inserts.cjs`
+
+Keep existing scripts and `src/timetable-write-coordination.cjs`.
+Confirm prior test reports `63 empty tables`, `5 triggers`,
+and remove old `RD_TRIGGER_LAB_ALLOW_LOCK`,
+`RD_TRIGGER_LAB_ALLOW_RACE`, and `RD_TRIGGER_LAB_ALLOW_DDL`
+from environment variables. Add an explicit one-time test flag:
+
+`RD_TRIGGER_LAB_ALLOW_WRITE=RUN_LAB_TIMETABLE_WRITE_7_12`
+
+Run from DirectAdmin → Setup Node.js App → Run JS Script:
+
+`check:lab-timetable-locked-inserts`
+
+Expected `returncode: 0`, `STEP 7.12 LOCKED INSERT OK`,
+`SAME ROOM + SAME TEACHER`, `ADJACENT PERIOD ALLOWED`,
+`LAB CLEANUP VERIFIED`, `NOT PRODUCTION READY`.
+The result JSON contains two cases with
+`blocked_before_commit: true` and
+`retry_after_commit: "overlap"`, plus
+`committed_test_rows: 3`, `cleanup_verified: true`.
+
+**Immediately remove** `RD_TRIGGER_LAB_ALLOW_WRITE` after
+the diagnostic. If the script fails, do not retry blindly, because
+this step creates temporary *committed* synthetic timetable rows.
+Preserve error category (never share database credentials) and
+inspect the lab before the next test.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
