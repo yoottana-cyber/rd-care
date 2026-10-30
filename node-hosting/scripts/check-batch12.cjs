@@ -11,6 +11,7 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
  log=console.log,warn=console.error}={}){
  const tests=[
   path.join(__dirname,'../test/batch1-school-read.test.cjs'),
+  path.join(__dirname,'../test/batch1-attendance-write.test.cjs'),
   path.join(__dirname,'../test/batch2-manifest.test.cjs'),
   path.join(__dirname,'../test/batch2-reconciliation.test.cjs'),
   path.join(__dirname,'../test/timetable-offline-api-contract.test.cjs')
