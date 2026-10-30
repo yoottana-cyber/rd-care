@@ -25,7 +25,9 @@ This folder is a **fail-closed scaffold** for an isolated school-hosting migrati
 | `scripts/check-auth-transaction.cjs` | Isolated **transactional** test: fake user/hash/session, then ROLLBACK |
 | `src/test-auth-crypto.cjs` | Scrypt helpers for the smoke test; NOT backward-compatible with existing D1 password hashes |
 | `src/d1-password-compat.cjs` | D1 PBKDF2-SHA256 compatibility verifier (legacy 100k and rd2$ 20k) |
+| `src/staging-auth-service.cjs` | Unexposed staff/student/guardian Login, Me and Logout logic; NOT connected to HTTP |
 | `scripts/check-password-compat.cjs` | Offline, synthetic test of original Worker password formats; no DB access |
+| `scripts/check-auth-service.cjs` | Transaction-only real MariaDB test across teacher/student/guardian fake accounts; ROLLBACK |
 | `scripts/inspect-d1-schema.cjs` | Offline schema-only D1 export inventory; refuses files containing INSERT data |
 | `test/migration-preflight.test.cjs` | Tests for safe read-only connectivity and schema inspection |
 
@@ -320,6 +322,47 @@ upgrade valid accounts to a stronger password hashing scheme, e.g. a carefully
 tuned Argon2id/scrypt, without silently reinterpreting existing salts.
 The Node.js HTTP app remains deliberately fail-closed while we port login,
 permission checks and all business-rule triggers.
+
+## Stage 6.4: Staff / student / guardian authentication service (internal test only)
+
+The original D1 endpoints are `POST /api/auth/login` (staff/teacher),
+`POST /api/portal/auth/login` (student + guardian), and corresponding
+`/auth/me` and `/auth/logout` routes. They use a lowercase username,
+`password_salt` + hex PBKDF2 hash, SHA-256 of a random bearer token in
+`sessions` or `portal_sessions`, and optional `remember` for 30 days
+instead of the ordinary 8 hours. The ported internal service follows those
+contracts, with portal roles checked separately. Wrong passwords increment
+lockout state; five failures lock a username for 15 minutes.
+
+**This implementation is deliberately NOT wired to `http-handler.cjs`.**
+All HTTP `/api/auth/*` and `/api/portal/auth/*` paths still return HTTP 501
+`endpoint_not_migrated`; `/api/health` still returns HTTP 503.
+
+Transfer only these three updated/additional files by FTP to
+`/home/ratsadaa/rd-connect-node-stage`:
+- `package.json`
+- `src/staging-auth-service.cjs`
+- `scripts/check-auth-service.cjs`
+
+They depend on `src/d1-password-compat.cjs` and
+`scripts/check-auth-transaction.cjs`, already installed in earlier steps.
+In DirectAdmin → Setup Node.js App → Run JS Script, run **`check:auth-service`**.
+
+Expected output:
+`returncode: 0` plus `STEP 6.4 OK`, `ROLLBACK VERIFIED`,
+and `PUBLIC API DISABLED`. The smoke test **refuses** nonempty
+`users`, `students`, `portal_accounts`, `sessions` and related
+staging tables, wrong database name, or non-InnoDB tables.
+It creates random synthetic staff, classroom, pupil and portal accounts
+inside a transaction, tests correct/wrong password, role mismatches,
+Bearer session login/me/logout and 8-hour vs 30-day expiration, then
+rolls back the entire transaction. **It may advance AUTO_INCREMENT
+counters, but leaves no user/classroom/student/session rows.**
+
+Before switching any real PWA to this app, implement and audit concurrent
+login lockout handling, strong password hash upgrades, all authorization
+boundaries, the 10 missing SQLite business-rule triggers, and a full
+migration dry run on an anonymized dataset.
 
 ## DirectAdmin trial setup
 
