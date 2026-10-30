@@ -856,6 +856,72 @@ Never run the installer on the school's `ratsadaa_connect`,
 never import real records, enable live Node Login, or merge this
 work into `main`.
 
+## Stage 7.7: Two-connection guardian role/link race diagnostic (lab only)
+
+Stages 7.5–7.6 have installed exactly 3 guardian triggers in
+`ratsadaa_trgtest` and verified basic single-transaction behavior.
+Stage 7.7 tests a common stale-snapshot interleaving under MariaDB's
+REPEATABLE READ with **two active database connections**. It deliberately
+does not claim full concurrency correctness from one diagnostic.
+
+**Important:** The test temporarily **COMMITS synthetic teacher, classroom,
+two student and guardian account rows** so both database connections can
+see them; it then runs concurrent *overlapping* transactions, rolls back
+the attempted link, and deletes the synthetic rows by their exact IDs.
+It finally verifies **all 63 lab tables are empty**. Unlike prior
+pure-ROLLBACK tests, a Node/process crash during this step can leave
+synthetic rows in the disposable lab. The preflight refuses to run
+against any database that already contains rows; on failure or
+interruption STOP, inspect the lab and do not retry or run broad DELETEs.
+Never use real school identities.
+
+The scripted scenario:
+1. Read-only preflight checks `ratsadaa_trgtest`, 63 empty InnoDB
+   tables, and exactly the three expected guardian triggers.
+2. Seed five synthetic records (teacher, classroom, two pupils, guardian).
+3. Connection B starts REPEATABLE READ and reads the guardian's old role.
+4. Connection A changes the *unlinked* guardian into a student account
+   linked to the second synthetic pupil and COMMITs.
+5. Connection B tries to INSERT a guardian link for that account using
+   the older snapshot. Record whether the trigger rejects or mistakenly
+   permits it, then always ROLLBACK connection B.
+6. Delete only the synthetic seed by exact IDs, validate the whole
+   lab is empty and the three triggers remain.
+7. Report either `STALE_SNAPSHOT_ALLOWED` (vulnerability found) or
+   `INVALID_LINK_REJECTED_IN_THIS_INTERLEAVING` (one interleaving
+   blocked; **not** a general proof of concurrency safety).
+   
+No DDL, schema migration, live Login, Push, or Cloudflare changes occur.
+
+### Upload + DirectAdmin
+
+Only upload these two files to the existing staged Node root:
+- `node-hosting/package.json` → `package.json`
+- `node-hosting/scripts/check-lab-guardian-race.cjs` →
+  `scripts/check-lab-guardian-race.cjs`
+
+The prior code in `src/lab-guardian-update-guards.cjs`,
+`scripts/check-lab-guardian-updates.cjs` and
+`scripts/check-trigger-lab.cjs` must remain installed.
+
+**Remove** any old `RD_TRIGGER_LAB_ALLOW_DDL` environment setting.
+Add an explicit test-only environment setting:
+`RD_TRIGGER_LAB_ALLOW_RACE=RUN_LAB_GUARDIAN_RACE_7_7`.
+This does NOT expose an HTTP endpoint and enables NO DDL.
+From DirectAdmin → Setup Node.js App → Run JS Script, run
+`check:lab-guardian-race` **once**, while no other application
+is accessing the disposable trigger lab. Delete
+`RD_TRIGGER_LAB_ALLOW_RACE` immediately after completion.
+
+Expected `returncode: 0` and `STEP 7.7 DIAGNOSTIC COMPLETE`,
+one of the two race findings above, and `LAB CLEANUP VERIFIED`.
+Both results leave production approval **blocked**: a detected stale
+snapshot calls for transaction locking fixes, while a blocked
+single interleaving still needs true simultaneous race testing,
+lock timeouts, isolation-level analysis and robust application-layer
+authorizations. If cleanup fails, do not rerun blindly; preserve
+the error and inspect only disposable lab rows.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
