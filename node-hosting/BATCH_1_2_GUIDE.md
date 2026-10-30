@@ -366,6 +366,66 @@ record-level migration parity. Actual delivery can be marked
 successfully ONLY after a verified Web Push response and commit
 on an authorized, fully integrated production writer.
 
+## Batch 1 continuation — Mock provider receipts (NO NETWORK)
+
+The last `check:lab-push-queue` was confirmed on the isolated
+MariaDB laboratory: four synthetic recipient deliveries, deduplicated
+attempts, revoked links and disabled categories blocked, and a new
+generation queued separately; both transactions rolled back and
+all 63 lab tables plus five triggers remained unchanged.
+
+The next component is **the result of a Push send**, not a real
+Push sender. It deliberately uses only synthetic cases:
+
+- `src/lab-push-provider-receipt.cjs` classifies Web Push HTTP
+  responses. 201/202 mean **accepted by the Push provider**, not
+  displayed or read on the mobile device. HTTP 404/410 means the
+  subscription is expired (cleanup is still required by the future
+  sender). HTTP 429/5xx is retryable, subject to the existing
+  attempt counter and 2-minute cooldown. Other non-accepted
+  responses are terminal in this fail-closed contract.
+- An unknown response due to timeout/network failure is **NOT**
+  falsely marked successful; it remains `sending`, and a later
+  claim may retry. End-to-end exactly-once delivery **cannot be
+  guaranteed** when the provider response is lost.
+- Any SQL delivery result may change only if the matching
+  `event_id + generation + subscription_id` row is still
+  `sending` at the same **attempt number**. A late response
+  from an earlier attempt cannot overwrite a newer claim.
+- `test/batch1-lab-push-receipt.test.cjs` covers eight synthetic
+  cases (accepted, expired, throttle/server failure, network
+  unknown, stale response, three audiences, and lab-only guards).
+  This test is also included in `check:batch12`.
+- `scripts/check-push-receipts-offline.cjs` exposes a
+  no-database/no-network standalone DirectAdmin check.
+
+### DirectAdmin: one command, no temporary flag
+
+Upload the latest experimental ZIP's `node-hosting/` contents
+into the **existing isolated Node test application**, without
+overwriting DirectAdmin secret settings or the live Cloudflare site.
+
+Ensure the previous `RD_TRIGGER_LAB_ALLOW_PUSH_QUEUE`
+permission has been **removed**. No other flag is needed.
+
+DirectAdmin → Setup Node.js App → Run JS Script:
+
+```text
+check:push-receipts-offline
+```
+
+Expected **returncode 0** with:
+`PUSH RECEIPTS OFFLINE OK`,
+`PROVIDER ACCEPTANCE OK`, `FAILURE HANDLING OK`,
+`STALE CLAIMS BLOCKED`, `PUBLIC API CLOSED`,
+`NO DB OR NETWORK`, `NOT PRODUCTION READY`.
+
+This does **not** claim that an external Push was sent or a device
+received anything. Production work still needs a sender library,
+VAPID configuration, an authorized background worker/cron, safe
+subscription cleanup, per-attempt durable receipts, and concurrency
+stress tests. The public API still returns 501.
+
 ## What Batch 2 actually implements
 
 New **private/offline local source exporter**, **dry-run import
