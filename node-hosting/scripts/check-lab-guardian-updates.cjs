@@ -45,6 +45,10 @@ async function check(conn){
    'INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,1,?,1)',
    [unique('labp'),room.insertId,'Synthetic Pupil']
   );
+  const [pupil2]=await conn.execute(
+   'INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,?,2,?,1)',
+   [unique('labp'),room.insertId,'Synthetic Pupil Two']
+  );
   const [student]=await conn.execute(
    "INSERT INTO portal_accounts(username,display_name,role,student_id,password_salt,password_hash,active,created_by) VALUES(?,?,'student',?,?,?,1,?)",
    [unique('labs'),'Synthetic Student Account',pupil.insertId,'fake-salt','fake-hash',teacher.insertId]
@@ -70,8 +74,8 @@ async function check(conn){
    [student.insertId,guardianA.insertId,pupil.insertId],'update_link_to_student_role');
   // Bypass #2: change guardian A into student after a valid link exists.
   await expectGuard(conn,
-   'UPDATE portal_accounts SET role=? WHERE id=?',
-   ['student',guardianA.insertId],'update_linked_guardian_role');
+   'UPDATE portal_accounts SET role=?, student_id=? WHERE id=?',
+   ['student',pupil2.insertId,guardianA.insertId],'update_linked_guardian_role');
   const [stillGuardian]=await conn.execute(
    'SELECT role FROM portal_accounts WHERE id=?',[guardianA.insertId]
   );
@@ -90,16 +94,16 @@ async function check(conn){
   );
   ensure(validLink.length===1,'valid_guardian_reassignment');
   await expectGuard(conn,
-   'UPDATE portal_accounts SET role=? WHERE id=?',
-   ['student',guardianB.insertId],'reassigned_guardian_role_locked');
+   'UPDATE portal_accounts SET role=?, student_id=? WHERE id=?',
+   ['student',pupil2.insertId,guardianB.insertId],'reassigned_guardian_role_locked');
   const [oldLink]=await conn.execute(
    'SELECT 1 AS present FROM guardian_student_links WHERE guardian_account_id=?',
    [guardianA.insertId]
   );
   ensure(oldLink.length===0,'old_link_removed');
   // Unlinked guardian A should not be permanently blocked from role changes.
-  await conn.execute('UPDATE portal_accounts SET role=? WHERE id=?',
-   ['student',guardianA.insertId]);
+  await conn.execute('UPDATE portal_accounts SET role=?, student_id=? WHERE id=?',
+   ['student',pupil2.insertId,guardianA.insertId]);
   const [changed]=await conn.execute('SELECT role FROM portal_accounts WHERE id=?',
    [guardianA.insertId]);
   ensure(changed.length===1&&changed[0].role==='student','unlinked_role_change_allowed');
