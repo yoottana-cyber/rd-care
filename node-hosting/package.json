@@ -16,7 +16,8 @@
     "verify:schema": "node scripts/verify-schema.cjs",
     "check:auth-txn": "node scripts/check-auth-transaction.cjs",
     "check:password-compat": "node scripts/check-password-compat.cjs",
-    "check:auth-service": "node scripts/check-auth-service.cjs"
+    "check:auth-service": "node scripts/check-auth-service.cjs",
+    "check:auth-http": "node scripts/check-auth-http.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
