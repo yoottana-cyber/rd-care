@@ -126,7 +126,7 @@ async function run({env=process.env,driver,
  if(!ok){
   const reason=String(error?.message||'');
   warn('PUSH DISPATCH LAB FAILED ('+
-   (/^lab_dispatch_[a-z_]+$/.test(reason)?reason:category(error))+').');
+   (/^lab_(?:dispatch|push)_[a-z_]+$/.test(reason)?reason:category(error))+').');
   warn('NO COMMIT executed; confirm lab emptiness before any retry if rollback uncertain.');
   return 1;
  }
