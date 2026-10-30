@@ -48,7 +48,8 @@
     "check:push-offline": "node scripts/check-push-offline.cjs",
     "check:lab-push-queue": "node scripts/check-lab-push-queue-rollback.cjs",
     "check:push-receipts-offline": "node scripts/check-push-receipts-offline.cjs",
-    "check:lab-push-dispatch": "node scripts/check-lab-push-dispatch-rollback.cjs"
+    "check:lab-push-dispatch": "node scripts/check-lab-push-dispatch-rollback.cjs",
+    "check:all-staging": "node scripts/check-all-staging.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
