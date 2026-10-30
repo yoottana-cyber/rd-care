@@ -48,12 +48,9 @@ function assertExpectedTrigger(t){
 }
 async function checkTriggerSet(conn,expectedCount){
  if(![1,2,3].includes(expectedCount))throw Error('lab_expected_trigger_count_invalid');
- await labTriggerMetadata(conn,1).catch(err=>{
-  // The older helper can only validate 0/1; when checking 2/3, our full
-  // check below validates all trigger identities instead.
-  if(expectedCount===1)throw err;
-  if(err?.message!=='lab_unexpected_trigger_count')throw err;
- });
+ // Old 7.5 helper verifies the original trigger precisely while it is
+ // still the only installed trigger; this helper validates the full set.
+ if(expectedCount===1)await labTriggerMetadata(conn,1);
  const [[current]]=await conn.execute('SELECT DATABASE() AS db');
  if(current?.db!==LAB_DATABASE)throw Error('lab_database_mismatch');
  const [rows]=await conn.execute(
