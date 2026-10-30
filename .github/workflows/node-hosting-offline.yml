@@ -1,0 +1,45 @@
+name: Node Hosting Staging Offline Contracts
+
+on:
+  push:
+    branches:
+      - plan/node24-mariadb-directadmin
+    paths:
+      - 'node-hosting/**'
+      - '.github/workflows/node-hosting-offline.yml'
+  pull_request:
+    paths:
+      - 'node-hosting/**'
+      - '.github/workflows/node-hosting-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-offline:
+    name: Node.js 24 offline contracts only
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: node-hosting
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install staging dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Offline unit contract and migration-plan NO_GO
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-batch12.cjs
+          code=$?
+          set -e
+          if [ "$code" -ne 2 ]; then
+            echo "::error::Node offline tests failed, or migration planning did not remain NO_GO (status $code)."
+            exit 1
+          fi
+          echo 'Node offline contracts passed. D1 data migration still PENDING. Production NO_GO.'
