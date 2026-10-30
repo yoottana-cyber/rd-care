@@ -36,6 +36,13 @@ test('unported endpoints fail closed; health is explicitly not ready',()=>{
   assert.equal(r.body.error,'endpoint_not_migrated');
   assert.equal(r.body.ok,false);
  }
+ assert.deepEqual(response('GET','/web/rd-connect-node-test/api/health').body,ready.body);
+ assert.equal(response('GET','/web/rd-connect-node-test/api/health?check=1').code,503);
+ assert.equal(response('POST','/web/rd-connect-node-test/api/auth/login').code,501);
+ assert.equal(response('POST','/web/rd-connect-node-test/api/health').code,405);
+ assert.equal(response('GET','/a/web/rd-connect-node-test/api/health').code,404);
+ assert.equal(response('GET','/web/rd-connect-node-testing/api/health').code,404);
+ assert.equal(response('GET','/web/rd-connect-node-test/').code,404);
  assert.equal(response('GET','/admin').code,404);
  assert.equal(response('POST','/api/health').code,405);
 });
