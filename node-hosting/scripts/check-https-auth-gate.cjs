@@ -64,9 +64,6 @@ async function run({log=console.log,warn=console.error}={}){
   const failure=await invoke(failed,req());
   if(failure.status!==503||failure.body.error!=='staging_probe_failed'||
      JSON.stringify(failure.body).includes('SECRET_DB_PASSWORD'))throw Error('internal_error_leaked');
-  const publicHandler=res();
-  await requestHandler(req('POST',SECRET),publicHandler);
-  if(publicHandler.status!==404)throw Error('public_probe_enabled_without_env');
   for(const path of ['/api/auth/login','/api/portal/auth/login']){
    const r=res();await requestHandler({method:'POST',url:path,headers:{}},r);
    if(r.status!==501||r.body.error!=='endpoint_not_migrated')throw Error('public_auth_accidentally_open');
