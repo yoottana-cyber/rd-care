@@ -147,6 +147,77 @@ behavior warnings/outbox generation are **still blocked** until
 full D1-equivalent concurrency and side effects are ported.
 The release decision stays **NO-GO**.
 
+## Batch 1 continuation — Period attendance, truancy score lifecycle and outbox (rollback-only)
+
+Stage daily-transaction `check:lab-daily-attendance` was confirmed on
+the separate MariaDB lab: synthetic two-student daily attendance,
+pending-only review cancellation, delivered event preserved, two
+ROLLBACKs, all 63 tables empty and the same five triggers.
+
+The next consolidated update adds:
+- `src/lab-period-attendance-transaction.cjs`: MariaDB SQL for an
+  **unexposed, disposable LAB ONLY** period check-in transaction.
+  Validates the timetable owner, active lesson, date/weekday and
+  exact historical enrollment roster. It stores 'truancy' in
+  `attendance_period` as 'absent' with a separate
+  `period_truancy` classification, preserves one
+  `truancy_events` record, and uses the exact configured
+  `truancy_score_policy` / `affairs_behavior_rules` negative
+  points (never assumes -10).
+- Linked misconduct score behavior: first truancy creates one
+  `behavior_records` plus `truancy_behavior_links`;
+  re-submitting the same truancy does not create a second score;
+  correction soft-deletes the original score; reclassification
+  restores that **same ID**, not a duplicate. **Good deed points
+  are not offset or modified.**
+- Ordinary period absence queues an advisor review only where
+  the student's daily attendance does not already show 'absent'.
+  Cancel only PENDING notifications when status is corrected.
+  Keep DELIVERED audit history unchanged. Teaching notes and
+  attendance audit records are part of the same transaction.
+- `scripts/check-lab-period-truancy-rollback.cjs`: exercise a
+  **synthetic configurable -7 policy** and two students through
+  truancy, resubmission, correction, restoration, ordinary absence,
+  pending review, delivered-vs-pending cancellation, and note
+  clearing. Repeat with an injected error. Both cases **always
+  ROLLBACK and check every table is empty**. No COMMIT or Push
+  delivery occurs. Exactly five previously verified lab triggers
+  must remain unchanged.
+- `test/batch1-lab-period.test.cjs` is also included in
+  `check:batch12` offline tests.
+
+### One DirectAdmin integration test (no actual school data)
+
+After downloading the latest experimental ZIP, upload the complete
+contents of `node-hosting/` to the existing isolated DirectAdmin
+`/home/ratsadaa/rd-connect-node-stage/` application. Do not
+change `RD_DB_*` staging settings.
+
+1. Confirm `RD_TRIGGER_LAB_ALLOW_ATTENDANCE` and older
+   `RD_TRIGGER_LAB_ALLOW_*` test opt-ins are REMOVED.
+2. In DirectAdmin → Setup Node.js App → Environment Variables
+   temporarily add:
+   `RD_TRIGGER_LAB_ALLOW_PERIOD=RUN_LAB_PERIOD_TRUANCY_ROLLBACK_B1`
+3. Via Run JS Script run: `check:lab-period-truancy`.
+4. Expected **returncode 0**, lines:
+   `BATCH 1 LAB PERIOD OK`, `SCORE LIFECYCLE OK`,
+   `OUTBOX OK`, `ROLLBACK VERIFIED`, and `LAB UNCHANGED`.
+   No data should be committed and all 63 tables must remain
+   empty with five original triggers.
+5. Immediately REMOVE `RD_TRIGGER_LAB_ALLOW_PERIOD`.
+   If error or `LAB UNCHANGED` is missing, **do not blindly
+   retry**; inspect the lab emptiness/transaction state.
+
+This check is NOT proof of concurrency-safe production operation.
+Only the five guardian/timetable triggers exist in this lab;
+the full D1 behavior trigger suite is NOT installed there.
+This isolated writer implements its own linked scoring behavior
+for synthetic exercises. Its SQL must still be validated against
+the actual MariaDB schema and compared with the original Worker
+semantics before enabling production. No public auth/login,
+student/parent endpoints, period writes, QR, behavior writes or
+Web Push are enabled by this update. **GO-LIVE remains NO-GO.**
+
 ## What Batch 2 actually implements
 
 New **private/offline local source exporter**, **dry-run import
