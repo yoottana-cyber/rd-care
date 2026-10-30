@@ -73,8 +73,8 @@ async function makeFixture(conn,date){
   'INSERT INTO period_truancy(student_id,timetable_id,school_date,recorded_by) VALUES(?,?,?,?)',
   [f.students[0],f.lessonId,date,f.actor.id]);
  await conn.execute(
-  "INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category) VALUES(?,-7,'Synthetic Conduct',?,?,'moderate')",
-  [f.students[0],f.actor.id,f.ruleId]);
+  "INSERT INTO behavior_records(student_id,points,reason,recorded_by,affairs_rule_id,affairs_category,created_at) VALUES(?,-7,'Synthetic Conduct',?,?,'moderate',?)",
+  [f.students[0],f.actor.id,f.ruleId,date+' 12:00:00']);
  return {...f,teacher,staff,pupil,guardian,
   staffId:Number(staffRow.insertId),
   pupilAccountId:Number(pupilRow.insertId),
@@ -139,7 +139,8 @@ async function fullCycle(conn,date){
    'guardian_attendance_history');
   res=await expect(conn,'GET','/api/portal/behavior?student_id='+f.students[0]+
    '&from='+date+'&to='+date,{token:guardianToken},200);
-  need(Array.isArray(res.items),'guardian_behavior_data');
+  need(res.items?.length===1&&Number(res.items[0].points)===-7,
+   'guardian_behavior_data');
   await expect(conn,'GET','/api/auth/me',{token:guardianToken},401);
   await expect(conn,'POST','/api/portal/auth/logout',
    {token:guardianToken},200);
