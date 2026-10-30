@@ -122,8 +122,8 @@ function reportSafeStepFailure(result,step,warn){
  const coarse=['ETIMEDOUT','ENOBUFS','ENOENT','EACCES'].includes(code)?code:'none';
  warn('STAGING STEP RESULT: exit='+status+' error='+coarse+'.');
  if(step?.name!=='OFFLINE_AND_MIGRATION_PLAN')return;
- const allowed=/^BATCH 1\\+2 (?:OFFLINE TESTS FAILED|OFFLINE DIAGNOSTIC|TAP FAILING CASES|FAILED CASE|MISSING TEST FILE|TEST PROCESS TIMED OUT|NO TAP FAILURES RECORDED)/;
- for(const line of String(result?.stderr||'').split(/\\r?\\n/)){
+ const allowed=/^BATCH 1\+2 (?:OFFLINE TESTS FAILED|OFFLINE DIAGNOSTIC|TAP FAILING CASES|FAILED CASE|MISSING TEST FILE|TEST PROCESS TIMED OUT|NO TAP FAILURES RECORDED)/;
+ for(const line of String(result?.stderr||'').split(/\r?\n/)){
   if(allowed.test(line))
    warn(line.slice(0,185).replace(/[a-f0-9]{48,}/ig,'[redacted]'));
  }
