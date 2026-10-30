@@ -26,12 +26,12 @@ function safeOfflineFailure(proc,tests,warn=console.error){
  // Synthetic test titles are fixed in repository code; never print arbitrary
  // error payloads or assertion values from TAP output.
  const raw=String(proc?.stdout||'');
- const failing=raw.split(/\\r?\\n/).filter(line=>/^not ok \\d+ - /.test(line));
+ const failing=raw.split(/\r?\n/).filter(line=>/^not ok \d+ - /.test(line));
  warn('BATCH 1+2 TAP FAILING CASES: '+failing.length+'.');
  for(const line of failing.slice(0,8)){
-  const testName=line.replace(/^not ok \\d+ - /,'').trim().slice(0,140)
+  const testName=line.replace(/^not ok \d+ - /,'').trim().slice(0,140)
    .replace(/[a-f0-9]{48,}/ig,'[redacted]')
-   .replace(/[^a-zA-Z0-9 _.,:;()\\-]/g,'?');
+   .replace(/[^a-zA-Z0-9 _.,:;()\-]/g,'?');
   warn('BATCH 1+2 FAILED CASE: '+testName);
  }
  if(code==='ETIMEDOUT')
