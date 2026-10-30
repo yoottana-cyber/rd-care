@@ -1665,7 +1665,7 @@ The full migration, data protection, test plan, Cron/Push checklist and security
 Rather than running every experimental check separately, upload the
 full `node-hosting/` directory to the isolated DirectAdmin test app,
 remove old `RD_TRIGGER_LAB_ALLOW_*` flags, then choose Run JS Script
-`check:all-staging`. It runs eight groups of offline checks, synthetic
+`check:all-staging`. It runs consolidated offline and internal auth/portal checks, synthetic
 MariaDB rollback-only attendance, truancy and Push labs, and a final
 read-only NO-GO release gate. It never sends real Web Push or imports
 student data. Successful staging verification exits 0 even though
