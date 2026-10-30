@@ -30,6 +30,8 @@ test('lab credentials are separate and exact database name is required',()=>{
   {...safeEnv,RD_TRIGGER_LAB_DB_NAME:'ratsadaa_connect'},
   {...safeEnv,RD_TRIGGER_LAB_DB_NAME:'ratsadaa_trgtest_backup'},
   {...safeEnv,RD_DB_NAME:LAB_DATABASE},
+  {...safeEnv,RD_DB_USER:'synthetic_lab_user'},
+  {...safeEnv,RD_DB_PASSWORD:'synthetic_test_password'},
   {...safeEnv,RD_TRIGGER_LAB_DB_PASSWORD:''}
  ])assert.throws(()=>getLabConfig(bad),/lab_/);
 });
