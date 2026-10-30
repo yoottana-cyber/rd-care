@@ -39,7 +39,9 @@
     "check:lab-timetable-locked-updates": "node scripts/check-lab-timetable-locked-updates.cjs",
     "check:lab-timetable-retries": "node scripts/check-lab-timetable-retries.cjs",
     "check:lab-timetable-http-contract": "node scripts/check-lab-timetable-http-contract.cjs",
-    "check:go-live": "node scripts/check-go-live-readiness.cjs"
+    "check:go-live": "node scripts/check-go-live-readiness.cjs",
+    "check:batch12": "node scripts/check-batch12.cjs",
+    "check:d1-migration-plan": "node scripts/check-d1-migration-plan.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
