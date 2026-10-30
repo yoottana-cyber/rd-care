@@ -669,6 +669,58 @@ separate lab after explicit verification. Only then can MariaDB trigger
 DDL and two-connection concurrency tests begin. MariaDB DDL is not
 rolled back by `ROLLBACK`; work solely in a disposable database.
 
+## Stage 7.4: Import the 63-table SCHEMA ONLY into the isolated trigger lab
+
+Stage 7.3 has verified `ratsadaa_trgtest` is a separate, completely
+empty, InnoDB-capable MariaDB test database using its own credentials.
+This step uses a **schema-only**, corrected MariaDB export, with
+63 `CREATE TABLE` statements and 119 `ALTER TABLE ... ADD CONSTRAINT`
+foreign keys. It has **no INSERT, UPDATE, DELETE, DROP, CREATE TRIGGER,
+CREATE USER, or production database reference to execute**.
+
+The delivered standalone file is
+`RD_CONNECT_7_4_LAB_SCHEMA_ONLY.sql` (63,730 bytes,
+SHA-256 `890f2bcf97eb657503b71e8610eab3e3acf3033517ea68aa886815cdd0843ff0`).
+Its source is the corrected `04_FULL_SCHEMA_CORRECTED.sql` from the
+previous `RD_CONNECT_MariaDB_Warning1901_Fix_2026-10-30.zip`.
+A new leading `USE \`ratsadaa_trgtest\`;` pins the import
+to the disposable lab, regardless of whichever database is highlighted
+in phpMyAdmin. This file was created from the locally supplied original
+corrected schema; it is shared as a **conversation artifact**, not stored
+within this GitHub source branch.
+
+**Procedure:**
+
+1. In phpMyAdmin check that `ratsadaa_trgtest` is selected and
+   contains **zero tables**. Verify `ratsadaa_connect` is not selected
+   for the import. The SQL contains a `USE ratsadaa_trgtest` safeguard.
+2. Use phpMyAdmin → Import → select only
+   `RD_CONNECT_7_4_LAB_SCHEMA_ONLY.sql`.
+   Do NOT import the SQLite D1 file or SQL trigger draft from step 7.2.
+3. If the import reports **any error**, STOP. DDL auto-commits;
+   repeating a partial import is unsafe. Preserve the error and
+   report it before proceeding.
+4. After successful import, upload from `node-hosting/` to the
+   existing DirectAdmin Node app:
+   - `package.json` → `package.json`
+   - `scripts/verify-trigger-lab-schema.cjs` →
+     `scripts/verify-trigger-lab-schema.cjs`
+5. Run DirectAdmin → Setup Node.js App → Run JS Script →
+   `verify:trigger-lab-schema`.
+   Expected `returncode: 0`, 63 tables, 119 FKs, no triggers,
+   no views, end_date varchar(10), two required unique indexes, and
+   **all 63 tables empty**. All checks use SELECT only and the separate
+   `RD_TRIGGER_LAB_DB_*` credentials.
+6. If it fails, keep the lab database isolated and preserve its state
+   for investigation. Never import another schema over the existing
+   school staging database.
+
+The schema clone is meant only to make a safe sandbox for testing
+triggers. Do not import real student or guardian records. No production
+API becomes available because the schema is installed. The public Login
+endpoints remain 501, and `/api/health` remains
+`migration_not_ready`.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
