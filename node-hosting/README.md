@@ -1059,6 +1059,78 @@ change. Period-end validation and concurrent timetable writes remain
 outstanding. If the test fails, share the safe error code from
 DirectAdmin; do not rerun the installer.
 
+## Stage 7.10: Two-connection timetable overlap diagnostic — disposable MariaDB lab ONLY
+
+**Precondition:** Stage 7.9 installation + rollback test returned code 0.
+The test database `ratsadaa_trgtest` contains 63 EMPTY InnoDB
+tables, 119 foreign keys, exactly FIVE previously installed triggers
+(3 guardian, 2 timetable), and no actual staff/student records.
+This stage does NOT create, alter or drop triggers.
+
+**What it tests:** two MariaDB connections each start separate active
+transactions. A INSERTs a synthetic active lesson and does NOT commit;
+B INSERTs a time-overlapping lesson before A finishes. Test cases:
+1. SAME CLASSROOM, DIFFERENT TEACHERS, different start periods but
+   overlapping inclusive period ranges (A 1–2, B 2–3).
+2. SAME TEACHER, DIFFERENT CLASSROOMS, overlapping ranges
+   (A 4–5, B 5–6).
+
+The script tests whether B is rejected by the timetable trigger,
+temporarily accepted due to uncommitted A, or blocked by the DB lock.
+B and A's lesson transactions are **ALWAYS ROLLED BACK** even if
+an overlap is accepted. The test never commits an invalid timetable.
+Results are diagnostic, not production approval.
+
+Unlike the 7.9 rollback-only test, **teacher/classroom fixture records
+are temporarily COMMITTED** so both connections can see FK parents.
+Cleanup DELETEs **only those exact synthetic fixture IDs**, then
+verifies all 63 tables empty and all 5 triggers still installed.
+A process crash or interrupted cleanup can strand synthetic fixtures:
+STOP and inspect the isolated lab before trying again; do not run
+blind retries or broad DELETEs. No real data, public Login, Cloudflare
+D1 or `ratsadaa_connect` should be used.
+
+### Upload two files
+
+From the staged GitHub branch, copy into
+`/home/ratsadaa/rd-connect-node-stage`:
+- `node-hosting/package.json` → `package.json`
+- `node-hosting/scripts/check-lab-timetable-race.cjs`
+  → `scripts/check-lab-timetable-race.cjs`
+
+Leave existing `src/lab-timetable-guards.cjs`,
+`scripts/check-lab-guardian-updates.cjs` and
+`scripts/check-trigger-lab.cjs` intact.
+
+In DirectAdmin → Setup Node.js App → Environment Variables:
+1. Remove any older `RD_TRIGGER_LAB_ALLOW_DDL` variable.
+2. Set `RD_TRIGGER_LAB_ALLOW_RACE=RUN_LAB_TIMETABLE_RACE_7_10`
+   temporarily. This enables a single diagnostic script only;
+   there is **no** database DDL or public HTTP endpoint.
+
+Run `check:lab-timetable-race` **ONCE** from Run JS Script.
+Expect `returncode: 0`, `STEP 7.10 DIAGNOSTIC COMPLETE`,
+`LAB CLEANUP VERIFIED` and `PRODUCTION BLOCKED`.
+Possible outcomes:
+- `OVERLAP_ACCEPTED_WHILE_OTHER_TRANSACTION_OPEN`:
+  a race weakness was observed on the tested case(s), but the test
+  rolled back both lessons.
+- `NO_OVERLAP_ACCEPTED_IN_THESE_CASES`:
+  no overlap was accepted in these interleavings. This does **not**
+  establish general concurrency safety.
+
+The `LAB STATUS` lists `same_room` and `same_teacher` scenarios
+and each second-insert result: `OVERLAP_ACCEPTED`,
+`TRIGGER_REJECTED`, `LOCK_WAIT_TIMEOUT` or `DEADLOCK`.
+InnoDB session lock wait is bounded to 4 seconds; deadlock/timeout
+are reported as diagnostics, not as confirmed business-rule rejections.
+
+**Remove `RD_TRIGGER_LAB_ALLOW_RACE` immediately after the test**.
+Never rerun if a test fails or if `LAB CLEANUP VERIFIED` is absent.
+Next work: design concurrency-safe timetable write coordination and
+period-range validation. Do not copy these race-prone triggers directly
+into school `ratsadaa_connect`.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
