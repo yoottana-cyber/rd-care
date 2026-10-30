@@ -14,10 +14,11 @@ const env={
 function reply(step,code=step.expected){
  return {status:code,signal:null,stdout:step.markers.join('\n'),stderr:''};
 }
-test('one DirectAdmin command groups 8 isolated checks without exposing a real route',()=>{
- assert.equal(STEPS.length,8);
+test('one DirectAdmin command groups 9 isolated checks without exposing a real route',()=>{
+ assert.equal(STEPS.length,9);
  assert.deepEqual(STEPS.map(s=>s.name),[
-  'OFFLINE_AND_MIGRATION_PLAN','PUSH_RECIPIENTS_OFFLINE',
+  'OFFLINE_AND_MIGRATION_PLAN','AUTH_HTTP_MARIADB_ROLLBACK',
+  'PUSH_RECIPIENTS_OFFLINE',
   'PUSH_RECEIPTS_OFFLINE','DAILY_ATTENDANCE_ROLLBACK',
   'PERIOD_TRUANCY_ROLLBACK','PUSH_QUEUE_ROLLBACK',
   'PUSH_MOCK_DISPATCH_ROLLBACK','RELEASE_NO_GO_GUARD'
@@ -63,7 +64,7 @@ test('single run executes all steps, prints concise result and keeps lab opt-ins
    return reply(step);
   },log:m=>messages.push(m),warn:m=>errors.push(m)});
  assert.equal(result,0);
- assert.equal(calls.length,8);
+ assert.equal(calls.length,9);
  assert.equal(errors.length,0);
  assert.ok(messages.some(x=>x.includes('STAGING COMBINED TESTS PASS')));
  assert.ok(messages.some(x=>x.includes('RELEASE STILL NO_GO')));
@@ -74,10 +75,10 @@ test('stops at first failing lab, does not continue to next action',()=>{
  let calls=0;const errors=[];
  const result=run({env,execute:()=>{
   const step=STEPS[calls++];
-  return calls===5?{status:1,stdout:'lab error'}:reply(step);
+  return calls===6?{status:1,stdout:'lab error'}:reply(step);
  },log:()=>{},warn:x=>errors.push(x)});
  assert.equal(result,1);
- assert.equal(calls,5);
+ assert.equal(calls,6);
  assert.match(errors[0],/PERIOD_TRUANCY_ROLLBACK/);
  assert.ok(errors.some(x=>x.includes('do NOT assume lab was unchanged')));
 });
@@ -85,10 +86,10 @@ test('missing rollback marker is a failure even with status 0',()=>{
  let calls=0;
  const result=run({env,execute:()=>{
   const step=STEPS[calls++];
-  return calls===4?{status:0,stdout:'BATCH 1 LAB DAILY OK'}:reply(step);
+  return calls===5?{status:0,stdout:'BATCH 1 LAB DAILY OK'}:reply(step);
  },log:()=>{},warn:()=>{}});
  assert.equal(result,1);
- assert.equal(calls,4);
+ assert.equal(calls,5);
 });
 test('preflight failure causes zero subprocesses; no SQL or external network',()=>{
  let invoked=0;const errors=[];
