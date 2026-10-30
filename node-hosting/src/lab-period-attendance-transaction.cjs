@@ -128,6 +128,7 @@ async function applyPeriodInOpenTransaction(conn,body,{
    await conn.execute(TRUANCY_UPSERT,[...key,plan.actor_id]);
    await conn.execute(EVENT_UPSERT,[...key,plan.actor_id]);
    const [[linked]]=await conn.execute(LINK,key);
+   let scoreId=linked?.behavior_record_id??null;
    if(linked){
     await conn.execute(RESTORE_SCORE,[plan.actor_id,linked.behavior_record_id]);
    }else{
@@ -136,11 +137,12 @@ async function applyPeriodInOpenTransaction(conn,body,{
      Number(rule.id),rule.category]);
     need(Number(saved?.insertId)>0,'score_record_insert_failed');
     await conn.execute(LINK_SCORE,[...key,saved.insertId]);
+    scoreId=saved.insertId;
     scored++;
    }
    if(!previousTruancy)
     await conn.execute(SCORE_AUDIT,[plan.actor_id,'truancy_auto_score_applied',
-     String(linked?.behavior_record_id||0)]);
+     String(scoreId)]);
    await conn.execute(RESOLVE_ALERT,key);
    await conn.execute(CANCEL_OUTBOX,key);
   }else{
