@@ -43,7 +43,8 @@
     "check:batch12": "node scripts/check-batch12.cjs",
     "check:d1-migration-plan": "node scripts/check-d1-migration-plan.cjs",
     "check:d1-reconciliation": "node scripts/check-d1-reconciliation.cjs",
-    "check:lab-daily-attendance": "node scripts/check-lab-daily-attendance-rollback.cjs"
+    "check:lab-daily-attendance": "node scripts/check-lab-daily-attendance-rollback.cjs",
+    "check:lab-period-truancy": "node scripts/check-lab-period-truancy-rollback.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
