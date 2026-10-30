@@ -28,6 +28,7 @@ This folder is a **fail-closed scaffold** for an isolated school-hosting migrati
 | `src/staging-auth-service.cjs` | Unexposed staff/student/guardian Login, Me and Logout logic; NOT connected to HTTP |
 | `src/staging-auth-http.cjs` | Unexposed HTTP JSON adapter for six Login/Me/Logout routes; no public listener |
 | `scripts/check-auth-http.cjs` | Offline in-process HTTP contract test; no DB, no network socket |
+| `scripts/check-auth-http-db.cjs` | Isolated in-process HTTP → auth service → MariaDB integration test; rolls back all rows |
 | `scripts/check-password-compat.cjs` | Offline, synthetic test of original Worker password formats; no DB access |
 | `scripts/check-auth-service.cjs` | Transaction-only real MariaDB test across teacher/student/guardian fake accounts; ROLLBACK |
 | `scripts/inspect-d1-schema.cjs` | Offline schema-only D1 export inventory; refuses files containing INSERT data |
@@ -397,6 +398,44 @@ checks, add a network-safe test-account isolation boundary, decide and
 test password-hash upgrades, review brute-force concurrency and session
 management, plus access controls and the ten missing business-rule triggers.
 Do not change the existing school's Cloudflare Worker/D1/PWA.
+
+## Stage 6.6: End-to-end in-process HTTP adapter + actual staging MariaDB
+
+After the separate tests in stages 6.4 (database auth service) and 6.5
+(HTTP request contract), run the combined **`check:auth-http-db`**.
+It passes synthetic HTTP requests through the **unexposed** HTTP adapter,
+the auth service, and the real MariaDB `ratsadaa_connect` connection.
+
+Preflight refuses wrong DB name, nonempty authentication / roster tables
+and non-InnoDB tables. It creates random fake teacher, classroom, student
+and guardian records inside one transaction. It checks wrong passwords,
+role mismatches, Login/Me/Logout, token revocation, and 8-hour vs 30-day
+session durations. The whole transaction is rolled back; it verifies
+no synthetic accounts, sessions, login attempts or roster rows remain.
+AUTO_INCREMENT counters may advance even after ROLLBACK. No real student
+information is imported and no actual public login endpoint is enabled.
+
+Upload two updated/new files into `/home/ratsadaa/rd-connect-node-stage/`:
+- `package.json`
+- `scripts/check-auth-http-db.cjs`
+
+Dependencies `scripts/check-auth-http.cjs`,
+`scripts/check-auth-service.cjs`,
+`src/staging-auth-http.cjs`,
+`src/staging-auth-service.cjs`,
+`src/d1-password-compat.cjs` must already be present from the previous stages.
+
+In **DirectAdmin → Setup Node.js App → Run JS Script**, run
+`check:auth-http-db`. Expect `returncode: 0`, `STEP 6.6 OK`,
+`ROLLBACK VERIFIED`, and `HTTPS LOGIN NOT ENABLED`.
+
+The public Passenger `app.js` and `src/http-handler.cjs` stay unchanged:
+`/api/auth/login` and `/api/portal/auth/login` continue returning
+HTTP 501 `endpoint_not_migrated`. An HTTP adapter being tested in process
+is **not** permission to expose it to the internet. Production auth still
+needs concurrency-safe rate limiting, password-hash upgrades, hardened
+session expiry/refresh, thorough authorization tests, recovery, monitoring,
+and business-rule trigger parity.
 
 ## DirectAdmin trial setup
 
