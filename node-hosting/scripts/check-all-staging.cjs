@@ -114,6 +114,21 @@ function accepted(result,step){
  const output=String(result.stdout||'');
  return step.markers.every(marker=>output.includes(marker));
 }
+// Echo only fixed, redacted diagnostic lines from the offline runner.
+// Never print untrusted child stderr/stdout, stack traces or DB credentials.
+function reportSafeStepFailure(result,step,warn){
+ const status=Number.isInteger(result?.status)?result.status:'unknown';
+ const code=String(result?.error?.code||'');
+ const coarse=['ETIMEDOUT','ENOBUFS','ENOENT','EACCES'].includes(code)?code:'none';
+ warn('STAGING STEP RESULT: exit='+status+' error='+coarse+'.');
+ if(step?.name!=='OFFLINE_AND_MIGRATION_PLAN')return;
+ const allowed=/^BATCH 1\\+2 (?:OFFLINE TESTS FAILED|OFFLINE DIAGNOSTIC|TAP FAILING CASES|FAILED CASE|MISSING TEST FILE|TEST PROCESS TIMED OUT|NO TAP FAILURES RECORDED)/;
+ for(const line of String(result?.stderr||'').split(/\\r?\\n/)){
+  if(allowed.test(line))
+   warn(line.slice(0,185).replace(/[a-f0-9]{48,}/ig,'[redacted]'));
+ }
+}
+
 function category(error){
  const message=String(error?.message||'');
  if(/^suite_[a-z_]+$/.test(message))return message;
@@ -143,6 +158,7 @@ function run({env=process.env,execute=spawnSync,
   }catch{result={status:null,error:Error('spawn_failed')}}
   if(!accepted(result,step)){
    warn('STAGING SUITE STOPPED AT '+(i+1)+'/'+STEPS.length+': '+step.name+'.');
+   reportSafeStepFailure(result,step,warn);
    warn('Expected isolated test result not confirmed; do NOT assume lab was unchanged.');
    warn('Inspect the lab and the original individual command before retrying.');
    return 1;
@@ -158,4 +174,4 @@ function run({env=process.env,execute=spawnSync,
  return 0;
 }
 if(require.main===module)process.exitCode=run();
-module.exports={STEPS,preflight,childEnv,accepted,category,run};
+module.exports={STEPS,preflight,childEnv,accepted,reportSafeStepFailure,category,run};
