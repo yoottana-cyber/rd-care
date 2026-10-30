@@ -3,16 +3,16 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {request,run}=require('../scripts/check-lab-auth-read-journey.cjs');
 const {requestHandler}=require('../src/http-handler.cjs');
-const {AUTH_PATHS,READ_PATHS,normalize}
- =require('../src/staging-school-internal-router.cjs');
+const {AUTH_PATHS,SCHOOL_PATHS,parsePath}
+ =require('../src/staging-integrated-http.cjs');
 test('internal routes include 6 exact auth and 8 scoped read views, never write endpoints',()=>{
  assert.equal(AUTH_PATHS.size,6);
- assert.equal(READ_PATHS.size,8);
+ assert.equal(SCHOOL_PATHS.size,8);
  assert.ok(AUTH_PATHS.has('/api/auth/login'));
  assert.ok(AUTH_PATHS.has('/api/portal/auth/me'));
- assert.ok(READ_PATHS.has('/api/attendance'));
- assert.ok(READ_PATHS.has('/api/portal/behavior'));
- assert.ok(!READ_PATHS.has('/api/attendance/commit'));
+ assert.ok(SCHOOL_PATHS.has('/api/attendance'));
+ assert.ok(SCHOOL_PATHS.has('/api/portal/behavior'));
+ assert.ok(!SCHOOL_PATHS.has('/api/attendance/commit'));
 });
 test('Internal router rejects unknown routing, disallowed method and absent tokens',async()=>{
  const conn={};
@@ -24,11 +24,11 @@ test('Internal router rejects unknown routing, disallowed method and absent toke
  assert.equal(c.status,401);
 });
 test('internal routing accepts the exact staging prefix, but not fake suffixes',()=>{
- assert.equal(normalize({url:'/web/rd-connect-node-test/api/classrooms'}),
+ assert.equal(parsePath('/web/rd-connect-node-test/api/classrooms'),
   '/api/classrooms');
- assert.equal(normalize({url:'/some/other/api/classrooms'}),
+ assert.equal(parsePath('/some/other/api/classrooms'),
   '/some/other/api/classrooms');
- assert.throws(()=>normalize({url:'http://user:password@localhost/api/classrooms'}),
+ assert.throws(()=>parsePath('http://user:password@localhost/api/classrooms'),
   /invalid_url/);
 });
 test('public Passenger returns 501 for private auth, guardian and student views',()=>{
