@@ -1501,6 +1501,91 @@ idempotency and bulk changes, authorization, and user-facing HTTP
 responses. The original RD CONNECT Cloudflare D1 and
 `ratsadaa_connect` remain unchanged.
 
+## Stage 7.15 — OFFLINE timetable authorization and HTTP error contracts
+
+Stage 7.14 passed on the isolated MariaDB `ratsadaa_trgtest`:
+one busy lock was retried and succeeded on the second pool checkout,
+permanently busy lock stopped at three attempts, `TIMETABLE_OVERLAP`
+was not retried, all named locks were released, **63 tables stayed
+empty** and **5 original lab triggers stayed installed**.
+
+This stage is deliberately **offline-only**: no SQL connection,
+HTTP listener, public endpoints, schema changes, fake fixture rows
+or new environment flags. All existing public API requests, including
+`/api/timetable`, must continue responding
+`501 endpoint_not_migrated` through `src/http-handler.cjs`.
+
+Added `src/timetable-offline-api-contract.cjs`:
+- A future API must supply **trusted server-authenticated** staff
+  identity; never trust role or teacher ID from HTTP request body,
+  query, cookie, or arbitrary headers. This module does **not**
+  authenticate sessions itself.
+- Only an ACTIVE `teacher` role in staff area may INSERT a timetable
+  for their own ID, and only edit/delete an existing timetable row
+  with matching `teacher_user_id` verified through a DB read.
+  Default-deny admin and generic staff *write* permissions until an
+  explicit authorization policy has been designed and approved.
+  A subject teacher also assigned to student affairs can use their
+  standard authenticated teacher account; student and guardian
+  portal users cannot write timetables.
+- The client must not override `teacher_user_id`. Full timetable
+  period/weekday/subject validation is completed before mutation.
+- Public-safe response mapping (no SQL/password/token/internal errors,
+  no CORS, `Cache-Control: no-store`):
+  - 400 invalid request; 401 unauthenticated; 403 forbidden;
+    404 missing timetable; 405 unsupported method;
+  - 409 actual `TIMETABLE_OVERLAP` or stale-row conflict;
+  - 503 transient busy/lock/deadlock or exhausted retries with
+    `Retry-After: 1`;
+  - 503 generic `service_unavailable` for unknown database errors
+    and uncertain connection state;
+  - 201 INSERT success, 200 UPDATE success, 204 DELETE success.
+- These mapping functions are internal prototypes. They are **not**
+  HTTP route handlers and are not wired into `app.js` or public
+  `src/http-handler.cjs`. A future endpoint needs existing
+  authentication/session lookup, authorization, body parsing and
+  size limits, DB owner read, authorization on every operation,
+  safe pooled connection lifecycle, CSRF/origin assessment for
+  selected authentication transport, and tests.
+
+### Upload and execute — NO environment flag required
+
+Download the latest experimental branch. Upload exactly **three**
+files from `node-hosting/` to
+`/home/ratsadaa/rd-connect-node-stage/`:
+
+- `package.json` → `package.json`
+- `src/timetable-offline-api-contract.cjs` →
+  `src/timetable-offline-api-contract.cjs`
+- `scripts/check-lab-timetable-http-contract.cjs` →
+  `scripts/check-lab-timetable-http-contract.cjs`
+
+Keep the previous auth and timetable modules installed. Confirm
+`RD_TRIGGER_LAB_ALLOW_RETRY` and previous write/DDL/lock/race opt-in
+flags are removed. **Do not change any DB credentials or add an
+environment flag for stage 7.15**.
+
+In DirectAdmin → Setup Node.js App → Run JS Script, run
+`check:lab-timetable-http-contract`. It checks synthetic trusted
+teacher identities, authorization denials, safe response mappings
+and calls the existing in-process public handler to ensure that
+timetable routes still report `501 endpoint_not_migrated`.
+It does NOT send requests over the network or connect to MariaDB.
+
+Expected `returncode:0` with:
+- `STEP 7.15 OFFLINE API CONTRACT OK`
+- `AUTHORIZATION: 12 negative cases denied`
+- `HTTP RESPONSES: 400/401/403/404/409/503`
+- `PUBLIC API CLOSED`
+- `NO DB ACCESS`
+
+If it fails, do not enable public APIs to make tests pass;
+report its safe error category, inspect uploaded file versions
+and the unchanged `http-handler.cjs`. Nothing in this stage
+authorizes copying these prototypes into `ratsadaa_connect`,
+enabling authentication on the public Node site, importing real
+students or merging the experimental branch into `main`.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
