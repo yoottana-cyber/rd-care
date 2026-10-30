@@ -26,6 +26,18 @@ function requestHandler(req,res){
  try{path=normalizeAppPath(new URL(req.url||'/', 'http://local.invalid').pathname)}
  catch{return reply(res,400,{ok:false,error:'invalid_path'})}
  // Never mirror untrusted Origin, session keys or request data.
+ // Static, unprivileged transport probe for school staging only.
+ // A 200 proves Passenger/HTTPS routing, NOT database/application readiness.
+ // Do not include runtime versions, environment details, tokens or SQL results.
+ if(path==='/api/migration/transport'&&method==='GET')
+  return reply(res,200,{
+   ok:true,
+   check:'transport_only',
+   login_enabled:false,
+   migration_ready:false
+  });
+ if(path==='/api/migration/transport')
+  return reply(res,405,{ok:false,error:'method_not_allowed'});
  if(path==='/api/health'&&method==='GET')
   return reply(res,503,{
    ok:false,
