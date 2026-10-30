@@ -174,4 +174,4 @@ async function run({env=process.env,driver,log=console.log,warn=console.error}={
 if(require.main===module)run().then(code=>{process.exitCode=code},()=>{
  console.error('STEP 7.13 FAILED (unknown).');process.exitCode=1;
 });
-module.exports={OPT_IN,makeLesson,expectAttempt,getLesson,countLessons,runChecks,run};
+module.exports={OPT_IN,makeLesson,expectAttempt,getLesson,countLessons,cleanup,runChecks,run};
