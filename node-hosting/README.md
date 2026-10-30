@@ -21,6 +21,7 @@ This folder is a **fail-closed scaffold** for an isolated school-hosting migrati
 | `.env.example` | Placeholder environment variable names only |
 | `mysql/0000_migration_ledger.sql` | Migration ledger only; not the school schema |
 | `scripts/check-db.cjs` | Explicit **read-only** MariaDB connection check; no startup connection |
+| `scripts/verify-schema.cjs` | Explicit **read-only** MariaDB 63-table / 119-FK baseline check |
 | `scripts/inspect-d1-schema.cjs` | Offline schema-only D1 export inventory; refuses files containing INSERT data |
 | `test/migration-preflight.test.cjs` | Tests for safe read-only connectivity and schema inspection |
 
@@ -83,6 +84,28 @@ npm run inspect:d1 -- ../worker/rd-connect-schema-only.sql
 ```
 
 The inspector reports table/index/trigger/view counts, executes **no SQL**, and rejects exports containing INSERT statements. Its report is an inventory, **not a MySQL conversion**; SQLite triggers, partial indexes and permissions must be ported and tested before any real-data import.
+
+## Stage 1: Verify the actual empty MariaDB schema (school test database)
+
+School test DB `ratsadaa_connect` was inspected in phpMyAdmin with **63 tables, 119 FKs,
+0 triggers, `student_enrollments.end_date = varchar(10)`, 2 named unique indexes**.
+The user ran the three-part warning-1901 fix, and those numbers match the expected staging baseline.
+This is **not sufficient for use with real students**: 10 SQLite business-rule triggers
+and the entire application API still need careful porting.
+
+After updating the following two files in `rd-connect-node-stage/`:
+- `package.json`
+- `scripts/verify-schema.cjs`
+
+Open DirectAdmin → Setup Node.js App → `rd-connect-node-stage` → Run JS Script,
+and choose `verify:schema`. This is the equivalent of running `npm run verify:schema`
+and only reads MariaDB `information_schema` metadata.
+
+Expected exit code `0` and `SCHEMA CHECK OK`; the script prints the five numeric/type
+checks and says that business-rule triggers are not ported. It does **not** read
+personal records, change schema, import data, or modify Cloudflare.
+On a mismatch, it exits nonzero and lists the mismatching metadata fields.
+Do not point the existing school PWA at this Node application yet.
 
 ## DirectAdmin trial setup
 
