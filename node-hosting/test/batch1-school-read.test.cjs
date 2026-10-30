@@ -118,3 +118,43 @@ test('authenticated adapter returns scoped data while public Handler still retur
  assert.equal(publicRes.status,501);
  assert.equal(publicRes.json().error,'endpoint_not_migrated');
 });
+
+test('daily attendance read does not give subject-only teacher homeroom rights',async()=>{
+ const otherRoom={id:7,advisor_user_id:20,advisor2_user_id:30};
+ const conn=makeConn(sql=>{
+  if(sql.startsWith('SELECT id,advisor_user_id'))return [otherRoom];
+  if(sql.includes('FROM timetable'))return [{allowed:1}];
+  throw Error('unexpected read attempt: '+sql);
+ });
+ await fail(()=>school.dailyAttendance(conn,teacher,7,'2026-10-30'),403);
+ assert.equal(conn.calls.length,1);
+});
+test('period attendance returns only recorded statuses, with daily reference',async()=>{
+ const subjectTeacher={kind:'staff',role:'teacher',id:3};
+ const conn=makeConn((sql,args)=>{
+  if(sql.startsWith('SELECT id,advisor_user_id'))return [{id:7,advisor_user_id:9,advisor2_user_id:8}];
+  if(sql.includes('SELECT 1 AS allowed FROM timetable'))return [{allowed:1}];
+  if(sql.startsWith('SELECT id,classroom_id,teacher_user_id,day_of_week'))
+   return [{id:17,classroom_id:7,teacher_user_id:3,day_of_week:5}];
+  if(sql.includes('FROM attendance_period'))return [{student_id:21,status:'truancy'}];
+  if(sql.includes('FROM attendance_daily'))return [{student_id:21,status:'present'}];
+  if(sql.includes('FROM period_teaching_logs'))return [{note:'sample lesson',updated_at:'2026-10-30'}];
+  throw Error('unexpected: '+sql);
+ });
+ const actual=await school.periodAttendance(conn,subjectTeacher,7,'2026-10-30',17);
+ assert.deepEqual(actual.items,[{student_id:21,status:'truancy'}]);
+ assert.deepEqual(actual.daily_items,[{student_id:21,status:'present'}]);
+ assert.equal(actual.daily_read_only,true);
+ assert.equal(actual.teaching_note,'sample lesson');
+ assert.deepEqual(conn.calls[3].args,[17,'2026-10-30',7]);
+});
+test('period attendance forbids another teacher and mismatched weekday',async()=>{
+ const conn=makeConn((sql)=>{
+  if(sql.startsWith('SELECT id,advisor_user_id'))return [{id:7,advisor_user_id:3,advisor2_user_id:null}];
+  if(sql.startsWith('SELECT id,classroom_id,teacher_user_id,day_of_week'))
+   return [{id:17,classroom_id:7,teacher_user_id:19,day_of_week:5}];
+  throw Error('unexpected: '+sql);
+ });
+ await fail(()=>school.periodAttendance(conn,teacher,7,'2026-10-30',17),403);
+ await fail(()=>school.periodAttendance(conn,teacher,7,'2026-10-29',17),400);
+});
