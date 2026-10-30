@@ -426,6 +426,67 @@ VAPID configuration, an authorized background worker/cron, safe
 subscription cleanup, per-attempt durable receipts, and concurrency
 stress tests. The public API still returns 501.
 
+## New continuation — MOCK sender → SQL receipt end-to-end in isolated MariaDB
+
+Confirmed on DirectAdmin: `check:push-receipts-offline` returned 0,
+with eight synthetic tests passing; no DB/network, public routes 501.
+
+This batch prepares **one lab-only integration test** that uses the
+existing MariaDB queue, claim, and provider receipt SQL as a sequence:
+
+- `src/lab-push-mock-dispatch.cjs`: claims a **verified** queue job
+  using its event/generation/audience/subscription ID. Reads the
+  claim's current attempt number from MariaDB, then persists an
+  EXPLICITLY MOCKED provider HTTP status using the existing
+  attempt-matched receipt writer. It cannot use an endpoint URL,
+  VAPID key, network callback or real Web Push service.
+- `scripts/check-lab-push-dispatch-rollback.cjs`: seeds a
+  completely synthetic incident and **four fake devices** (two
+  advisors, one linked guardian, one student) inside a MariaDB
+  transaction. Exercises mocked 201/202 provider acceptance,
+  duplicate claims, 2-minute cooldown, transient 429/503 retries,
+  terminal 410, no response, stale receipt blocking, 3-attempt
+  cap, cancelled incident and newly reclassified generation.
+  It performs a second transaction with an injected failure,
+  and ROLLBACKs BOTH cases with **no COMMIT**.
+- `test/batch1-lab-push-dispatch.test.cjs` covers eight offline
+  safety and SQL-ordering cases. The tests are also in
+  `check:batch12`.
+
+**One DirectAdmin run**, on the same isolated stage with only
+`ratsadaa_trgtest` credentials for the lab:
+
+1. Download the latest experimental branch ZIP; upload the full
+   contents of `node-hosting/` to
+   `/home/ratsadaa/rd-connect-node-stage/`.
+2. Ensure old lab flags are removed. Temporarily configure:
+   `RD_TRIGGER_LAB_ALLOW_PUSH_QUEUE=RUN_LAB_PUSH_QUEUE_ROLLBACK_B1`
+   (same synthetic-only queue lab permission as before).
+3. DirectAdmin → Setup Node.js App → Run JS Script:
+   `check:lab-push-dispatch`.
+4. Expected `returncode: 0`, with
+   `PUSH DISPATCH LAB OK`, `RECEIPT INTEGRITY OK`,
+   `RETRY SAFETY OK`, `PUBLIC PUSH DISABLED`,
+   `ROLLBACK VERIFIED` and `LAB UNCHANGED`.
+5. Immediately REMOVE `RD_TRIGGER_LAB_ALLOW_PUSH_QUEUE`.
+   If any error appears or `LAB UNCHANGED` is missing,
+   confirm the lab is empty before a rerun.
+
+**No real Push is sent.** Provider HTTP results are faked in-process;
+a 201/202 reflects acceptance by the simulated provider only, never
+confirmed phone/device delivery. The lab has 63 empty tables and
+five previously checked triggers before and after the test. The
+production staging `ratsadaa_connect`, live Cloudflare Worker/D1,
+DNS and public API are left unchanged.
+
+**Release remains NO_GO.** Next prerequisites include an actual
+Web Push sender with secure VAPID configuration and network
+restrictions, real subscription registration/authentication,
+verified post-commit dispatch, concurrent multi-process claims,
+separate provider response transactions, retry supervision and
+opt-in testing on a consenting school-owned device. None of
+those is enabled by this lab.
+
 ## What Batch 2 actually implements
 
 New **private/offline local source exporter**, **dry-run import
