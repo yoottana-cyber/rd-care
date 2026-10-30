@@ -26,6 +26,8 @@ This folder is a **fail-closed scaffold** for an isolated school-hosting migrati
 | `src/test-auth-crypto.cjs` | Scrypt helpers for the smoke test; NOT backward-compatible with existing D1 password hashes |
 | `src/d1-password-compat.cjs` | D1 PBKDF2-SHA256 compatibility verifier (legacy 100k and rd2$ 20k) |
 | `src/staging-auth-service.cjs` | Unexposed staff/student/guardian Login, Me and Logout logic; NOT connected to HTTP |
+| `src/staging-auth-http.cjs` | Unexposed HTTP JSON adapter for six Login/Me/Logout routes; no public listener |
+| `scripts/check-auth-http.cjs` | Offline in-process HTTP contract test; no DB, no network socket |
 | `scripts/check-password-compat.cjs` | Offline, synthetic test of original Worker password formats; no DB access |
 | `scripts/check-auth-service.cjs` | Transaction-only real MariaDB test across teacher/student/guardian fake accounts; ROLLBACK |
 | `scripts/inspect-d1-schema.cjs` | Offline schema-only D1 export inventory; refuses files containing INSERT data |
@@ -363,6 +365,38 @@ Before switching any real PWA to this app, implement and audit concurrent
 login lockout handling, strong password hash upgrades, all authorization
 boundaries, the 10 missing SQLite business-rule triggers, and a full
 migration dry run on an anonymized dataset.
+
+## Stage 6.5: test the HTTP request/response contract without exposing Login
+
+Added an **isolated** HTTP adapter at `src/staging-auth-http.cjs` for:
+`/api/auth/login`, `/api/auth/me`, `/api/auth/logout` and portal
+equivalents. The adapter parses JSON safely with an 8 KiB body limit,
+requires correct HTTP methods, emits no-store JSON errors and does not allow
+CORS by default. It requires explicit dependency injection of a DB
+connection and is **NOT imported by `app.js` or `src/http-handler.cjs`**.
+
+The `check:auth-http` script verifies these contracts with synthetic requests
+**in-process**. It uses **no network port, no school DB credentials or
+queries, no real account records and no external requests**. The active
+Passenger handler still responds HTTP 501 `endpoint_not_migrated`
+for all public auth endpoints, including `/api/auth/login`.
+It is a component readiness check, **not** a real public-endpoint test.
+
+Upload only these three files from the branch into the existing staging Node root:
+- `package.json`
+- `src/staging-auth-http.cjs`
+- `scripts/check-auth-http.cjs`
+
+In DirectAdmin → Setup Node.js App → Run JS Script, run `check:auth-http`.
+Expected `returncode: 0`, `STEP 6.5 OK`, `NEGATIVE TESTS OK`,
+and `PUBLIC AUTH STILL CLOSED`. If the script fails, do not
+connect the HTTP adapter to the public server.
+
+Before actually enabling a trial Login endpoint, complete further safety
+checks, add a network-safe test-account isolation boundary, decide and
+test password-hash upgrades, review brute-force concurrency and session
+management, plus access controls and the ten missing business-rule triggers.
+Do not change the existing school's Cloudflare Worker/D1/PWA.
 
 ## DirectAdmin trial setup
 
