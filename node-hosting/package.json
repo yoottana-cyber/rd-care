@@ -13,7 +13,8 @@
     "test": "node --test test/*.test.cjs",
     "check:db": "node scripts/check-db.cjs",
     "inspect:d1": "node scripts/inspect-d1-schema.cjs",
-    "verify:schema": "node scripts/verify-schema.cjs"
+    "verify:schema": "node scripts/verify-schema.cjs",
+    "check:auth-txn": "node scripts/check-auth-transaction.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
