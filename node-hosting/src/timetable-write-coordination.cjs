@@ -63,7 +63,7 @@ async function acquireNamedLocks(conn,keys,{timeout=0}={}){
   for(const key of keys){
    const [[result]]=await conn.execute('SELECT GET_LOCK(?, ?) AS acquired',[key,timeout]);
    if(Number(result?.acquired)===1){held.push(key);continue}
-   if(result?.acquired===0)throw Error('lab_named_lock_busy');
+   if(result?.acquired!=null&&Number(result.acquired)===0)throw Error('lab_named_lock_busy');
    throw Error('lab_named_lock_error');
   }
   return held;
