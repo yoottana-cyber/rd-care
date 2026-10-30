@@ -4,7 +4,8 @@
 // Requires the isolated ratsadaa_trgtest DB and a caller-owned transaction.
 // The caller MUST begin a transaction and ALWAYS ROLLBACK after synthetic tests.
 // Actual school writes, Push sending, and Period/truancy writes remain BLOCKED.
-const {planAttendance}=require('./attendance-write-contract.cjs');
+const {planAttendance,requireStaff,requireWriteDate,bangkokToday,allowedDaily}
+ =require('./attendance-write-contract.cjs');
 const {LAB_DATABASE}=require('../scripts/check-trigger-lab.cjs');
 
 const OPT_IN='RUN_LAB_DAILY_ATTENDANCE_ROLLBACK_B1';
@@ -45,16 +46,20 @@ async function applyDailyInOpenTransaction(conn,body,{
  // IMPORTANT: Must be run AFTER the caller begins its single transaction.
  // SELECT ... FOR UPDATE below is meaningful only in an open transaction.
  assertLabFlag(env);
- await assertConnection(conn);
+ // Verify the caller's actor and date before any roster/student query.
+ requireStaff(actor);
  if(!body||body.kind!=='daily')fail(400,'invalid_kind');
+ const today=bangkokToday(now);
+ requireWriteDate(body.date,today);
  const roomId=body.classroom_id;
  if(!Number.isSafeInteger(roomId)||roomId<1)fail(400,'invalid_room');
+ await assertConnection(conn);
  const [rooms]=await conn.execute(ROOM_SQL,[roomId]);
  const room=rooms[0];if(!room)fail(404,'not_found');
+ allowedDaily(actor,room);
  const [rows]=await conn.execute(ROSTER_SQL,[roomId,body.date,body.date]);
  const enrolled=rows.map(r=>Number(r.id));
- const plan=planAttendance(body,{actor,room,enrolled,
-  today:require('./attendance-write-contract.cjs').bangkokToday(now)});
+ const plan=planAttendance(body,{actor,room,enrolled,today});
  if(plan.mutation_allowed!==false||plan.kind!=='daily')
   throw Error('lab_daily_unexpected_write_contract');
  let upserts=0,absenceEvents=0;
