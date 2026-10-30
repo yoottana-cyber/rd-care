@@ -33,7 +33,8 @@
     "check:lab-guardian-reverse-race": "node scripts/check-lab-guardian-reverse-race.cjs",
     "install:lab-timetable-guards": "node scripts/install-lab-timetable-guards.cjs",
     "check:lab-timetable-guards": "node scripts/check-lab-timetable-guards.cjs",
-    "check:lab-timetable-race": "node scripts/check-lab-timetable-race.cjs"
+    "check:lab-timetable-race": "node scripts/check-lab-timetable-race.cjs",
+    "check:lab-timetable-locks": "node scripts/check-lab-timetable-locks.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
