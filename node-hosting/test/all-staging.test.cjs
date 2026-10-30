@@ -14,14 +14,15 @@ const env={
 function reply(step,code=step.expected){
  return {status:code,signal:null,stdout:step.markers.join('\n'),stderr:''};
 }
-test('one DirectAdmin command groups 10 isolated checks without exposing a real route',()=>{
- assert.equal(STEPS.length,10);
+test('one DirectAdmin command groups 11 isolated checks without exposing a real route',()=>{
+ assert.equal(STEPS.length,11);
  assert.deepEqual(STEPS.map(s=>s.name),[
   'OFFLINE_AND_MIGRATION_PLAN','AUTH_HTTP_MARIADB_ROLLBACK',
   'INTEGRATED_HTTP_MARIADB_ROLLBACK','PUSH_RECIPIENTS_OFFLINE',
   'PUSH_RECEIPTS_OFFLINE','DAILY_ATTENDANCE_ROLLBACK',
   'PERIOD_TRUANCY_ROLLBACK','PUSH_QUEUE_ROLLBACK',
-  'PUSH_MOCK_DISPATCH_ROLLBACK','RELEASE_NO_GO_GUARD'
+  'PUSH_MOCK_DISPATCH_ROLLBACK','AUTH_PORTAL_READ_ROLLBACK',
+  'RELEASE_NO_GO_GUARD'
  ]);
  assert.equal(STEPS.filter(s=>s.expected===2).length,2);
 });
@@ -64,7 +65,7 @@ test('single run executes all steps, prints concise result and keeps lab opt-ins
    return reply(step);
   },log:m=>messages.push(m),warn:m=>errors.push(m)});
  assert.equal(result,0);
- assert.equal(calls.length,10);
+ assert.equal(calls.length,11);
  assert.equal(errors.length,0);
  assert.ok(messages.some(x=>x.includes('STAGING COMBINED TESTS PASS')));
  assert.ok(messages.some(x=>x.includes('RELEASE STILL NO_GO')));
