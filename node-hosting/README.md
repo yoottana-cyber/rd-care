@@ -35,6 +35,26 @@ npm start
 
 Then open `http://127.0.0.1:3000/api/health` (expected 503). Stop with Ctrl+C. Nothing is written to any database.
 
+## DirectAdmin URL-prefix diagnostic (school staging)
+
+Application URL is `https://ratsada.ac.th/web/rd-connect-node-test`.
+CloudLinux Passenger may forward requests with the entire path
+`/web/rd-connect-node-test/api/health` or strip that mount path and pass
+`/api/health`. The staging HTTP router now accepts **both** forms.
+
+After uploading the latest `src/http-handler.cjs`, restart the Node app and open:
+
+`https://ratsada.ac.th/web/rd-connect-node-test/api/health`
+
+Expected: HTTP **503** with JSON `{"ok":false,"service":"RD CONNECT school Node.js migration","error":"migration_not_ready"}`.
+This is intentional and means **Node.js routing works**, not that MariaDB or the application is ready.
+Opening the application root URL `/web/rd-connect-node-test/` returns `404 not_found` by design:
+the migration-only shell has no homepage or frontend.
+
+If health still returns `404 not_found`, inspect the app's `src/http-handler.cjs` on the server,
+confirm that the file contains `STAGING_MOUNT_PATH`, then restart Passenger.
+Do **not** alter `/web/rd-connect/` or any D1/Worker environment settings.
+
 ## Stage 0: verify MariaDB access (separate empty TEST database)
 
 1. In DirectAdmin create a **new, empty staging** MariaDB database and a restricted test database user. Do not select the database used by any current school website.
