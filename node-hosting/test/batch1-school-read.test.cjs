@@ -158,3 +158,40 @@ test('period attendance forbids another teacher and mismatched weekday',async()=
  await fail(()=>school.periodAttendance(conn,teacher,7,'2026-10-30',17),403);
  await fail(()=>school.periodAttendance(conn,teacher,7,'2026-10-29',17),400);
 });
+
+test('saved daily attendance contract preserves missing students as missing',async()=>{
+ const conn=makeConn(sql=>{
+  if(sql.startsWith('SELECT id,advisor_user_id'))return [{id:7,advisor_user_id:3,advisor2_user_id:null}];
+  if(sql.includes('FROM attendance_daily a'))return [{student_id:21,status:'present'}];
+  throw Error('unexpected query '+sql);
+ });
+ const r=await school.savedDailyAttendance(conn,teacher,7,'2026-10-30');
+ assert.deepEqual(r,{items:[{student_id:21,status:'present'}]});
+ assert.deepEqual(conn.calls[1].args,[7,'2026-10-30']);
+});
+test('staff and portal attendance paths dispatch to independent services',async()=>{
+ const calls=[];
+ const services={
+  async trustedSession(conn,kind){
+   return kind==='portal'?{kind:'portal',role:'guardian',id:2}:teacher;
+  },
+  async savedDailyAttendance(conn,user,room,date){
+   calls.push('staff-daily');
+   return {items:[]};
+  },
+  async portalAttendance(conn,user,student,from,to){
+   calls.push('portal');
+   assert.equal(student,'21');
+   return {student_id:21,daily:[],period:[],late:[]};
+  }
+ };
+ const staffRes=mockRes();
+ await handleStagingSchoolRead(mockReq('/api/attendance?kind=daily&classroom_id=7&date=2026-10-30'),
+  staffRes,{connection:{},services});
+ assert.equal(staffRes.status,200);
+ const portalRes=mockRes();
+ await handleStagingSchoolRead(mockReq('/api/portal/attendance?student_id=21&from=2026-10-01&to=2026-10-30'),
+  portalRes,{connection:{},services});
+ assert.equal(portalRes.status,200);
+ assert.deepEqual(calls,['staff-daily','portal']);
+});
