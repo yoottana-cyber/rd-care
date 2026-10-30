@@ -113,7 +113,7 @@ async function verifyPostCleanup(main){
  return true;
 }
 async function run({env=process.env,driver,log=console.log,warn=console.error}={}){
- let pool,main,peer,ids=null,testResult=null,testError=null,cleaned=false;
+ let pool,main,peer,ids=null,testResult=null,testError=null,cleaned=false,seedAttempted=false;
  try{
   if(env.RD_TRIGGER_LAB_ALLOW_RACE!==OPT_IN)
    throw Error('lab_explicit_race_approval_required');
@@ -126,6 +126,7 @@ async function run({env=process.env,driver,log=console.log,warn=console.error}={
   peer=await pool.getConnection();
   const [[db]]=await peer.execute('SELECT DATABASE() AS db');
   need(db?.db===LAB_DATABASE,'second_connection_wrong_database');
+  seedAttempted=true;
   ids=await seed(main);
   try{testResult=await race(main,peer,ids)}catch(e){testError=e}
  }catch(e){testError=e}
@@ -148,7 +149,7 @@ async function run({env=process.env,driver,log=console.log,warn=console.error}={
   const msg=String(testError?.message||'');
   const reason=msg.startsWith('lab_')?msg:category(testError);
   warn('STEP 7.7 FAILED ('+reason+').');
-  if(ids&&!cleaned)warn('MANUAL LAB INSPECTION REQUIRED: synthetic committed seed may remain; do not retry or delete arbitrary data.');
+  if(seedAttempted&&!cleaned)warn('MANUAL LAB INSPECTION REQUIRED: synthetic committed seed may remain; do not retry or delete arbitrary data.');
   return 1;
  }
  log('STEP 7.7 DIAGNOSTIC COMPLETE: overlapping MariaDB transactions tested on separate connections.');
