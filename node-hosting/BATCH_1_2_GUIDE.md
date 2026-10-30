@@ -218,6 +218,75 @@ semantics before enabling production. No public auth/login,
 student/parent endpoints, period writes, QR, behavior writes or
 Web Push are enabled by this update. **GO-LIVE remains NO-GO.**
 
+## Batch 1 continuation — Safe OFFLINE truancy Push eligibility
+
+**Lab period/truancy SQL passed on isolated MariaDB:** two synthetic
+students, configurable -7 points, single linked behavior record,
+correction soft-delete and same-ID restoration; pending-only outbox
+cancellation; both complete-lifecycle and injected-error transactions
+ROLLBACK; 63 tables empty and five triggers unchanged.
+
+The latest branch adds **OFFLINE ONLY** notification eligibility, not
+delivery infrastructure:
+
+- `src/truancy-push-offline-plan.cjs` validates a trusted, previously
+  COMMITTED, still-active and recent truancy event before considering
+  outbound Push. It refuses corrected/dismissed events, stale events,
+  incomplete recipient identity, dates outside the 14-day attendance
+  window, or missing VAPID readiness.
+- It separately verifies primary/secondary homeroom advisors,
+  **verified** guardian links, active parent/student portal accounts,
+  and student identity. It honors each admin-managed
+  `truancy_advisor`, `truancy_guardian` and `truancy_student`
+  notification category.
+- Eligibility is keyed by
+  `event_id:generation:recipient_type:subscription_id`.
+  A delivered record may never be sent again. Maximum **3**
+  attempts, minimum **2-minute** cooldown for recently failed
+  or abandoned `sending` entries. A corrected-and-reclassified
+  event may use a new generation. Duplicate subscriber rows are
+  suppressed. Output never contains Web Push endpoints, secret keys,
+  student names, student numbers or medical/behavior details.
+- `test/batch1-truancy-push-offline.test.cjs` validates ten
+  no-network synthetic cases. The same tests are now included
+  in `check:batch12` and available independently as
+  `check:push-offline`.
+- `scripts/check-push-offline.cjs` also verifies the existing
+  Passenger handler returns **501 endpoint_not_migrated** for
+  unported attendance/Push routes. This is intentional; no endpoint
+  is enabled by adding files.
+
+### Run the next single DirectAdmin check
+
+Upload the fresh **complete contents** of `node-hosting/` from
+the experimental ZIP to
+`/home/ratsadaa/rd-connect-node-stage/` without changing
+secret DirectAdmin settings.
+
+Ensure old `RD_TRIGGER_LAB_ALLOW_PERIOD` and other temporary
+write flags are **removed**. No environment flag, VAPID setting,
+database connection or student/guardian export is needed.
+
+DirectAdmin → Setup Node.js App → Run JS Script:
+`check:push-offline`.
+
+Expected **returncode 0** with:
+- `PUSH OFFLINE OK`
+- `DEDUPLICATION OK`
+- `SAFETY OK`
+- `PUBLIC API CLOSED`
+- `NO DB ACCESS OR PUSH`
+- `NOT PRODUCTION READY`
+
+Even when the offline test passes, **real Web Push remains
+UNIMPLEMENTED on the Node backend**: durable MariaDB delivery
+upserts/atomic claims, token-verified subscriptions, genuine VAPID
+cryptography, scheduling, device removal on 404/410 and provider
+response handling must be independently built and tested.
+This command does NOT call a Push provider or connect to D1/MariaDB,
+so it cannot verify actual browser delivery. GO-LIVE is still
+NO-GO; Cloudflare D1 and the original PWA remain untouched.
+
 ## What Batch 2 actually implements
 
 New **private/offline local source exporter**, **dry-run import
