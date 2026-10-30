@@ -1413,6 +1413,94 @@ installed/modified here. Continued work includes bounded retry,
 safe pool connection lifecycle, bulk changes and API integration;
 do not merge this into main or enable public Node Login.
 
+## Stage 7.14 — Safe timetable retry policy + connection lifecycle lab check
+
+**Prerequisite:** Stage 7.13 passed on MariaDB. The isolated lab
+`ratsadaa_trgtest` has 63 EMPTY tables, 119 FKs and exactly five
+verified triggers; all synthetic timetable rows were deleted.
+
+The shared timetable coordination helpers now include a prototype
+`src/timetable-safe-retry.cjs`:
+- maximum **three** attempts (configurable only 1–3), bounded delay,
+  and **a new pool checkout for each attempt**. The database driver may
+  return the same physical connection after proper cleanup; this is
+  not a promise of a new TCP connection every time.
+- Only transient `lab_named_lock_busy`, InnoDB 1205 lock timeout, or
+  1213 deadlock may be retried, **after** the application writer has
+  completed its ROLLBACK and released its advisory locks.
+- **No retry** for `TIMETABLE_OVERLAP`, stale update snapshots,
+  validation errors, unknown COMMIT state, or other SQL errors.
+- A failure to ROLLBACK or RELEASE_LOCK, network connection loss, or
+  uncertain pooled connection state marks it UNSAFE and the connection
+  is destroyed rather than returned to the pool.
+- Exhaustion returns `lab_timetable_retry_exhausted`; callers must
+  show temporary contention rather than misreporting a schedule clash.
+- The retry function is **not integrated into any public API** and
+  must be used ONLY with an operation that has safely rolled back and
+  released all locks before rejecting. Passing arbitrary SQL or an
+  operation with unknown commit state invalidates this guarantee.
+  Operations already committed must never be replayed.
+
+### Stage 7.14 MariaDB diagnostic — NO DATA WRITES
+
+The DirectAdmin test is intentionally **read-only in table data**.
+It uses MariaDB GET_LOCK / RELEASE_LOCK on random *synthetic*
+classroom/day and teacher/day key names, through two connections:
+1. One connection holds the two locks. Another connection first
+   reports BUSY; the test releases the locks and the retry succeeds on
+   its second attempt with a fresh **pool checkout**.
+2. Hold locks again for all three permitted retries. Verify
+   `lab_timetable_retry_exhausted` after precisely 3 attempts,
+   and cleanly release all named locks.
+3. Synthesize a business-level `TIMETABLE_OVERLAP` error and verify
+   it is **not** retried (one attempt only).
+4. Check no remaining `IS_USED_LOCK` owners, all 63 tables empty and
+   all five original triggers untouched.
+
+It runs no INSERT, UPDATE, DELETE, CREATE, ALTER or DROP, uses no
+student/staff data, does not enable HTTP Login/Push and must not be
+pointed at `ratsadaa_connect`.
+
+Upload these **four** files from the latest experimental
+`node-hosting/` to the existing
+`/home/ratsadaa/rd-connect-node-stage/`:
+- `package.json` → `package.json`
+- `src/timetable-write-coordination.cjs` →
+  `src/timetable-write-coordination.cjs` (improved unsafe lock
+  release error classification)
+- `src/timetable-safe-retry.cjs` → `src/timetable-safe-retry.cjs`
+- `scripts/check-lab-timetable-retries.cjs` →
+  `scripts/check-lab-timetable-retries.cjs`
+
+In DirectAdmin → Setup Node.js App → Environment Variables, remove
+old `RD_TRIGGER_LAB_ALLOW_WRITE`,
+`RD_TRIGGER_LAB_ALLOW_DDL`,
+`RD_TRIGGER_LAB_ALLOW_RACE` and
+`RD_TRIGGER_LAB_ALLOW_LOCK` if present. Add:
+`RD_TRIGGER_LAB_ALLOW_RETRY=RUN_LAB_TIMETABLE_RETRY_7_14`.
+Run **`check:lab-timetable-retries`** via Run JS Script.
+
+Expected `returncode: 0` and:
+`STEP 7.14 RETRY OK`,
+`BOUNDED RETRY OK`,
+`BUSINESS ERROR OK`,
+`LAB UNCHANGED`.
+The JSON should include `busy_then_retry_succeeded:true`,
+`successful_attempts:2`,
+`busy_exhausted_after:3`,
+`overlap_attempts:1`, and
+`named_locks_released:true`.
+
+Remove `RD_TRIGGER_LAB_ALLOW_RETRY` immediately after the test.
+On failure, preserve the error category and investigate lock state.
+Do not weaken lab guardrails or change production/staging database
+credentials. This test validates one bounded retry protocol, not
+end-to-end API readiness. Before deployment: integrate **all**
+timetable writers, transaction/pool lifecycle across endpoints,
+idempotency and bulk changes, authorization, and user-facing HTTP
+responses. The original RD CONNECT Cloudflare D1 and
+`ratsadaa_connect` remain unchanged.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
