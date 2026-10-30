@@ -51,7 +51,7 @@ async function releaseNamedLocks(conn,keys){
    if(Number(result?.released)!==1)throw Error('lab_named_lock_release_failed');
   }catch(e){firstError??=e}
  }
- if(firstError)throw firstError;
+ if(firstError)throw Error('lab_named_lock_release_failed',{cause:firstError});
 }
 async function acquireNamedLocks(conn,keys,{timeout=0}={}){
  need(Array.isArray(keys)&&keys.length===2&&keys[0]<keys[1]&&
