@@ -24,6 +24,13 @@ const STEPS=Object.freeze([
   markers:['STEP 6.6 OK','ROLLBACK VERIFIED','HTTPS LOGIN NOT ENABLED']
  }),
  Object.freeze({
+  name:'INTEGRATED_HTTP_MARIADB_ROLLBACK',
+  script:'check-integrated-http-db.cjs',
+  expected:0,
+  markers:['INTEGRATED HTTP MARIADB OK','PERMISSION ISOLATION OK',
+   'ROLLBACK VERIFIED','PUBLIC API CLOSED']
+ }),
+ Object.freeze({
   name:'PUSH_RECIPIENTS_OFFLINE',
   script:'check-push-offline.cjs',
   expected:0,
@@ -142,7 +149,7 @@ function run({env=process.env,execute=spawnSync,
   }
   log('['+(i+1)+'/'+STEPS.length+'] '+step.name+': OK');
  }
- log('STAGING COMBINED TESTS PASS: 9 grouped checks from one DirectAdmin command.');
+ log('STAGING COMBINED TESTS PASS: 10 grouped checks from one DirectAdmin command.');
  log('LAB/STAGING ROLLBACK VERIFIED: authenticated teacher/student/guardian HTTP, attendance, period, Push queue and mock sender/receipt.');
  log('PUBLIC API STILL CLOSED: migration HTTP routes remain intentionally disabled.');
  log('DATA MIGRATION PENDING: D1 export/import and actual application parity not complete.');
