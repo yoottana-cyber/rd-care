@@ -11,6 +11,8 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
  log=console.log,warn=console.error}={}){
  const tests=[
   path.join(__dirname,'../test/batch1-school-read.test.cjs'),
+  path.join(__dirname,'../test/batch1-integrated-http.test.cjs'),
+  path.join(__dirname,'../test/staging-auth-http.test.cjs'),
   path.join(__dirname,'../test/batch1-attendance-write.test.cjs'),
   path.join(__dirname,'../test/batch1-timetable-parity.test.cjs'),
   path.join(__dirname,'../test/batch1-lab-daily-attendance.test.cjs'),
@@ -34,6 +36,7 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
   return 1;
  }
  log('BATCH 1 OFFLINE OK: staff/portal read-only authorization, rosters, daily and portal views.');
+ log('BATCH 1 PRIVATE AUTH+SCHOOL OK: token-backed teacher, student, guardian read-only HTTP workflows.');
  log('BATCH 1 WRITE GUARDS OK: daily/period roster, rights, truancy blocker and timetable history tests.');
  log('BATCH 1 HTTP CLOSED: Passenger still blocks unported school API routes.');
  log('BATCH 2 PLANNER OK: manifest validation, file integrity and foreign-key ordering unit tests.');
