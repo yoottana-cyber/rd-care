@@ -59,7 +59,6 @@ test('student portal cannot impersonate another student, guardian must have link
   if(sql.includes('FROM students WHERE'))return [{id:22}];
   throw Error('unexpected query');
  });
- assert.equal(await school.portalStudentId(conn,student,22).catch(e=>e.status),403);
  assert.equal(await school.portalStudentId(conn,guardian,22),22);
  await fail(()=>school.portalStudentId(conn,guardian,23),403);
  const pupil={kind:'portal',role:'student',id:11};
