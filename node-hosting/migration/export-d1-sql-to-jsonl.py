@@ -40,6 +40,8 @@ def export_dump(dump_file, output_dir):
     destination = Path(output_dir).expanduser().resolve()
     if destination.exists():
         raise ValueError("output_directory_already_exists")
+    if any((parent / ".git").exists() for parent in (destination, *destination.parents)):
+        raise ValueError("output_inside_git_repository")
     if not Path(dump_file).is_file():
         raise ValueError("trusted_d1_dump_not_found")
     # Never place dump data or secrets in a database used by Node/DirectAdmin.
@@ -83,6 +85,8 @@ def export_dump(dump_file, output_dir):
                             output.write(record)
                             sha.update(record)
                             count += 1
+                    if os.name != "nt":
+                        os.chmod(destination / filename, 0o600)
                     manifest_tables.append({
                         "name": name, "file": filename, "columns": columns,
                         "rows": count, "sha256": sha.hexdigest()
@@ -99,6 +103,8 @@ def export_dump(dump_file, output_dir):
                     json.dumps(manifest, ensure_ascii=False, indent=2),
                     encoding="utf-8"
                 )
+                if os.name != "nt":
+                    os.chmod(destination / "manifest.json", 0o600)
             except BaseException:
                 shutil.rmtree(destination, ignore_errors=True)
                 raise
@@ -127,7 +133,8 @@ def main():
         if reason not in {
             "output_directory_already_exists", "trusted_d1_dump_not_found",
             "d1_table_inventory_mismatch", "d1_foreign_key_check_failed",
-            "d1_column_inventory_invalid", "unsupported_sqlite_value"
+            "d1_column_inventory_invalid", "unsupported_sqlite_value",
+            "output_inside_git_repository"
         }:
             reason = "offline_export_failed"
         print("LOCAL EXPORT FAILED (" + reason + ").", file=sys.stderr)
