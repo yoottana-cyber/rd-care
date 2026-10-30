@@ -19,6 +19,7 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
   path.join(__dirname,'../test/batch1-truancy-push-offline.test.cjs'),
   path.join(__dirname,'../test/batch1-lab-push-queue.test.cjs'),
   path.join(__dirname,'../test/batch1-lab-push-receipt.test.cjs'),
+  path.join(__dirname,'../test/batch1-lab-push-dispatch.test.cjs'),
   path.join(__dirname,'../test/batch2-manifest.test.cjs'),
   path.join(__dirname,'../test/batch2-reconciliation.test.cjs'),
   path.join(__dirname,'../test/timetable-offline-api-contract.test.cjs')
