@@ -12,6 +12,7 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
  const tests=[
   path.join(__dirname,'../test/batch1-school-read.test.cjs'),
   path.join(__dirname,'../test/batch1-integrated-http.test.cjs'),
+  path.join(__dirname,'../test/batch1-auth-read-journey.test.cjs'),
   path.join(__dirname,'../test/staging-auth-http.test.cjs'),
   path.join(__dirname,'../test/batch1-attendance-write.test.cjs'),
   path.join(__dirname,'../test/batch1-timetable-parity.test.cjs'),
