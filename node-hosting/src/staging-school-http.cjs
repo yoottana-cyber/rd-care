@@ -15,6 +15,7 @@ const ROUTES=Object.freeze({
  '/api/classrooms':{kind:'staff',action:'rooms'},
  '/api/students':{kind:'staff',action:'roster'},
  '/api/attendance/daily':{kind:'staff',action:'daily'},
+ '/api/attendance':{kind:'staff',action:'attendance'},
  '/api/my-timetable':{kind:'staff',action:'timetable'},
  '/api/portal/children':{kind:'portal',action:'children'},
  '/api/portal/attendance':{kind:'portal',action:'attendance'},
@@ -56,6 +57,14 @@ async function handleStagingSchoolRead(req,res,{connection,services=school}={}){
    case 'rooms':value=await services.listRooms(connection,current);break;
    case 'roster':value=await services.roster(connection,current,room,date);break;
    case 'daily':value=await services.dailyAttendance(connection,current,room,date);break;
+   case 'attendance':
+    if(query.get('kind')==='daily')
+     value=await services.dailyAttendance(connection,current,room,date);
+    else if(query.get('kind')==='period')
+     value=await services.periodAttendance(connection,current,room,date,
+      query.get('timetable_id'));
+    else {const invalid=Error('invalid_kind');invalid.status=400;throw invalid}
+    break;
    case 'timetable':value=await services.teacherTimetable(connection,current);break;
    case 'children':value=await services.portalChildren(connection,current);break;
    case 'attendance':value=await services.portalAttendance(connection,current,
