@@ -92,10 +92,10 @@ function topology(tables,fks){
  const blocked=tables.filter(t=>!done.has(t)).sort();
  return {stages,cyclic_or_blocked_tables:blocked};
 }
-function compareSchema(manifest,dbTables,columns,foreignKeys){
+function compareSchema(manifest,dbTables,columns,foreignKeys,foreignKeyCount){
  need(Array.isArray(dbTables)&&dbTables.length===TABLES,'target_table_count');
  need(Array.isArray(columns)&&columns.length>0,'target_columns_missing');
- need(Array.isArray(foreignKeys)&&foreignKeys.length===FOREIGN_KEYS,'target_fk_count');
+ need(Array.isArray(foreignKeys)&&foreignKeyCount===FOREIGN_KEYS,'target_fk_count');
  const sources=new Map(manifest.tables.map(t=>[t.name,t]));
  const targets=new Map(dbTables.map(t=>[t.TABLE_NAME,t]));
  need(targets.size===TABLES,'target_duplicate_names');
