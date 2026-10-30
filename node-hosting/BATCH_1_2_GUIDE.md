@@ -287,6 +287,85 @@ This command does NOT call a Push provider or connect to D1/MariaDB,
 so it cannot verify actual browser delivery. GO-LIVE is still
 NO-GO; Cloudflare D1 and the original PWA remain untouched.
 
+## Batch 1 continuation — REAL MariaDB Push queue/claim lab (NEVER sends Push)
+
+The last `check:push-offline` completed on DirectAdmin with
+`returncode: 0`, all ten synthetic notification tests passing,
+and seven public Push/attendance routes still returning 501.
+
+This batch adds:
+- `src/lab-truancy-push-queue.cjs`: transaction-only MariaDB queue
+  for **two possible classroom advisors**, verified guardian links,
+  and authenticated student portal accounts. Recipient lookup is
+  performed from current DB relationships; it does not accept any
+  device endpoint from a client. Requires a current active
+  `truancy_events` row with an actual `period_truancy` record
+  and `attendance_period.status='absent'`, within 14 Bangkok
+  calendar days. Event generations are preserved separately.
+- Queue inserts are idempotent `INSERT IGNORE ... SELECT` under the
+  schema's unique keys. Admin `notification_preferences` for
+  `truancy_advisor`, `truancy_guardian`,
+  `truancy_student` control each audience separately.
+- `claim` is an atomic conditional SQL UPDATE of the correct
+  delivery table, with **at most 3 attempts**, a **2-minute**
+  stale-retry cooldown, a current event/status check and a
+  **fresh verification of the advisor/guardian/student link**.
+  Claims are blocked for recipients revoked after an event queued
+  or a notification category disabled by an administrator.
+- Neither queue nor claim contacts VAPID/Push providers, uses
+  live subscriptions, sends Web Push or marks a delivery
+  `delivered`. The synthetic lab script is permitted to
+  simulate a provider acceptance to confirm that already
+  accepted events cannot be reclaimed; that row is ROLLED BACK.
+- `scripts/check-lab-push-queue-rollback.cjs`: a real MariaDB
+  diagnostic with synthetic users, classroom, student, guardian,
+  subscriptions, event and notification preferences. Exercises
+  four devices (2 advisors, 1 guardian, 1 student), queues
+  idempotently, checks duplicate claims, category disable,
+  revoked guardian link, failed/cooldown attempt count,
+  reclassified truancy generation and a deliberate error.
+  **Every transaction is ROLLED BACK**, never COMMIT.
+  All **63 lab tables** must be empty and **5 triggers** intact.
+- `test/batch1-lab-push-queue.test.cjs`: offline opt-in,
+  recipient SQL, idempotence, conditional claim and no-network
+  tests, included in `check:batch12`.
+- Release Pack 3 now also refuses the temporary
+  `RD_TRIGGER_LAB_ALLOW_PUSH_QUEUE` flag (as well as previous
+  daily and period opt-ins) during production readiness checks.
+
+### DirectAdmin: one new temporary lab test
+
+1. Download the latest ZIP from the experimental branch and
+   upload the contents of `node-hosting/` to
+   `/home/ratsadaa/rd-connect-node-stage/`. Keep
+   `RD_DB_*` and `RD_TRIGGER_LAB_DB_*` credentials unchanged.
+2. REMOVE all prior one-time `RD_TRIGGER_LAB_ALLOW_*` test
+   variables, especially `RD_TRIGGER_LAB_ALLOW_PERIOD`.
+3. Temporarily create ONE Environment Variable:
+   `RD_TRIGGER_LAB_ALLOW_PUSH_QUEUE=RUN_LAB_PUSH_QUEUE_ROLLBACK_B1`
+4. DirectAdmin → Setup Node.js App → Run JS Script:
+   **`check:lab-push-queue`**.
+5. Expected **returncode: 0**, with:
+   `PUSH QUEUE LAB OK`, `CLAIM AND DEDUPE OK`,
+   `SAFETY OK`, `REACTIVATION OK`,
+   `ROLLBACK VERIFIED` and `LAB UNCHANGED`.
+6. **Immediately REMOVE** `RD_TRIGGER_LAB_ALLOW_PUSH_QUEUE`.
+   If a test fails or `LAB UNCHANGED` does not appear,
+   inspect the lab's table inventory and transaction state
+   **before any rerun**; do not bypass environment guards.
+
+This test uses `ratsadaa_trgtest` only. It does not install
+triggers or create durable data. The Node public API remains
+closed; school Cloudflare Worker + D1 is untouched.
+
+**Still NO-GO for production:** the test does NOT prove multi-
+connection race safety, real subscription authentication, VAPID
+sender crypto, browser support, 404/410 subscription removal,
+worker/cron retry scheduling, transport-layer receipts or
+record-level migration parity. Actual delivery can be marked
+successfully ONLY after a verified Web Push response and commit
+on an authorized, fully integrated production writer.
+
 ## What Batch 2 actually implements
 
 New **private/offline local source exporter**, **dry-run import
