@@ -922,6 +922,65 @@ lock timeouts, isolation-level analysis and robust application-layer
 authorizations. If cleanup fails, do not rerun blindly; preserve
 the error and inspect only disposable lab rows.
 
+## Stage 7.8 — Reverse two-connection guardian link/role race (disposable lab)
+
+Stage 7.7 reported `INVALID_LINK_REJECTED_IN_THIS_INTERLEAVING` and
+confirmed the committed fake seed and all lab tables were cleaned up.
+That one interleaving alone does not prove absence of races.
+
+Step 7.8 tests the **reverse timing** on isolated `ratsadaa_trgtest`.
+It requires the original 3 exact guardian triggers and an EMPTY
+63-table laboratory. The script uses two distinct MariaDB connections:
+1. COMMIT a fake teacher, classroom, two students, and a guardian
+   account, using the existing 7.7 `seed` helper.
+2. Connection B starts a transaction and INSERTs a valid guardian link,
+   keeping the insert uncommitted.
+3. Connection A starts a second transaction and tries to UPDATE that
+   guardian into a student account. The update is in flight while
+   B still owns its transaction.
+4. B COMMITs the guardian link, then A's UPDATE result is observed.
+   A's UPDATE is ALWAYS rolled back, even if the guard unexpectedly
+   allowed it. A session-only 5s InnoDB lock timeout is used.
+5. Delete the exact fake seed/link IDs, verify 63 tables empty and the
+   original 3 triggers still present.
+
+A fake seed is temporarily COMMITTED, so an interrupted process can
+leave harmless synthetic records in the disposable lab. On ANY failure,
+stop, preserve the error, and check the lab before trying again.
+Do not use student, staff, or parent records from the live system.
+
+**Upload exactly two changed/new files from `node-hosting/`:**
+- `package.json` → `/home/ratsadaa/rd-connect-node-stage/package.json`
+- `scripts/check-lab-guardian-reverse-race.cjs` →
+  `/home/ratsadaa/rd-connect-node-stage/scripts/check-lab-guardian-reverse-race.cjs`
+
+The existing `scripts/check-lab-guardian-race.cjs`, `src/lab-guardian-update-guards.cjs`,
+`scripts/check-lab-guardian-updates.cjs`, and other prior dependencies
+must remain installed. **Do not import SQL or change triggers.**
+
+Remove any old `RD_TRIGGER_LAB_ALLOW_RACE` value. Then add this
+different, explicit environment setting in DirectAdmin:
+`RD_TRIGGER_LAB_ALLOW_RACE=RUN_LAB_GUARDIAN_REVERSE_RACE_7_8`.
+Also confirm `RD_TRIGGER_LAB_ALLOW_DDL` is ABSENT.
+
+Via Setup Node.js App → Run JS Script execute
+`check:lab-guardian-reverse-race` **once**. Expected:
+`returncode: 0`, `STEP 7.8 DIAGNOSTIC COMPLETE`,
+`LAB CLEANUP VERIFIED`, and `PRODUCTION BLOCKED`.
+
+The outcome line reports one of:
+- `LINKED_ROLE_CHANGE_REJECTED_IN_THIS_INTERLEAVING`:
+  observed guard rejected a role update in the tested order.
+- `ROLE_UPDATE_ALLOWED — POTENTIAL CONCURRENCY BYPASS DETECTED`:
+  the guard allowed a role update, but the test rolled it back.
+
+Either outcome is a *diagnostic*, not approval to operate the Node
+service with real school accounts. A race finding must be fixed and
+then re-tested, while even two passing race cases don't prove all
+possible concurrency schedules. **Remove**
+`RD_TRIGGER_LAB_ALLOW_RACE` promptly when finished.
+`ratsadaa_connect`, live D1 and public Login APIs remain untouched.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
