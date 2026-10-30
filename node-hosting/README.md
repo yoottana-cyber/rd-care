@@ -784,6 +784,77 @@ open a public Login API, import real school records, or merge into main.
 The known guardian UPDATE and role-change bypasses must be addressed
 before considering this rule production-ready.
 
+## Stage 7.6 — Close guardian link UPDATE and account-role change bypasses (lab only)
+
+Stage 7.5 has now passed on the actual disposable `ratsadaa_trgtest`:
+the single `guardian_link_role_guard` INSERT trigger rejected student
+accounts, accepted guardian accounts, and synthetic records rolled back.
+The live `ratsadaa_connect` schema and Cloudflare D1 remain untouched.
+
+This stage adds exactly **two additional triggers** on the **isolated**
+MariaDB lab, for a total of **three** guardian-related triggers:
+
+1. `guardian_link_role_guard_update`: BEFORE UPDATE on
+   `guardian_student_links` verifies that the NEW guardian account role is
+   actually `guardian`, preventing an existing link from being reassigned
+   to a student login.
+2. `guardian_account_role_guard_update`: BEFORE UPDATE on
+   `portal_accounts` rejects changing `role='guardian'` to another
+   value while linked students still exist. Non-role profile changes and
+   changes after links are reassigned remain permitted.
+
+**These two new rules are lab hardening only, not a complete
+production-ready concurrency solution.** Simultaneous link inserts and
+guardian role updates still require two-session race tests and an
+atomic locking policy before importing real data.
+
+### Files
+
+Upload five files from `node-hosting/` to
+`/home/ratsadaa/rd-connect-node-stage/`:
+
+- `package.json`
+- `src/lab-guardian-update-guards.cjs`
+- `scripts/install-lab-guardian-update-guards.cjs`
+- `scripts/check-lab-guardian-updates.cjs`
+- The previous `src/lab-guardian-guard.cjs` must remain in place,
+  **do not replace or remove it**.
+
+The lab DB must still have 63 empty InnoDB tables, 119 foreign keys,
+and **exactly 1** installed trigger from stage 7.5.
+
+**One-time explicit DDL opt-in.** In DirectAdmin → Setup Node.js App →
+Environment Variables, set:
+`RD_TRIGGER_LAB_ALLOW_DDL=INSTALL_GUARDIAN_UPDATE_DDL_ON_TEST_DB_7_6`.
+This is a new value; the old 7.5 value does not authorize this install.
+Run `install:lab-guardian-updates` once via Run JS Script.
+The installer verifies the exact lab DB name, different DB credentials,
+63 empty InnoDB tables, 119 foreign keys, original trigger metadata,
+and no other triggers **before** creating anything. It checks the second
+and third installed trigger separately. Expected `returncode:0` and
+`STEP 7.6 INSTALL OK` with exactly 3 guardian triggers.
+
+**Immediately delete** `RD_TRIGGER_LAB_ALLOW_DDL` from the app
+environment after successful installation. **Do not rerun the installer**.
+DDL auto-commits, so on a partial failure there may be 2 rather than
+3 triggers; stop and inspect the lab before any follow-up installation.
+
+Run `check:lab-guardian-updates` next. This invokes MariaDB with
+synthetic teacher, two students, student portal, and guardian portal
+accounts, tests blocked INSERT/UPDATE student-account linking and
+blocked linked-guardian role updates, plus successful authorized guardian
+reassignment and unrelated profile update. Transaction `ROLLBACK`
+removes all fake records, and all 63 tables are checked empty.
+Expected `returncode:0`, `STEP 7.6 TEST OK` and
+`ROLLBACK VERIFIED`.
+
+The older `check:lab-guardian-guard` and
+`verify:trigger-lab-schema` check scripts are now superseded for
+this 3-trigger lab baseline (they expect exactly 1 or 0 trigger).
+Never run the installer on the school's `ratsadaa_connect`,
+never import real records, enable live Node Login, or merge this
+work into `main`.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
