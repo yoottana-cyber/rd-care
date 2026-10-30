@@ -44,59 +44,40 @@ Push and backup/restore evidence are separately verified.
 ---
 
 
-## NEW — SINGLE TEST COMMAND (use this instead of all the individual labs)
+## ONE COMMAND FOR ALL STAGING CHECKS
 
-The previous isolated tests remain available for diagnosing failures, but
-**you do not need to download/upload ZIP repeatedly just to run them.**
+Run **`check:all-staging`** in DirectAdmin → Setup Node.js App → Run JS Script
+after uploading the latest experimental `node-hosting/` files to
+`/home/ratsadaa/rd-connect-node-stage/`. Remove any old
+`RD_TRIGGER_LAB_ALLOW_*` temporary variables first; keep the
+independent `RD_DB_*` staging and `RD_TRIGGER_LAB_DB_*` credentials unchanged.
 
-After this combined code is uploaded ONCE into the existing
-`/home/ratsadaa/rd-connect-node-stage/` Node.js test application:
+The suite currently includes **11 grouped checks**, all inside the
+single command: offline school/Auth/migration planning, two separate
+real MariaDB rollback tests for teacher/student/guardian login and
+private school reads, Push recipient readiness, mock receipt rules,
+daily attendance rollback, period truancy/behavior rollback, Push
+queue rollback, fake Push dispatcher rollback, additional staff/
+portal/student-affairs SQL read journey on the isolated five-trigger
+lab, and read-only public API + release NO_GO checks.
 
-1. Remove any old `RD_TRIGGER_LAB_ALLOW_*` temporary write/DDL flags.
-   Keep existing MariaDB staging and separate trigger-lab database
-   credentials unchanged. Confirm that `ratsadaa_connect` is still
-   the EMPTY staging database and `ratsadaa_trgtest` is still the
-   separate EMPTY, 5-trigger laboratory.
-2. DirectAdmin → Setup Node.js App → Run JS Script:
-   **`check:all-staging`**
-3. Expect `returncode: 0` and eight sequential lines
-   `[1/8] ... OK` through `[8/8] ... OK`, followed by
-   `STAGING COMBINED TESTS PASS`, `LAB ROLLBACK VERIFIED`,
-   `PUBLIC API STILL CLOSED` and **`RELEASE STILL NO_GO`**.
+Expected on success: `returncode: 0`, lines `[1/11] ... OK` through
+`[11/11] ... OK`, `STAGING COMBINED TESTS PASS`,
+`LAB/STAGING ROLLBACK VERIFIED`, `PUBLIC API STILL CLOSED`, and
+`RELEASE STILL NO_GO`.
 
-The eight grouped checks run:
-(1) authorization/attendance/timetable/API and D1 migration-plan
-offline contracts (missing private D1 manifest remains **PENDING**,
-not a failure); (2) Push recipient eligibility; (3) mock provider
-receipt logic; (4) actual MariaDB synthetic daily-attendance rollback;
-(5) synthetic period/truancy score rollback; (6) recipient Push
-queue/claim rollback; (7) queue → mock provider → receipt rollback;
-(8) read-only staging 63-table/119-FK/zero-trigger baseline and
-still-closed public HTTP production readiness gate.
+Temporary opt-in permissions are passed only to the relevant synthetic
+lab child process. No public API becomes available; no student data
+is migrated, no real Push is sent. The two staging database tests
+create **synthetic rows inside transactions that always ROLLBACK**.
+The other MariaDB tests use only the separate disposable laboratory.
+The final release check must return NO_GO by design.
 
-The combined runner internally passes the *exact required* opt-in flag
-**only to that child laboratory test**, never to its own parent process
-or the final release check. You do **not** add any test variable in
-DirectAdmin. Every SQL-writing test continues to be completely
-synthetic, lab-only and **ROLLBACK-only**; no test commits data or
-sends real Web Push. Any missing `ROLLBACK VERIFIED` /
-`LAB UNCHANGED` marker causes an immediate failure, and the next
-test will not run. No credentials or personal records are printed.
+If any stage stops or no ROLLBACK/LAB UNCHANGED confirmation appears,
+check the staging/lab database state before retrying. This command
+is a test of experimental migration scaffolding, not permission to
+switch production off Cloudflare.
 
-The final `check:go-live` child intentionally exits 2 because
-production deployment is **NO_GO**. The combined runner accepts that
-only with matching fail-closed logs; `returncode: 0` for the combined
-runner means *staging tests passed*, NOT production is ready.
-
-If `check:all-staging` stops at (for example) `[7/8]`, do NOT
-blindly rerun or leave a temporary test flag enabled. First check
-the relevant isolated lab database, then diagnose only that failed
-step. No need to re-upload files unless we actually change code.
-
-The original Cloudflare RD CONNECT Worker + D1, DNS, production PWA,
-teacher accounts and real Push service are not modified. Real data
-migration, production-safe API parity, browser/Web Push opt-in and
-backup/rollback signoff remain pending.
 
 ---
 
