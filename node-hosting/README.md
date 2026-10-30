@@ -22,6 +22,8 @@ This folder is a **fail-closed scaffold** for an isolated school-hosting migrati
 | `mysql/0000_migration_ledger.sql` | Migration ledger only; not the school schema |
 | `scripts/check-db.cjs` | Explicit **read-only** MariaDB connection check; no startup connection |
 | `scripts/verify-schema.cjs` | Explicit **read-only** MariaDB 63-table / 119-FK baseline check |
+| `scripts/check-auth-transaction.cjs` | Isolated **transactional** test: fake user/hash/session, then ROLLBACK |
+| `src/test-auth-crypto.cjs` | Scrypt helpers for the smoke test; NOT backward-compatible with existing D1 password hashes |
 | `scripts/inspect-d1-schema.cjs` | Offline schema-only D1 export inventory; refuses files containing INSERT data |
 | `test/migration-preflight.test.cjs` | Tests for safe read-only connectivity and schema inspection |
 
@@ -106,6 +108,41 @@ checks and says that business-rule triggers are not ported. It does **not** read
 personal records, change schema, import data, or modify Cloudflare.
 On a mismatch, it exits nonzero and lists the mismatching metadata fields.
 Do not point the existing school PWA at this Node application yet.
+
+## Stage 2: Test fake-account authentication and session storage (NOT live login)
+
+**Prerequisites:** Node.js `verify:schema` returned `SCHEMA CHECK OK` for the same
+isolated MariaDB database, `ratsadaa_connect`. This command is intended for a
+new **empty** test database only. It refuses to run if `users`, `students`,
+`portal_accounts`, or `sessions` already contain records, if database name
+is not exactly `ratsadaa_connect`, or if the relevant storage tables are not InnoDB.
+
+Update these three files inside `/home/ratsadaa/rd-connect-node-stage/` using FTP:
+- `package.json`
+- `src/test-auth-crypto.cjs`
+- `scripts/check-auth-transaction.cjs`
+
+In DirectAdmin → Setup Node.js App → `rd-connect-node-stage` → Run JS Script,
+select `check:auth-txn` (equivalent to `npm run check:auth-txn`).
+
+The command generates a random fake teacher username and random password in
+memory; hashes the password with scrypt, inserts this test account and a SHA-256
+session token hash using **parameterized SQL inside one InnoDB transaction**,
+verifies correct/wrong passwords and the temporary session, and then calls
+`ROLLBACK`. It checks that neither the temporary user nor its session remains.
+As with any InnoDB rolled-back insert, the AUTO_INCREMENT counter may advance,
+but **no fake user/session row remains**.
+
+Expected: `returncode: 0`, `STEP 6.2 OK`, and `ROLLBACK VERIFIED`.
+On errors it prints a broad category without leaking the generated password,
+tokens or SQL row data. If the script refuses a non-empty database, **do not
+delete the rows**; it is a safety condition.
+
+This is **not a production Login API** and is not compatible with D1 PBKDF2
+passwords. No `/api/auth/login` route is added or enabled. Until all 10 missing
+business-rule triggers, privacy checks, role permissions and audit protections
+are ported, do not import any real student accounts or point the existing PWA
+at this Node.js staging app.
 
 ## DirectAdmin trial setup
 
