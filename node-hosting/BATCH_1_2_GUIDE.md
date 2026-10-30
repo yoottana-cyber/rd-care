@@ -1,5 +1,49 @@
 # RD CONNECT — Combined Batch 1 + Batch 2, October 2026
 
+## Consolidated Batch 1 — private end-to-end auth and portal data journey (31 Oct 2026)
+
+A new **synthetic, rollback-only** MariaDB lab check verifies actual
+teacher, student-affairs, student and verified guardian sessions against
+the existing private Node HTTP handlers. No Passenger/public routes are
+enabled and no live school data is imported.
+
+- `scripts/check-lab-auth-read-journey.cjs` uses only
+  `ratsadaa_trgtest` after verifying **63 empty tables and five
+  pre-existing triggers**. It creates random, throwaway accounts,
+  one advisor classroom with two enrolled students, daily and period
+  attendance, one explicit truancy and a misconduct record.
+- Staff: teacher log-in, their classroom/roster/daily/period views;
+  Student Affairs staff can view school rooms but **cannot** take
+  unrelated homeroom attendance privileges.
+- Student portal: one student sees only their own records.
+  Guardian portal: only a **verified linked student**, and another
+  student is denied with HTTP 403. Both staff/portal tokens are
+  isolated from each other and revoked by logout.
+- Every test uses the existing internal
+  `src/staging-integrated-http.cjs` composition and
+  `staging-auth-service.cjs`, without opening public routes.
+  The single SQL transaction is ROLLED BACK, then emptiness
+  and the five original triggers are re-verified.
+- `test/batch1-auth-read-journey.test.cjs` and existing
+  `test/batch1-integrated-http.test.cjs` are part of the
+  offline `check:batch12` suite.
+
+The **one** DirectAdmin command remains `check:all-staging`. It now
+includes the additional auth/session/school-portal MariaDB test
+alongside previous offline, attendance, behavior, mock Push queue
+and fail-closed release checks. There is **no need to manually set
+any test flag, run every component separately, or upload the ZIP on
+each small commit**. The aggregate result is still **NO_GO** for a
+production cutover, even if all staging tests pass.
+
+The new SQL journey has been added to the experimental branch but
+has **not yet been run in the school's DirectAdmin MariaDB**.
+Do not link the live PWA until full API parity, data migration,
+Push and backup/restore evidence are separately verified.
+
+---
+
+
 ## NEW — SINGLE TEST COMMAND (use this instead of all the individual labs)
 
 The previous isolated tests remain available for diagnosing failures, but
