@@ -88,6 +88,19 @@ async function dailyAttendance(conn,user,roomId,date){
   [date,room.id,date,date]);
  return {school_date:date,items:rows};
 }
+async function savedDailyAttendance(conn,user,roomId,date){
+ if(!validDate(date))fail(400,'invalid_date');
+ const room=await assertRoom(conn,user,roomId,'daily');
+ const [items]=await conn.execute(
+  `SELECT a.student_id,a.status FROM attendance_daily a
+   JOIN student_enrollments h ON h.student_id=a.student_id
+   WHERE h.classroom_id=? AND a.school_date=?
+     AND h.start_date<=a.school_date
+     AND (h.end_date IS NULL OR h.end_date>a.school_date)`,
+  [room.id,date]);
+ // Missing rows stay missing. Frontend distinguishes not yet recorded.
+ return {items};
+}
 async function periodAttendance(conn,user,roomId,date,timetableId){
  if(!validDate(date))fail(400,'invalid_date');
  // Reading period attendance does not grant access to another teacher's
@@ -215,4 +228,4 @@ async function portalBehavior(conn,user,studentId,from,to){
  return {student_id:id,items:entries};
 }
 module.exports={asId,validDate,dateRange,trustedSession,assertRoom,listRooms,roster,
- dailyAttendance,periodAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior};
+ dailyAttendance,savedDailyAttendance,periodAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior};
