@@ -11,10 +11,19 @@ function reply(res,status,data){
  });
  res.end(JSON.stringify(data));
 }
+// CloudLinux/Passenger may forward either /api/* or the full application URL
+// /web/rd-connect-node-test/api/*. Accept only this configured staging mount;
+// never match an arbitrary URL suffix (which could bypass route boundaries).
+const STAGING_MOUNT_PATH='/web/rd-connect-node-test';
+function normalizeAppPath(path){
+ if(path===STAGING_MOUNT_PATH||path===STAGING_MOUNT_PATH+'/')return '/';
+ if(path.startsWith(STAGING_MOUNT_PATH+'/'))return path.slice(STAGING_MOUNT_PATH.length);
+ return path;
+}
 function requestHandler(req,res){
  const method=req.method||'GET';
  let path='/';
- try{path=new URL(req.url||'/', 'http://local.invalid').pathname}
+ try{path=normalizeAppPath(new URL(req.url||'/', 'http://local.invalid').pathname)}
  catch{return reply(res,400,{ok:false,error:'invalid_path'})}
  // Never mirror untrusted Origin, session keys or request data.
  if(path==='/api/health'&&method==='GET')
@@ -29,4 +38,4 @@ function requestHandler(req,res){
   return reply(res,501,{ok:false,error:'endpoint_not_migrated'});
  return reply(res,404,{ok:false,error:'not_found'});
 }
-module.exports={requestHandler};
+module.exports={requestHandler,normalizeAppPath};
