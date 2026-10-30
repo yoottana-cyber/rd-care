@@ -536,6 +536,42 @@ real staff, student, or guardian accounts. All ten missing business-rule
 triggers, stronger password hashing, hardened auth and authorization,
 and migration parity must be completed before production cutover.
 
+## Stage 7.1: Read-only prerequisites for D1 business-rule triggers
+
+The original **schema-only** SQLite D1 export contains exactly ten
+`CREATE TRIGGER` statements (guardian role, timetable insert/update
+overlaps, behavior soft-delete/restore, truancy insert/delete scoring,
+two push notification events, and behavior incident application).
+The school MariaDB staging schema was imported without any triggers.
+Before writing any MariaDB trigger DDL, run this **READ-ONLY** preflight.
+
+Upload only these two files from the experimental branch:
+- `node-hosting/package.json` → `/home/ratsadaa/rd-connect-node-stage/package.json`
+- `node-hosting/scripts/check-trigger-preflight.cjs` →
+  `/home/ratsadaa/rd-connect-node-stage/scripts/check-trigger-preflight.cjs`
+
+In DirectAdmin → Setup Node.js App → Run JS Script, run
+`check:trigger-preflight`. It checks the connected DB is exactly
+`ratsadaa_connect`, 14 required InnoDB tables and 52 essential
+columns, 3 relevant unique composite keys and the baseline of zero
+installed MariaDB triggers. Only information_schema metadata is queried;
+no school account/student/guardian records are read, no DDL is applied
+and no Login endpoint is enabled.
+
+Expected output: `returncode: 0`, `STEP 7.1 OK`, `READ-ONLY INVENTORY`,
+`NO SCHEMA CHANGES` and `LIVE LOGIN STILL CLOSED`.
+If it fails, stop before creating any database triggers and inspect
+schema drift. A passed audit **does not mean all trigger semantics have
+been ported**. Original D1 and the live school PWA remain unchanged.
+
+After this read-only gate, draft MariaDB trigger migrations and
+synthetic-only transaction tests as a separate reviewed step. MariaDB
+DDL auto-commits; do not assume `ROLLBACK` removes a new trigger.
+Timetable overlap checks also need concurrency-safe locking, and
+app-level authorization / trigger ordering must be audited before
+any production switch. MariaDB 10.4 should be upgraded by hosting
+before production cutover.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
