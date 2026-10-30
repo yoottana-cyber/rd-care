@@ -572,6 +572,45 @@ app-level authorization / trigger ordering must be audited before
 any production switch. MariaDB 10.4 should be upgraded by hosting
 before production cutover.
 
+## Stage 7.2: Review draft SQL for guardian and timetable rules (no database changes)
+
+The original D1 schema-only SQL (not sample-memory approximations) was checked
+against the MariaDB staging schema export for the following **three** triggers:
+- `guardian_link_role_guard` blocks a link unless the portal account is a guardian;
+- `timetable_clash_insert` blocks single-writer active timetable overlap;
+- `timetable_clash_update` excludes its own row and checks the same overlap.
+
+The draft file
+`migrations/drafts/0001_guardian_timetable_10_4.sql`
+contains candidate MariaDB 10.4 `SIGNAL SQLSTATE '45000'` replacements
+and an explicit DO NOT EXECUTE banner. **Do not import the SQL into phpMyAdmin
+or run it on the school's MariaDB staging database.** It has only been
+reviewed statically, NOT executed on MariaDB.
+
+**Why not install yet?** The D1 overlap SELECT does not prove
+race-safety for two concurrent teacher schedules, and the original
+guardian guard also has an update-bypass risk if an already-linked
+portal account changes role. Trigger creation is DDL and implicitly
+commits, so ROLLBACK does not remove a newly created trigger. Next,
+test an isolated disposable database with two concurrent sessions and
+review an account-role update guard before any installation.
+
+For the current read-only stage, upload three files from the staging branch:
+- `package.json`
+- `scripts/check-trigger-draft.cjs`
+- `migrations/drafts/0001_guardian_timetable_10_4.sql`
+
+Use DirectAdmin → Setup Node.js App → Run JS Script →
+`check:trigger-draft`. Expected `returncode: 0` and
+`STEP 7.2 DRAFT OK`, `NO DATABASE ACCESS / NO DDL`,
+`NOT APPROVED FOR DEPLOYMENT`. This script ONLY reads the .sql
+text from disk to check essential guard clauses; it does **not**
+execute SQL, connect to MariaDB or verify database syntax.
+
+The existing `ratsadaa_connect` remains on its tested baseline of
+0 triggers. Do not merge staging into main or switch the live Cloudflare
+PWA yet.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
