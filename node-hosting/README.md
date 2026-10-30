@@ -981,6 +981,84 @@ possible concurrency schedules. **Remove**
 `RD_TRIGGER_LAB_ALLOW_RACE` promptly when finished.
 `ratsadaa_connect`, live D1 and public Login APIs remain untouched.
 
+## Stage 7.9 — MariaDB timetable overlap triggers, isolated lab only
+
+**Prerequisite:** Stage 7.8 passed. The database `ratsadaa_trgtest`
+must still have **63 empty tables, 119 foreign keys, exactly 3 guardian
+triggers and zero timetable triggers**. This stage copies the *original
+D1* clash predicates to two MariaDB 10.4 BEFORE triggers using
+`SIGNAL SQLSTATE '45000'`.
+
+- `timetable_clash_insert` rejects an active lesson sharing an inclusive
+  period with another active lesson in the same classroom OR by the same
+  teacher on the same weekday.
+- `timetable_clash_update` checks the same condition when a lesson
+  changes, excluding its own row by `t.id <> OLD.id`. MariaDB does not
+  support SQLite's `UPDATE OF ...` syntax, so its trigger runs on all
+  updates and the predicate decides whether to block.
+
+The existing generated timetable UNIQUE index also applies; the
+original D1 and MariaDB business rules are not generally identical
+without comprehensive constraint tests. **These triggers do not yet
+guarantee race-safety for simultaneous class/teacher writes**; that
+will require two-connection tests and properly serialized locking.
+
+Only upload these 4 new/updated files to
+`/home/ratsadaa/rd-connect-node-stage/`:
+- `node-hosting/package.json` → `package.json`
+- `node-hosting/src/lab-timetable-guards.cjs` →
+  `src/lab-timetable-guards.cjs`
+- `node-hosting/scripts/install-lab-timetable-guards.cjs` →
+  `scripts/install-lab-timetable-guards.cjs`
+- `node-hosting/scripts/check-lab-timetable-guards.cjs` →
+  `scripts/check-lab-timetable-guards.cjs`
+
+Keep previously installed guardian test modules intact.
+**Do not import the older 7.2 SQL draft into phpMyAdmin.**
+Confirm old `RD_TRIGGER_LAB_ALLOW_RACE` has been removed.
+
+### A. Opt-in once to DDL on LAB ONLY
+
+DirectAdmin → Setup Node.js App → Environment Variables:
+`RD_TRIGGER_LAB_ALLOW_DDL=INSTALL_TIMETABLE_DDL_ON_TEST_DB_7_9`.
+Existing `RD_TRIGGER_LAB_DB_*` credentials point ONLY to the
+disposable `ratsadaa_trgtest`. NEVER modify `RD_DB_*` or import
+the SQL into `ratsadaa_connect`.
+
+Run `install:lab-timetable-guards` using Run JS Script **one time**.
+Installer verifies exact lab database name, 63 empty InnoDB tables,
+119 FKs, 0 views, original 3 guardian trigger definitions and no other
+triggers. It creates exactly 2 timetable triggers, checking the
+total count after each, then returns:
+`returncode: 0`, `STEP 7.9 INSTALL OK`,
+`installed_triggers: 5` and `timetable_triggers: 2`.
+
+**Immediately remove** `RD_TRIGGER_LAB_ALLOW_DDL` after installation.
+If any error occurs STOP: one trigger may have been committed even if
+the next failed. Never blindly rerun DDL; inspect the lab first.
+
+### B. Test with fake data and ROLLBACK
+
+Run `check:lab-timetable-guards`.
+This tests fake teachers and classrooms inside a single transaction:
+same-room overlap rejected, same-teacher overlap rejected, adjacent
+period allowed, different weekday allowed, inactive overlap allowed,
+active toggle to clash rejected, unchanged-record edit allowed,
+period update clash rejected, weekday update clash rejected.
+The transaction is rolled back regardless of success/failure, then
+all 63 tables are checked empty and the five triggers validated.
+
+Expect `returncode: 0`, `STEP 7.9 TEST OK`,
+`ROLLBACK VERIFIED` and `PRODUCTION BLOCKED`.
+
+The trigger laboratory should now contain **5 triggers (3 extra
+guardian guards + 2 original timetable rules)**; the school's staging
+`ratsadaa_connect` remains on **0** business-rule triggers.
+Live Cloudflare D1, real student data and public Node Login must not
+change. Period-end validation and concurrent timetable writes remain
+outstanding. If the test fails, share the safe error code from
+DirectAdmin; do not rerun the installer.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
