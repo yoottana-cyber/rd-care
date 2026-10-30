@@ -1308,6 +1308,111 @@ this step creates temporary *committed* synthetic timetable rows.
 Preserve error category (never share database credentials) and
 inspect the lab before the next test.
 
+## Stage 7.13 — Coordinated timetable UPDATE + DELETE lab integration
+
+Stage 7.12 passed on actual MariaDB: both concurrent same-room and
+same-teacher INSERT attempts returned BUSY while the first writer
+held named locks, then returned TIMETABLE_OVERLAP after COMMIT; a
+nonoverlapping adjacent period was allowed. Three committed
+synthetic timetable rows were removed and all 63 tables were empty.
+The test-only database `ratsadaa_trgtest` contains exactly five triggers.
+
+Stage 7.13 extends the same stable advisory-lock protocol for
+**UPDATE and DELETE**, and adds **stale-row detection**. Only the
+separate disposable test DB may be used; the live Cloudflare D1,
+Node staging `ratsadaa_connect`, public Login and real school
+records are never changed.
+
+### Prototype behavior
+
+New `src/timetable-locked-update-delete.cjs` functions:
+- `coordinatedUpdate(conn, dbName, id, nextLesson)`: read old
+  row, validate new day/period/teacher/classroom/subject, acquire
+  **the union of original and target locks** in global sorted order,
+  start transaction, re-read the row `FOR UPDATE`, compare original
+  fields to detect a concurrent change, check target overlaps
+  **excluding the same timetable id**, UPDATE, COMMIT then release
+  all named locks. On error, ROLLBACK then release.
+- `coordinatedDelete(conn, dbName, id)`: read old row,
+  lock its original classroom/day and teacher/day keys, begin
+  transaction, re-read `FOR UPDATE`, verify row unchanged,
+  DELETE, COMMIT then release.
+- A stale observation returns `lab_timetable_stale_snapshot`.
+  A conflicting target returns the same business error
+  `TIMETABLE_OVERLAP` as INSERT; a held key returns
+  `lab_named_lock_busy` (temporary contention, not overlap).
+- These are **lab prototypes**, not integrated into any API.
+  A future production system must enforce the lock protocol for
+  all writers, including bulk changes, and discard pooled
+  connections when rollback or lock release state is uncertain.
+
+The integration script:
+1. Checks exact test DB identity, **all 63 tables empty**, exactly
+   five known triggers, and two distinct MariaDB connections.
+2. Temporarily COMMITS **two fake teachers and two classrooms**.
+   Creates synthetic timetable rows through the coordinated INSERT.
+3. Moves a timetable from old classroom/teacher to different
+   classroom/teacher: a peer INSERT to old **and new** resource
+   returns BUSY while update holds locks. After update COMMIT,
+   original slot is available, and new overlapping slot returns
+   TIMETABLE_OVERLAP.
+4. Rejects a move into an already occupied period, preserving
+   the original timetable row.
+5. Forces a concurrent update between old row observation and
+   lock acquisition, verifying the stale snapshot is refused
+   rather than silently overwriting the peer's timetable.
+6. DELETEs the moved lesson: while DELETE holds the original
+   resource lock, a peer cannot write that slot. After COMMIT,
+   the peer can insert into the freed slot.
+7. Deletes only **synthetic fixture classroom/teacher IDs and all
+   their synthetic timetable rows**, verifies every one of the
+   63 lab tables empty, and confirms exactly five triggers remain.
+
+Unlike a pure ROLLBACK test, this temporarily COMMITS synthetic
+fixtures and lessons. **If the script stops abruptly or fails
+to print LAB CLEANUP VERIFIED, do NOT rerun.** Inspect the disposable
+lab for any leftover synthetic records first; never use broad
+unscoped DELETE/TRUNCATE statements.
+
+### DirectAdmin
+
+Download the latest plan/node24-mariadb-directadmin branch.
+Upload **three files** from `node-hosting/` to
+`/home/ratsadaa/rd-connect-node-stage/`:
+- `package.json`
+- `src/timetable-locked-update-delete.cjs`
+- `scripts/check-lab-timetable-locked-updates.cjs`
+
+Previously deployed `src/timetable-locked-insert.cjs`,
+`src/timetable-write-coordination.cjs`, and
+`scripts/check-lab-timetable-locked-inserts.cjs` stay in place.
+
+In DirectAdmin → Setup Node.js App → Environment Variables,
+remove old flags `RD_TRIGGER_LAB_ALLOW_LOCK`,
+`RD_TRIGGER_LAB_ALLOW_RACE`, `RD_TRIGGER_LAB_ALLOW_DDL`.
+Set **only** this new temporary opt-in:
+`RD_TRIGGER_LAB_ALLOW_WRITE=RUN_LAB_TIMETABLE_UPDATE_DELETE_7_13`.
+No real database credentials should be changed or disclosed.
+
+Run **`check:lab-timetable-locked-updates`** via Run JS Script.
+Expected `returncode: 0`:
+`STEP 7.13 LOCKED UPDATE/DELETE OK`,
+`UPDATE: old/new slots busy`,
+`DELETE: old slot busy`,
+`LAB CLEANUP VERIFIED`, `NOT PRODUCTION READY`.
+
+The JSON report has `old_and_new_locks_verified:true`,
+`overlap_update_rejected:true`,
+`stale_snapshot_update_rejected:true`,
+`delete_lock_verified:true`, `deleted_slot_reusable:true`,
+`cleanup_verified:true`.
+
+**Immediately remove** `RD_TRIGGER_LAB_ALLOW_WRITE` after
+the test and **do not blindly rerun** on failure. No triggers are
+installed/modified here. Continued work includes bounded retry,
+safe pool connection lifecycle, bulk changes and API integration;
+do not merge this into main or enable public Node Login.
+
 ## DirectAdmin trial setup
 
 Use a **separate staging subdomain** with HTTPS and a newly created MySQL database. Do not install over `ratsada.ac.th`:
