@@ -12,7 +12,7 @@ const {category}=require('./check-db.cjs');
 const {bangkokToday}=require('../src/attendance-write-contract.cjs');
 const {seed}=require('./check-lab-period-truancy-rollback.cjs');
 const {d1PasswordHash}=require('../src/d1-password-compat.cjs');
-const {handleInternalSchoolRequest}=require('../src/staging-school-internal-router.cjs');
+const {handleIntegratedStaging}=require('../src/staging-integrated-http.cjs');
 const need=(yes,why)=>{if(!yes)throw Error('lab_journey_'+why)};
 const nonce=()=>randomBytes(8).toString('hex');
 const makePerson=()=>({
@@ -33,7 +33,7 @@ async function request(conn,method,url,{body,token}={}){
   end(text){this.raw=String(text??'')},
   json(){return JSON.parse(this.raw)}
  };
- await handleInternalSchoolRequest(req,res,{connection:conn});
+ await handleIntegratedStaging(req,res,{connection:conn});
  need(res.status>0&&res.raw.length>0,'incomplete_response');
  need(res.headers['Cache-Control']==='no-store'&&
   !res.headers['Access-Control-Allow-Origin'],'unsafe_response_headers');
