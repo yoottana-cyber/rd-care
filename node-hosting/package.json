@@ -18,7 +18,8 @@
     "check:password-compat": "node scripts/check-password-compat.cjs",
     "check:auth-service": "node scripts/check-auth-service.cjs",
     "check:auth-http": "node scripts/check-auth-http.cjs",
-    "check:auth-http-db": "node scripts/check-auth-http-db.cjs"
+    "check:auth-http-db": "node scripts/check-auth-http-db.cjs",
+    "check:https-transport": "node scripts/check-https-transport.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
