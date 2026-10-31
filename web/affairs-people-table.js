@@ -4,17 +4,25 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 export const activeTeachers=teachers=>(teachers||[]).filter(t=>
  Number(t.active)===1&&['teacher','staff'].includes(t.role)&&Number.isSafeInteger(Number(t.id))).
  slice().sort((a,b)=>String(a.display_name).localeCompare(String(b.display_name),'th'));
-export const teacherLabel=teacher=>teacher?
- String(teacher.display_name||'')+' (@'+String(teacher.username||'')+')'+
- (teacher.role==='staff'?' • ฝ่ายกิจการ':''):'';
+// Ordinary choices show only the full name. For genuinely duplicated names,
+// a neutral sequence number distinguishes accounts without exposing usernames.
+export const teacherLabel=teacher=>teacher?String(teacher.display_name||'').trim():'';
+export function teacherChoiceLabel(teacher,teachers){
+ if(!teacher)return '';
+ const name=teacherLabel(teacher);
+ const same=teachers.filter(t=>teacherLabel(t)===name);
+ if(same.length<2)return name;
+ const index=same.findIndex(t=>Number(t.id)===Number(teacher.id));
+ return name+' • '+(index+1);
+}
 export function selectedLabel(userId,teachers){
  const teacher=teachers.find(t=>Number(t.id)===Number(userId));
- return teacher?teacherLabel(teacher):'';
+ return teacher?teacherChoiceLabel(teacher,teachers):'';
 }
 export function resolveTeacherId(value,teachers){
  const typed=String(value??'').trim();
  if(!typed)return null;
- const found=teachers.find(t=>teacherLabel(t)===typed);
+ const found=teachers.find(t=>teacherChoiceLabel(t,teachers)===typed);
  if(!found)throw Error('กรุณาเลือกชื่อครูจากรายการค้นหาที่แสดง ไม่ใช่พิมพ์ชื่อใหม่เอง');
  return Number(found.id);
 }
@@ -31,21 +39,21 @@ export function filterAdvisorRoster(rooms,{query='',grade='all',coverage='all'}=
 }
 export function advisorManagementMarkup(roster){
  const teachers=activeTeachers(roster.teachers);
- const userLabels=new Map(teachers.map(t=>[Number(t.id),teacherLabel(t)]));
+ const userLabels=new Map(teachers.map(t=>[Number(t.id),teacherChoiceLabel(t,teachers)]));
  const rows=(roster.rooms||[]).map(room=>({
   ...room,
   primaryLabel:userLabels.get(Number(room.advisor_user_id))||room.advisor_name||'',
   secondaryLabel:userLabels.get(Number(room.advisor2_user_id))||room.advisor2_name||''
  }));
  const choices='<datalist id="rdAffairsTeacherChoices">'+teachers.map(t=>
-  '<option value="'+esc(teacherLabel(t))+'"></option>').join('')+'</datalist>';
- const search=(value,name,label,placeholder='ค้นหาชื่อหรือ Username')=>
+  '<option value="'+esc(teacherChoiceLabel(t,teachers))+'"></option>').join('')+'</datalist>';
+ const search=(value,name,label,placeholder='ค้นหาชื่อครู')=>
   '<input class="rd-affairs-searchable-teacher" type="search" list="rdAffairsTeacherChoices" '+
   'name="'+name+'" aria-label="'+esc(label)+'" autocomplete="off" '+
   'value="'+esc(value)+'" placeholder="'+esc(placeholder)+'">';
  const headFor=grade=>(roster.heads||[]).find(x=>Number(x.grade)===grade);
  const heads='<section class="card stack"><h3>หัวหน้าระดับชั้น ม.1–ม.6</h3>'+
-  '<p class="muted">ค้นหาชื่อหรือ Username ได้ ครูผู้สอนและครูฝ่ายกิจการนักเรียนที่ยังใช้งานสามารถเป็นหัวหน้าระดับได้ โดยไม่เปลี่ยนบทบาทหรือสิทธิ์เดิม</p>'+
+  '<p class="muted">ค้นหาชื่อครูได้ ครูผู้สอนและครูฝ่ายกิจการนักเรียนที่ยังใช้งานสามารถเป็นหัวหน้าระดับได้ โดยไม่เปลี่ยนบทบาทหรือสิทธิ์เดิม</p>'+
   '<div class="rd-affairs-people-grid">'+[1,2,3,4,5,6].map(grade=>
    '<form class="rd-affairs-person" data-affairs-head="'+grade+'">'+
     '<strong>ระดับชั้นมัธยมศึกษาปีที่ '+grade+'</strong>'+
@@ -84,7 +92,7 @@ export function advisorManagementMarkup(roster){
      '<td><button type="button" class="button secondary rd-affairs-save-room" data-save-affairs-advisor="'+Number(room.id)+'">บันทึก</button></td></tr>';
    }).join('')+'</tbody></table>'+
   '<p id="rdAffairsAdvisorEmpty" class="muted" hidden>ไม่พบห้องเรียนที่ตรงกับตัวกรอง</p>'+
-  '</div><p class="muted">พิมพ์ชื่อหรือ Username ในช่องเลือกครูเพื่อกรองรายการ แล้วเลือกชื่อที่แสดงใน Dropdown ก่อนบันทึก หากต้องการยกเลิกการมอบหมายให้ลบชื่อออก</p>'+
+  '</div><p class="muted">พิมพ์ชื่อครูเพื่อกรองรายการ แล้วเลือกชื่อที่แสดงใน Dropdown ก่อนบันทึก หากมีชื่อซ้ำจะแสดงหมายเลขลำดับเพื่อแยกบัญชี หากต้องการยกเลิกการมอบหมายให้ลบชื่อออก</p>'+
   '</section>';
  return {markup:choices+heads+table,teachers,rooms:rows};
 }
