@@ -31,6 +31,8 @@ import {createScoreHistoryPopup} from './score-history-popup.js';
 import {createTeacherScoreMonitor} from './teacher-score-monitor.js';
 import {createBehaviorAdjustment} from './behavior-adjustment.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
+import {teacherDailyWorkMarkup} from './teacher-daily-work.js';
+import {takeAttendanceSnapshot,attendanceHasUnsavedChanges} from './attendance-draft-guard.js';
 import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-ui.js';
 import {initTheme,bindThemeButtons} from './theme.js';
 configureRolePwa(location.search);
@@ -44,7 +46,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0,behaviorRules:[],notice:null};
+const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,advisorToday:null,advisorTodayUnavailable:false,attendanceBaseline:null,attendanceSaving:false,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0,behaviorRules:[],notice:null};
 const referenceCache=createRequestCache();
 const pwaTools=createPwaTools({api,toast});
 const lateGate=createLateGate({api,mount,toast,safeRun});
@@ -448,7 +450,16 @@ async function showTab(tab,{preserveDate=false}={}){
  }
 }
 async function loadDashboard(){
- state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));
+ const date=state.date;
+ const [overview,assigned]=await Promise.all([
+  api('/api/dashboard?date='+encodeURIComponent(date)),
+  api('/api/dashboard/advisor-rooms?date='+encodeURIComponent(date))
+   .then(value=>({data:value})).catch(()=>({error:true}))
+ ]);
+ if(state.tab!=='dashboard'||state.date!==date)return;
+ state.stats=overview;
+ state.advisorToday=assigned.data||null;
+ state.advisorTodayUnavailable=Boolean(assigned.error);
  renderDashboard();
 }
 function renderDashboard(){
@@ -484,6 +495,8 @@ function renderDashboard(){
      <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(state.date)}</p></div></div>
    <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
   </div>
+  ${state.user?.role!=='admin'||state.advisorToday?.items?.length?
+    teacherDailyWorkMarkup(state.advisorToday,{date:state.date,unavailable:state.advisorTodayUnavailable}):''}
   <h3 class="dashboard-section-title">🌈 แอปพลิเคชัน (Smart Apps)</h3>
   <div class="card smart-apps-card"><div class="grid quick-actions">${actions.map(([tab,icon,title,desc,tone])=>
    `<button type="button" class="quick-action ${tone}" data-quick-tab="${tab}" title="${desc}" aria-label="${title}: ${desc}">
@@ -506,7 +519,13 @@ function renderDashboard(){
   try{state.date=dateToday();await loadDashboard();toast('อัปเดตข้อมูลล่าสุดแล้ว')}
   finally{if(button.isConnected)button.disabled=false}
  }));
- $$('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
+ $('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
+ $('[data-daily-room]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+  const roomId=Number(button.dataset.dailyRoom);
+  if(!state.advisorToday?.items?.some(room=>Number(room.id)===roomId))return;
+  state.roomId=roomId;
+  await showTab('attendance',{preserveDate:true});
+ })));
 }
 let attendanceRequestId=0;
 async function loadAttendance(){
