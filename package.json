@@ -23,7 +23,8 @@
     "school:push-keygen": "node school-hosting/push-keys.cjs",
     "school:push-check": "node school-hosting/push-check.cjs",
     "school:cron-preflight": "node school-hosting/cron-preflight.cjs",
-    "school:advisor-check": "node school-hosting/advisor-check.cjs"
+    "school:advisor-check": "node school-hosting/advisor-check.cjs",
+    "school:personnel-test": "node --test school-hosting/test/personnel-import.test.cjs"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"
