@@ -11,9 +11,11 @@ function run({log=console.log,warn=console.error}={}){
   log('PRIVATE ROUTE NAME+METHOD FOUND: '+out.private_route_present+
    ' (response shape, SQL and permissions NOT verified).');
   log('NO MATCHING PRIVATE ROUTE: '+out.private_route_missing+'.');
-  log('PORTAL PATH MISMATCH: Worker '+REQUIRED_PATH_DIFF.cloudflare+
-   ' vs Node prototypes '+REQUIRED_PATH_DIFF.node_prototype_attendance+
-   ' and '+REQUIRED_PATH_DIFF.node_prototype_behavior+'.');
+  if(!out.rows.some(x=>x.path===REQUIRED_PATH_DIFF.cloudflare&&
+   x.coverage==='PRIVATE_ROUTE_PRESENT_SHAPE_UNVERIFIED'))
+   throw Error('stage13_portal_records_route_missing');
+  log('PORTAL RECORDS PRIVATE ROUTE FOUND: Worker '+REQUIRED_PATH_DIFF.cloudflare+
+   ' now has a matching internal GET route; full behavior/schema parity remains unverified.');
   log('PUBLIC PASSENGER API CLOSED: login, guardian records and attendance are still 501; health is 503.');
   warn('STAGE 13 NO_GO: complete API parity, privacy, score/history semantics and Push remain pending.');
   return 2;
