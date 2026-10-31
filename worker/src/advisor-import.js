@@ -192,6 +192,9 @@ export async function advisorImportEndpoint(req,env,user,path){
     statements.push(env.DB.prepare(
      "UPDATE users SET display_name=? WHERE lower(username)=? AND role IN ('teacher','staff') AND active=1 AND deleted_at IS NULL"
     ).bind(text(row.full_name),username));
+    statements.push(env.DB.prepare(
+     "INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,'advisor_bulk_name_updated','users',?)"
+    ).bind(user.id,username));
    }
   }
   for(const [label,group] of byRoom){
