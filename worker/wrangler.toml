@@ -10,7 +10,7 @@ keep_vars = true
 crons = ["*/5 * * * *"]
 
 [vars]
-ALLOWED_ORIGINS = "http://localhost:5500,https://school.example.ac.th,https://rd-connect.ratsada.ac.th"
+ALLOWED_ORIGINS = "http://localhost:5500,https://school.example.ac.th"
 
 [[d1_databases]]
 binding = "DB"
