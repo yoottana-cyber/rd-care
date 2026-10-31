@@ -92,9 +92,12 @@ async function run({env=process.env,log=console.log,now=Date.now()}={}){
   backups.ageHours+'h.');
  log('VAPID CONFIGURATION: '+(result.push?'PRESENT (delivery untested)':'INCOMPLETE'));
  for(const note of result.notes)log('NEXT: '+note);
- log('PILOT TECHNICAL CHECK PASS. OPERATOR MUST VERIFY CRON, PUSH AND LIMITED CLASSROOM ACCESS.');
+ const needsPreparation=result.notes.some(text=>/^(IMPORT_PILOT_ROSTERS|ASSIGN_PILOT_TEACHERS|SCHEDULE_DAILY_BACKUP|CONFIGURE_SCHOOL_VAPID):/.test(text));
+ log('READ-ONLY DATABASE INSPECTION PASS. '+
+  (needsPreparation?'PILOT PREPARATION PENDING.':'AUTOMATED GATES CHECKED.')+
+  ' CRON, PUSH AND CLASSROOM ACCESS STILL REQUIRE MANUAL VERIFICATION.');
  log('LIVE DATABASE UNCHANGED; NO PUSH SENT; NO DATA IMPORTED.');
- return {ok:true,counts,backupAgeHours:backups.ageHours,notes:result.notes};
+ return {ok:true,preparationPending:needsPreparation,counts,backupAgeHours:backups.ageHours,notes:result.notes};
 }
 if(require.main===module)run().catch(e=>{
  const code=String(e?.message||'');
