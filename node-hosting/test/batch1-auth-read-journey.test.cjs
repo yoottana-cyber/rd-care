@@ -7,12 +7,13 @@ const {AUTH_PATHS,SCHOOL_PATHS,parsePath}
  =require('../src/staging-integrated-http.cjs');
 test('internal routes include 6 exact auth and 9 scoped read views, never write endpoints',()=>{
  assert.equal(AUTH_PATHS.size,6);
- assert.equal(SCHOOL_PATHS.size,9);
+ assert.equal(SCHOOL_PATHS.size,10);
  assert.ok(AUTH_PATHS.has('/api/auth/login'));
  assert.ok(AUTH_PATHS.has('/api/portal/auth/me'));
  assert.ok(SCHOOL_PATHS.has('/api/attendance'));
  assert.ok(SCHOOL_PATHS.has('/api/portal/behavior'));
  assert.ok(SCHOOL_PATHS.has('/api/portal/records'));
+ assert.ok(SCHOOL_PATHS.has('/api/portal/truancy'));
  assert.ok(!SCHOOL_PATHS.has('/api/attendance/commit'));
 });
 test('Internal router rejects unknown routing, disallowed method and absent tokens',async()=>{
