@@ -7,6 +7,7 @@ const os=require('node:os');
 const path=require('node:path');
 const {migrate,CONFIRM}=require('../migrate.cjs');
 const {createHandler}=require('../server.cjs');
+const {run:makeAdmin,CONFIRM:ADMIN_CONFIRM}=require('../setup-admin.cjs');
 
 test('school-hosted PWA and original Worker API respond on the same mount',async()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'rd-school-http-'));
@@ -14,6 +15,9 @@ test('school-hosted PWA and original Worker API respond on the same mount',async
  let server,db;
  try{
   migrate({filename:file,confirm:CONFIRM,log(){}});
+  await makeAdmin({env:{RD_SQLITE_FILE:file,RD_SCHOOL_ADMIN_CONFIRM:ADMIN_CONFIRM,
+   RD_SETUP_USERNAME:'schooladmin',RD_SETUP_DISPLAY_NAME:'Synthetic Admin',
+   RD_SETUP_PASSWORD:'synthetic-strong-school-password'},log(){}});
   const env={RD_PUBLIC_ORIGIN:'https://ratsada.ac.th',
    RD_APP_MOUNT:'/web/rd-connect',RD_SQLITE_FILE:file};
   const app=await createHandler(env);
@@ -33,6 +37,21 @@ test('school-hosted PWA and original Worker API respond on the same mount',async
   const health=await fetch(origin+'/web/rd-connect/api/health');
   assert.equal(health.status,200);
   assert.equal((await health.json()).ok,true);
+  const login=await fetch(origin+'/web/rd-connect/api/auth/login',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:JSON.stringify({username:'schooladmin',
+    password:'synthetic-strong-school-password'})});
+  assert.equal(login.status,200);
+  const creds=await login.json();
+  assert.match(creds.token,/^[a-f0-9]{64}$/);
+  const rooms=await fetch(origin+'/web/rd-connect/api/classrooms',{
+   headers:{authorization:'Bearer '+creds.token}});
+  assert.equal(rooms.status,200);
+  assert.equal((await rooms.json()).items.length,48);
+  const setup=await fetch(origin+'/web/rd-connect/api/setup',{
+   method:'POST',headers:{'content-type':'application/json'},
+   body:'{}'});
+  assert.equal(setup.status,404);
   const forbidden=await fetch(origin+'/web/rd-connect/api/health',{
    headers:{origin:'https://attacker.example'}});
   assert.equal(forbidden.status,403);
