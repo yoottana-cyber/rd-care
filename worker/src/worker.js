@@ -1094,16 +1094,28 @@ async function route(req,env,ctx){
 }
 export default {
  async scheduled(event,env,ctx){
-  ctx.waitUntil(Promise.all([
-   deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
-   deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
-   deliverStudentPush(env).catch(e=>console.warn('RD scheduled student push',e?.name)),
-   deliverScorePush(env).catch(e=>console.warn('RD scheduled score push',e?.name)),
-   deliverStudentMessages(env).catch(e=>console.warn('RD scheduled student messages',e?.name)),
-   sendScheduledAttendanceReminders(env).catch(e=>console.warn('RD scheduled daily attendance reminder',e?.name)),
+  // Wait for ALL scheduled tasks to settle before the school-local SQLite
+  // adapter closes its database; log aggregate attendance outcome without PII.
+  ctx.waitUntil((async()=>{
+   const results=await Promise.allSettled([
+    deliverAdvisorPush(env).catch(e=>console.warn('RD scheduled staff push',e?.name)),
+    deliverTruancyPush(env).catch(e=>console.warn('RD scheduled truancy push',e?.name)),
+    deliverStudentPush(env).catch(e=>console.warn('RD scheduled student push',e?.name)),
+    deliverScorePush(env).catch(e=>console.warn('RD scheduled score push',e?.name)),
+    deliverStudentMessages(env).catch(e=>console.warn('RD scheduled student messages',e?.name)),
+    sendScheduledAttendanceReminders(env).then(summary=>{
+     console.info('RD DAILY REMINDER:',summary.state,'rooms:',Number(summary.count)||0,
+      'delivered:',(summary.outcomes||[]).filter(x=>x.state==='sent').length);
+     return summary;
+    }),
     deliverLateQrPush(env).catch(e=>console.warn('RD scheduled late QR push',e?.name)),
     cleanupStudentFileJobs(env).catch(e=>console.warn('RD student import cleanup',e?.name))
-  ]));
+   ]);
+   if(results[5].status==='rejected'){
+    console.error('RD DAILY REMINDER ERROR:',results[5].reason?.name||'unknown');
+    throw Error('school_daily_reminder_job_failed');
+   }
+  })());
  },
  async fetch(req,env,ctx){
   const origin=req.headers.get('origin');
