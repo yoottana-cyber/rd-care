@@ -51,7 +51,7 @@ export function createPersonnelImport({api,onSuccess,toast}){
   for(const p of preview)if(counts[p.status]!==undefined)counts[p.status]++;
   if(btn){
    btn.hidden=!preview.length;
-   btn.disabled=busy||counts.error>0||counts.imported>0||counts.updated>0||
+   btn.disabled=busy||rows.length===0||counts.error>0||counts.imported>0||counts.updated>0||
     counts.ready+counts.update===0;
   }
   if(!box)return;
@@ -80,7 +80,9 @@ export function createPersonnelImport({api,onSuccess,toast}){
   mode=String(data.get('mode')||'skip');
   const file=data.get('file');fileLabel=file?.name||'';
   const button=container.querySelector('#personnelImportPreviewButton');
+  const controls=[...form.querySelectorAll('input,select')];
   if(button)button.disabled=true;
+  for(const element of controls)element.disabled=true;
   phase='กำลังตรวจสอบไฟล์และ Username ที่มีอยู่ในฐานข้อมูล...';draw(container);
   try{
    const source=await readFile(file,String(data.get('encoding')||'auto'));
@@ -115,7 +117,10 @@ export function createPersonnelImport({api,onSuccess,toast}){
    wipe();preview=[];phase='ตรวจสอบไม่สำเร็จ: '+String(e?.message||'ระบบไม่พร้อม')+
     ' • ไม่มีการบันทึก';
   }finally{
-   busy=false;if(button?.isConnected)button.disabled=false;draw(container);
+   busy=false;
+   for(const element of controls)if(element.isConnected)element.disabled=false;
+   if(button?.isConnected)button.disabled=false;
+   draw(container);
   }
  }
  async function commit(container){
@@ -129,7 +134,9 @@ export function createPersonnelImport({api,onSuccess,toast}){
    '\nรหัสผ่าน บทบาท สิทธิ์ และสถานะของบัญชีเดิมจะไม่เปลี่ยน'))return;
   busy=true;
   const button=container.querySelector('#personnelImportCommit');
+  const controls=[...container.querySelectorAll('#personnelImportForm input,#personnelImportForm select')];
   if(button)button.disabled=true;
+  for(const element of controls)element.disabled=true;
   let created=0,updated=0,skipped=0,done=0;
   try{
    // Re-evaluate every chunk on the server, so stale browser previews cannot
@@ -158,7 +165,10 @@ export function createPersonnelImport({api,onSuccess,toast}){
     ' รายการ • ไม่ทราบผลบางชุด: '+String(e?.message||'ข้อผิดพลาด')+
     ' • กรุณาตรวจรายชื่อในระบบแล้วเลือกไฟล์ตรวจสอบใหม่ก่อนนำเข้าต่อ ไม่ส่งซ้ำโดยอัตโนมัติ';
   }finally{
-   wipe();busy=false;if(button?.isConnected)button.disabled=true;draw(container);
+   wipe();busy=false;
+   for(const element of controls)if(element.isConnected)element.disabled=false;
+   if(button?.isConnected)button.disabled=true;
+   draw(container);
   }
  }
  function render(container){
