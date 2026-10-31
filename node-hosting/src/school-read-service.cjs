@@ -324,9 +324,9 @@ async function portalRecords(conn,user,studentId,from,to){
 // absent period mark, active event and active student. No writes.
 async function portalTruancy(conn,user,from=null,to=null){
  if(user?.kind!=='portal')fail(403,'forbidden');
+ const range=from===null&&to===null?null:dateRange(from,to);
  if(user.role==='student')return {items:[]};
  if(user.role!=='guardian')fail(403,'forbidden');
- const range=from===null&&to===null?null:dateRange(from,to);
  const sql=`SELECT e.id,e.student_id,e.school_date,t.period,t.subject,s.full_name,
    e.created_at FROM truancy_events e
    JOIN period_truancy tr ON tr.student_id=e.student_id
