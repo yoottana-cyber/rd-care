@@ -167,6 +167,24 @@ async function wave(kind,number,actors,children,date,log){
   (breakdown?' | '+breakdown:''));
  return {kind,number,success:number-failures.length,failures,wall,stats};
 }
+async function verifyScopedAccess(actors,children,date){
+ const teacher=actors[0],otherRoom=actors[1];
+ const payload={
+  kind:'daily',date,classroom_id:otherRoom.roomId,
+  entries:otherRoom.studentIds.map(student_id=>({student_id,status:'present'}))
+ };
+ const url='http://127.0.0.1:'+children[0].port+'/rd-load/api/attendance';
+ const unauthorized=await fetch(url,{
+  method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)
+ });
+ const forbidden=await fetch(url,{
+  method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+teacher.token},
+  body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)
+ });
+ if(unauthorized.status!==401||forbidden.status!==403)
+  throw Error('school_load_authorization_isolation_failed');
+}
 function verifyRows(file,date){
  const db=new DatabaseSync(file,{readOnly:true,allowExtension:false});
  try{
@@ -204,6 +222,8 @@ async function run({log=console.log}={}){
   const results=[];
   for(const kind of ['daily','period'])
    for(const level of LEVELS)results.push(await wave(kind,level,actors,children,date,log));
+  await verifyScopedAccess(actors,children,date);
+  log('AUTHORIZATION: anonymous 401 and cross-class teacher 403 (isolation OK).');
   await stopChildren(children.splice(0));
   const counts=verifyRows(file,date);
   const fail=results.some(r=>r.failures.length>0||r.stats.p95>10000);
@@ -225,7 +245,11 @@ async function run({log=console.log}={}){
 }
 if(require.main===module)run().then(code=>{process.exitCode=code},e=>{
  const m=String(e?.message||'');
- const category=/^school_load_[a-z0-9_]+$/.test(m)?m:'school_load_unexpected_error';
+ const category=/^school_load_[a-z0-9_]+$/.test(m)?m:
+  /SQLITE_BUSY|database is locked/i.test(m)?'school_load_sqlite_busy':
+  /SQLITE_CONSTRAINT|TIMETABLE_OVERLAP/i.test(m)?'school_load_fixture_constraint':
+  /SQLITE_ERROR/i.test(m)?'school_load_sqlite_error':
+  'school_load_unexpected_error';
  console.error('LOAD TEST FAILED ('+category+').');
  process.exitCode=1;
 });
