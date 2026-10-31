@@ -33,17 +33,20 @@ export function filterAdvisorRoster(rooms,{query='',grade='all',coverage='all'}=
   if(coverage==='missing'&&(r.advisor_user_id||r.advisor2_user_id))return false;
   if(coverage==='partial'&&!(r.advisor_user_id&&!r.advisor2_user_id))return false;
   if(!q)return true;
-  return [r.label,r.advisor_name,r.advisor2_name,r.primaryLabel,r.secondaryLabel]
+  return [r.label,r.advisor_name,r.advisor2_name,r.primaryLabel,r.secondaryLabel,r.primaryUsername,r.secondaryUsername]
    .some(x=>String(x||'').toLocaleLowerCase('th').includes(q));
  });
 }
 export function advisorManagementMarkup(roster){
  const teachers=activeTeachers(roster.teachers);
  const userLabels=new Map(teachers.map(t=>[Number(t.id),teacherChoiceLabel(t,teachers)]));
+ const userSearch=new Map(teachers.map(t=>[Number(t.id),String(t.username||'')]));
  const rows=(roster.rooms||[]).map(room=>({
   ...room,
   primaryLabel:userLabels.get(Number(room.advisor_user_id))||room.advisor_name||'',
-  secondaryLabel:userLabels.get(Number(room.advisor2_user_id))||room.advisor2_name||''
+  secondaryLabel:userLabels.get(Number(room.advisor2_user_id))||room.advisor2_name||'',
+  primaryUsername:userSearch.get(Number(room.advisor_user_id))||'',
+  secondaryUsername:userSearch.get(Number(room.advisor2_user_id))||''
  }));
  const choices='<datalist id="rdAffairsTeacherChoices">'+teachers.map(t=>
   '<option value="'+esc(teacherChoiceLabel(t,teachers))+'"></option>').join('')+'</datalist>';
