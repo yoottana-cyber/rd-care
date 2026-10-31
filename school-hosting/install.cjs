@@ -13,6 +13,47 @@ const {run:backup,backupRoot}=require('./backup.cjs');
 const {settings}=require('./server.cjs');
 const ROOT=path.resolve(__dirname,'..');
 const WEB_ROOT=path.join(ROOT,'web');
+// Allowlisted synthetic-only test names. Never echo arbitrary child TAP
+// assertions: untrusted stack traces could expose SQL, env or school paths.
+const KNOWN_SMOKE_TESTS=Object.freeze([
+ 'full original Worker migration chain works on server-local native SQLite',
+ 'D1 SQL first/all/run, boolean binding and atomic batch behave correctly',
+ 'private DB cannot be stored in public web directory',
+ 'request routing is deterministic and cannot traverse webroot',
+ 'unmodified Worker can answer health and setup/admin login using school-local D1',
+ 'school-hosted PWA and original Worker API respond on the same mount'
+]);
+function safeSmokeDiagnostics(result,warn){
+ const output=String(result?.stdout||'');
+ const failed=output.split(/\r?\n/).map(line=>
+  /^\s*not ok \d+ - (.+)$/.exec(line)?.[1]?.trim()).filter(Boolean);
+ const known=failed.filter(name=>KNOWN_SMOKE_TESTS.includes(name));
+ for(const name of [...new Set(known)].slice(0,8))
+  warn('SCHOOL SMOKE FAILED CASE: '+name+'.');
+ const codes=[...new Set(
+  [...output.matchAll(/school_(?:migration_failed_)?[a-z0-9_]+/g)]
+   .map(x=>x[0]).filter(x=>x.length<=100)
+ )];
+ for(const code of codes.slice(0,5))
+  warn('SCHOOL SMOKE ERROR CATEGORY: '+code+'.');
+ const all=output+'\n'+String(result?.stderr||'');
+ const bootstrap=[
+  ['ERR_MODULE_NOT_FOUND','MODULE_NOT_FOUND'],
+  ['MODULE_NOT_FOUND','MODULE_NOT_FOUND'],
+  ['ERR_UNKNOWN_BUILTIN_MODULE','NODE_SQLITE_UNAVAILABLE'],
+  ['ERR_UNKNOWN_FILE_EXTENSION','ES_MODULE_LOADING_FAILED'],
+  ['ERR_REQUIRE_ESM','ES_MODULE_LOADING_FAILED'],
+  ['SQLITE_CANTOPEN','SQLITE_CANTOPEN'],
+  ['SQLITE_CONSTRAINT','SQLITE_CONSTRAINT'],
+  ['SQLITE_ERROR','SQLITE_ERROR'],
+  ['SyntaxError','SYNTAX_ERROR'],
+  ['ReferenceError','REFERENCE_ERROR']
+ ].find(([needle])=>all.includes(needle));
+ if(bootstrap)warn('SCHOOL SMOKE NODE CATEGORY: '+bootstrap[1]+'.');
+ if(!failed.length&&!codes.length&&!bootstrap)
+  warn('SCHOOL SMOKE NO SAFE TEST DETAILS: run school:test for full synthetic TAP diagnostics.');
+ return {known:known.length,codes:codes.length,bootstrap:bootstrap?.[1]||null};
+}
 function preflight(env){
  const config=settings(env);
  if(env.RD_SCHOOL_INIT_CONFIRM!==INIT_CONFIRM||
@@ -50,6 +91,7 @@ async function run({env=process.env,execute=spawnSync,
   const error=String(result?.error?.code||'');
   warn('SCHOOL INSTALL STOPPED AT 1/4: SMOKE TEST FAILED ('+
    (['ETIMEDOUT','ENOBUFS','ENOENT'].includes(error)?error:'test_failed')+').');
+  safeSmokeDiagnostics(result,warn);
   warn('DATABASE NOT CREATED BY INSTALL; inspect tests privately before retry.');
   return 1;
  }
@@ -76,4 +118,4 @@ async function run({env=process.env,execute=spawnSync,
 if(require.main===module)run().then(code=>{process.exitCode=code},()=>{
  console.error('SCHOOL INSTALL FAILED (unexpected).');process.exitCode=1;
 });
-module.exports={preflight,run};
+module.exports={preflight,run,KNOWN_SMOKE_TESTS,safeSmokeDiagnostics};
