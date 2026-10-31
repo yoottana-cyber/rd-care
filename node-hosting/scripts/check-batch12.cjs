@@ -26,14 +26,28 @@ function safeOfflineFailure(proc,tests,warn=console.error){
  // Synthetic test titles are fixed in repository code; never print arbitrary
  // error payloads or assertion values from TAP output.
  const raw=String(proc?.stdout||'');
- const failing=raw.split(/\r?\n/).filter(line=>/^not ok \d+ - /.test(line));
+ // Nested TAP (and Node --test bootstrap errors) can be indented.
+ const failing=raw.split(/\r?\n/).filter(line=>/^\s*not ok \d+ - /.test(line));
  warn('BATCH 1+2 TAP FAILING CASES: '+failing.length+'.');
  for(const line of failing.slice(0,8)){
-  const testName=line.replace(/^not ok \d+ - /,'').trim().slice(0,140)
+  const testName=line.replace(/^\s*not ok \d+ - /,'').trim().slice(0,140)
    .replace(/[a-f0-9]{48,}/ig,'[redacted]')
    .replace(/[^a-zA-Z0-9 _.,:;()\-]/g,'?');
   warn('BATCH 1+2 FAILED CASE: '+testName);
  }
+ // Classify only allowlisted bootstrap problems. NEVER echo stderr, paths,
+ // stack traces, environment variables, or untrusted test assertions.
+ const stderr=String(proc?.stderr||'');
+ const categories=[
+  ['ReferenceError','REFERENCE_ERROR'],
+  ['SyntaxError','SYNTAX_ERROR'],
+  ['ERR_MODULE_NOT_FOUND','MODULE_NOT_FOUND'],
+  ['MODULE_NOT_FOUND','MODULE_NOT_FOUND'],
+  ['ENOENT','FILE_NOT_FOUND'],
+  ['EACCES','ACCESS_DENIED']
+ ];
+ const found=categories.find(([needle])=>stderr.includes(needle));
+ if(found)warn('BATCH 1+2 NODE BOOTSTRAP CATEGORY: '+found[1]+'.');
  if(code==='ETIMEDOUT')
   warn('BATCH 1+2 TEST PROCESS TIMED OUT (no schema or DB operation from test runner).');
  if(!failing.length&&missing.length===0&&code==='none')
@@ -62,6 +76,8 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
   path.join(__dirname,'../test/batch1-lab-push-dispatch.test.cjs'),
   path.join(__dirname,'../test/batch2-manifest.test.cjs'),
   path.join(__dirname,'../test/batch2-reconciliation.test.cjs'),
+  path.join(__dirname,'../test/d1-rollback-rehearsal.test.cjs'),
+  path.join(__dirname,'../test/d1-synthetic-fixture.test.cjs'),
   path.join(__dirname,'../test/timetable-offline-api-contract.test.cjs')
  ];
  let proc;

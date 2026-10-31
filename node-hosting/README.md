@@ -1,5 +1,16 @@
 # RD CONNECT — DirectAdmin Node.js + MariaDB (Migration-only)
 
+## Stage 12 — private synthetic JSONL → MariaDB rollback rehearsal
+
+See [Stage 12 instructions](./D1_REHEARSAL.md). Run `make:d1-fixture` to
+generate a **fictional, disabled teacher account** plus 62 empty JSONL tables
+from the read-only metadata of the empty staging DB — **no D1 export or real
+school records**. Temporarily opt in to `check:d1-rehearsal` with the
+synthetic-only manifest and check unconditional ROLLBACK plus 63 empty tables.
+The usual 11-group test remains safe; no stage-12 import happens automatically.
+This is **not full D1 schema/data/application parity or go-live approval**.
+
+
 ## Consolidated Batch 1 + Batch 2 (offline school APIs + D1 migration preparation)
 
 The combined application/data groundwork has been added to this
