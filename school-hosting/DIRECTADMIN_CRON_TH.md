@@ -26,7 +26,7 @@ Preflight จะสรุปเหตุการณ์ที่อาจรอ�
 ## 2. ตรวจคำสั่งที่ Cron ของโฮสต์ใช้ได้
 
 CloudLinux Node.js Selector รองรับการเรียกสคริปต์จาก package.json ผ่าน
-`cloudlinux-selector run-script --interpreter nodejs --app-root rd-connect-school-app --script-name NAME`.
+`cloudlinux-selector run-script --json --interpreter nodejs --app-root rd-connect-school-app --script-name NAME`.
 การเรียกด้วย Selector ช่วยให้ใช้ Node.js และ Environment Variables ของแอปที่ตั้งไว้
 ใน DirectAdmin แทนการสร้าง VAPID Keys ใหม่หรือพิมพ์รหัสลับลงใน Cron
 
@@ -47,7 +47,7 @@ DirectAdmin → Advanced Features → Cron Jobs → Create Cron Job
 - Command (หนึ่งบรรทัด):
 
 ```sh
-/usr/bin/flock -n /home/ratsadaa/rd-connect-private/rd-connect-backup.lock /usr/sbin/cloudlinux-selector run-script --interpreter nodejs --app-root rd-connect-school-app --script-name school:backup >> /home/ratsadaa/rd-connect-private/backup-cron.log 2>&1
+/usr/bin/flock -n /home/ratsadaa/rd-connect-private/rd-connect-backup.lock /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --app-root rd-connect-school-app --script-name school:backup >> /home/ratsadaa/rd-connect-private/backup-cron.log 2>&1
 ```
 
 **02:00 เป็นเวลาเซิร์ฟเวอร์** ตรวจให้ตรงกับ Asia/Bangkok หากโฮสต์ใช้เขตเวลาอื่น
@@ -65,11 +65,18 @@ DirectAdmin → Advanced Features → Cron Jobs → Create Cron Job
 - Command (หนึ่งบรรทัด):
 
 ```sh
-/usr/bin/flock -n /home/ratsadaa/rd-connect-private/rd-connect-push.lock /usr/sbin/cloudlinux-selector run-script --interpreter nodejs --app-root rd-connect-school-app --script-name school:cron >> /home/ratsadaa/rd-connect-private/push-cron.log 2>&1
+/usr/bin/flock -n /home/ratsadaa/rd-connect-private/rd-connect-push.lock /usr/sbin/cloudlinux-selector run-script --json --interpreter nodejs --app-root rd-connect-school-app --script-name school:cron >> /home/ratsadaa/rd-connect-private/push-cron.log 2>&1
 ```
 
 `flock -n` ใช้ป้องกันการรันรอบถัดไปทับซ้อนกับรอบที่ยังไม่เสร็จ
 ไม่ต้องใส่ `setInterval` ใน Passenger และไม่ต้องเรียก HTTP API จาก Cron
+
+> สำคัญ: CloudLinux Selector บนโฮสต์นี้ต้องใช้ `run-script --json`;
+> หากไม่ระบุจะได้ `use --json option, other modes currently unsupported`.
+> ผลของ Selector เป็น JSON: ตรวจ `result` ว่าเป็น `success` และตรวจ log
+> หากมีฟิลด์ `data` อาจเป็น stdout ของสคริปต์ที่เข้ารหัส Base64
+> จึงอย่าตัดสินด้วยการค้นหา `SCHOOL CRON COMPLETED` เป็น plain text อย่างเดียว
+> ต้องตรวจผลสำรองฐานข้อมูลและการส่งแจ้งเตือนจริงอีกครั้ง
 
 ## 5. ตรวจผลหลังเปิดจริง
 
