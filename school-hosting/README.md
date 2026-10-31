@@ -36,6 +36,26 @@ No npm dependencies are needed for the Node-hosted version.
 **Do not overwrite** `node-hosting/`, `ratsadaa_connect` or the Cloudflare
 Worker/D1; this is a separate deployment path.
 
+## Fast install — one DirectAdmin command
+
+For a **new, empty, privately located** school database the recommended
+path is [QUICK_START_TH.md](QUICK_START_TH.md):
+
+1. Upload the full branch as one Node project and set four permanent
+   environment variables and five temporary admin/init variables.
+2. In Setup Node.js App → Run JS Script choose **`school:install`**.
+3. It runs the synthetic test suite, installs 46 original migrations,
+   seeds 48 rooms, creates the first admin locally and verifies an
+   independent private SQLite backup. Expected exit **0**.
+4. **Delete all five temporary secret/confirmation variables** and
+   restart the app. Validate locally at the test URL before any school
+   data import or domain switch.
+
+This refuses an already-present database rather than overwriting it.
+The individual `school:test`, `school:init`, `school:admin` and
+`school:backup` scripts below remain available for fault isolation,
+**not** for blindly repeating a partial installation.
+
 ## One-time DirectAdmin configuration
 
 1. Create a **new** Node.js 24 app for example:
