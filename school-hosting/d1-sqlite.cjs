@@ -23,6 +23,10 @@ function privateDbPath(filename,webRoot){
  const dir=path.dirname(resolved);
  if(!fs.existsSync(dir))throw Error('school_database_parent_missing');
  if(fs.lstatSync(dir).isSymbolicLink())throw Error('school_database_parent_symlink_blocked');
+ const realDir=fs.realpathSync(dir);
+ if(realDir.split(path.sep).some(part=>part==='public_html')||
+  realDir===publicRoot||realDir.startsWith(publicRoot+path.sep))
+  throw Error('school_database_real_path_not_private');
  return resolved;
 }
 function plain(row){
