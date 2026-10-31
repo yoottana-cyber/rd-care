@@ -58,7 +58,7 @@ function sheet(rows,widths,freeze=true){
   '<cols>'+columns+'</cols><sheetData>'+data+'</sheetData></worksheet>';
 }
 export function buildExampleXlsx(kind='students',scoreRules=[]){
- const isAdvisor=kind==='advisors',isPortal=kind==='portal',isRoster=kind==='roster';
+ const isAdvisor=kind==='advisors',isPortal=kind==='portal',isRoster=kind==='roster',isPersonnel=kind==='personnel';
  const isScore=kind==='score-good'||kind==='score-behavior',isGoodScore=kind==='score-good';
  const isCriteria=kind==='criteria-good'||kind==='criteria-behavior',isGoodCriteria=kind==='criteria-good';
  const eligibleRules=isScore&&Array.isArray(scoreRules)?
@@ -88,6 +88,11 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   ['student_no','full_name','student_username','student_password','guardian_name','guardian_username','guardian_password'],
   ['000001','นักเรียนตัวอย่าง ก','000001','ReplaceStudentPassword1','ผู้ปกครองตัวอย่าง ก','guardian000001','ReplaceGuardianPassword1'],
   ['000002','นักเรียนตัวอย่าง ข','000002','ReplaceStudentPassword2','ผู้ปกครองตัวอย่าง ข','guardian000002','ReplaceGuardianPassword2']
+ ]:isPersonnel?[
+  ['username','full_name','role','password'],
+  ['teacher_demo_new','ครูตัวอย่าง คนใหม่','teacher','ChangeThisDemoTeacher2026'],
+  ['staff_demo_new','บุคลากรตัวอย่าง คนใหม่','staff','ChangeThisDemoStaff2026'],
+  ['teacher_existing','ครูตัวอย่าง ที่มีบัญชีแล้ว','teacher','']
  ]:isAdvisor?[
   ['classroom','full_name','username','password'],
   ['ม.1/1','ครูตัวอย่าง หนึ่ง','teacher001','Teacher#1234'],
@@ -150,6 +155,17 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   ['การเชื่อม','ใช้เลขประจำตัวนักเรียนเชื่อมความสัมพันธ์ ต้องตรวจสอบตัวตนก่อนกดนำเข้า'],
   ['รหัสผ่าน','ห้ามใช้เลขบัตรประชาชน ไม่บังคับเปลี่ยนรหัสครั้งแรก'],
   ['ความปลอดภัย','ใช้ตัวอย่างเท่านั้น เก็บไฟล์รหัสผ่านอย่างปลอดภัย ห้ามส่งกลุ่มสาธารณะ']
+ ]:isPersonnel?[
+  ['RD CONNECT — นำเข้าบัญชีบุคลากร','คำอธิบาย'],
+  ['Personnel','คอลัมน์ username,full_name,role,password ตามลำดับ'],
+  ['username','คีย์จับคู่บัญชีเดิม (3–40 ตัว อังกฤษ ตัวเลข จุด ขีด)'],
+  ['full_name','ชื่อ–สกุลที่ต้องการให้ระบบแสดง'],
+  ['role','เฉพาะ teacher หรือ staff ห้ามใช้ admin'],
+  ['password','บุคลากรใหม่: teacher อย่างน้อย 10 ตัว / staff อย่างน้อย 12 ตัว'],
+  ['คนเดิม','โหมดข้ามไม่แก้ข้อมูลใด โหมดอัปเดตเปลี่ยนเฉพาะชื่อที่แสดง'],
+  ['ความปลอดภัย','รหัสผ่านและบทบาทของคนเดิมไม่เปลี่ยน บัญชีพักยังคงพัก'],
+  ['ข้อควรระวัง','Username ที่ลบไปแล้วไม่สร้างซ้ำ ห้ามนำตัวอย่างนี้เข้าระบบจริงโดยไม่แก้'],
+  ['สำรองข้อมูล','รัน school:backup ก่อนนำเข้าบุคลากรจริง']
  ]:isAdvisor?[
   ['RD Care — ตัวอย่างนำเข้าครูที่ปรึกษาทุกห้องในไฟล์เดียว','คำอธิบาย'],
   ['Advisors','4 คอลัมน์ในแถวแรก classroom,full_name,username,password'],
@@ -195,7 +211,7 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
  const workbook='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
-  '<sheets><sheet name="'+(isCriteria?'Criteria':isScore?'Score Import':isPortal?'Portal Accounts':isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="'+(isCriteria?'Existing rules':isScore?'Rules':'Rooms')+'" sheetId="3" r:id="rId3"/></sheets></workbook>';
+  '<sheets><sheet name="'+(isCriteria?'Criteria':isScore?'Score Import':isPortal?'Portal Accounts':isPersonnel?'Personnel':isAdvisor?'Advisors':'Students')+'" sheetId="1" r:id="rId1"/><sheet name="Instructions" sheetId="2" r:id="rId2"/><sheet name="'+(isCriteria?'Existing rules':isScore?'Rules':'Rooms')+'" sheetId="3" r:id="rId3"/></sheets></workbook>';
  const bookRelations='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
   [1,2,3].map(n=>'<Relationship Id="rId'+n+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+n+'.xml"/>').join('')+
@@ -214,7 +230,7 @@ export function buildExampleXlsx(kind='students',scoreRules=[]){
   '[Content_Types].xml':types,'_rels/.rels':relations,
   'xl/workbook.xml':workbook,'xl/_rels/workbook.xml.rels':bookRelations,
   'xl/styles.xml':styles,
-  'xl/worksheets/sheet1.xml':sheet(students,isCriteria?[16,20,61,15,14]:isScore?[25,16,64]:isRoster?[17,14,22,40]:isPortal?[22,39,27,34,39,28,34]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
+  'xl/worksheets/sheet1.xml':sheet(students,isCriteria?[16,20,61,15,14]:isScore?[25,16,64]:isRoster?[17,14,22,40]:isPortal?[22,39,27,34,39,28,34]:isPersonnel?[25,40,18,29]:isAdvisor?[17,38,25,24]:[17,14,22,35,22,20]),
   'xl/worksheets/sheet2.xml':sheet(instructions,[49,83]),
   'xl/worksheets/sheet3.xml':sheet(rooms,isCriteria?[16,20,56,15,14]:isScore?[16,50,16,25]:[32])
  });
@@ -228,6 +244,15 @@ export function downloadStudentExampleXlsx(){
  setTimeout(()=>URL.revokeObjectURL(url),3000);
 }
 
+export function buildPersonnelExampleXlsx(){return buildExampleXlsx('personnel')}
+export function downloadPersonnelExampleXlsx(){
+ const bytes=buildPersonnelExampleXlsx();
+ const url=URL.createObjectURL(new Blob([bytes],{type:MIME}));
+ const link=document.createElement('a');
+ link.href=url;link.download='RD_CONNECT_Personnel_Import.xlsx';
+ document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
 export function buildAdvisorExampleXlsx(){return buildExampleXlsx('advisors')}
 export function downloadAdvisorExampleXlsx(){
  const bytes=buildAdvisorExampleXlsx();
