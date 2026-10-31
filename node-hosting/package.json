@@ -53,7 +53,8 @@
     "check:lab-auth-read": "node scripts/check-lab-auth-read-journey.cjs",
     "check:integrated-http-db": "node scripts/check-integrated-http-db.cjs",
     "check:d1-rehearsal": "node scripts/check-d1-rollback-rehearsal.cjs",
-    "make:d1-fixture": "node scripts/make-d1-synthetic-fixture.cjs"
+    "make:d1-fixture": "node scripts/make-d1-synthetic-fixture.cjs",
+    "check:api-parity": "node scripts/check-stage13-api-parity.cjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6"
