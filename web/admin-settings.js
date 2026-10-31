@@ -16,7 +16,7 @@ export function adminMetrics(users,rooms){
 }
 const roleText={teacher:'ครูผู้สอน',staff:'กิจการนักเรียน',admin:'ผู้ดูแลระบบ'};
 export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
- reload,refreshRooms,clearStudentCache,advisorImporter,parseCsv,periodChoices,navigate}){
+ reload,refreshRooms,clearStudentCache,advisorImporter,personnelImporter,parseCsv,periodChoices,navigate}){
  let tab='overview',editUserId=null,search='',filterRole='all',filterStatus='all';
  const pushPolicy=createAdminNotificationPolicy({api,toast,safeRun});
  const users=()=>getUsers()||[],rooms=()=>getRooms()||[];
@@ -52,7 +52,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
   const person=users().find(u=>u.id===editUserId&&['teacher','staff'].includes(u.role));
   return `<div class="rd-settings-content"><div class="rd-settings-section-heading">
    <div><h3>บัญชีครูและบุคลากร</h3><p>สร้างบัญชีใหม่และจัดการบุคลากรอย่างเป็นระบบ</p></div>
-   <span class="rd-settings-counter">${users().length} บัญชี</span></div>
+   <div class="row" style="align-items:center;gap:10px"><button type="button" class="button secondary" id="openPersonnelBulkImport">📥 นำเข้าบุคลากร</button><span class="rd-settings-counter">${users().length} บัญชี</span></div></div>
    <div class="rd-settings-people-grid">
     <section class="rd-settings-panel">${panel('＋','เพิ่มบัญชีใหม่','ครูผู้สอนและฝ่ายกิจการนักเรียน')}
      <form id="addUser" class="rd-settings-form">
@@ -155,6 +155,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
      <button type="button" class="button full" id="openStudentRosterImport">เปิดศูนย์ทะเบียนและนำเข้านักเรียน</button>
     </section>
     <div id="advisorImportHolder" class="rd-settings-advisor-import"></div>
+    <div id="personnelImportHolder" class="rd-settings-advisor-import"></div>
    </div></div>`;
  }
  const notifications=()=>`<div class="rd-settings-content rd-admin-notifications">
@@ -248,6 +249,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
     }});
    editUserId=null;return true;
   },'บันทึกข้อมูลบุคลากรสำเร็จ');
+  document.querySelector('#openPersonnelBulkImport')?.addEventListener('click',()=>{tab='import';render()});
   onSubmit('addUser',async f=>{
    await api('/api/admin/users',{method:'POST',body:{
     username:String(f.get('username')).trim(),display_name:String(f.get('display_name')).trim(),
@@ -283,6 +285,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
  function bindImports(){
   document.querySelector('#openStudentRosterImport')?.addEventListener('click',()=>navigate?.('adminStudents'));
   advisorImporter.render(document.querySelector('#advisorImportHolder'));
+  personnelImporter?.render(document.querySelector('#personnelImportHolder'));
  }
   function render(){
   mount(layout());

@@ -7,6 +7,7 @@ import { validateLateSelfReport,validateLateReviewState,bangkokArrivalTime } fro
 import {portalRoutes,portalAdminRoutes} from './portal.js';
 import {searchStudents} from './student-search.js';
 import {advisorImportEndpoint} from './advisor-import.js';
+import {personnelImportEndpoint} from './personnel-import.js';
 import {validateUserPassword,userPasswordMinimum} from './user-password-policy.js';
 import {unifiedRosterEndpoint,unifiedRosterReadiness} from './unified-roster.js';
 import {studentStatisticsEndpoint} from './student-statistics.js';
@@ -688,6 +689,8 @@ async function adminRoutes(req,env,user,path){
  if(req.method==='GET'&&path==='/api/admin/student-search')return searchStudents(req,env,user);
  if(req.method==='GET'&&path==='/api/admin/student-statistics')return studentStatisticsEndpoint(env);
  if(path==='/api/admin/advisors/preview'||path==='/api/admin/advisors/commit')return advisorImportEndpoint(req,env,user,path);
+ if(path==='/api/admin/personnel-import/preview'||path==='/api/admin/personnel-import/commit')
+  return personnelImportEndpoint(req,env,user,path);
  if(path.startsWith('/api/admin/portal/'))return portalAdminRoutes(req,env,user,path);
  if(req.method==='POST'&&/^\/api\/admin\/(users|students)\/\d+\/delete$/.test(path))
   return adminDeleteIdentity(req,env,user,path);

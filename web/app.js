@@ -5,6 +5,7 @@ import {createUnifiedImport} from './unified-import.js';
 import {createPilotImportPreflight} from './pilot-import-preflight.js';
 import {createStudentStatistics} from './student-statistics.js';
 import {createAdvisorImport} from './advisor-import.js';
+import {createPersonnelImport} from './personnel-import.js';
 import {createAdminSettings} from './admin-settings.js';
 import {createSchoolSettings} from './school-settings.js';
 import {createTimetableAudit} from './timetable-audit.js';
@@ -67,10 +68,11 @@ const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:asy
 const studentStatistics=createStudentStatistics({api,mount,safeRun,isActive:()=>state.tab==='studentStatistics',
  onRoom:async id=>{adminStudentState.roomId=id;adminStudentState.editId=null;await showTab('adminStudents')}});
 const advisorImporter=createAdvisorImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();toast('นำเข้าครูที่ปรึกษาสำเร็จ');await loadAdmin()}});
+const personnelImporter=createPersonnelImport({api,toast,onSuccess:async()=>{referenceCache.clear();await loadAdmin()}});
 const adminSettings=createAdminSettings({api,mount,safeRun,toast,
  getUsers:()=>state.users,getRooms:()=>state.rooms,reload:loadAdmin,
  refreshRooms:refreshClassroomList,clearStudentCache:()=>referenceCache.clear(),
- advisorImporter,parseCsv,periodChoices,navigate:showTab});
+ advisorImporter,personnelImporter,parseCsv,periodChoices,navigate:showTab});
 async function refreshClassroomList(){
  const result=await api('/api/classrooms');
  state.rooms=result.items;referenceCache.clear();
