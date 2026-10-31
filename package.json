@@ -1,0 +1,23 @@
+{
+  "name": "rd-connect-school-selfhost",
+  "private": true,
+  "version": "0.1.0",
+  "type": "commonjs",
+  "description": "School-local hosting for existing RD CONNECT Worker + SQLite",
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "school:init": "node school-hosting/migrate.cjs",
+    "school:test": "node --test school-hosting/test/*.test.cjs",
+    "school:backup": "node school-hosting/backup.cjs",
+    "school:cron": "node school-hosting/cron.cjs",
+    "school:admin": "node school-hosting/setup-admin.cjs",
+    "school:install": "node school-hosting/install.cjs"
+  },
+  "dependencies": {
+    "qrcode-generator": "2.0.4"
+  }
+}

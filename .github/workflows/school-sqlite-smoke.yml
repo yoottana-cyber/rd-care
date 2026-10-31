@@ -1,0 +1,26 @@
+name: RD CONNECT school-local SQLite smoke
+on:
+  pull_request:
+    paths:
+      - 'school-hosting/**'
+      - 'worker/src/**'
+      - 'worker/migrations/**'
+      - 'worker/classrooms_only.sql'
+      - 'web/config.js'
+      - 'app.js'
+      - 'package.json'
+      - '.github/workflows/school-sqlite-smoke.yml'
+  workflow_dispatch:
+jobs:
+  school-sqlite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run original Worker schema, auth, PWA and HTTP checks on SQLite
+        run: npm run school:test

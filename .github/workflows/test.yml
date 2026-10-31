@@ -83,7 +83,7 @@ jobs:
           node --check web/sw.js
           node --check web/login-route.js
           node --check web/portal-date-range.js
-          node --check 'functions/api/[[path]].js'
+          node --input-type=module --check < 'functions/api/[[path]].js'
       - name: Unit tests
         run: node --test tests/*.test.mjs
       - name: Test schema + sample data

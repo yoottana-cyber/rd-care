@@ -1,7 +1,7 @@
-// Four characters for demo teacher accounts per school request.
-// Staff and administrator accounts retain a stricter minimum.
+// School self-hosting candidate: stronger passwords required for newly created
+// teacher accounts. Existing salted hashes are still verified by password.js.
 export function userPasswordMinimum(role){
- return role==='teacher'?4:12;
+ return role==='teacher'?10:12;
 }
 export function validateUserPassword(password,role){
  const min=userPasswordMinimum(role);

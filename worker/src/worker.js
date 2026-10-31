@@ -125,7 +125,10 @@ async function setup(req,env){
  if(!env.SETUP_TOKEN||env.SETUP_TOKEN==='REPLACE_WITH_A_LONG_RANDOM_ONE_TIME_SECRET')throw error(503,'ยังไม่ได้ตั้งค่า SETUP_TOKEN');
  const supplied=req.headers.get('x-setup-token')||'';
  if(!equalHash(supplied,env.SETUP_TOKEN))throw error(403,'รหัสตั้งค่าระบบไม่ถูกต้อง');
- const exists=await env.DB.prepare('SELECT id FROM users LIMIT 1').first();
+ // Migration 0017 creates one disabled QR system actor, not a human login.
+ // Block setup if ANY human/staff user exists (active or archived),
+ // while allowing only the explicitly named built-in disabled system actor.
+ const exists=await env.DB.prepare("SELECT id FROM users WHERE username<>'rd-care-late-system' LIMIT 1").first();
  if(exists)throw error(409,'ระบบมีบัญชีผู้ใช้งานแล้ว ไม่สามารถตั้งค่าเริ่มต้นซ้ำ');
  const b=await payload(req);
  const username=String(b.username||'').trim().toLowerCase(), pass=String(b.password||'');
