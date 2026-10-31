@@ -1,0 +1,39 @@
+name: Verify school-hosted RD CONNECT (Node SQLite)
+
+on:
+  push:
+    branches: [feature/school-direct-node-sqlite]
+    paths:
+      - 'school-hosting/**'
+      - 'web/config.js'
+      - 'app.js'
+      - 'package.json'
+      - '.github/workflows/school-hosting.yml'
+  pull_request:
+    paths:
+      - 'school-hosting/**'
+      - 'web/config.js'
+      - 'app.js'
+      - 'package.json'
+      - '.github/workflows/school-hosting.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  school-sqlite-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install app dependencies without modifying lockfiles
+        run: npm install --no-audit --no-fund --no-package-lock
+      - name: Verify Passenger and school API syntax
+        run: |
+          node --check app.js
+          node --check school-hosting/server.cjs
+          node --check school-hosting/test/school-subdomain.test.cjs
+      - name: Run school-local SQLite tests using synthetic data
+        run: npm run school:test
