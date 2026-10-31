@@ -90,7 +90,7 @@ async function run({env=process.env,log=console.log,now=Date.now()}={}){
  log('ATTENDANCE HISTORY: daily '+counts.dailyRecords+'; period '+counts.periodRecords+'.');
  log('BACKUP: latest owner-only private snapshot passes schema/integrity checks; age '+
   backups.ageHours+'h.');
- log('VAPID CONFIGURATION: '+(result.push?'PRESENT (delivery untested)':'INCOMPLETE'));
+ log('VAPID CONFIGURATION: '+(result.push?'PRESENT (pair must pass school:push-check; delivery untested)':'INCOMPLETE'));
  for(const note of result.notes)log('NEXT: '+note);
  const needsPreparation=result.notes.some(text=>/^(IMPORT_PILOT_ROSTERS|ASSIGN_PILOT_TEACHERS|SCHEDULE_DAILY_BACKUP|CONFIGURE_SCHOOL_VAPID):/.test(text));
  log('READ-ONLY DATABASE INSPECTION PASS. '+
