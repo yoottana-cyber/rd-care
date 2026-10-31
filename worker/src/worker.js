@@ -642,6 +642,28 @@ async function reviewAlert(req,env,user,id){
  await env.DB.batch(stmts);
  return json({ok:true,notification:'บันทึกเหตุการณ์ลงคิวภายในแล้ว แต่ยังไม่ได้ส่ง Push หรือข้อความถึงผู้ปกครอง'});
 }
+// Server-authorized overview: include ONLY rooms advised by this login.
+// Being a subject teacher does not authorize viewing other homerooms' daily work.
+async function advisorDailyProgress(req,env,user){
+ requireRole(user,['teacher','staff','admin']);
+ const date=new URL(req.url).searchParams.get('date')||bangkokToday();
+ requireDate(date);
+ const sql=`SELECT c.id,c.grade,c.label,
+  COUNT(DISTINCT s.id) AS students,COUNT(DISTINCT d.student_id) AS checked
+  FROM classrooms c
+  LEFT JOIN student_enrollments h ON h.classroom_id=c.id
+   AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)
+  LEFT JOIN students s ON s.id=h.student_id AND s.active=1
+  LEFT JOIN attendance_daily d ON d.student_id=s.id AND d.school_date=?
+  WHERE (c.advisor_user_id=? OR c.advisor2_user_id=?)
+  GROUP BY c.id,c.grade,c.room,c.label
+  ORDER BY c.grade,c.room`;
+ const {results}=await env.DB.prepare(sql).bind(date,date,date,user.id,user.id).all();
+ return json({date,items:(results||[]).map(row=>({
+  id:Number(row.id),grade:Number(row.grade),label:row.label,
+  students:Number(row.students)||0,checked:Number(row.checked)||0
+ }))});
+}
 async function dashboard(req,env,user){
  const date=new URL(req.url).searchParams.get('date')||bangkokToday();requireDate(date);
  const scope=isStaff(user)?{query:'',args:[]}:await env.DB.prepare(`SELECT id FROM classrooms WHERE advisor_user_id=? OR advisor2_user_id=? OR id IN
@@ -1050,7 +1072,8 @@ async function route(req,env,ctx){
   requireRole(user,['teacher','staff','admin']);
   return json({items:await advisorTruancyItems(env,user)});
  }
- if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
+ if(req.method==='GET'&&path==='/api/dashboard/advisor-rooms')return advisorDailyProgress(req,env,user);
+  if(req.method==='GET'&&path==='/api/dashboard')return dashboard(req,env,user);
  if(req.method==='POST'&&path==='/api/late/self/code')return issueLateSelfCode(req,env,user);
  if(req.method==='GET'&&path==='/api/late/self/requests')return listLateSelf(req,env,user);
  const lateReview=/^\/api\/late\/self\/requests\/(\d+)\/review$/.exec(path);
