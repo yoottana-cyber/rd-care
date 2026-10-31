@@ -1,11 +1,12 @@
 'use strict';
-// Explicit, private synthetic-data D1 -> MariaDB rehearsal. ALWAYS ROLLBACK.
+// Explicit, private synthetic-fixture JSONL -> MariaDB rehearsal. ALWAYS ROLLBACK.
 // This command is NOT called by check:all-staging or Passenger.
 // Exit 0 means rollback-only rehearsal passed; release remains NO_GO.
 const fs=require('node:fs');
 const path=require('node:path');
 const {openPool}=require('../src/database.cjs');
-const {loadManifest,checkFiles,compareSchema}=require('../migration/manifest-planner.cjs');
+const {checkFiles,compareSchema}=require('../migration/manifest-planner.cjs');
+const {loadSyntheticManifest}=require('../migration/synthetic-manifest.cjs');
 const {inspectTarget}=require('./check-d1-migration-plan.cjs');
 const {replay}=require('../migration/rollback-rehearsal.cjs');
 const {reconcile}=require('../migration/reconcile.cjs');
@@ -72,7 +73,7 @@ async function run({env=process.env,makePool=openPool,log=console.log,
   transaction=false;
   await inspect(conn); // independently verify all 63 tables are empty again
   rollbackVerified=true;
-  log('D1 STAGING REHEARSAL PASS: 63 tables, '+replayed.rows+
+  log('STAGE 12 SYNTHETIC REHEARSAL PASS: 63 tables, '+replayed.rows+
    ' private fixture rows compared inside transaction.');
   log('ROLLBACK VERIFIED: 63 staging tables empty, 119 FKs, zero triggers.');
   log('PUBLIC API CLOSED / NO REAL PUSH / RELEASE NO_GO.');
