@@ -54,7 +54,9 @@ async function run({env=process.env,log=console.log,diagnose=readVapidDiagnostic
  return {ready:vapid.ready,code:vapid.code,counts};
 }
 if(require.main===module){
- run().catch(e=>{
+ run().then(result=>{
+  if(!result.ready)process.exitCode=2; // Config is incomplete, not an unexpected test error.
+ }).catch(e=>{
   const code=String(e?.message||'');
   console.error('SCHOOL PUSH CHECK BLOCKED ('+
    (/^school_push_[a-z0-9_]+$/.test(code)?code:'school_push_read_only_check_failed')+').');
