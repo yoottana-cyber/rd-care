@@ -42,7 +42,7 @@ async function run({env=process.env,backupFile=null,log=console.log}={}){
  const directory=backupRoot(env);
  if(path.resolve(source).startsWith(directory+path.sep))
   throw Error('school_backup_cannot_include_live_database');
- let backup=latestBackup(directory);
+ let backup;
  if(backupFile){
   // Only accept a real private backup in the configured backup directory.
   if(typeof backupFile!=='string'||path.dirname(path.resolve(backupFile))!==directory||
@@ -53,7 +53,7 @@ async function run({env=process.env,backupFile=null,log=console.log}={}){
   if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1024||stat.mode&0o077)
    throw Error('school_backup_file_insecure');
   backup={file,name:path.basename(file),mtimeMs:stat.mtimeMs,size:stat.size};
- }
+ }else backup=latestBackup(directory);
  if(fs.realpathSync(source)===fs.realpathSync(backup.file))
   throw Error('school_backup_equals_live_database');
  const destinationDir=fs.mkdtempSync(path.join(directory,'.rd-restore-check-'));
