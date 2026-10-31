@@ -32,6 +32,13 @@ function plain(row){
  return Object.fromEntries(Object.entries(row).map(([key,value])=>
   [key,typeof value==='bigint'?Number(value):value]));
 }
+function d1Value(v){
+ if(v===null||typeof v==='string'||typeof v==='number'||typeof v==='bigint')return v;
+ if(typeof v==='boolean')return v?1:0;
+ if(v instanceof Uint8Array)return Buffer.from(v);
+ if(v instanceof ArrayBuffer)return Buffer.from(v);
+ throw Error('unsupported_d1_bound_value');
+}
 function isRead(sql){
  return /^\s*(?:SELECT|PRAGMA|EXPLAIN)\b/i.test(sql)||
   /^\s*WITH\b/i.test(sql);
@@ -41,7 +48,7 @@ class D1Prepared{
   if(typeof sql!=='string'||!sql.trim())throw Error('d1_sql_required');
   this.db=db;this.sql=sql;this.params=params;
  }
- bind(...values){return new D1Prepared(this.db,this.sql,values)}
+ bind(...values){return new D1Prepared(this.db,this.sql,values.map(d1Value))}
  _statement(){return this.db.prepare(this.sql)}
  async first(column){
   const value=plain(this._statement().get(...this.params));
@@ -115,4 +122,4 @@ function openLocalD1({filename,webRoot,readonly=false}){
  }
  return new SchoolD1(sqlite);
 }
-module.exports={D1Prepared,SchoolD1,privateDbPath,openLocalD1,plain,isRead};
+module.exports={D1Prepared,SchoolD1,privateDbPath,openLocalD1,plain,isRead,d1Value};
