@@ -95,6 +95,11 @@ async function schoolHandler(req,res,{worker,db,env,config}){
  let where;
  try{where=cleanUrl(req.url,config.mount)}
  catch{return fail(res,400,'invalid_request')}
+ if(req.url.split('?')[0]===config.mount){
+  res.writeHead(308,{...commonHeaders(),
+   Location:config.mount+'/'+where.query});
+  return res.end();
+ }
  if(!where.pathname.startsWith('/api/'))
   return staticFile(req,res,where);
  if(!approvedOrigin(req,config.origin))return fail(res,403,'origin_not_allowed');
