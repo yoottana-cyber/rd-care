@@ -66,9 +66,9 @@ function safeFailure(p,kind,warn){
  }
  warn('STOP: no release action. Inspect isolated staging/lab state before retry.');
 }
-function run({env=process.env,execute=spawnSync,log=console.log,
- warn=console.error}={}){
- try{preflight(env)}catch(e){
+function run({env=process.env,execute=spawnSync,validate=preflight,
+ log=console.log,warn=console.error}={}){
+ try{validate(env)}catch(e){
   const name=String(e?.message||'');
   warn('FULL STAGING BLOCKED ('+
    (/^full_staging_[a-z_]+$/.test(name)?name:'invalid_staging_configuration')+').');
