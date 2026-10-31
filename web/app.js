@@ -409,7 +409,7 @@ function bindFilters(onChange,{guardAttendance=false}={}){
  }));
 }
 async function showTab(tab,{preserveDate=false}={}){
- if(tab!==state.tab&&!confirmAttendanceExit())return;
+ if(!confirmAttendanceExit())return; // Even re-opening the current tab must not discard edits.
  const previousTab=state.tab;
  state.date=dateOnAttendanceEntry({tab,previousTab,selectedDate:state.date,
   today:dateToday(),preserveDate});
