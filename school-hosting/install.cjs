@@ -21,7 +21,12 @@ const KNOWN_SMOKE_TESTS=Object.freeze([
  'private DB cannot be stored in public web directory',
  'request routing is deterministic and cannot traverse webroot',
  'unmodified Worker can answer health and setup/admin login using school-local D1',
- 'school-hosted PWA and original Worker API respond on the same mount'
+ 'school-hosted PWA and original Worker API respond on the same mount',
+ 'daily register resets date on return from period; explicit links and in-place dates survive',
+ 'printed school subpath QR, Cloudflare legacy QR and unrelated links',
+ 'camera scanner signals valid QR and does not accept a random QR',
+ 'school backup restores into private temporary copy without changing live DB',
+ 'restore test refuses missing or insecure backup without touching live DB'
 ]);
 function safeSmokeDiagnostics(result,warn){
  const output=String(result?.stdout||'');
