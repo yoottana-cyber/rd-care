@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {openPool}=require('../src/database.cjs');
 const {checkFiles,compareSchema}=require('../migration/manifest-planner.cjs');
-const {loadSyntheticManifest}=require('../migration/synthetic-manifest.cjs');
+const {loadSyntheticManifest,syntheticReplayOrder}=require('../migration/synthetic-manifest.cjs');
 const {inspectTarget}=require('./check-d1-migration-plan.cjs');
 const {replay}=require('../migration/rollback-rehearsal.cjs');
 const {reconcile}=require('../migration/reconcile.cjs');
@@ -52,9 +52,9 @@ async function run({env=process.env,makePool=openPool,log=console.log,
   pool=makePool(env);
   conn=await pool.getConnection();
   const target=await inspect(conn); // 63 empty InnoDB, 119 FKs, zero triggers
-  const plan=compareSchema(manifest,target.tables,target.columns,target.fk,
+  const targetPlan=compareSchema(manifest,target.tables,target.columns,target.fk,
    target.foreignKeys);
-  need(!plan.cyclic_or_blocked_tables.length,'fk_cycle_requires_design');
+  const plan=syntheticReplayOrder(manifest,targetPlan);
   const [generated]=await conn.execute(
    'SELECT TABLE_NAME,COLUMN_NAME,EXTRA FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE()');
   const supplied=new Map(manifest.tables.map(t=>[t.name,new Set(t.columns)]));
