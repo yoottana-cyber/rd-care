@@ -36,7 +36,7 @@ function guard(env){
  return target;
 }
 async function run({env=process.env,makePool=openPool,log=console.log,
- warn=console.error,load=loadManifest,verify=checkFiles,
+ warn=console.error,load=loadSyntheticManifest,verify=checkFiles,
  inspect=inspectTarget,play=replay,check=reconcile}={}){
  if(!env.RD_D1_REHEARSAL_CONFIRM){
   log('D1 REHEARSAL DISABLED: explicit synthetic-data confirmation missing.');
