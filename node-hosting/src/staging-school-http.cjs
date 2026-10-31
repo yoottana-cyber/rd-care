@@ -18,6 +18,7 @@ const ROUTES=Object.freeze({
  '/api/attendance':{kind:'staff',action:'school_attendance'},
  '/api/my-timetable':{kind:'staff',action:'timetable'},
  '/api/portal/children':{kind:'portal',action:'children'},
+ '/api/portal/records':{kind:'portal',action:'portal_records'},
  '/api/portal/attendance':{kind:'portal',action:'portal_attendance'},
  '/api/portal/behavior':{kind:'portal',action:'behavior'}
 });
@@ -67,6 +68,8 @@ async function handleStagingSchoolRead(req,res,{connection,services=school}={}){
     break;
    case 'timetable':value=await services.teacherTimetable(connection,current);break;
    case 'children':value=await services.portalChildren(connection,current);break;
+   case 'portal_records':value=await services.portalRecords(connection,current,
+    query.get('student_id'),query.get('from'),query.get('to'));break;
    case 'portal_attendance':value=await services.portalAttendance(connection,current,
     query.get('student_id'),query.get('from'),query.get('to'));break;
    case 'behavior':value=await services.portalBehavior(connection,current,
