@@ -1,99 +1,104 @@
-# RD CONNECT — D1 → MariaDB, rollback-only rehearsal (Stage 12)
+# RD CONNECT — Stage 12: synthetic JSONL → MariaDB rollback rehearsal
 
-**Status: EXPERIMENTAL / NO_GO.** Keep the existing Cloudflare Worker/D1
-and PWA unchanged. This is a private, opt-in **synthetic/sanitized data**
-rehearsal for the existing *empty* school staging database,
-`ratsadaa_connect`. It is NOT a production importer, not a release
-approval, and it does NOT enable any HTTP API, Push or background job.
+**STATUS: EXPERIMENTAL / NO_GO. No real school records.**
+The school Cloudflare D1/Worker/PWA is unchanged and remains the source
+of truth. This experiment never enables public login/API or actual Push.
 
-## What is already present
+## Before starting
 
-- `migration/export-d1-sql-to-jsonl.py`: trusted D1 SQL → PRIVATE JSONL
-  and a 63-table SHA-256/count manifest on a trusted local machine.
-- `migration/manifest-planner.cjs`: table/column/FK dependency analysis.
-- `scripts/check-d1-migration-plan.cjs`: read-only target check.
-- `migration/reconcile.cjs`: row counts + 119 FK orphan checks.
+- Use **ONLY** the isolated Node app at
+  `/home/ratsadaa/rd-connect-node-stage/` and empty MariaDB
+  `ratsadaa_connect`. Do NOT run on a live school DB.
+- Existing `RD_DB_*` secrets must be configured privately in DirectAdmin
+  and scoped to staging only. Do not share them with GitHub/ChatGPT.
+- Keep `RD_TRIGGER_LAB_ALLOW_*`, `RD_MIGRATION_ALLOW_IMPORT` and
+  `RD_ENABLE_SCHOOL_WRITES` unset.
+- Upload the **full node-hosting/** contents from the experimental branch.
+  The standard `check:all-staging` must continue to pass all 11 groups.
 
-## New rehearsal (not part of the normal staging command)
+## A. Generate an entirely fictional, private fixture (no D1 export)
 
-`scripts/check-d1-rollback-rehearsal.cjs` + the
-`migration/rollback-rehearsal.cjs` helper:
+DirectAdmin → Setup Node.js App → Run JS Script:
 
-1. Disabled by default (exit 2), without opening a database connection.
-2. Requires explicit `RD_D1_REHEARSAL_CONFIRM=RUN_SYNTHETIC_D1_ROLLBACK_ONLY`,
-   `RD_DB_NAME=ratsadaa_connect`, and `RD_D1_MANIFEST_FILE` pointing
-   to a private `manifest.json` **outside any Git repository and public web root**.
-   Existing `RD_DB_*` credentials must have access **only** to this
-   disposable, empty staging DB. Never put DB passwords into files or chat.
-3. Refuses any `RD_TRIGGER_LAB_ALLOW_*`, `RD_MIGRATION_ALLOW_IMPORT`, or
-   `RD_ENABLE_SCHOOL_WRITES` flag.
-4. Validates ALL JSONL files against the manifest (SHA-256 and newline
-   counts) before any database connection, then checks source columns
-   against all 63 empty InnoDB tables, 119 FKs, zero triggers,
-   generated-column mismatch and FK dependency cycles.
-5. Starts one MariaDB transaction, uses prepared `INSERT` statements
-   (up to 25 rows per batch) in dependency order, and verifies counts and
-   FK orphans **inside** the uncommitted transaction.
-6. Calls `ROLLBACK` **unconditionally**, including when an error is
-   detected; re-checks that all 63 tables are empty. No `COMMIT`,
-   `SET FOREIGN_KEY_CHECKS=0`, SQL DDL, actual Web Push or live D1
-   connection is present.
+```
+make:d1-fixture
+```
 
-**Important:** InnoDB `AUTO_INCREMENT` counters may still advance
-despite rollback. This is why the rehearsal MUST target a disposable,
-isolated staging database, never production or a database with records.
-
-## Use only after preparing a private synthetic fixture
-
-Do not upload actual students' passwords, national IDs, guardian links,
-behavior data or other personal records to GitHub, ChatGPT, or a public
-web directory. For the first trial use a **sanitized fixture**, handled
-on an access-controlled machine and transferred securely to a private
-path outside `public_html`. The source manifest records 63 tables.
-Do NOT run this against a populated staging or school database.
-
-On the test Node app `/home/ratsadaa/rd-connect-node-stage/`:
-
-- First run `npm run check:all-staging`. Its current 11-step result
-  must remain green and the release test **NO_GO**.
-- Without additional environment settings, `npm run check:d1-rehearsal`
-  returns exit 2, `D1 REHEARSAL DISABLED`, with no DB connection.
-- Only for an approved private **synthetic** rehearsal, configure the
-  two temporary variables below through DirectAdmin's private
-  environment editor (not via GitHub):
+Expected exit code 0:
 
 ```text
-RD_D1_MANIFEST_FILE=/private/non-public/path/manifest.json
+STAGE 12 SYNTHETIC FIXTURE READY: 63 tables, 1 fictional disabled account, NO SCHOOL ROWS READ.
+PRIVATE MANIFEST PATH: /home/ratsadaa/.rd-connect-stage12-synthetic-.../manifest.json
+NEXT: configure RD_D1_MANIFEST_FILE with this exact path and explicitly authorize rehearsal.
+PUBLIC API STILL CLOSED / RELEASE NO_GO.
+```
+
+**Copy the precise path shown by your server**, not the placeholder above.
+The generator reads only `information_schema` and verifies all 63 MariaDB
+tables are empty, InnoDB, with 119 foreign keys and 0 triggers.
+It creates 63 private JSONL files with only **one invented, inactive
+teacher account** (not a valid password hash). The other 62 tables
+contain zero rows. The source manifest is visibly labeled
+`synthetic-staging-schema` and cannot be confused with a real D1 export.
+
+The fixture directory is automatically chosen under the private home
+directory, *outside public_html and outside Git*. Permissions are restricted
+to the owning account where supported. Do not upload these files to
+GitHub or a public web path.
+
+## B. Explicitly authorize a rollback-only replay
+
+In DirectAdmin → the **TEST Node app** → Environment Variables
+temporarily add:
+
+```text
+RD_D1_MANIFEST_FILE=<the exact private manifest path from A>
 RD_D1_REHEARSAL_CONFIRM=RUN_SYNTHETIC_D1_ROLLBACK_ONLY
 ```
 
-- Run `check:d1-rehearsal` under **Run JS Script**. Expected success:
-  exit 0, `D1 STAGING REHEARSAL PASS`, `ROLLBACK VERIFIED`,
-  `PUBLIC API CLOSED`, `RELEASE NO_GO`.
-- Remove both temporary variables immediately after rehearsal.
-  Any failure, incomplete output, or missing rollback confirmation means
-  **STOP**: inspect database state before doing anything else. Do not
-  bypass preflight or repeat automatically.
+Do **not** set `RD_MIGRATION_ALLOW_IMPORT` or any live-write flag.
+Run JS Script:
 
-## Known blockers before migration of real records
+```
+check:d1-rehearsal
+```
 
-- Source/target column types, generated column mappings, SQLite integer
-  precision, date/time and binary conversions require additional review.
-  Invalid conversions fail closed and roll back.
-- Cross-table FK cycles and row-level/self-references are **not**
-  automatically bypassed; a dedicated audited import design is required.
-- A matching row count/FK check is not enough. Record-level identity
-  and hashes, temporal enrollments, guardians, attendance chronology,
-  behavior scoring, audit history, password upgrade and Push subscriptions
-  require separate verification.
-- Backups and a verified RESTORE, full API parity, PHP/Node hosting
-  safety review, real Push testing, consent/data-governance and approved
-  cutover remain pending. Public API must stay 501/503 as currently
-  configured.
+Expected success:
 
-## Developer tests
+```text
+returncode: 0
+STAGE 12 SYNTHETIC REHEARSAL PASS: 63 tables, 1 private fixture rows compared inside transaction.
+ROLLBACK VERIFIED: 63 staging tables empty, 119 FKs, zero triggers.
+PUBLIC API CLOSED / NO REAL PUSH / RELEASE NO_GO.
+```
 
-`npm test` runs `test/d1-rollback-rehearsal.test.cjs` offline without
-opening sockets/databases. `check:batch12`, used by the existing
-`check:all-staging` command, now includes those synthetic guard and
-rollback regressions. No test imports actual school records.
+The script validates every JSONL hash/count BEFORE connecting to MariaDB,
+checks the empty staging schema, replays only the explicitly labeled
+synthetic fixture using prepared statements in FK dependency order,
+checks row counts and FK relationships **inside one uncommitted transaction**,
+then **ROLLBACKs and rechecks all 63 tables are empty**. There is no COMMIT.
+
+**Remove both temporary environment variables immediately afterward.**
+Run `check:all-staging` once more to confirm the usual 11-group tests
+are still intact. An unexpected exit 1, FK-cycle blocker, missing rollback
+confirmation or post-rollback mismatch means **STOP** and inspect the
+isolated staging DB privately. Do not repeatedly attempt a failed test,
+bypass FK checks or enable HTTP endpoints.
+
+## Distinguish this from real D1 migration
+
+- `make:d1-fixture` **does not connect to D1, does not export real
+  student data**, and does not demonstrate real-data type compatibility.
+- `check:d1-rehearsal` **rejects real D1 source manifests**; it accepts
+  only the private `synthetic-staging-schema` source marker.
+- The pre-existing `export-d1-sql-to-jsonl.py` and
+  `check:d1-migration-plan` remain separate, private *planning* tools,
+  not an approved real-data importer.
+- Even after PASS, complete history, identity/password upgrades,
+  attendance/truancy semantics, behavior/merit, guardian relationships,
+  non-lossy type mapping, actual backup + restore, full API and Push parity
+  are unverified. The release gate **MUST remain NO_GO**.
+
+**Transaction note:** an InnoDB ROLLBACK may advance AUTO_INCREMENT
+counters. For that reason the database must be disposable, isolated,
+and empty before and after this run.
