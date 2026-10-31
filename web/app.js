@@ -31,6 +31,8 @@ import {createScoreHistoryPopup} from './score-history-popup.js';
 import {createTeacherScoreMonitor} from './teacher-score-monitor.js';
 import {createBehaviorAdjustment} from './behavior-adjustment.js';
 import {renderAttendanceCharts} from './dashboard-charts.js';
+import {teacherDailyWorkMarkup} from './teacher-daily-work.js';
+import {takeAttendanceSnapshot,attendanceHasUnsavedChanges} from './attendance-draft-guard.js';
 import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-ui.js';
 import {initTheme,bindThemeButtons} from './theme.js';
 configureRolePwa(location.search);
@@ -44,7 +46,7 @@ document.addEventListener('error',event=>{
 },true);
 const $=(selector)=>document.querySelector(selector);
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0,behaviorRules:[],notice:null};
+const state={token:readAuthSession('rd_token'),user:null,tab:'dashboard',rooms:[],users:[],roomId:null,date:dateToday(),kind:'daily',slotId:null,slots:[],students:[],statuses:{},savedCount:0,pushFeedback:null,dailyReferences:{},teachingNote:'',teachingNoteUpdatedAt:null,stats:null,advisorToday:null,advisorTodayUnavailable:false,attendanceBaseline:null,attendanceSaving:false,alerts:[],lates:[],selfLates:[],behaviors:[],behaviorTotal:0,behaviorRules:[],notice:null};
 const referenceCache=createRequestCache();
 const pwaTools=createPwaTools({api,toast});
 const lateGate=createLateGate({api,mount,toast,safeRun});
@@ -110,7 +112,7 @@ async function api(path,{method='GET',body,auth=true,timeoutMs=12000}={}){
   const response=await fetch(API_BASE_URL+path,{method,headers:{'Content-Type':'application/json',...(auth&&state.token?{Authorization:`Bearer ${state.token}`}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:controller.signal,cache:'no-store'});
   const data=await response.json().catch(()=>({}));
   if(!response.ok){
-   if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();advisorImporter.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
+   if(response.status===401&&auth){referenceCache.clear();unifiedImport.clear();advisorImporter.clear();state.token='';state.user=null;state.attendanceBaseline=null;state.statuses={};clearAuthSession('rd_token');renderLogin();}
    const message=response.status>=500?(data.message||data.error||`HTTP ${response.status}`):
     (data.error||data.message||`HTTP ${response.status}`);
    const failure=new Error(message);failure.httpStatus=response.status;
@@ -374,15 +376,40 @@ async function renewStaffRememberedSession(){
  }catch{/* Offline/errors keep the original expiry; only an actual 401 clears it. */}
  finally{staffRenewInFlight=false}
 }
-async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
+async function logout(){if(!confirmAttendanceExit())return;try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
 function roomOptions(advisorOnly=false){
  const rooms=advisorOnly&&['teacher','staff'].includes(state.user?.role)?
   state.rooms.filter(r=>(r.advisor_user_id===state.user.id||r.advisor2_user_id===state.user.id)):state.rooms;
  return rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
-function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
+function attendanceDirty(){return ['attendance','periodCheckin'].includes(state.tab)&&attendanceHasUnsavedChanges(state,state.attendanceBaseline)}
+function confirmAttendanceExit(){
+ if(state.attendanceSaving){toast('กำลังบันทึกข้อมูล กรุณาตรวจสอบผลก่อนเปลี่ยนหน้า',true);return false}
+ return !attendanceDirty()||confirm('มีข้อมูลเช็กชื่อที่แก้ไขแต่ยังไม่บันทึก หากออกจากหน้านี้ข้อมูลที่แก้ไขจะสูญหาย ยืนยันออกจากหน้า?');
+}
+window.addEventListener('beforeunload',event=>{
+ if(!state.attendanceSaving&&!attendanceDirty())return;
+ event.preventDefault();event.returnValue='';
+});
+function updateAttendanceDraftNotice(){
+ const el=$('#attendanceDraftNotice');if(!el)return;
+ const dirty=attendanceDirty();
+ el.textContent=dirty?'● มีข้อมูลแก้ไขที่ยังไม่ได้บันทึก':'ตรวจสอบข้อมูลก่อนกดยืนยันเพื่อบันทึก';
+ el.className=dirty?'rd-attendance-draft-notice dirty':'rd-attendance-draft-notice';
+}
+function bindFilters(onChange,{guardAttendance=false}={}){
+ $('#room')?.addEventListener('change',e=>safeRun(async()=>{
+  if(guardAttendance&&!confirmAttendanceExit()){e.target.value=String(state.roomId);return}
+  state.roomId=Number(e.target.value);state.slotId=null;await onChange();
+ }));
+ $('#day')?.addEventListener('change',e=>safeRun(async()=>{
+  if(guardAttendance&&!confirmAttendanceExit()){e.target.value=state.date;return}
+  state.date=e.target.value;state.slotId=null;await onChange();
+ }));
+}
 async function showTab(tab,{preserveDate=false}={}){
+ if(!confirmAttendanceExit())return; // Even re-opening the current tab must not discard edits.
  const previousTab=state.tab;
  state.date=dateOnAttendanceEntry({tab,previousTab,selectedDate:state.date,
   today:dateToday(),preserveDate});
@@ -448,7 +475,16 @@ async function showTab(tab,{preserveDate=false}={}){
  }
 }
 async function loadDashboard(){
- state.stats=await api('/api/dashboard?date='+encodeURIComponent(state.date));
+ const date=state.date;
+ const [overview,assigned]=await Promise.all([
+  api('/api/dashboard?date='+encodeURIComponent(date)),
+  api('/api/dashboard/advisor-rooms?date='+encodeURIComponent(date))
+   .then(value=>({data:value})).catch(()=>({error:true}))
+ ]);
+ if(state.tab!=='dashboard'||state.date!==date)return;
+ state.stats=overview;
+ state.advisorToday=assigned.data||null;
+ state.advisorTodayUnavailable=Boolean(assigned.error);
  renderDashboard();
 }
 function renderDashboard(){
@@ -484,6 +520,8 @@ function renderDashboard(){
      <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(state.date)}</p></div></div>
    <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
   </div>
+  ${state.user?.role!=='admin'||state.advisorToday?.items?.length?
+    teacherDailyWorkMarkup(state.advisorToday,{date:state.date,unavailable:state.advisorTodayUnavailable}):''}
   <h3 class="dashboard-section-title">🌈 แอปพลิเคชัน (Smart Apps)</h3>
   <div class="card smart-apps-card"><div class="grid quick-actions">${actions.map(([tab,icon,title,desc,tone])=>
    `<button type="button" class="quick-action ${tone}" data-quick-tab="${tab}" title="${desc}" aria-label="${title}: ${desc}">
@@ -507,6 +545,12 @@ function renderDashboard(){
   finally{if(button.isConnected)button.disabled=false}
  }));
  $$('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
+ $$('[data-daily-room]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
+  const roomId=Number(button.dataset.dailyRoom);
+  if(!state.advisorToday?.items?.some(room=>Number(room.id)===roomId))return;
+  state.roomId=roomId;
+  await showTab('attendance',{preserveDate:true});
+ })));
 }
 let attendanceRequestId=0;
 async function loadAttendance(){
@@ -532,7 +576,10 @@ async function loadAttendance(){
     <div class="card stack"><div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(date)}"></div>
     <p class="warn">วันนี้ยังไม่มีคาบสอนตามตารางของคุณ ${canTeach()?'กรุณาสร้างตารางสอนของตนเอง หรือเลือกวันที่มีคาบสอน':'กรุณาเลือกวันที่มีตารางสอน'}</p>
     ${canTeach()?'<button class="button" data-tab="myTimetable" type="button">+ สร้างตารางสอนของฉัน</button>':''}</div></section>`);
-   $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
+   $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{
+ if(!confirmAttendanceExit()){e.target.value=state.date;return}
+ state.date=e.target.value;state.slotId=null;await loadAttendance();
+}));
    return;
   }
   roomId=slot.classroom_id;state.roomId=roomId;
@@ -559,6 +606,7 @@ async function loadAttendance(){
  state.teachingNoteUpdatedAt=kind==='period'?attendanceData.teaching_note_updated_at||null:null;
  state.statuses=Object.fromEntries(state.students.map(x=>[x.id,'present']));
  for(const entry of entries)state.statuses[entry.student_id]=entry.status;
+ state.attendanceBaseline=takeAttendanceSnapshot(state);
  renderAttendance();
 }
 function statusCounts(){return Object.fromEntries(Object.keys(state.kind==='period'?periodNames:names)
@@ -646,26 +694,36 @@ function renderAttendance(){
   <textarea id="teachingNote" rows="4" maxlength="2000" placeholder="ตัวอย่าง: เรื่อง การเขียนโปรแกรมด้วยเงื่อนไข ทดลองทำใบงานและฝึกปฏิบัติ...">${esc(state.teachingNote)}</textarea>
   <div class="teaching-note-foot"><span>บันทึกแยกตามวันที่ วิชา และคาบเรียน สามารถกลับมาแก้ไขได้</span><span id="teachingNoteCount">${state.teachingNote.length.toLocaleString('th-TH')} / 2,000</span></div>
  </section>`:''}
+ <div id="attendanceDraftNotice" role="status" aria-live="polite" class="rd-attendance-draft-notice">ตรวจสอบข้อมูลก่อนกดยืนยันเพื่อบันทึก</div>
  <button id="saveAttendance" class="button full" ${!state.students.length||!daily&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
  $('#refreshAttendanceRoster')?.addEventListener('click',()=>safeRun(loadAttendance));
- if(daily)bindFilters(loadAttendance);
+ if(daily)bindFilters(loadAttendance,{guardAttendance:true});
  $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
- $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));
+ $('#slot')?.addEventListener('change',e=>safeRun(async()=>{
+ if(!confirmAttendanceExit()){e.target.value=String(state.slotId);return}
+ state.slotId=Number(e.target.value)||null;await loadAttendance();
+}));
  $$('[data-student]').forEach(btn=>btn.addEventListener('click',()=>{state.statuses[Number(btn.dataset.student)]=btn.dataset.status;updateAttendanceControls()}));
  $('#markAll')?.addEventListener('click',()=>{for(const student of state.students){if(state.kind==='daily'&&state.statuses[student.id]==='late')continue;state.statuses[student.id]='present'}updateAttendanceControls()});
  $('#teachingNote')?.addEventListener('input',event=>{
   state.teachingNote=event.target.value;
+  updateAttendanceDraftNotice();
   const count=$('#teachingNoteCount');if(count)count.textContent=state.teachingNote.length.toLocaleString('th-TH')+' / 2,000';
  });
  $('#saveAttendance')?.addEventListener('click',()=>safeRun(saveAttendance));
+ updateAttendanceDraftNotice();
 }
-function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();}
+function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();updateAttendanceDraftNotice();}
 async function saveAttendance(){
- if(!state.students.length)return;
+ if(!state.students.length||state.attendanceSaving)return;
  if(state.kind==='period'&&Object.values(state.statuses).includes('truancy')&&!confirm(
   'ยืนยันบันทึกสถานะหนีเรียนและหักคะแนนพฤติกรรม -10 ต่อรายการโดยอัตโนมัติ? บันทึกซ้ำจะไม่หักเพิ่ม และหากแก้สถานะจากหนีเรียน ระบบจะคืนคะแนนส่วนนี้ พร้อมแจ้ง Push ไปยังอุปกรณ์ที่เปิดรับ'
  ))return;
- const button=$('#saveAttendance');button.disabled=true;
+ const button=$('#saveAttendance'),oldText=button?.textContent||'ยืนยันและบันทึกทั้งห้อง';
+ state.attendanceSaving=true;
+ if(button){button.disabled=true;button.textContent='กำลังบันทึก...'}
+ const controls=$('#room,#day,#periodDay,#slot,#markAll,#teachingNote,[data-student]');
+ for(const input of controls)input.disabled=true;
  try{
   const body={kind:state.kind,date:state.date,classroom_id:state.roomId,
    timetable_id:state.kind==='period'?state.slotId:null,
@@ -673,9 +731,17 @@ async function saveAttendance(){
   if(state.kind==='period')body.teaching_note=state.teachingNote;
   const result=await api('/api/attendance',{method:'POST',body});
   state.pushFeedback=state.kind==='period'?result.push||null:null;
+  state.attendanceBaseline=takeAttendanceSnapshot(state);
   toast('บันทึกสำเร็จ '+result.saved+' คน'+(result.push?.reason==='no_subscribers'?' • ยังไม่มีอุปกรณ์รับ Push':''));
   await loadAttendance();
- }finally{if(button.isConnected)button.disabled=false}
+ }catch(error){
+  updateAttendanceDraftNotice();
+  throw new Error('ยังไม่สามารถยืนยันผลการบันทึกได้ ข้อมูลที่แก้ไขยังอยู่บนหน้านี้ กรุณาตรวจสอบรายการก่อนบันทึกซ้ำ: '+String(error?.message||'เชื่อมต่อไม่สำเร็จ'));
+ }finally{
+  state.attendanceSaving=false;
+  for(const input of controls)if(input.isConnected)input.disabled=false;
+  if(button?.isConnected){button.disabled=false;button.textContent=oldText}
+ }
 }
 async function loadLate(){
  if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}

@@ -1,0 +1,37 @@
+/* Focus on daily check-in without hiding existing Smart Apps or dashboards. */
+.rd-teacher-today{display:grid;gap:15px;min-width:0}
+.rd-teacher-today-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.rd-teacher-today-heading h3{margin:0 0 5px;font-size:17px}
+.rd-teacher-today-heading p{margin:0}
+.rd-teacher-today-counter{border-radius:99px;border:1px solid #cce9db;background:#eaf9f0;
+ padding:6px 12px;color:#146d4b;font-size:12px;font-weight:750}
+.rd-teacher-rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px}
+.rd-teacher-room{border:1px solid #d8ebe0;border-radius:14px;padding:15px;
+ display:grid;gap:13px;background:#fbfefd;min-width:0}
+.rd-teacher-room-pending{border-color:#edd9ae;background:#fffdf7}
+.rd-teacher-room-complete{border-color:#c8e9d8;background:#f7fdf9}
+.rd-teacher-room-header{display:grid;gap:5px}
+.rd-teacher-room-header strong{font-size:16px;color:#154b36}
+.rd-teacher-room-state{font-size:12px;color:#6b776e}
+.rd-teacher-room-progress{display:flex;align-items:center;gap:9px}
+.rd-teacher-room-progress progress{flex:1;min-width:0;width:100%;height:11px;accent-color:#14865b}
+.rd-teacher-room-progress span{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rd-teacher-room .button{justify-self:start;min-height:43px}
+.rd-teacher-today-note{font-size:12px;color:#617c6d;margin:0}
+.rd-attendance-draft-notice{border-radius:10px;background:#eef6f1;border:1px solid #daebdf;
+ padding:10px 12px;color:#385d4b;font-size:12px;font-weight:650}
+.rd-attendance-draft-notice.dirty{background:#fff4db;border-color:#e8c884;color:#8b611a}
+[data-theme="dark"] .rd-teacher-today-counter,
+[data-theme="dark"] .rd-teacher-room{background:#223d2d;color:#e8faef;border-color:#496f55}
+[data-theme="dark"] .rd-teacher-room-header strong{color:#e1fce8}
+[data-theme="dark"] .rd-teacher-room-state,[data-theme="dark"] .rd-teacher-today-note{color:#c5d9ca}
+[data-theme="dark"] .rd-attendance-draft-notice{background:#253e2f;color:#caeed7;border-color:#497055}
+[data-theme="dark"] .rd-attendance-draft-notice.dirty{background:#4a3b21;color:#ffe2a1;border-color:#97783a}
+@media(max-width:630px){
+ .rd-teacher-today{padding:14px}
+ .rd-teacher-rooms{grid-template-columns:1fr}
+ .rd-teacher-room{grid-template-columns:minmax(0,1fr) auto;gap:8px}
+ .rd-teacher-room-header,.rd-teacher-room-progress{grid-column:1/-1}
+ .rd-teacher-room .button{grid-column:1/-1;justify-self:stretch}
+}
+@media(prefers-reduced-motion:reduce){.rd-teacher-room *{transition:none!important}}
