@@ -1673,12 +1673,24 @@ The full migration, data protection, test plan, Cron/Push checklist and security
 
 ## One-command staged verification (recommended)
 
-Rather than running every experimental check separately, upload the
-full `node-hosting/` directory to the isolated DirectAdmin test app,
-remove old `RD_TRIGGER_LAB_ALLOW_*` flags, then choose Run JS Script
-`check:all-staging`. It runs consolidated offline and internal auth/portal checks, synthetic
-MariaDB rollback-only attendance, truancy and Push labs, and a final
-read-only NO-GO release gate. It never sends real Web Push or imports
-student data. Successful staging verification exits 0 even though
-production readiness intentionally remains NO-GO. See
-`BATCH_1_2_GUIDE.md` for details.
+To avoid two separate test runs after every API change, upload one
+**reviewed batch** of files from the experimental `node-hosting/`
+branch to the isolated DirectAdmin test app and select Run JS Script:
+
+```text
+check:full-staging
+```
+
+This executes `check:all-staging` (the existing 11 grouped offline,
+synthetic auth/guardian/student, MariaDB rollback and NO-GO checks)
+**followed automatically** by `check:api-parity` (41+ representative
+Worker route/method contracts and public 501/503 gate). Expected
+combined exit is **0** when the tests pass, despite the nested
+API audit's deliberately expected exit **2** and the unchanged
+production **NO_GO** status. Temporary rehearsal/import flags are
+forbidden; the command does not perform a D1 import or send real Push.
+
+See [ONE_COMMAND_STAGING.md](ONE_COMMAND_STAGING.md) for
+results, safe failure behavior and scope limitations. From now on,
+bundle multiple related private API changes before uploading and
+running this single command.
