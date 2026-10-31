@@ -14,7 +14,8 @@
     "school:test": "node --test school-hosting/test/*.test.cjs",
     "school:backup": "node school-hosting/backup.cjs",
     "school:cron": "node school-hosting/cron.cjs",
-    "school:admin": "node school-hosting/setup-admin.cjs"
+    "school:admin": "node school-hosting/setup-admin.cjs",
+    "school:install": "node school-hosting/install.cjs"
   },
   "dependencies": {}
 }
