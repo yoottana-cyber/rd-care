@@ -525,7 +525,8 @@ async function loadAttendance(){
   }
   roomId=slot.classroom_id;state.roomId=roomId;
  }
- const studentsResponse=await referenceCache.get('students:'+roomId+':'+date,()=>api('/api/students?classroom_id='+roomId+'&date='+encodeURIComponent(date)));
+ // Attendance rosters must be fresh after an import or a change of date.
+ const studentsResponse=await api('/api/students?classroom_id='+roomId+'&date='+encodeURIComponent(date));
  if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId)return;
  state.students=studentsResponse.items;
  const slotId=kind==='period'?state.slotId:null;
@@ -581,6 +582,11 @@ function renderDailyOverview(){
    <p class="daily-reference-hint">นักเรียนที่บันทึกว่า “ขาด” รายวันแล้ว หากเช็กขาดรายคาบอีกจะไม่สร้างรายการแจ้งเตือนครูที่ปรึกษาซ้ำ แต่ยังเก็บผลรายคาบไว้ • สถานะรายวันไม่ได้ยืนยันการเข้าเรียนทุกคาบ</p>
  </section>`;
 }
+function emptyRosterHint(){
+ return `<div class="empty" role="status"><strong>ไม่พบรายชื่อนักเรียนที่มีผลในวันที่ ${esc(state.date)}</strong>
+  <p>หากเพิ่งนำเข้านักเรียน แต่เลือกวันสอนก่อนวันที่เริ่มลงทะเบียน รายชื่อจะไม่ปรากฏเพื่อรักษาประวัติการเรียน กรุณาเลือกวันที่นักเรียนมีสถานะเรียนอยู่ หรือตรวจวันเริ่มลงทะเบียนในเมนูจัดการนักเรียน</p>
+  <button type="button" class="button secondary" id="refreshAttendanceRoster">🔄 โหลดรายชื่ออีกครั้ง</button></div>`;
+}
 function renderAttendance(){
  const daily=state.kind==='daily';
  const eligible=state.rooms.filter(r=>!['teacher','staff'].includes(state.user?.role)||(r.advisor_user_id===state.user?.id||r.advisor2_user_id===state.user?.id));
@@ -612,7 +618,7 @@ function renderAttendance(){
  </div>`:''}
  <div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
  ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การบันทึกซ้ำจะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคน ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
- <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
+ <div class="attendance-list">${students||emptyRosterHint()}</div>
  ${!daily?`<section class="teaching-note-card" aria-label="บันทึกการสอนรายคาบ"><div class="teaching-note-heading">
   <div><h3>📝 บันทึกการสอน <span class="teaching-note-optional">(ไม่บังคับ)</span></h3>
    <p class="muted">หัวข้อหรือเนื้อหาที่สอน กิจกรรมการเรียนรู้ ปัญหาหรือข้อเสนอแนะของคาบนี้</p></div>
@@ -623,6 +629,7 @@ function renderAttendance(){
   <div class="teaching-note-foot"><span>บันทึกแยกตามวันที่ วิชา และคาบเรียน สามารถกลับมาแก้ไขได้</span><span id="teachingNoteCount">${state.teachingNote.length.toLocaleString('th-TH')} / 2,000</span></div>
  </section>`:''}
  <button id="saveAttendance" class="button full" ${!state.students.length||!daily&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
+ $('#refreshAttendanceRoster')?.addEventListener('click',()=>safeRun(loadAttendance));
  if(daily)bindFilters(loadAttendance);
  $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
  $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));
