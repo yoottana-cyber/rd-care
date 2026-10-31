@@ -1,0 +1,4 @@
+﻿username,full_name,role,password
+teacher_demo_new,ครูตัวอย่าง คนใหม่,teacher,ChangeThisDemoTeacher2026
+staff_demo_new,บุคลากรตัวอย่าง คนใหม่,staff,ChangeThisDemoStaff2026
+teacher_existing,ครูตัวอย่าง ที่มีบัญชีแล้ว,teacher,
