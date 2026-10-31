@@ -43,7 +43,7 @@ async function run({env=process.env,makePool=openPool,log=console.log,
   log('NO_DB_CONNECTION / NO_IMPORT / RELEASE NO_GO.');
   return 2;
  }
- let pool,conn,transaction=false,rollbackVerified=false;
+ let pool,conn,transaction=false,rollbackVerified=false,discardConnection=false;
  try{
   const manifestFile=guard(env);
   const {base,manifest}=load(manifestFile);
@@ -90,12 +90,16 @@ async function run({env=process.env,makePool=openPool,log=console.log,
     await inspect(conn);
     rollbackVerified=true;
    }catch{
+    discardConnection=true;
     warn('ROLLBACK NOT VERIFIED: quarantine staging; inspect privately before retry.');
    }
   }
   if(!rollbackVerified&&transaction)
    warn('DO NOT REPEAT OR ENABLE PUBLIC API until staging emptiness is verified.');
-  if(conn){try{conn.release()}catch{}}
+  if(conn){
+   try{if(discardConnection&&typeof conn.destroy==='function')conn.destroy();
+    else if(!discardConnection)conn.release()}catch{}
+  }
   if(pool){try{await pool.end()}catch{}}
  }
 }
