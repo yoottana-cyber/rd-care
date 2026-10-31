@@ -498,7 +498,9 @@ function renderDashboard(){
  }));
  $$('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
 }
+let attendanceRequestId=0;
 async function loadAttendance(){
+ const requestId=++attendanceRequestId;
  const kind=state.kind,tab=state.tab,date=state.date;
  let roomId=state.roomId;
  if(kind==='daily'){
@@ -511,7 +513,7 @@ async function loadAttendance(){
   state.roomId=roomId;state.slots=[];
  }else{
   const response=await api('/api/timetable?date='+encodeURIComponent(date)+(canTeach()?'&scope=mine':''));
-  if(state.tab!==tab||state.date!==date)return;
+  if(requestId!==attendanceRequestId||state.tab!==tab||state.date!==date)return;
   state.slots=response.items;
   let slot=state.slots.find(r=>r.id===state.slotId);
   if(!slot){slot=state.slots[0];state.slotId=slot?.id||null;}
@@ -527,14 +529,14 @@ async function loadAttendance(){
  }
  // Attendance rosters must be fresh after an import or a change of date.
  const studentsResponse=await api('/api/students?classroom_id='+roomId+'&date='+encodeURIComponent(date));
- if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId)return;
+ if(requestId!==attendanceRequestId||state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId)return;
  state.students=studentsResponse.items;
  state.rosterInfo=studentsResponse.roster_info||null;
  const slotId=kind==='period'?state.slotId:null;
  const q='?kind='+kind+'&classroom_id='+roomId+'&date='+encodeURIComponent(date)+(kind==='period'?'&timetable_id='+slotId:'');
  const attendanceData=await api('/api/attendance'+q);
  const entries=attendanceData.items;
- if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId||(kind==='period'&&state.slotId!==slotId))return;
+ if(requestId!==attendanceRequestId||state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId||(kind==='period'&&state.slotId!==slotId))return;
  state.savedCount=entries.length;
  // Keep the daily register independent of this period's editable status.
  // An absent daily record is not proof of absence in every later period.
