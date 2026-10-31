@@ -38,7 +38,9 @@ function settings(env=process.env){
 }
 function cleanUrl(raw,mount){
  if(typeof raw!=='string'||!raw.startsWith('/')||raw.startsWith('//')||
-  raw.length>4096)throw Error('school_invalid_url');
+  raw.length>4096||/%2e|%2f|%5c|%00/i.test(raw)||
+  raw.split('?')[0].split('/').some(x=>x==='..'||x==='.') )
+  throw Error('school_invalid_url');
  const url=new URL(raw,'https://internal.invalid');
  // Some Passenger configurations retain the mount prefix, others strip it.
  const relative=url.pathname===mount?'/':
