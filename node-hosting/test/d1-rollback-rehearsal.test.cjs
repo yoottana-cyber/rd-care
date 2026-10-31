@@ -54,6 +54,10 @@ test('wrong database, forbidden flags and symlink are denied',()=>{
   const base={RD_DB_NAME:'ratsadaa_connect',RD_D1_MANIFEST_FILE:source,
    RD_D1_REHEARSAL_CONFIRM:CONFIRM};
   assert.equal(guard(base),source);
+  fs.mkdirSync(path.join(dir,'public_html'));
+  const exposed=path.join(dir,'public_html','manifest.json');
+  fs.writeFileSync(exposed,'{}');
+  assert.throws(()=>guard({...base,RD_D1_MANIFEST_FILE:exposed}),/migration_manifest_under_web_root/);
   assert.throws(()=>guard({...base,RD_DB_NAME:'ratsadaa_connect_prod'}),/migration_target_must_be_staging/);
   assert.throws(()=>guard({...base,RD_ENABLE_SCHOOL_WRITES:'1'}),/migration_school_writes_forbidden/);
   assert.throws(()=>guard({...base,RD_MIGRATION_ALLOW_IMPORT:'1'}),/migration_school_writes_forbidden/);
