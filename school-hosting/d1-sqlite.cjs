@@ -90,7 +90,7 @@ class SchoolD1{
   try{
    const results=[];
    for(const s of statements)
-    results.push(isRead(s.sql)?s._allSync():s._runSync());
+    results.push(s._statement().columns().length?s._allSync():s._runSync());
    this.sqlite.exec('COMMIT');
    return results;
   }catch(e){
