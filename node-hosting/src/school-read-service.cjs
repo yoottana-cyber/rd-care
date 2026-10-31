@@ -227,5 +227,95 @@ async function portalBehavior(conn,user,studentId,from,to){
   [id,from+' 00:00:00',new Date(Date.parse(to+'T00:00:00Z')+86400000).toISOString().slice(0,10)+' 00:00:00']);
  return {student_id:id,items:entries};
 }
+// Stage 13 — exact Worker /api/portal/records response contract, private only.
+// Keep attendance/late/conduct/merit independent. All data reads require a
+// VERIFIED student login or guardian link and an at-most-90-day range.
+// Mirror worker/src/portal.js records(), worker/src/score-ledger.js,
+// without exposing this route through Passenger.
+function portalScoreSummary(value){
+ const good_total=Math.max(0,Number(value?.good_total)||0);
+ const behavior_deducted=Math.max(0,Number(value?.behavior_deducted)||0);
+ const behavior_adjusted=Math.max(0,Number(value?.behavior_adjusted)||0);
+ return {good_total,behavior_deducted,behavior_adjusted,
+  behavior_remaining:Math.max(0,behavior_deducted-behavior_adjusted)};
+}
+async function portalRecords(conn,user,studentId,from,to){
+ const id=asId(studentId);
+ if(!id)fail(400,'invalid_student');
+ dateRange(from,to);
+ await portalStudentId(conn,user,id);
+ const [students]=await conn.execute(
+  `SELECT s.id,s.full_name,s.student_no,c.label AS classroom_label
+   FROM students s JOIN classrooms c ON c.id=s.classroom_id
+   WHERE s.id=? AND s.active=1 LIMIT 1`,[id]);
+ const student=students[0];
+ if(!student)fail(404,'not_found');
+ const [daily]=await conn.execute(
+  'SELECT school_date,status FROM attendance_daily WHERE student_id=? AND school_date BETWEEN ? AND ? ORDER BY school_date DESC LIMIT 90',
+  [id,from,to]);
+ const [period]=await conn.execute(
+  `SELECT p.school_date,
+   CASE WHEN tr.student_id IS NOT NULL AND p.status='absent'
+        THEN 'truancy' ELSE p.status END AS status,
+   t.period,t.subject
+   FROM attendance_period p
+   JOIN timetable t ON t.id=p.timetable_id
+   LEFT JOIN period_truancy tr ON tr.student_id=p.student_id
+    AND tr.timetable_id=p.timetable_id AND tr.school_date=p.school_date
+   WHERE p.student_id=? AND p.school_date BETWEEN ? AND ?
+   ORDER BY p.school_date DESC,t.period LIMIT 1500`,[id,from,to]);
+ const [late]=await conn.execute(
+  `SELECT school_date,arrived_at,state FROM late_records
+   WHERE student_id=? AND school_date BETWEEN ? AND ?
+   ORDER BY school_date DESC LIMIT 90`,[id,from,to]);
+ const [rows]=await conn.execute(
+  `SELECT record_date,points,reason,affairs_category,score_type,warning_no FROM (
+     SELECT SUBSTR(b.created_at,1,10) AS record_date,
+       b.points,b.reason,b.affairs_category,
+       CASE
+        WHEN b.deleted_at IS NULL AND b.points>0 AND
+         (b.affairs_category IS NULL OR b.affairs_category='good')
+        THEN 'good'
+        WHEN b.deleted_at IS NULL AND b.points>0 AND
+         b.affairs_category='adjustment'
+        THEN 'adjustment'
+        ELSE 'behavior'
+       END AS score_type,
+       0 AS warning_no,b.id AS entry_id
+     FROM behavior_records b
+     WHERE b.student_id=? AND b.deleted_at IS NULL
+      AND SUBSTR(b.created_at,1,10) BETWEEN ? AND ?
+     UNION ALL
+     SELECT SUBSTR(i.created_at,1,10) AS record_date,
+      0 AS points,i.reason,i.affairs_category,'behavior' AS score_type,
+      i.warning_no,i.id AS entry_id
+     FROM behavior_incidents i
+     WHERE i.student_id=? AND i.deleted_at IS NULL
+      AND i.points_applied=0 AND i.warning_no>0
+      AND SUBSTR(i.created_at,1,10) BETWEEN ? AND ?
+    ) AS dated_entries
+    ORDER BY record_date DESC,entry_id DESC LIMIT 100`,
+  [id,from,to,id,from,to]);
+ const [totals]=await conn.execute(
+  `SELECT
+   COALESCE(SUM(CASE WHEN b.deleted_at IS NULL AND b.points>0
+      AND (b.affairs_category IS NULL OR b.affairs_category='good')
+      THEN b.points ELSE 0 END),0) AS good_total,
+   COALESCE(SUM(CASE WHEN b.deleted_at IS NULL AND b.points<0
+      THEN -b.points ELSE 0 END),0) AS behavior_deducted,
+   COALESCE(SUM(CASE WHEN b.deleted_at IS NULL AND b.points>0
+      AND b.affairs_category='adjustment'
+      THEN b.points ELSE 0 END),0) AS behavior_adjusted
+   FROM behavior_records b
+   WHERE b.student_id=? AND SUBSTR(b.created_at,1,10) BETWEEN ? AND ?`,
+  [id,from,to]);
+ const scores=portalScoreSummary(totals[0]);
+ return {student,from,to,daily,period,late,
+  truancy:period.filter(row=>row.status==='truancy'),
+  behavior:rows.filter(row=>row.score_type!=='good'),
+  good:rows.filter(row=>row.score_type==='good'),
+  behavior_total:-scores.behavior_remaining,...scores,
+  note:'คะแนนความดีแยกจากคะแนนพฤติกรรม • ลดคะแนนพฤติกรรมได้เฉพาะเกณฑ์ปรับพฤติกรรม'};
+}
 module.exports={asId,validDate,dateRange,trustedSession,assertRoom,listRooms,roster,
- dailyAttendance,savedDailyAttendance,periodAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior};
+ dailyAttendance,savedDailyAttendance,periodAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior,portalScoreSummary,portalRecords};

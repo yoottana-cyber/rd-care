@@ -14,14 +14,14 @@ test('representative Worker API contracts are unique, safe and audit private ada
  assert.equal(result.private_route_present+result.private_route_missing,result.total);
  assert.ok(result.rows.every(r=>r.coverage.includes('PRIVATE_ROUTE')));
 });
-test('Node portal attendance and behavior helpers are NOT substitutes for Worker /records',()=>{
+test('Node private portal records route added; response semantics remain separately tested',()=>{
  assert.equal(REQUIRED_PATH_DIFF.cloudflare,'/api/portal/records');
- assert.equal(privateRouteFor('GET','/api/portal/records'),false);
+ assert.equal(privateRouteFor('GET','/api/portal/records'),true);
  assert.equal(privateRouteFor('GET','/api/portal/attendance'),true);
  assert.equal(privateRouteFor('GET','/api/portal/behavior'),true);
  const matrix=report();
  assert.ok(matrix.rows.some(r=>r.path==='/api/portal/records'&&
-  r.coverage==='NO_MATCHING_PRIVATE_ROUTE'));
+  r.coverage==='PRIVATE_ROUTE_PRESENT_SHAPE_UNVERIFIED'));
 });
 test('read-only Node routes never imply that attendance/timetable writes were ported',()=>{
  assert.equal(privateRouteFor('GET','/api/attendance'),true);
@@ -38,7 +38,7 @@ test('offline stage 13 audit always returns NO_GO and logs no credentials',()=>{
  const logs=[],warnings=[];
  const code=run({log:x=>logs.push(x),warn:x=>warnings.push(x)});
  assert.equal(code,2);
- assert.ok(logs.some(x=>x.includes('PORTAL PATH MISMATCH')));
+ assert.ok(logs.some(x=>x.includes('PORTAL RECORDS PRIVATE ROUTE FOUND')));
  assert.ok(logs.some(x=>x.includes('PUBLIC PASSENGER API CLOSED')));
  assert.ok(warnings.some(x=>x.includes('NO_GO')));
  assert.ok(!logs.concat(warnings).join('\n').includes('password'));
