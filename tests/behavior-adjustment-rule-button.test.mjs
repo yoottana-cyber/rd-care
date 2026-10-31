@@ -10,7 +10,8 @@ test('changing adjustment rule immediately enables submit with an already select
   '#adjustmentSearch':{value:''},
   '#adjustmentReason':{value:'Details preserved'},
   '#adjustmentRule':{value:''},
-  '#adjustmentSubmit':{disabled:true}
+  '#adjustmentSubmit':{disabled:true},
+  '#adjustmentRecordForm':{}
  };
  let mounts=0,previewRemoved=0;
  const checkbox={dataset:{adjustmentStudent:'42'},checked:false,
@@ -72,15 +73,24 @@ test('changing adjustment rule immediately enables submit with an already select
   assert.equal(previewRemoved,1);
 
   let prevented=false;
-  await handlers.get('#adjustmentRecordForm:submit')?.({preventDefault(){prevented=true}});
-  // Test fake document does not emulate a form: state change alone must not call API.
-  assert.equal(prevented,false);
-  assert.equal(previewRequests,0);
+  await handlers.get('#adjustmentRecordForm:submit')({preventDefault(){prevented=true}});
+  assert.equal(prevented,true,'enabled button reaches validation API');
+  assert.equal(previewRequests,1);
+  const afterPreview=mounts;
 
+  // The user changes the rule again: stale preview is removed and button
+  // state is updated without losing the selected pupil.
   controls['#adjustmentRule'].value='';
   handlers.get('#adjustmentRule:change')();
   assert.equal(controls['#adjustmentSubmit'].disabled,true);
-  assert.equal(mounts,beforeRuleChange);
+  assert.equal(mounts,afterPreview);
+  assert.equal(previewRemoved,2);
+  controls['#adjustmentRule'].value='5';
+  handlers.get('#adjustmentRule:change')();
+  assert.equal(controls['#adjustmentSubmit'].disabled,false);
+  checkbox.checked=false;
+  handlers.get('student:change')({currentTarget:checkbox});
+  assert.equal(controls['#adjustmentSubmit'].disabled,true,'no student selected');
  }finally{
   globalThis.document=previousDocument;
  }
