@@ -529,6 +529,7 @@ async function loadAttendance(){
  const studentsResponse=await api('/api/students?classroom_id='+roomId+'&date='+encodeURIComponent(date));
  if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId)return;
  state.students=studentsResponse.items;
+ state.rosterInfo=studentsResponse.roster_info||null;
  const slotId=kind==='period'?state.slotId:null;
  const q='?kind='+kind+'&classroom_id='+roomId+'&date='+encodeURIComponent(date)+(kind==='period'?'&timetable_id='+slotId:'');
  const attendanceData=await api('/api/attendance'+q);
@@ -583,9 +584,14 @@ function renderDailyOverview(){
  </section>`;
 }
 function emptyRosterHint(){
+ const info=state.rosterInfo||{},first=info.first_start_date;
+ const count=Number(info.currently_enrolled)||0;
+ const details=count&&first&&state.date<first
+  ?`<p><strong>พบว่าห้องนี้มีนักเรียนที่ลงทะเบียนอยู่ ${count} คน แต่วันเริ่มลงทะเบียนที่เร็วที่สุดคือ ${esc(first)}</strong> ซึ่งช้ากว่าวันสอนที่เลือก กรุณาเลือกวันสอนที่ตรงกับวันที่นักเรียนเริ่มเรียน หรือตรวจข้อมูลการลงทะเบียนกับแอดมิน</p>`
+  :count?`<p>ห้องนี้มีนักเรียนลงทะเบียนปัจจุบัน ${count} คน แต่ไม่พบรายชื่อที่มีผลในวันที่เลือก กรุณาตรวจประวัติย้ายเข้า/ย้ายออก และวันเริ่มลงทะเบียน</p>`
+  :'<p>ยังไม่พบการลงทะเบียนนักเรียนที่ใช้งานอยู่ในห้องนี้ กรุณาตรวจหน้าแอดมินและนำเข้าข้อมูลให้เรียบร้อย</p>';
  return `<div class="empty" role="status"><strong>ไม่พบรายชื่อนักเรียนที่มีผลในวันที่ ${esc(state.date)}</strong>
-  <p>หากเพิ่งนำเข้านักเรียน แต่เลือกวันสอนก่อนวันที่เริ่มลงทะเบียน รายชื่อจะไม่ปรากฏเพื่อรักษาประวัติการเรียน กรุณาเลือกวันที่นักเรียนมีสถานะเรียนอยู่ หรือตรวจวันเริ่มลงทะเบียนในเมนูจัดการนักเรียน</p>
-  <button type="button" class="button secondary" id="refreshAttendanceRoster">🔄 โหลดรายชื่ออีกครั้ง</button></div>`;
+  ${details}<button type="button" class="button secondary" id="refreshAttendanceRoster">🔄 โหลดรายชื่ออีกครั้ง</button></div>`;
 }
 function renderAttendance(){
  const daily=state.kind==='daily';
