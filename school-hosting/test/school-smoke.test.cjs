@@ -28,7 +28,8 @@ test('full original Worker migration chain works on server-local native SQLite',
   try{
    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM classrooms').get().n,48);
    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM students').get().n,0);
-   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM users').get().n,0);
+   const accounts=db.prepare('SELECT username,role,active FROM users').all();
+   assert.deepEqual(accounts,[{username:'rd-care-late-system',role:'staff',active:0}]);
    assert.equal(db.prepare('PRAGMA integrity_check').get().integrity_check,'ok');
    assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
   }finally{db.close()}
