@@ -383,7 +383,7 @@ function roomOptions(advisorOnly=false){
  return rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
-function attendanceDirty(){return attendanceHasUnsavedChanges(state,state.attendanceBaseline)}
+function attendanceDirty(){return ['attendance','periodCheckin'].includes(state.tab)&&attendanceHasUnsavedChanges(state,state.attendanceBaseline)}
 function confirmAttendanceExit(){
  if(state.attendanceSaving){toast('กำลังบันทึกข้อมูล กรุณาตรวจสอบผลก่อนเปลี่ยนหน้า',true);return false}
  return !attendanceDirty()||confirm('มีข้อมูลเช็กชื่อที่แก้ไขแต่ยังไม่บันทึก หากออกจากหน้านี้ข้อมูลที่แก้ไขจะสูญหาย ยืนยันออกจากหน้า?');
@@ -715,11 +715,15 @@ function renderAttendance(){
 }
 function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();updateAttendanceDraftNotice();}
 async function saveAttendance(){
- if(!state.students.length)return;
+ if(!state.students.length||state.attendanceSaving)return;
  if(state.kind==='period'&&Object.values(state.statuses).includes('truancy')&&!confirm(
   'ยืนยันบันทึกสถานะหนีเรียนและหักคะแนนพฤติกรรม -10 ต่อรายการโดยอัตโนมัติ? บันทึกซ้ำจะไม่หักเพิ่ม และหากแก้สถานะจากหนีเรียน ระบบจะคืนคะแนนส่วนนี้ พร้อมแจ้ง Push ไปยังอุปกรณ์ที่เปิดรับ'
  ))return;
- const button=$('#saveAttendance');button.disabled=true;
+ const button=$('#saveAttendance'),oldText=button?.textContent||'ยืนยันและบันทึกทั้งห้อง';
+ state.attendanceSaving=true;
+ if(button){button.disabled=true;button.textContent='กำลังบันทึก...'}
+ const controls=$('#room,#day,#periodDay,#slot,#markAll,#teachingNote,[data-student]');
+ for(const input of controls)input.disabled=true;
  try{
   const body={kind:state.kind,date:state.date,classroom_id:state.roomId,
    timetable_id:state.kind==='period'?state.slotId:null,
@@ -727,9 +731,17 @@ async function saveAttendance(){
   if(state.kind==='period')body.teaching_note=state.teachingNote;
   const result=await api('/api/attendance',{method:'POST',body});
   state.pushFeedback=state.kind==='period'?result.push||null:null;
+  state.attendanceBaseline=takeAttendanceSnapshot(state);
   toast('บันทึกสำเร็จ '+result.saved+' คน'+(result.push?.reason==='no_subscribers'?' • ยังไม่มีอุปกรณ์รับ Push':''));
   await loadAttendance();
- }finally{if(button.isConnected)button.disabled=false}
+ }catch(error){
+  updateAttendanceDraftNotice();
+  throw new Error('ยังไม่สามารถยืนยันผลการบันทึกได้ ข้อมูลที่แก้ไขยังอยู่บนหน้านี้ กรุณาตรวจสอบรายการก่อนบันทึกซ้ำ: '+String(error?.message||'เชื่อมต่อไม่สำเร็จ'));
+ }finally{
+  state.attendanceSaving=false;
+  for(const input of controls)if(input.isConnected)input.disabled=false;
+  if(button?.isConnected){button.disabled=false;button.textContent=oldText}
+ }
 }
 async function loadLate(){
  if(!state.roomId){mount('<div class="empty">ยังไม่มีห้องเรียนที่ได้รับสิทธิ์</div>');return}
