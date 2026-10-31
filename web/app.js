@@ -544,7 +544,7 @@ function renderDashboard(){
   try{state.date=dateToday();await loadDashboard();toast('อัปเดตข้อมูลล่าสุดแล้ว')}
   finally{if(button.isConnected)button.disabled=false}
  }));
- $('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
+ $('[data-quick-tab]').forEachbutton=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
  $('[data-daily-room]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
   const roomId=Number(button.dataset.dailyRoom);
   if(!state.advisorToday?.items?.some(room=>Number(room.id)===roomId))return;
