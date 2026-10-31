@@ -63,3 +63,31 @@ test('student affairs UI clearly describes Node.js Cron and daily skip states',(
  assert.match(worker,/Promise\.allSettled/);
  assert.match(worker,/school_daily_reminder_job_failed/);
 });
+
+
+test('read-only status reports unsubscribed advisors without sending anything',async()=>{
+ const today=bangkokToday(),w=weekday(today);
+ let sends=0;
+ const room={id:5,grade:2,label:'Room 2/5',advisor_user_id:19,advisor2_user_id:null,
+  students:30,checked:0};
+ const db={prepare(sql){
+  if(sql.includes('FROM affairs_settings'))return {first:async()=>({
+   auto_enabled:1,reminder_time:'00:00',weekdays:String(w)})};
+  if(sql.includes('FROM notification_preferences'))return {bind:()=>({first:async()=>({enabled:1})})};
+  if(sql.includes('FROM affairs_non_school_days'))return {bind:()=>({first:async()=>null})};
+  if(sql.includes('FROM classrooms c'))return {bind:()=>({all:async()=>({results:[room]})})};
+  if(sql.includes('FROM affairs_attendance_reminders'))return {bind:()=>({all:async()=>({results:[]})})};
+  if(sql.includes('FROM staff_push_subscriptions'))return {bind:()=>({all:async()=>({results:[]})})};
+  sends++;
+  throw Error('Unexpected database mutation or query: '+sql);
+ }};
+ const path='/api/affairs/reminder-status';
+ const response=await studentAffairsRoutes(new Request('https://rd.test'+path),{DB:db},
+  {id:77,role:'staff'},path);
+ const body=await response.json();
+ assert.equal(body.today,today);
+ assert.equal(body.reason,'no_subscriptions');
+ assert.equal(body.pending_rooms,1);
+ assert.equal(body.opted_in_advisors,0);
+ assert.equal(sends,0);
+});
