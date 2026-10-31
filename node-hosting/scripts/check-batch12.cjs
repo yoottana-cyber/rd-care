@@ -62,6 +62,7 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
   path.join(__dirname,'../test/batch1-lab-push-dispatch.test.cjs'),
   path.join(__dirname,'../test/batch2-manifest.test.cjs'),
   path.join(__dirname,'../test/batch2-reconciliation.test.cjs'),
+  path.join(__dirname,'../test/d1-rollback-rehearsal.test.cjs'),
   path.join(__dirname,'../test/timetable-offline-api-contract.test.cjs')
  ];
  let proc;
