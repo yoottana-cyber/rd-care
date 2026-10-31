@@ -51,11 +51,12 @@ class D1Prepared{
   if(!(column in value))throw Error('unknown_d1_column');
   return value[column];
  }
- async all(){
+ _allSync(){
   return {success:true,results:this._statement().all(...this.params).map(plain),
    meta:{served_by:'school-sqlite'}};
  }
- async run(){
+ async all(){return this._allSync()}
+ _runSync(){
   const state=this._statement().run(...this.params);
   return {success:true,meta:{
    changes:Number(state.changes),
@@ -63,6 +64,7 @@ class D1Prepared{
    served_by:'school-sqlite'
   }};
  }
+ async run(){return this._runSync()}
  async raw({columnNames=false}={}){
   const stmt=this._statement();
   const columns=stmt.columns().map(x=>x.name);
@@ -81,7 +83,7 @@ class SchoolD1{
   try{
    const results=[];
    for(const s of statements)
-    results.push(isRead(s.sql)?await s.all():await s.run());
+    results.push(isRead(s.sql)?s._allSync():s._runSync());
    this.sqlite.exec('COMMIT');
    return results;
   }catch(e){
