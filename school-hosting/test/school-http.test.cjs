@@ -48,6 +48,29 @@ test('school-hosted PWA and original Worker API respond on the same mount',async
    headers:{authorization:'Bearer '+creds.token}});
   assert.equal(rooms.status,200);
   assert.equal((await rooms.json()).items.length,48);
+  // Synthetic new enrollment starts today. Yesterday's period must not
+  // silently show names, but the authorized admin gets date diagnostics.
+  const created=db.sqlite.prepare(
+   "INSERT INTO students(student_no,classroom_id,roll_no,full_name,active) VALUES(?,1,1,?,1)")
+   .run('SYNTH-001','Fictional test learner');
+  db.sqlite.prepare(
+   "INSERT INTO student_enrollments(student_id,classroom_id,roll_no,start_date) VALUES(?,1,1,?)")
+   .run(created.lastInsertRowid,'2026-10-31');
+  const studentPath='/web/rd-connect/api/students?classroom_id=1&date=';
+  const authHeaders={authorization:'Bearer '+creds.token};
+  const before=await fetch(origin+studentPath+'2026-10-30',{headers:authHeaders});
+  assert.equal(before.status,200);
+  const beforeJson=await before.json();
+  assert.equal(beforeJson.items.length,0);
+  assert.equal(beforeJson.roster_info.currently_enrolled,1);
+  assert.equal(beforeJson.roster_info.first_start_date,'2026-10-31');
+  const active=await fetch(origin+studentPath+'2026-10-31',{headers:authHeaders});
+  assert.equal(active.status,200);
+  assert.equal((await active.json()).items.length,1);
+  const qr=await fetch(origin+'/web/rd-connect/api/late/qr/print',{headers:authHeaders});
+  assert.equal(qr.status,200);
+  const printed=await qr.json();
+  assert.equal(printed.url,'https://ratsada.ac.th/web/rd-connect/?late_qr=gate');
   const setup=await fetch(origin+'/web/rd-connect/api/setup',{
    method:'POST',headers:{'content-type':'application/json'},
    body:'{}'});

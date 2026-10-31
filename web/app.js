@@ -12,6 +12,7 @@ import {createMyTimetable,periodChoices} from './my-timetable.js';
 import {createLateGate} from './late-gate.js';
 import {readLateGateIntent} from './late-qr-intent.js';
 import {createPeriodCenter} from './period-center.js';
+import {dateOnAttendanceEntry} from './attendance-date.js';
 import {createPwaTools} from './pwa-client.js';
 import {offerPushIntro} from './push-intro.js';
 import {registerPwaUpdates} from './pwa-updates.js';
@@ -256,7 +257,7 @@ async function boot(){
    query.get('date')<=dateToday()){
   state.roomId=Number(query.get('classroom_id'));state.date=query.get('date');
   history.replaceState(null,'',location.pathname+'?login=staff'+location.hash);
-  await showTab('attendance');return;
+  await showTab('attendance',{preserveDate:true});return;
  }
  if(requested==='notifications'||requested==='advisorCenter'||requested==='lateGate'){
   history.replaceState(null,'',location.pathname+'?login=staff'+location.hash);
@@ -377,7 +378,12 @@ function roomOptions(advisorOnly=false){
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
-async function showTab(tab){scorePopup.close();if(tab!=='lateGate')lateGate.destroy();portalAdminUI?.cancel();state.tab=tab;
+async function showTab(tab,{preserveDate=false}={}){
+ const previousTab=state.tab;
+ state.date=dateOnAttendanceEntry({tab,previousTab,selectedDate:state.date,
+  today:dateToday(),preserveDate});
+ if(tab==='attendance'&&previousTab!==tab)state.slotId=null;
+ scorePopup.close();if(tab!=='lateGate')lateGate.destroy();portalAdminUI?.cancel();state.tab=tab;
  if(tab==='attendance')state.kind='daily';
  if(tab==='periodAttendance'||tab==='periodCheckin')state.kind='period';
  if(tab!=='adminStudents')unifiedImport.clear();
@@ -498,7 +504,9 @@ function renderDashboard(){
  }));
  $$('[data-quick-tab]').forEach(button=>button.addEventListener('click',()=>safeRun(()=>showTab(button.dataset.quickTab))));
 }
+let attendanceRequestId=0;
 async function loadAttendance(){
+ const requestId=++attendanceRequestId;
  const kind=state.kind,tab=state.tab,date=state.date;
  let roomId=state.roomId;
  if(kind==='daily'){
@@ -511,7 +519,7 @@ async function loadAttendance(){
   state.roomId=roomId;state.slots=[];
  }else{
   const response=await api('/api/timetable?date='+encodeURIComponent(date)+(canTeach()?'&scope=mine':''));
-  if(state.tab!==tab||state.date!==date)return;
+  if(requestId!==attendanceRequestId||state.tab!==tab||state.date!==date)return;
   state.slots=response.items;
   let slot=state.slots.find(r=>r.id===state.slotId);
   if(!slot){slot=state.slots[0];state.slotId=slot?.id||null;}
@@ -525,14 +533,16 @@ async function loadAttendance(){
   }
   roomId=slot.classroom_id;state.roomId=roomId;
  }
- const studentsResponse=await referenceCache.get('students:'+roomId+':'+date,()=>api('/api/students?classroom_id='+roomId+'&date='+encodeURIComponent(date)));
- if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId)return;
+ // Attendance rosters must be fresh after an import or a change of date.
+ const studentsResponse=await api('/api/students?classroom_id='+roomId+'&date='+encodeURIComponent(date));
+ if(requestId!==attendanceRequestId||state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId)return;
  state.students=studentsResponse.items;
+ state.rosterInfo=studentsResponse.roster_info||null;
  const slotId=kind==='period'?state.slotId:null;
  const q='?kind='+kind+'&classroom_id='+roomId+'&date='+encodeURIComponent(date)+(kind==='period'?'&timetable_id='+slotId:'');
  const attendanceData=await api('/api/attendance'+q);
  const entries=attendanceData.items;
- if(state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId||(kind==='period'&&state.slotId!==slotId))return;
+ if(requestId!==attendanceRequestId||state.tab!==tab||state.date!==date||state.kind!==kind||state.roomId!==roomId||(kind==='period'&&state.slotId!==slotId))return;
  state.savedCount=entries.length;
  // Keep the daily register independent of this period's editable status.
  // An absent daily record is not proof of absence in every later period.
@@ -581,6 +591,16 @@ function renderDailyOverview(){
    <p class="daily-reference-hint">นักเรียนที่บันทึกว่า “ขาด” รายวันแล้ว หากเช็กขาดรายคาบอีกจะไม่สร้างรายการแจ้งเตือนครูที่ปรึกษาซ้ำ แต่ยังเก็บผลรายคาบไว้ • สถานะรายวันไม่ได้ยืนยันการเข้าเรียนทุกคาบ</p>
  </section>`;
 }
+function emptyRosterHint(){
+ const info=state.rosterInfo||{},first=info.first_start_date;
+ const count=Number(info.currently_enrolled)||0;
+ const details=count&&first&&state.date<first
+  ?`<p><strong>พบว่าห้องนี้มีนักเรียนที่ลงทะเบียนอยู่ ${count} คน แต่วันเริ่มลงทะเบียนที่เร็วที่สุดคือ ${esc(first)}</strong> ซึ่งช้ากว่าวันสอนที่เลือก กรุณาเลือกวันสอนที่ตรงกับวันที่นักเรียนเริ่มเรียน หรือตรวจข้อมูลการลงทะเบียนกับแอดมิน</p>`
+  :count?`<p>ห้องนี้มีนักเรียนลงทะเบียนปัจจุบัน ${count} คน แต่ไม่พบรายชื่อที่มีผลในวันที่เลือก กรุณาตรวจประวัติย้ายเข้า/ย้ายออก และวันเริ่มลงทะเบียน</p>`
+  :'<p>ยังไม่พบการลงทะเบียนนักเรียนที่ใช้งานอยู่ในห้องนี้ กรุณาตรวจหน้าแอดมินและนำเข้าข้อมูลให้เรียบร้อย</p>';
+ return `<div class="empty" role="status"><strong>ไม่พบรายชื่อนักเรียนที่มีผลในวันที่ ${esc(state.date)}</strong>
+  ${details}<button type="button" class="button secondary" id="refreshAttendanceRoster">🔄 โหลดรายชื่ออีกครั้ง</button></div>`;
+}
 function renderAttendance(){
  const daily=state.kind==='daily';
  const eligible=state.rooms.filter(r=>!['teacher','staff'].includes(state.user?.role)||(r.advisor_user_id===state.user?.id||r.advisor2_user_id===state.user?.id));
@@ -612,7 +632,7 @@ function renderAttendance(){
  </div>`:''}
  <div class="row between"><div><h3>รายชื่อนักเรียน (${state.students.length} คน)</h3><span class="muted" id="counts">${statusSummary()}</span></div><button id="markAll" class="button ghost" type="button">เลือกมาทั้งหมด</button></div>
  ${state.savedCount?`<div class="ok">มีข้อมูลบันทึกแล้ว ${state.savedCount} คน • การบันทึกซ้ำจะปรับสถานะล่าสุด</div>`:'<div class="warn">ข้อมูลเบื้องต้นแสดง “มา” ทุกคน ต้องตรวจสอบด้วยตัวเองก่อนบันทึก</div>'}
- <div class="attendance-list">${students||'<div class="empty">ยังไม่มีนักเรียนในห้องนี้</div>'}</div>
+ <div class="attendance-list">${students||emptyRosterHint()}</div>
  ${!daily?`<section class="teaching-note-card" aria-label="บันทึกการสอนรายคาบ"><div class="teaching-note-heading">
   <div><h3>📝 บันทึกการสอน <span class="teaching-note-optional">(ไม่บังคับ)</span></h3>
    <p class="muted">หัวข้อหรือเนื้อหาที่สอน กิจกรรมการเรียนรู้ ปัญหาหรือข้อเสนอแนะของคาบนี้</p></div>
@@ -623,6 +643,7 @@ function renderAttendance(){
   <div class="teaching-note-foot"><span>บันทึกแยกตามวันที่ วิชา และคาบเรียน สามารถกลับมาแก้ไขได้</span><span id="teachingNoteCount">${state.teachingNote.length.toLocaleString('th-TH')} / 2,000</span></div>
  </section>`:''}
  <button id="saveAttendance" class="button full" ${!state.students.length||!daily&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
+ $('#refreshAttendanceRoster')?.addEventListener('click',()=>safeRun(loadAttendance));
  if(daily)bindFilters(loadAttendance);
  $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
  $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));

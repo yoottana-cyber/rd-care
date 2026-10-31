@@ -2,13 +2,21 @@
 // The camera stays local; only the validated public "gate" intent reaches the
 // existing authenticated /api/portal/late/qr submission after confirmation.
 const PUBLIC_ORIGIN='https://rd-care.pages.dev';
-export function isSchoolLateQr(raw,appOrigin=PUBLIC_ORIGIN){
+// Printed QR codes are absolute links. On school-hosted Node.js the PWA
+// lives under /web/rd-connect-fast/, not at the domain root. Compare the
+// exact application mount to prevent QR codes for arbitrary paths/hosts.
+// Previously printed Cloudflare root QR codes are accepted for transition.
+export function isSchoolLateQr(raw,appUrl=PUBLIC_ORIGIN+'/'){
  if(typeof raw!=='string'||!raw.trim())return false;
  try{
-  const url=new URL(raw.trim());
-  return (url.origin===appOrigin||url.origin===PUBLIC_ORIGIN)&&
-   (url.pathname==='/'||url.pathname==='/index.html')&&
-   url.searchParams.get('late_qr')==='gate';
+  const url=new URL(raw.trim()),app=new URL(appUrl);
+  if(url.protocol!=='https:'||url.searchParams.get('late_qr')!=='gate')return false;
+  const base=app.pathname.endsWith('/')?app.pathname:new URL('.',app).pathname;
+  const sameApp=url.origin===app.origin&&
+   (url.pathname===base||url.pathname===base+'index.html');
+  const olderPrintedQr=url.origin===PUBLIC_ORIGIN&&
+   (url.pathname==='/'||url.pathname==='/index.html');
+  return sameApp||olderPrintedQr;
  }catch{return false}
 }
 export function lateCameraError(error){
@@ -26,7 +34,7 @@ export function lateCameraError(error){
 export function createStudentLateQrScanner({
  onDetected,onInvalid=()=>{},
  loadScanner=async()=> (await import('./vendor/qr-scanner.min.js')).default,
- origin=()=>globalThis.location?.origin||PUBLIC_ORIGIN
+ origin=()=>globalThis.location?.href||PUBLIC_ORIGIN+'/'
 }){
  let camera=null,generation=0;
  function stop(){

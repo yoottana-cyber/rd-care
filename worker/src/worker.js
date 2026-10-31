@@ -155,7 +155,18 @@ async function getStudents(req,env,user){
  JOIN student_enrollments h ON h.student_id=s.id
  WHERE h.classroom_id=? AND h.start_date<=? AND (h.end_date IS NULL OR h.end_date>?)
  AND s.active=1 ORDER BY h.roll_no`).bind(roomId,date,date).all();
- return json({items:results});
+ if(results.length)return json({items:results});
+ // Attendance on a past date can legitimately predate the room's first
+ // enrollment. Reveal only counts after assertRoom() authorizes this teacher.
+ const info=await env.DB.prepare(`SELECT COUNT(DISTINCT s.id) AS current_count,
+  MIN(h.start_date) AS first_start_date FROM student_enrollments h
+  JOIN students s ON s.id=h.student_id
+  WHERE h.classroom_id=? AND h.end_date IS NULL AND s.active=1`)
+  .bind(roomId).first();
+ return json({items:[],roster_info:{
+  currently_enrolled:Number(info?.current_count||0),
+  first_start_date:info?.first_start_date||null
+ }});
 }
 async function getTimetable(req,env,user){
  const url=new URL(req.url);

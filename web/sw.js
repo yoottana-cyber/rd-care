@@ -1,13 +1,13 @@
 // RD CONNECT offline app shell. This cache contains only public static assets,
 // never authenticated responses, student records, or arbitrary same-origin URLs.
-const CACHE='rd-care-shell-v118';
+const CACHE='rd-care-shell-v120';
 const CACHE_PREFIX='rd-care-shell-';
 const ASSETS=[
  './','./index.html','./app.css','./theme.css','./login.css','./login-route.js',
  './pwa-role.js','./pwa-updates.js','./pwa-client.js','./push-intro.js','./smart-school-ui.css',
  './rd-design-system.css','./media/ratsada-crest.webp','./reference-ui.css',
  './charts.css','./dashboard-charts.js','./theme.js','./app.js',
- './navigation-ui.js','./period-clock.js','./my-timetable.js','./period-center.js','./period-center.css',
+ './navigation-ui.js','./period-clock.js','./my-timetable.js','./period-center.js','./attendance-date.js','./period-center.css',
  './mobile-app.css','./late-gate.js','./late-gate.css','./late-qr-intent.js',
  './auth-session.js','./mobile-nav.js','./notification-settings.js','./config.js',
  './run-safely.js','./request-cache.js','./xlsx-reader.js','./portal-ui.js',
