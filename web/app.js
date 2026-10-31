@@ -576,7 +576,10 @@ async function loadAttendance(){
     <div class="card stack"><div class="field"><label for="periodDay">วันที่สอน</label><input id="periodDay" type="date" max="${dateToday()}" value="${esc(date)}"></div>
     <p class="warn">วันนี้ยังไม่มีคาบสอนตามตารางของคุณ ${canTeach()?'กรุณาสร้างตารางสอนของตนเอง หรือเลือกวันที่มีคาบสอน':'กรุณาเลือกวันที่มีตารางสอน'}</p>
     ${canTeach()?'<button class="button" data-tab="myTimetable" type="button">+ สร้างตารางสอนของฉัน</button>':''}</div></section>`);
-   $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
+   $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{
+ if(!confirmAttendanceExit()){e.target.value=state.date;return}
+ state.date=e.target.value;state.slotId=null;await loadAttendance();
+}));
    return;
   }
   roomId=slot.classroom_id;state.roomId=roomId;
@@ -691,20 +694,26 @@ function renderAttendance(){
   <textarea id="teachingNote" rows="4" maxlength="2000" placeholder="ตัวอย่าง: เรื่อง การเขียนโปรแกรมด้วยเงื่อนไข ทดลองทำใบงานและฝึกปฏิบัติ...">${esc(state.teachingNote)}</textarea>
   <div class="teaching-note-foot"><span>บันทึกแยกตามวันที่ วิชา และคาบเรียน สามารถกลับมาแก้ไขได้</span><span id="teachingNoteCount">${state.teachingNote.length.toLocaleString('th-TH')} / 2,000</span></div>
  </section>`:''}
+ <div id="attendanceDraftNotice" role="status" aria-live="polite" class="rd-attendance-draft-notice">ตรวจสอบข้อมูลก่อนกดยืนยันเพื่อบันทึก</div>
  <button id="saveAttendance" class="button full" ${!state.students.length||!daily&&!state.slotId?'disabled':''}>✓ ยืนยันและบันทึกทั้งห้อง</button></div></section>`);
  $('#refreshAttendanceRoster')?.addEventListener('click',()=>safeRun(loadAttendance));
- if(daily)bindFilters(loadAttendance);
+ if(daily)bindFilters(loadAttendance,{guardAttendance:true});
  $('#periodDay')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await loadAttendance()}));
- $('#slot')?.addEventListener('change',e=>safeRun(async()=>{state.slotId=Number(e.target.value)||null;await loadAttendance()}));
+ $('#slot')?.addEventListener('change',e=>safeRun(async()=>{
+ if(!confirmAttendanceExit()){e.target.value=String(state.slotId);return}
+ state.slotId=Number(e.target.value)||null;await loadAttendance();
+}));
  $$('[data-student]').forEach(btn=>btn.addEventListener('click',()=>{state.statuses[Number(btn.dataset.student)]=btn.dataset.status;updateAttendanceControls()}));
  $('#markAll')?.addEventListener('click',()=>{for(const student of state.students){if(state.kind==='daily'&&state.statuses[student.id]==='late')continue;state.statuses[student.id]='present'}updateAttendanceControls()});
  $('#teachingNote')?.addEventListener('input',event=>{
   state.teachingNote=event.target.value;
+  updateAttendanceDraftNotice();
   const count=$('#teachingNoteCount');if(count)count.textContent=state.teachingNote.length.toLocaleString('th-TH')+' / 2,000';
  });
  $('#saveAttendance')?.addEventListener('click',()=>safeRun(saveAttendance));
+ updateAttendanceDraftNotice();
 }
-function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();}
+function updateAttendanceControls(){for(const el of $$('[data-student]')){const chosen=state.statuses[Number(el.dataset.student)]===el.dataset.status;el.className='pill '+(chosen?el.dataset.status:'');el.setAttribute('aria-pressed',chosen)}$('#counts').textContent=statusSummary();updateAttendanceDraftNotice();}
 async function saveAttendance(){
  if(!state.students.length)return;
  if(state.kind==='period'&&Object.values(state.statuses).includes('truancy')&&!confirm(
