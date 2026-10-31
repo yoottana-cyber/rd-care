@@ -8,7 +8,7 @@ const reply=(data,status=200)=>new Response(JSON.stringify(data),{
 });
 const text=v=>typeof v==='string'?v.trim():'';
 const assignMode=mode=>['skip','update','replace'].includes(mode);
-const isReplace=mode=>mode==='replace'||mode==='update';
+const isReplace=mode=>mode==='replace'; // Preserve legacy update=name-only semantics for cached PWA clients.
 const userAllowed=u=>u&&['teacher','staff'].includes(u.role)&&Number(u.active)===1&&!u.deleted_at;
 
 /** Authoritative per-room import. All rows in each listed classroom form the
