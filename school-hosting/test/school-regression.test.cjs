@@ -9,6 +9,21 @@ const {migrate,CONFIRM}=require('../migrate.cjs');
 const {run:makeBackup}=require('../backup.cjs');
 const {run:verifyRestore}=require('../restore-test.cjs');
 
+async function dateModule(){
+ const code=fs.readFileSync(path.resolve(__dirname,'../../web/attendance-date.js'),'utf8');
+ return import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+}
+test('daily register resets date on return from period; explicit links and in-place dates survive',async()=>{
+ const {dateOnAttendanceEntry:select}=await dateModule();
+ const base={tab:'attendance',selectedDate:'2026-10-30',today:'2026-10-31'};
+ assert.equal(select({...base,previousTab:'periodCheckin'}),'2026-10-31');
+ assert.equal(select({...base,previousTab:'periodAttendance'}),'2026-10-31');
+ assert.equal(select({...base,previousTab:'myTimetable'}),'2026-10-31');
+ assert.equal(select({...base,previousTab:'attendance'}),'2026-10-30');
+ assert.equal(select({...base,previousTab:'dashboard',preserveDate:true}),'2026-10-30');
+ assert.equal(select({...base,tab:'periodCheckin',previousTab:'periodAttendance'}),'2026-10-30');
+ assert.equal(select({...base,tab:'dashboard',previousTab:'attendance'}),'2026-10-30');
+});
 async function qrModule(){
  // ESM browser module is imported from a self-contained source data URL.
  // The vendor scanner dynamic import is injected and therefore not called.
