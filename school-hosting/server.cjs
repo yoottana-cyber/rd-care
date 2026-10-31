@@ -144,7 +144,8 @@ async function schoolHandler(req,res,{worker,db,env,config}){
  }};
  try{
   const result=await worker.fetch(request,{
-   ...env,DB:db,ALLOWED_ORIGINS:config.origin
+   ...env,DB:db,ALLOWED_ORIGINS:config.origin,
+   RD_SCHOOL_APP_URL:config.origin+config.mount+'/'
   },ctx);
   const responseHeaders={...commonHeaders()};
   // Do not proxy unsafe CORS/cookies, and never cache authenticated data.
