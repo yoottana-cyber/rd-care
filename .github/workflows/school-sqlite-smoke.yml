@@ -11,6 +11,11 @@ on:
       - 'package.json'
       - '.github/workflows/school-sqlite-smoke.yml'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   school-sqlite:
     runs-on: ubuntu-latest
