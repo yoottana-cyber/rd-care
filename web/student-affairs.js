@@ -1,4 +1,5 @@
 import {scoreHistoryTables} from './score-history.js';
+import {advisorManagementMarkup,resolveTeacherId,filterAdvisorRoster} from './affairs-people-table.js';
 import {createCriteriaExcelImport} from './criteria-excel-import.js';
 import {dailyAttendanceSummaryTable,attendanceRoomTable} from './affairs-attendance-table.js';
 import {criteriaTableMarkup,RULE_GROUPS} from './criteria-table.js';
@@ -15,7 +16,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  const state={tab:'attendance',date:bangkokToday(),attendance:null,people:null,rules:null,
   selectedStudent:null,studentMatches:[],cases:[],score:null,ruleEdit:null,search:'',
   grade:0,monitorQuery:'',monitorLimit:100,monitorStudent:null,monitorScore:null,monitorCases:[],scoreSummary:[],ruleKind:'behavior',adjustmentRules:[],adjustmentGrade:0,adjustmentStatus:'all',adjustmentQuery:'',messageSearch:'',messageMatches:[],messageStudent:null,messageSent:[],ruleQuery:'',ruleCategory:'all',rulePageSize:'25',rulePage:1,
-  roomQuery:'',roomGrade:'all',roomStatus:'all',roomPageSize:'25',roomPage:1};
+  roomQuery:'',roomGrade:'all',roomStatus:'all',roomPageSize:'25',roomPage:1,advisorQuery:'',advisorGrade:'all',advisorCoverage:'all'};
  const criteria=createCriteriaExcelImport({api,toast});
  const bind=(selector,event,fn)=>document.querySelectorAll(selector).forEach(node=>
   node.addEventListener(event,e=>safeRun(()=>fn(e,node))));
@@ -175,39 +176,66 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  }
  async function people(){
   const p=await api('/api/affairs/people');state.people=p;
-  const teachers=p.teachers.filter(x=>x.active),headFor=grade=>p.heads.find(x=>x.grade===grade);
-  const option=(selected,empty='ยังไม่กำหนด')=>`<option value="">${empty}</option>`+teachers.map(t=>
-   `<option value="${t.id}" ${Number(t.id)===Number(selected)?'selected':''}>${esc(t.display_name)}</option>`).join('');
-  frame(`<section class="card stack"><h3>หัวหน้าระดับชั้น ม.1–ม.6</h3>
-    <p class="muted">กำหนดบุคลากรครูที่ทำหน้าที่หัวหน้าระดับ โดยไม่เปลี่ยนสิทธิ์ผู้ดูแลระบบ</p>
-    <div class="rd-affairs-people-grid">
-     ${[1,2,3,4,5,6].map(grade=>`<form class="rd-affairs-person" data-affairs-head="${grade}">
-      <strong>ระดับชั้นมัธยมศึกษาปีที่ ${grade}</strong>
-      <select name="teacher_user_id" aria-label="หัวหน้าระดับ ม.${grade}">${option(headFor(grade)?.teacher_user_id)}</select>
-      <button type="submit" class="button secondary">บันทึกหัวหน้าระดับ</button>
-     </form>`).join('')}
-    </div></section>
-    <section class="card stack"><h3>จัดการครูที่ปรึกษาประจำห้อง</h3>
-     <p class="muted">ห้องหนึ่งกำหนดครูที่ปรึกษาได้ 1–2 คน ทั้งสองคนเช็กชื่อรายวันและรับ Push ได้ด้วยบัญชีเดิม</p>
-     <div class="rd-affairs-people-grid">
-      ${p.rooms.map(room=>`<form class="rd-affairs-person" data-affairs-advisor="${room.id}">
-       <strong>${esc(room.label)}</strong>
-        <label>คนที่ 1<select name="teacher_user_id" aria-label="ครูที่ปรึกษาคนที่ 1 ห้อง ${esc(room.label)}">
-         ${option(room.advisor_user_id)}</select></label>
-        <label>คนที่ 2 (ไม่บังคับ)<select name="teacher2_user_id" aria-label="ครูที่ปรึกษาคนที่ 2 ห้อง ${esc(room.label)}">
-         ${option(room.advisor2_user_id,'ไม่มีคนที่ 2')}</select></label>
-        <button class="button secondary" type="submit">บันทึกครูที่ปรึกษา</button>
-      </form>`).join('')}
-     </div></section>`);
+  const {markup,teachers,rooms:advisorRooms}=advisorManagementMarkup(p);
+  frame(markup);
+  const getId=field=>resolveTeacherId(field?.value,teachers);
+  const root=document.querySelector('.rd-affairs-advisor-manager');
+  const gradeFilter=root?.querySelector('#rdAffairsAdvisorGrade');
+  const coverageFilter=root?.querySelector('#rdAffairsAdvisorCoverage');
+  const queryInput=root?.querySelector('#rdAffairsAdvisorSearch');
+  if(queryInput)queryInput.value=state.advisorQuery;
+  if(gradeFilter)gradeFilter.value=state.advisorGrade;
+  if(coverageFilter)coverageFilter.value=state.advisorCoverage;
+  const filter=()=>{
+   state.advisorQuery=queryInput?.value||'';
+   state.advisorGrade=gradeFilter?.value||'all';
+   state.advisorCoverage=coverageFilter?.value||'all';
+   const matched=new Set(filterAdvisorRoster(advisorRooms,{
+    query:state.advisorQuery,grade:state.advisorGrade,coverage:state.advisorCoverage
+   }).map(r=>Number(r.id)));
+   let shown=0;
+   root?.querySelectorAll('[data-affairs-advisor]').forEach(row=>{
+    const visible=matched.has(Number(row.dataset.affairsAdvisor));
+    row.hidden=!visible;if(visible)shown++;
+   });
+   const count=root?.querySelector('#rdAffairsAdvisorCount');
+   if(count)count.textContent='แสดง '+shown+' / '+advisorRooms.length+' ห้อง';
+   const empty=root?.querySelector('#rdAffairsAdvisorEmpty');
+   if(empty)empty.hidden=shown!==0;
+  };
+  queryInput?.addEventListener('input',filter);
+  gradeFilter?.addEventListener('change',filter);
+  coverageFilter?.addEventListener('change',filter);
+  filter();
   bind('[data-affairs-head]','submit',async(e,el)=>{
-   e.preventDefault();const value=new FormData(el).get('teacher_user_id');
-   await api('/api/affairs/heads',{method:'POST',body:{grade:Number(el.dataset.affairsHead),teacher_user_id:value?Number(value):null}});
-   toast('บันทึกหัวหน้าระดับแล้ว');await people();
+   e.preventDefault();
+   const input=el.querySelector('input[name="teacher_user_id"]');
+   const value=getId(input);
+   const button=el.querySelector('button[type="submit"]');
+   if(button)button.disabled=true;
+   try{
+    await api('/api/affairs/heads',{method:'POST',body:{
+     grade:Number(el.dataset.affairsHead),teacher_user_id:value
+    }});
+    toast('บันทึกหัวหน้าระดับแล้ว');await people();
+   }finally{if(button?.isConnected)button.disabled=false}
   });
-  bind('[data-affairs-advisor]','submit',async(e,el)=>{
-   e.preventDefault();const f=new FormData(el),value=f.get('teacher_user_id'),value2=f.get('teacher2_user_id');
-   await api('/api/affairs/advisor',{method:'POST',body:{classroom_id:Number(el.dataset.affairsAdvisor),teacher_user_id:value?Number(value):null,teacher2_user_id:value2?Number(value2):null}});
-   toast('บันทึกครูที่ปรึกษาแล้ว');await people();
+  bind('[data-save-affairs-advisor]','click',async(_,button)=>{
+   const row=button.closest('[data-affairs-advisor]');
+   if(!row)return;
+   const first=getId(row.querySelector('input[name="teacher_user_id"]'));
+   const second=getId(row.querySelector('input[name="teacher2_user_id"]'));
+   if(second&&!first)throw Error('เลือกครูที่ปรึกษาคนที่ 1 ก่อนคนที่ 2');
+   if(first&&first===second)throw Error('ครูที่ปรึกษาคนที่ 1 และ 2 ต้องไม่ซ้ำกัน');
+   if(!first&&!second&&!confirm('ยืนยันยกเลิกครูที่ปรึกษาทั้งสองคนของห้องนี้?'))return;
+   button.disabled=true;
+   try{
+    await api('/api/affairs/advisor',{method:'POST',body:{
+     classroom_id:Number(row.dataset.affairsAdvisor),
+     teacher_user_id:first,teacher2_user_id:second
+    }});
+    toast('บันทึกครูที่ปรึกษาแล้ว');await people();
+   }finally{if(button.isConnected)button.disabled=false}
   });
  }
  async function rules(){

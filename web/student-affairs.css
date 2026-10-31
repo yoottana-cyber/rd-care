@@ -320,3 +320,47 @@ body.rd-affairs-modal-open{overflow:hidden}
  .rd-affairs-table-scroll:focus-visible{outline:3px solid #e5b440;outline-offset:2px}
  .rd-att-table-result{align-items:flex-start}
 }
+
+/* Editable 48-class advisor roster: desktop table, mobile horizontal scroll. */
+.rd-affairs-advisor-manager{min-width:0}
+.rd-affairs-advisor-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.rd-affairs-counter{display:inline-flex;align-items:center;padding:8px 12px;background:#e5f8ed;
+ border-radius:12px;color:#146c4d;font-size:12px;white-space:nowrap}
+.rd-affairs-advisor-filters{display:grid;grid-template-columns:minmax(170px,1.8fr) minmax(120px,.7fr) minmax(140px,.8fr);
+ gap:10px;align-items:end}
+.rd-affairs-advisor-filters label,.rd-affairs-cell-label{display:grid;gap:5px;color:#526e5e;font-size:11px;font-weight:650}
+.rd-affairs-advisor-filters :is(input,select),.rd-affairs-searchable-teacher{display:block;width:100%;min-width:0;
+ min-height:42px;border:1px solid #cadfd1;border-radius:10px;padding:9px 10px;
+ background:#fff;color:#1b4532;font:inherit;font-size:12px}
+.rd-affairs-searchable-teacher:focus-visible,.rd-affairs-advisor-filters :is(input,select):focus-visible{
+ outline:3px solid #c4f0d7;border-color:#209969}
+.rd-affairs-advisor-table-wrap{max-width:100%;overflow:auto;border:1px solid #d6e8dc;border-radius:12px}
+.rd-affairs-advisor-table{min-width:880px;width:100%;border-collapse:separate;border-spacing:0}
+.rd-affairs-advisor-table thead th{position:sticky;top:0;background:#eaf7ee;color:#21543e;
+ z-index:2;white-space:nowrap;text-align:left}
+.rd-affairs-advisor-table tr:nth-child(even){background:#f8fcf9}
+.rd-affairs-advisor-table tr[hidden]{display:none}
+.rd-affairs-advisor-table :is(th,td){vertical-align:middle;padding:10px 9px}
+.rd-affairs-advisor-table th:first-child{white-space:nowrap;font-weight:800}
+.rd-affairs-advisor-table td:nth-child(2),.rd-affairs-advisor-table td:nth-child(3){min-width:255px}
+.rd-affairs-advisor-table .rd-affairs-save-room{min-height:38px;white-space:nowrap}
+.rd-affairs-status{display:inline-block;border-radius:100px;padding:5px 9px;font-size:11px;
+ font-weight:750;white-space:nowrap}
+.rd-affairs-status.two{background:#e0f7e9;color:#167346}
+.rd-affairs-status.one{background:#fff2d7;color:#8d671c}
+.rd-affairs-status.empty{background:#ffebec;color:#9a4551}
+.rd-affairs-advisor-table-wrap #rdAffairsAdvisorEmpty{padding:16px}
+.rd-affairs-person .rd-affairs-searchable-teacher{margin-top:5px}
+@media(max-width:720px){
+ .rd-affairs-advisor-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .rd-affairs-advisor-filters label:first-child{grid-column:1/-1}
+ .rd-affairs-advisor-table{min-width:820px}
+}
+@media(max-width:410px){.rd-affairs-advisor-filters{grid-template-columns:1fr}
+ .rd-affairs-advisor-filters label:first-child{grid-column:auto}}
+[data-theme="dark"] .rd-affairs-counter{background:#1c583e;color:#c7f6da}
+[data-theme="dark"] .rd-affairs-advisor-table-wrap{border-color:#456a50}
+[data-theme="dark"] .rd-affairs-advisor-table thead th{background:#275139;color:#dbf7e5}
+[data-theme="dark"] .rd-affairs-advisor-table tr:nth-child(even){background:#233b2c}
+[data-theme="dark"] .rd-affairs-advisor-filters :is(input,select),
+[data-theme="dark"] .rd-affairs-searchable-teacher{background:#1f3528;color:#e7f8ee;border-color:#4d795b}
