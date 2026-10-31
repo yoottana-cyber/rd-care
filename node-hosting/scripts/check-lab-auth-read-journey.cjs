@@ -141,6 +141,25 @@ async function fullCycle(conn,date){
    '&from='+date+'&to='+date,{token:guardianToken},200);
   need(res.items?.length===1&&Number(res.items[0].points)===-7,
    'guardian_behavior_data');
+  // Exact legacy GET /api/portal/records contract: historical daily,
+  // truancy, warning/conduct/merit ledgers and guardian ownership.
+  res=await expect(conn,'GET','/api/portal/records?student_id='+f.students[0]+
+   '&from='+date+'&to='+date,{token:guardianToken},200);
+  need(Number(res.student?.id)===f.students[0]&&res.daily?.length===1&&
+   res.period?.some(x=>x.status==='truancy')&&res.truancy?.length===1,
+   'guardian_records_attendance');
+  need(res.behavior?.length===1&&res.good?.length===0&&
+   res.behavior_deducted===7&&res.behavior_adjusted===0&&
+   res.behavior_remaining===7&&res.behavior_total===-7&&
+   res.good_total===0,'guardian_records_ledgers');
+  await expect(conn,'GET','/api/portal/records?student_id='+f.students[1]+
+   '&from='+date+'&to='+date,{token:guardianToken},403);
+  await expect(conn,'GET','/api/portal/records?student_id='+f.students[0]+
+   '&from='+date+'&to='+date,{token:pupilToken},403);
+  res=await expect(conn,'GET','/api/portal/records?student_id='+f.students[1]+
+   '&from='+date+'&to='+date,{token:pupilToken},200);
+  need(Number(res.student?.id)===f.students[1]&&res.behavior?.length===0,
+   'student_self_records');
   await expect(conn,'GET','/api/auth/me',{token:guardianToken},401);
   await expect(conn,'POST','/api/portal/auth/logout',
    {token:guardianToken},200);
@@ -193,7 +212,7 @@ async function run({env=process.env,driver,log=console.log,warn=console.error}={
  log('AUTH + READ LAB OK: teacher, student-affairs, student and guardian internal HTTP sessions and read flows.');
  log('ACCESS CONTROL OK: advisor vs student-affairs daily rights and verified guardian/student links.');
  log('SESSION ISOLATION OK: staff vs portal tokens and revoked logouts verified.');
- log('PORTAL DATA OK: synthetic roster, daily, truancy and behavior reads authorized.');
+ log('PORTAL DATA OK: synthetic guardian/student records, daily, truancy and separate score ledgers authorized.');
  log('ROLLBACK VERIFIED: synthetic identities, sessions, school records and behavior removed.');
  log('LAB UNCHANGED: 63 empty tables, five unchanged triggers and no public API.');
  log('NOT PRODUCTION READY: HTTP is internal only; migration, real Push and remaining APIs are blocked.');
