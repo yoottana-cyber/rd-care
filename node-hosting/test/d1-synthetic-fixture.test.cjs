@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {createModel,writeFixture,safeLocation}=require('../migration/synthetic-fixture.cjs');
-const {loadSyntheticManifest,SOURCE}=require('../migration/synthetic-manifest.cjs');
+const {loadSyntheticManifest,SOURCE,syntheticReplayOrder}=require('../migration/synthetic-manifest.cjs');
 const {checkFiles}=require('../migration/manifest-planner.cjs');
 const {readRows}=require('../migration/rollback-rehearsal.cjs');
 const {run}=require('../scripts/make-d1-synthetic-fixture.cjs');
@@ -53,6 +53,16 @@ test('safely writes and verifies private fixture, blocks mislabeled source',asyn
   assert.throws(()=>loadSyntheticManifest(result.manifestPath),
    /migration_only_synthetic_source_allowed/);
  }finally{fs.rmSync(temp,{recursive:true,force:true})}
+});
+test('zero-row FK cycles may be scheduled without disabling FK validation',()=>{
+ const manifest={tables:[{name:'users',rows:1},{name:'empty_a',rows:0},
+  {name:'empty_b',rows:0}]};
+ const plan=syntheticReplayOrder(manifest,{stages:[['users']],
+  cyclic_or_blocked_tables:['empty_a','empty_b']});
+ assert.deepEqual(plan.stages,[['users'],['empty_a','empty_b']]);
+ assert.deepEqual(plan.cyclic_or_blocked_tables,[]);
+ assert.throws(()=>syntheticReplayOrder(manifest,{stages:[['empty_a']],
+  cyclic_or_blocked_tables:['users','empty_b']}),/migration_fk_cycle_with_rows/);
 });
 test('fixture cannot be placed in public webroot or Git checkout',()=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'rd_stage12_guard_'));
