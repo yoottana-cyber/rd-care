@@ -23,7 +23,7 @@ export function prepareAdvisorRows(raw,rooms){
   else if(item.classroom.includes('\ufffd')||item.full_name.includes('\ufffd'))message='อักขระไทยเสียหาย กรุณาใช้ CSV UTF-8 หรือ Excel .xlsx';
   else if(!item.full_name||item.full_name.length>100)message='ชื่อ–สกุลครูต้องยาวไม่เกิน 100 ตัว';
   else if(!/^[a-z0-9._-]{3,40}$/i.test(item.username))message='Username ไม่ถูกต้อง';
-  else if(item.password&&item.password.length<4)message='รหัสผ่านครูใหม่ต้องมีอย่างน้อย 4 ตัว';
+  else if(item.password&&item.password.length<10)message='รหัสผ่านครูใหม่ต้องมีอย่างน้อย 10 ตัว';
   else if(item.password.length>128)message='รหัสผ่านยาวเกิน 128 ตัว';
   else if(/^\d{13}$/.test(item.password))message='ห้ามใช้เลขบัตรประชาชนเป็นรหัสผ่าน';
   else if((byRoom.get(item.classroom)||0)>=2)message='ห้องนี้มีครูที่ปรึกษาเกิน 2 คน';
@@ -35,7 +35,7 @@ export function prepareAdvisorRows(raw,rooms){
  return rows;
 }
 export function createAdvisorImport({api,rooms,onSuccess}){
- let currentRows=[],preview=[],busy=false,phase='',filename='',committed=0;
+ let currentRows=[],preview=[],busy=false,phase='',filename='',committed=0,existingMode='skip';
  function clear(){
   for(const row of currentRows)row.password='';
   currentRows=[];preview=[];busy=false;phase='';filename='';committed=0;
@@ -45,16 +45,19 @@ export function createAdvisorImport({api,rooms,onSuccess}){
   if(!target)return;
   const errors=preview.filter(x=>x.status==='error').length;
   const done=preview.filter(x=>x.status==='imported').length;
+  const skipped=preview.filter(x=>x.status==='skipped').length;
+  const updates=preview.filter(x=>['update_name','link_update'].includes(x.mode)).length;
+  const actionable=preview.filter(x=>x.status==='ready').length;
   target.innerHTML=preview.length?'<p class="summary"><strong>'+esc(filename)+'</strong> • '+preview.length+
-   ' รายการ • มีปัญหา '+errors+' • บันทึกแล้ว '+done+'</p>'+
+   ' รายการ • ข้าม '+skipped+' • อัปเดตชื่อ '+updates+' • มีปัญหา '+errors+' • บันทึกแล้ว '+done+'</p>'+
    '<div class="table-wrap" style="max-height:420px;overflow:auto"><table class="table"><thead><tr>'+
    '<th>แถว</th><th>ห้อง</th><th>ชื่อครูที่ปรึกษา</th><th>Username</th><th>การดำเนินการ</th><th>ผลตรวจ</th></tr></thead><tbody>'+
    preview.map(x=>'<tr><td>'+x.source_row+'</td><td>'+esc(x.room)+'</td><td>'+esc(x.full_name)+'</td><td>'+esc(x.username)+
-    '</td><td>'+esc(x.mode==='create'?'สร้างครูใหม่':x.mode==='link'?'ใช้บัญชีครูเดิม':'—')+'</td><td>'+
+    '</td><td>'+esc(x.mode==='create'?'สร้างบัญชี + ผูกห้อง':x.mode==='link'?'ผูกครูเดิมเพิ่ม':x.mode==='link_update'?'ผูกห้อง + อัปเดตชื่อ':x.mode==='update_name'?'อัปเดตชื่อเดิม':x.mode==='skip'?'ข้ามครูเดิม':'—')+'</td><td>'+
     esc(x.message|| (x.status==='imported'?'นำเข้าสำเร็จ':'พร้อมนำเข้า'))+'</td></tr>').join('')+
    '</tbody></table></div>':'';
-  button.hidden=!preview.length||done===preview.length;
-  button.disabled=busy||errors>0||done>0;
+  button.hidden=!preview.length||actionable===0;
+  button.disabled=busy||errors>0||done>0||actionable===0;
   const status=container.querySelector('#advisorImportStatus');
   if(status)status.textContent=phase;
  }
@@ -63,6 +66,7 @@ export function createAdvisorImport({api,rooms,onSuccess}){
   busy=true;clear();busy=true;phase='กำลังตรวจสอบไฟล์และรายชื่อครู...';draw(container);
   try{
    const form=container.querySelector('#advisorImportForm'),data=new FormData(form);
+   existingMode=String(data.get('existingMode')||'skip');
    const file=form.querySelector('input[name="file"]').files[0];
    let raw;
    if(file){
@@ -87,36 +91,51 @@ export function createAdvisorImport({api,rooms,onSuccess}){
     const groups=batches(currentRows,50);
     let start=0;
     for(const group of groups){
-     const result=await api('/api/admin/advisors/preview',{method:'POST',body:{advisors:group}});
+     const result=await api('/api/admin/advisors/preview',{method:'POST',body:{advisors:group,existingMode}});
      if(!Array.isArray(result.items)||result.items.length!==group.length)throw Error('ผลตรวจจากเซิร์ฟเวอร์ไม่ครบ');
      for(let i=0;i<result.items.length;i++)preview[start+i]={...result.items[i]};
      start+=group.length;
     }
    }
+   const toSave=preview.filter(r=>r.status==='ready').length;
+   const skipping=preview.filter(r=>r.status==='skipped').length;
    phase=preview.some(r=>r.status==='error')?'พบข้อมูลที่ต้องแก้ไข ก่อนนำเข้าครูที่ปรึกษา':
-    'ตรวจสอบผ่านทั้งหมด '+currentRows.length+' รายการ พร้อมยืนยันนำเข้า';
+    toSave?'ตรวจสอบแล้ว '+currentRows.length+' รายการ • พร้อมบันทึก '+toSave+' • ข้าม '+skipping:
+    'ข้อมูลเดิมครบแล้ว ข้าม '+skipping+' รายการ ไม่มีรายการที่ต้องบันทึก';
   }catch(e){
    for(const row of currentRows)row.password='';
    currentRows=[];preview=[];phase=e.message;
   }finally{busy=false;draw(container)}
  }
  async function commit(container){
-  if(busy||!preview.length||preview.some(x=>x.status!=='ready'))return;
-  if(!confirm('ยืนยันสร้างบัญชีครู/ผูกครูที่ปรึกษา '+currentRows.length+' รายการ?'))return;
+  if(busy||!preview.length||preview.some(x=>x.status==='error')||
+   !preview.some(x=>x.status==='ready')||preview.some(x=>x.status==='imported'))return;
+  const changes=preview.filter(x=>x.status==='ready').length;
+  const skipped=preview.filter(x=>x.status==='skipped').length;
+  if(!confirm('ยืนยันนำเข้าครูที่ปรึกษา?\nรายการบันทึก '+changes+' • ข้ามคนเดิม '+skipped+
+   '\nโหมด: '+(existingMode==='update'?'อัปเดตชื่อครูเดิม':'ข้ามรายการเดิม')+
+   '\nไม่เปลี่ยนรหัสผ่านและไม่เขียนทับครูที่ปรึกษาคนอื่น'))return;
   busy=true;committed=0;
+  let assigned=0,updated=0,skippedCount=0;
   try{
    for(const group of batches(currentRows,5)){
     const response=await api('/api/admin/advisors/commit',{method:'POST',body:{advisors:group}});
-    if(!response?.ok||response.assigned!==group.length)throw Error('ผลบันทึกชุดนี้ไม่ครบ');
+    if(!response?.ok||!Array.isArray(response.items)||response.items.length!==group.length)
+     throw Error('ผลบันทึกชุดนี้ไม่ครบ');
+    assigned+=Number(response.assigned)||0;
+    updated+=Number(response.updated)||0;
+    skippedCount+=Number(response.skipped)||0;
     for(let i=committed;i<committed+group.length;i++){
-     preview[i].status='imported';preview[i].message='นำเข้าสำเร็จ';
+     preview[i]={...response.items[i-committed]};
+     if(preview[i].status==='imported')preview[i].message='บันทึกสำเร็จ';
      currentRows[i].password='';
     }
     committed+=group.length;
-    phase='บันทึกแล้ว '+committed+' / '+currentRows.length+' รายการ';
+    phase='ประมวลผลแล้ว '+committed+' / '+currentRows.length+
+     ' • ผูกห้อง '+assigned+' • อัปเดตชื่อ '+updated+' • ข้าม '+skippedCount;
     draw(container);
    }
-   phase='นำเข้าครูที่ปรึกษาสำเร็จ '+committed+' รายการ';
+   phase='นำเข้าครูที่ปรึกษาเสร็จแล้ว • ผูกห้อง '+assigned+' • อัปเดตชื่อ '+updated+' • ข้าม '+skippedCount;
    await onSuccess?.();
   }catch(e){
    phase='บันทึกแล้ว '+committed+' รายการ และหยุดเนื่องจาก: '+e.message+
@@ -136,8 +155,12 @@ export function createAdvisorImport({api,rooms,onSuccess}){
    '<input type="file" name="file" accept=".xlsx,.csv,text/csv"></div>'+
    '<div class="field"><label>รหัสภาษาไทย CSV</label><select name="encoding"><option value="auto">ตรวจจับอัตโนมัติ</option>'+
    '<option value="utf-8">UTF-8</option><option value="windows-874">Windows-874 / TIS-620</option></select></div>'+
-   '<div class="field"><label>หรือวางข้อมูล CSV</label><textarea name="csv" rows="4" placeholder="classroom,full_name,username,password"></textarea></div>'+
-   '<p class="muted">ครูใหม่: กรอก Password อย่างน้อย 4 ตัว (แนะนำให้ยาวและไม่ซ้ำ) • ครูที่มีบัญชีแล้ว: ชื่อและ Username ต้องตรงกับระบบและเว้น Password ว่าง • ไม่เปลี่ยนรหัสผ่านครูเดิม</p>'+
+   '<div class="field"><label>หรือวางข้อมูล CSV</label><textarea name="csv" rows="4" placeholder="classroom,full_name,username,password"></textarea></div>'+ 
+   '<div class="field"><label>เมื่อครูเป็นที่ปรึกษาห้องนี้อยู่แล้ว</label><select name="existingMode" id="advisorExistingMode">'+
+   '<option value="skip">ข้ามรายการเดิม (แนะนำ) — เพิ่มเฉพาะรายการที่ยังไม่มี</option>'+
+   '<option value="update">อัปเดตชื่อบัญชีครูเดิม — เพิ่มรายการใหม่ด้วย</option></select></div>'+ 
+   '<p class="muted">ข้าม = ไม่เปลี่ยนคนเดิมในห้อง • อัปเดต = เปลี่ยนเฉพาะชื่อครูที่จับคู่ได้ด้วย Username; ครูเดิมที่ยังไม่ได้ผูกห้องอื่นสามารถเพิ่มลงห้องว่างได้ • ไม่แทนที่ครูอีกคนที่มีอยู่แล้ว</p>'+ 
+   '<p class="muted">ครูใหม่: กรอก Password อย่างน้อย 10 ตัว (แนะนำให้ยาวและไม่ซ้ำ) • ครูที่มีบัญชีแล้ว: ชื่อและ Username ต้องตรงกับระบบและเว้น Password ว่าง • ไม่เปลี่ยนรหัสผ่านครูเดิม</p>'+
    '<div class="warn">หนึ่งห้องมีครูที่ปรึกษาได้ 1 หรือ 2 คน • ใส่ห้องซ้ำ 2 แถวเพื่อกำหนด 2 คน • ครูเดิมไม่ถูกเขียนทับ • ใช้ Username ต่างกันในไฟล์</div>'+
    '<button class="button full" type="submit">ตรวจสอบทั้งไฟล์ก่อนนำเข้า</button></form>'+
    '<div id="advisorImportStatus" role="status" aria-live="polite" class="muted"></div>'+
@@ -147,6 +170,10 @@ export function createAdvisorImport({api,rooms,onSuccess}){
   container.querySelector('#advisorTemplateExcel').addEventListener('click',downloadAdvisorExampleXlsx);
   container.querySelector('#advisorImportForm').addEventListener('submit',e=>{e.preventDefault();preflight(container)});
   container.querySelector('#advisorImportCommit').addEventListener('click',()=>commit(container));
+  const invalidate=()=>{if(busy)return;clear();phase='มีการเปลี่ยนไฟล์หรือโหมด กรุณาตรวจสอบใหม่';draw(container)};
+  container.querySelector('#advisorExistingMode').addEventListener('change',invalidate);
+  container.querySelector('#advisorImportForm input[name="file"]').addEventListener('change',invalidate);
+  container.querySelector('#advisorImportForm textarea[name="csv"]').addEventListener('input',invalidate);
   draw(container);
  }
  return {render,clear};

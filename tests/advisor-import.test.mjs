@@ -45,7 +45,7 @@ test('existing username cannot be hijacked and a full room is not silently overw
  assert.match(planAdvisorImport([row()],roomMap,users).items[0].message,/ไม่ใช่บัญชีครู/);
  assert.match(planAdvisorImport([row('ม.3/2')],roomMap).items[0].message,/มีครูที่ปรึกษาครบ 2 คนแล้ว/);
  const teacher=[{username:'teacher_demo01',display_name:'ครูตัวอย่าง หนึ่ง',role:'teacher',active:1}];
- assert.match(planAdvisorImport([row()],roomMap,teacher).items[0].message,/เว้น Password ว่าง/);
+ assert.equal(planAdvisorImport([row()],roomMap,teacher).items[0].mode,'link');
  assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','')],roomMap,[{...teacher[0],display_name:'ครูคนอื่น'}]).items[0].message,/ชื่อไม่ตรง/);
 });
 test('supports two distinct advisors per room but rejects duplicates, third advisor, and invalid passwords',()=>{
@@ -62,8 +62,9 @@ test('supports two distinct advisors per room but rejects duplicates, third advi
  const usersDup=planAdvisorImport([row(),row('ม.2/3')],roomMap);
  assert.equal(usersDup.ready,false);
  assert.match(usersDup.items[1].message,/Username ซ้ำ/);
- assert.equal(planAdvisorImport([row('ม.1/1','teacher_demo01','1234')],roomMap).ready,true);
- assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','123')],roomMap).items[0].message,/4/);
+ assert.equal(planAdvisorImport([row('ม.1/1','teacher_demo01','1234')],roomMap).ready,false);
+ assert.equal(planAdvisorImport([row('ม.1/1','teacher_demo01','StrongPassword123')],roomMap).ready,true);
+ assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','123')],roomMap).items[0].message,/10/);
  assert.match(planAdvisorImport([row('ม.1/1','teacher_demo01','1234567890123')],roomMap).items[0].message,/เลขประจำตัวประชาชน/);
 });
 test('admin-only endpoint refuses teacher, anonymous and oversized commit before accessing D1',async()=>{
@@ -123,7 +124,7 @@ test('a previously assigned primary advisor is preserved when importing the seco
  assert.equal(plan.items[0].mode,'link');
 });
 test('front-end accepts two advisor rows in one room without changing file headers',()=>{
- const raw=csvRows('classroom,full_name,username,password\nม.1/1,ครูหนึ่ง,teacher001,Pass1234\nม.1/1,ครูสอง,teacher002,Pass5678');
+ const raw=csvRows('classroom,full_name,username,password\nม.1/1,ครูหนึ่ง,teacher001,TeacherPass1234\nม.1/1,ครูสอง,teacher002,TeacherPass5678');
  const result=prepareAdvisorRows(raw,[{label:'ม.1/1'}]);
  assert.equal(result.length,2);
  assert.equal(result.every(x=>x.status==='ready'),true);
