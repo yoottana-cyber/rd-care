@@ -1,5 +1,14 @@
 # RD CONNECT — DirectAdmin Node.js + MariaDB (Migration-only)
 
+## Stage 12 — private D1 → MariaDB transaction rehearsal
+
+The experimental [D1 rollback-only rehearsal](./D1_REHEARSAL.md) requires a
+private, **sanitized fixture** and explicit opt-in. It verifies JSONL hashes,
+foreign keys, row counts and post-ROLLBACK staging emptiness without any COMMIT.
+The normal 11-group staging suite remains safe; the rehearsal is **not** run
+automatically and **does not authorize** real student-data migration or go-live.
+
+
 ## Consolidated Batch 1 + Batch 2 (offline school APIs + D1 migration preparation)
 
 The combined application/data groundwork has been added to this
