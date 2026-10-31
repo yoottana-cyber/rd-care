@@ -31,6 +31,7 @@
     [OK] PERIOD 5 teachers: success 5/5 | p50 ...ms | p95 ...ms
     [OK] PERIOD 20 teachers: success 20/20 | p50 ...ms | p95 ...ms
     [OK] PERIOD 50 teachers: success 50/50 | p50 ...ms | p95 ...ms
+    AUTHORIZATION: anonymous 401 and cross-class teacher 403 (isolation OK).
     DATABASE: daily 960 rows, period 1000 rows, audit 150 writes; integrity OK, foreign keys OK.
     LOAD TEST PASS: 5/20/50 simultaneous requests in DAILY and PERIOD, 2 independent Node processes.
     ALL REAL SCHOOL DATA UNTOUCHED. SYNTHETIC DATABASE REMOVED.
