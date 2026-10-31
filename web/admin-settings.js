@@ -16,7 +16,7 @@ export function adminMetrics(users,rooms){
 }
 const roleText={teacher:'ครูผู้สอน',staff:'กิจการนักเรียน',admin:'ผู้ดูแลระบบ'};
 export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
- reload,refreshRooms,clearStudentCache,advisorImporter,parseCsv,periodChoices,navigate}){
+ reload,refreshRooms,clearStudentCache,advisorImporter,personnelImporter,parseCsv,periodChoices,navigate}){
  let tab='overview',editUserId=null,search='',filterRole='all',filterStatus='all';
  const pushPolicy=createAdminNotificationPolicy({api,toast,safeRun});
  const users=()=>getUsers()||[],rooms=()=>getRooms()||[];
@@ -155,6 +155,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
      <button type="button" class="button full" id="openStudentRosterImport">เปิดศูนย์ทะเบียนและนำเข้านักเรียน</button>
     </section>
     <div id="advisorImportHolder" class="rd-settings-advisor-import"></div>
+    <div id="personnelImportHolder" class="rd-settings-advisor-import"></div>
    </div></div>`;
  }
  const notifications=()=>`<div class="rd-settings-content rd-admin-notifications">
@@ -283,6 +284,7 @@ export function createAdminSettings({api,mount,safeRun,toast,getUsers,getRooms,
  function bindImports(){
   document.querySelector('#openStudentRosterImport')?.addEventListener('click',()=>navigate?.('adminStudents'));
   advisorImporter.render(document.querySelector('#advisorImportHolder'));
+  personnelImporter?.render(document.querySelector('#personnelImportHolder'));
  }
   function render(){
   mount(layout());
