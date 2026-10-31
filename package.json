@@ -17,7 +17,8 @@
     "school:admin": "node school-hosting/setup-admin.cjs",
     "school:install": "node school-hosting/install.cjs",
     "school:restore-test": "node school-hosting/restore-test.cjs",
-    "school:verify": "node school-hosting/verify.cjs"
+    "school:verify": "node school-hosting/verify.cjs",
+    "school:load-test": "node school-hosting/concurrency-test.cjs"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"
