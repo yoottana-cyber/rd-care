@@ -162,8 +162,8 @@ export async function advisorImportEndpoint(req,env,user,path){
  if(!body||!Array.isArray(body.advisors))fail(400,'ต้องส่งรายชื่อ advisors');
  const rows=body.advisors,commit=path.endsWith('/commit'),existingMode=body.existingMode??'skip';
  if(!assignMode(existingMode))fail(400,'โหมดจัดการครูที่ปรึกษาไม่ถูกต้อง');
- if(rows.length<1||rows.length>(commit?5:50))
-  fail(400,commit?'บันทึกชุดละไม่เกิน 5 ครู':'ตรวจครั้งละไม่เกิน 50 ครู');
+ if(rows.length<1||rows.length>(commit?5:120))
+  fail(400,commit?'บันทึกชุดละไม่เกิน 5 ครู':'ตรวจครั้งละไม่เกิน 120 ครู');
  const [roomData,userData]=await env.DB.batch([
   env.DB.prepare('SELECT id,label,advisor_user_id,advisor2_user_id FROM classrooms'),
   env.DB.prepare('SELECT id,username,display_name,role,active,deleted_at FROM users')
