@@ -376,15 +376,40 @@ async function renewStaffRememberedSession(){
  }catch{/* Offline/errors keep the original expiry; only an actual 401 clears it. */}
  finally{staffRenewInFlight=false}
 }
-async function logout(){try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
+async function logout(){if(!confirmAttendanceExit())return;try{await pwaTools.disable({silent:true})}catch{}try{await api('/api/auth/logout',{method:'POST'})}catch{}unifiedImport.clear();advisorImporter.clear();referenceCache.clear();state.token='';state.user=null;clearAuthSession('rd_token');renderLogin();}
 function roomOptions(advisorOnly=false){
  const rooms=advisorOnly&&['teacher','staff'].includes(state.user?.role)?
   state.rooms.filter(r=>(r.advisor_user_id===state.user.id||r.advisor2_user_id===state.user.id)):state.rooms;
  return rooms.map(r=>`<option value="${r.id}" ${r.id===state.roomId?'selected':''}>${esc(r.label)}</option>`).join('');
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
-function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
+function attendanceDirty(){return attendanceHasUnsavedChanges(state,state.attendanceBaseline)}
+function confirmAttendanceExit(){
+ if(state.attendanceSaving){toast('กำลังบันทึกข้อมูล กรุณาตรวจสอบผลก่อนเปลี่ยนหน้า',true);return false}
+ return !attendanceDirty()||confirm('มีข้อมูลเช็กชื่อที่แก้ไขแต่ยังไม่บันทึก หากออกจากหน้านี้ข้อมูลที่แก้ไขจะสูญหาย ยืนยันออกจากหน้า?');
+}
+window.addEventListener('beforeunload',event=>{
+ if(!state.attendanceSaving&&!attendanceDirty())return;
+ event.preventDefault();event.returnValue='';
+});
+function updateAttendanceDraftNotice(){
+ const el=$('#attendanceDraftNotice');if(!el)return;
+ const dirty=attendanceDirty();
+ el.textContent=dirty?'● มีข้อมูลแก้ไขที่ยังไม่ได้บันทึก':'ตรวจสอบข้อมูลก่อนกดยืนยันเพื่อบันทึก';
+ el.className=dirty?'rd-attendance-draft-notice dirty':'rd-attendance-draft-notice';
+}
+function bindFilters(onChange,{guardAttendance=false}={}){
+ $('#room')?.addEventListener('change',e=>safeRun(async()=>{
+  if(guardAttendance&&!confirmAttendanceExit()){e.target.value=String(state.roomId);return}
+  state.roomId=Number(e.target.value);state.slotId=null;await onChange();
+ }));
+ $('#day')?.addEventListener('change',e=>safeRun(async()=>{
+  if(guardAttendance&&!confirmAttendanceExit()){e.target.value=state.date;return}
+  state.date=e.target.value;state.slotId=null;await onChange();
+ }));
+}
 async function showTab(tab,{preserveDate=false}={}){
+ if(tab!==state.tab&&!confirmAttendanceExit())return;
  const previousTab=state.tab;
  state.date=dateOnAttendanceEntry({tab,previousTab,selectedDate:state.date,
   today:dateToday(),preserveDate});
@@ -578,6 +603,7 @@ async function loadAttendance(){
  state.teachingNoteUpdatedAt=kind==='period'?attendanceData.teaching_note_updated_at||null:null;
  state.statuses=Object.fromEntries(state.students.map(x=>[x.id,'present']));
  for(const entry of entries)state.statuses[entry.student_id]=entry.status;
+ state.attendanceBaseline=takeAttendanceSnapshot(state);
  renderAttendance();
 }
 function statusCounts(){return Object.fromEntries(Object.keys(state.kind==='period'?periodNames:names)
