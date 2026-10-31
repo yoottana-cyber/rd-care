@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {advisorManagementMarkup,resolveTeacherId,teacherLabel,activeTeachers,filterAdvisorRoster}
- from '../web/affairs-people-table.js';
+const webCode=readFileSync(new URL('../web/affairs-people-table.js',import.meta.url),'utf8');
+const {advisorManagementMarkup,resolveTeacherId,teacherLabel,activeTeachers,filterAdvisorRoster}=
+ await import('data:text/javascript;base64,'+Buffer.from(webCode).toString('base64'));
 import {studentAffairsRoutes} from '../worker/src/student-affairs.js';
 
 const teachers=[
