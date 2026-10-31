@@ -34,10 +34,10 @@ test('skip preserves an already assigned homeroom teacher even with a changed na
  assert.equal(result.items[0].mode,'skip');
  assert.equal(JSON.stringify(result).includes('NotForOverwrite'),false);
 });
-test('update mode makes uploaded room list authoritative, even when the room is already full',()=>{
+test('existing homeroom teacher update only modifies display name, keeping slot 1 and another teacher intact',()=>{
  const result=planAdvisorImport([row('ม.1/1','teacher_a','ครู ก ชื่อแก้ไข')],rooms,users,'update');
- assert.deepEqual([result.ready,result.assigned,result.skipped,result.updated,result.replacedRooms],[true,0,0,1,1]);
- assert.equal(result.items[0].mode,'replace');
+ assert.deepEqual([result.ready,result.assigned,result.skipped,result.updated],[true,0,0,1]);
+ assert.equal(result.items[0].mode,'update_name');
  assert.equal(result.items[0].slot,1);
 });
 test('existing teacher can be linked to an empty second classroom and optionally update display name',()=>{
@@ -45,11 +45,11 @@ test('existing teacher can be linked to an empty second classroom and optionally
  assert.deepEqual([existing.ready,existing.assigned,existing.updated],[true,1,0]);
  assert.equal(existing.items[0].mode,'link');
  const change=planAdvisorImport([row('ม.1/2','teacher_a','เปลี่ยนชื่อ ก')],rooms,users,'update');
- assert.equal(change.items[0].mode,'replace');
+ assert.equal(change.items[0].mode,'link_update');
  assert.deepEqual([change.assigned,change.updated],[1,1]);
 });
 test('full two-advisor room cannot be overwritten and inactive/admin credentials cannot be linked',()=>{
- const plan=planAdvisorImport([row('ม.1/1','new_teacher','คนอื่น','LongEnoughTeacherPassword')],rooms,users,'skip');
+ const plan=planAdvisorImport([row('ม.1/1','new_teacher','คนอื่น','LongEnoughTeacherPassword')],rooms,users,'update');
  assert.equal(plan.ready,false);
  assert.match(plan.items[0].message,/ครบ 2 คน/);
  assert.equal(planAdvisorImport([row('ม.1/2','inactive_d')],rooms,users,'skip').ready,false);
@@ -71,8 +71,7 @@ test('new accounts and second advisor slots remain supported without username du
   row('ม.1/2','new_teacher','ครูใหม่','LongEnoughTeacherPassword'),
   row('ม.1/3','new_teacher','ครูใหม่','LongEnoughTeacherPassword')
  ],rooms,users,'update');
- assert.equal(duplicated.ready,true);
- assert.equal(duplicated.created,1);
+ assert.equal(duplicated.ready,false);
 });
 test('preview is read-only; duplicate import commit with skip creates no mutations',async()=>{
  const env=makeDb();
@@ -88,7 +87,7 @@ test('preview is read-only; duplicate import commit with skip creates no mutatio
 });
 test('update commit writes only name and audit, never password, role, sessions or classroom slots',async()=>{
  const env=makeDb();
- const res=await advisorImportEndpoint(request([row('ม.1/1','teacher_a','ครูชื่อใหม่'),row('ม.1/1','teacher_b','ครู ข')],'update',true),
+ const res=await advisorImportEndpoint(request([row('ม.1/1','teacher_a','ครูชื่อใหม่')],'update',true),
   env,{id:1,role:'admin'},'/api/admin/advisors/commit');
  const data=await res.json();
  assert.equal(data.ok,true);
