@@ -26,7 +26,7 @@ async function run({env=process.env,log=console.log}={}){
   const hash=await passwordLib.passwordHash(password,salt);
   db.sqlite.exec('BEGIN IMMEDIATE');
   try{
-   if(db.sqlite.prepare('SELECT 1 AS found FROM users LIMIT 1').get())
+   if(db.sqlite.prepare("SELECT 1 AS found FROM users WHERE username<>'rd-care-late-system' LIMIT 1").get())
     throw Error('school_admin_already_initialized');
    const result=db.sqlite.prepare(
     "INSERT INTO users(username,display_name,role,password_salt,password_hash,active) VALUES(?,?,'admin',?,?,1)")
