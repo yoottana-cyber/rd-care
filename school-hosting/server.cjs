@@ -102,6 +102,9 @@ async function schoolHandler(req,res,{worker,db,env,config}){
  }
  if(!where.pathname.startsWith('/api/'))
   return staticFile(req,res,where);
+ // One-time administrator bootstrap is CLI-only; never expose the
+ // original Worker /api/setup endpoint on the public school URL.
+ if(where.pathname==='/api/setup')return fail(res,404,'not_found');
  if(!approvedOrigin(req,config.origin))return fail(res,403,'origin_not_allowed');
  const method=req.method||'GET';
  if(!['GET','POST','OPTIONS'].includes(method))
