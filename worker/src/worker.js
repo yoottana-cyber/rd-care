@@ -644,7 +644,7 @@ async function reviewAlert(req,env,user,id){
 }
 // Server-authorized overview: include ONLY rooms advised by this login.
 // Being a subject teacher does not authorize viewing other homerooms' daily work.
-async function advisorDailyProgress(req,env,user){
+export async function advisorDailyProgress(req,env,user){
  requireRole(user,['teacher','staff','admin']);
  const date=new URL(req.url).searchParams.get('date')||bangkokToday();
  requireDate(date);
