@@ -22,7 +22,8 @@
     "school:pilot-check": "node school-hosting/pilot-check.cjs",
     "school:push-keygen": "node school-hosting/push-keys.cjs",
     "school:push-check": "node school-hosting/push-check.cjs",
-    "school:cron-preflight": "node school-hosting/cron-preflight.cjs"
+    "school:cron-preflight": "node school-hosting/cron-preflight.cjs",
+    "school:advisor-check": "node school-hosting/advisor-check.cjs"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"

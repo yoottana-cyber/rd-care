@@ -2,6 +2,7 @@ import {API_BASE_URL} from './config.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
+import {createPilotImportPreflight} from './pilot-import-preflight.js';
 import {createStudentStatistics} from './student-statistics.js';
 import {createAdvisorImport} from './advisor-import.js';
 import {createAdminSettings} from './admin-settings.js';
@@ -60,6 +61,7 @@ const scoreRecorder=createScoreRecording({api,mount,safeRun,toast,rooms:()=>stat
 const behaviorAdjustment=createBehaviorAdjustment({api,mount,safeRun,toast,rooms:()=>state.rooms,
  getRoomId:()=>state.roomId,setRoomId:id=>{state.roomId=id},getTab:()=>state.tab,escapeHtml:esc,scorePopup});
 const adminStudentState={roomId:null,items:[],editId:null};
+const pilotImportPreflight=createPilotImportPreflight({rooms:()=>state.rooms});
 const unifiedImport=createUnifiedImport({api,rooms:()=>state.rooms,onSuccess:async()=>{referenceCache.clear();await loadAdminStudents()},
  onOpenConflict:async(id,roomId)=>{adminStudentState.roomId=roomId;adminStudentState.editId=id;await showTab('adminStudents')}});
 const studentStatistics=createStudentStatistics({api,mount,safeRun,isActive:()=>state.tab==='studentStatistics',
@@ -908,8 +910,10 @@ function renderAdminStudents(){
       `<div class="table-wrap"><table class="table"><thead><tr><th>ห้องเรียน</th><th>เลขที่</th><th>เริ่มวันที่</th><th>สิ้นสุดก่อนวันที่</th></tr></thead>
        <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(h.start_date)}</td><td>${esc(h.end_date||'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
    </section>`:''}
+  <div id="pilotImportHolder"></div>
   <div id="unifiedImportHolder"></div>
 `);
+ pilotImportPreflight.render($('#pilotImportHolder'));
  unifiedImport.render($('#unifiedImportHolder'));
  $('#adminStudentRoom').addEventListener('change',e=>safeRun(async()=>{
   adminStudentState.roomId=Number(e.target.value);adminStudentState.editId=null;await loadAdminStudents();

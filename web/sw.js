@@ -1,6 +1,6 @@
 // RD CONNECT offline app shell. This cache contains only public static assets,
 // never authenticated responses, student records, or arbitrary same-origin URLs.
-const CACHE='rd-care-shell-v121';
+const CACHE='rd-care-shell-v122';
 const CACHE_PREFIX='rd-care-shell-';
 const ASSETS=[
  './','./index.html','./app.css','./theme.css','./login.css','./login-route.js',
@@ -15,7 +15,7 @@ const ASSETS=[
  './vendor/qr-scanner.min.js','./vendor/qr-scanner-worker.min.js','./student-affairs.js',
  './student-affairs.css','./affairs-attendance-table.js','./criteria-table.js','./criteria-excel-import.js','./guardian-push.js','./portal-admin.js',
  './portal-table.js','./portal-batch.js','./portal-roster-import.js',
- './unified-import.js','./student-statistics.js','./student-statistics.css','./advisor-import.js','./admin-settings.js','./admin-notification-policy.js',
+ './unified-import.js','./pilot-import-preflight.js','./pilot-import-validation.js','./student-statistics.js','./student-statistics.css','./advisor-import.js','./admin-settings.js','./admin-notification-policy.js',
  './admin-settings.css','./csv-encoding.js','./template-xlsx.js',
  './score-recording.js','./score-recording.css','./score-history.js',
  './score-history-popup.js','./behavior-adjustment.js',
