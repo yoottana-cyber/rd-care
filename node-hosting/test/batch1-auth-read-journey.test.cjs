@@ -26,8 +26,8 @@ test('Internal router rejects unknown routing, disallowed method and absent toke
 test('internal routing accepts the exact staging prefix, but not fake suffixes',()=>{
  assert.equal(parsePath('/web/rd-connect-node-test/api/classrooms'),
   '/api/classrooms');
- assert.equal(parsePath('/some/other/api/classrooms'),
-  '/some/other/api/classrooms');
+ assert.throws(()=>parsePath('/some/other/api/classrooms'),
+  /invalid_path/);
  assert.throws(()=>parsePath('http://user:password@localhost/api/classrooms'),
   /invalid_url/);
 });
