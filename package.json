@@ -17,5 +17,7 @@
     "school:admin": "node school-hosting/setup-admin.cjs",
     "school:install": "node school-hosting/install.cjs"
   },
-  "dependencies": {}
+  "dependencies": {
+    "qrcode-generator": "2.0.4"
+  }
 }
