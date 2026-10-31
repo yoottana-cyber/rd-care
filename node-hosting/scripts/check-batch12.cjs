@@ -27,12 +27,12 @@ function safeOfflineFailure(proc,tests,warn=console.error){
  // error payloads or assertion values from TAP output.
  const raw=String(proc?.stdout||'');
  // Nested TAP (and Node --test bootstrap errors) can be indented.
- const failing=raw.split(/\r?\n/).filter(line=>/^\\s*not ok \\d+ - /.test(line));
+ const failing=raw.split(/\r?\n/).filter(line=>/^\s*not ok \d+ - /.test(line));
  warn('BATCH 1+2 TAP FAILING CASES: '+failing.length+'.');
  for(const line of failing.slice(0,8)){
-  const testName=line.replace(/^\\s*not ok \\d+ - /,'').trim().slice(0,140)
+  const testName=line.replace(/^\s*not ok \d+ - /,'').trim().slice(0,140)
    .replace(/[a-f0-9]{48,}/ig,'[redacted]')
-   .replace(/[^a-zA-Z0-9 _.,:;()\\-]/g,'?');
+   .replace(/[^a-zA-Z0-9 _.,:;()\-]/g,'?');
   warn('BATCH 1+2 FAILED CASE: '+testName);
  }
  // Classify only allowlisted bootstrap problems. NEVER echo stderr, paths,
