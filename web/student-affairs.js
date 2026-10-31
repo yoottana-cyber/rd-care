@@ -52,14 +52,41 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
  function reminderLabel(value){return ({sent:'ส่งถึงอุปกรณ์แล้ว',no_subscription:'ยังไม่ได้สมัครรับ Push',
   failed:'ส่งไม่สำเร็จ',queued:'รอส่ง',already_queued:'เคยแจ้งแล้ว',not_needed:'เช็กชื่อครบ/ยังไม่มีครูที่ปรึกษา'})[value]||value}
  async function attendance(){
-  const [result,daysOff]=await Promise.all([
+  const [result,daysOff,reminderStatus]=await Promise.all([
    api('/api/affairs/attendance?date='+encodeURIComponent(state.date)),
-   api('/api/affairs/closed-days')
+   api('/api/affairs/closed-days'),
+   api('/api/affairs/reminder-status').catch(()=>null)
   ]);
   state.attendance=result;
   const settings=result.setting,days=String(settings.weekdays||'1,2,3,4,5').split(',').map(Number);
   const weekdays=['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
   const teachers=result.items.filter(x=>x.students>0);
+  const reminderReasons={
+   switch_off:'ระบบเตือนอัตโนมัติยังปิดอยู่ — เปิดสวิตช์และบันทึกการตั้งค่า',
+   weekday_excluded:'วันนี้ไม่ได้อยู่ในวันที่เลือกให้ส่งเตือน',
+   before_time:'ยังไม่ถึงเวลาเริ่มแจ้งเตือนที่กำหนด',
+   category_disabled:'ผู้ดูแลระบบปิดประเภท Push «เตือนเช็กชื่อรายวัน → ครูที่ปรึกษา»',
+   holiday:'วันนี้ถูกกำหนดเป็นวันหยุดหรือวันที่ยกเว้นการแจ้งเตือน',
+   no_incomplete_rooms:'วันนี้ไม่มีห้องที่ยังเช็กชื่อไม่ครบ',
+   no_assigned_advisors:'ห้องที่เช็กชื่อไม่ครบยังไม่มีครูที่ปรึกษา',
+   already_attempted:'ห้องที่เข้าเงื่อนไขถูกประมวลผลอัตโนมัติแล้วในวันนี้ (ตรวจผลส่งด้านล่าง)',
+   no_subscriptions:'ครูที่ปรึกษาของห้องที่รอเตือนยังไม่ได้สมัครรับ Push บนโดเมนนี้',
+   ready:'เข้าเงื่อนไขพร้อมให้ Cron ประมวลผลในรอบถัดไป'
+  };
+  const autoStatus=reminderStatus?
+   `<div class="card" role="status" aria-live="polite">
+     <h4>สถานะเตือนอัตโนมัติวันนี้ (${esc(reminderStatus.today)} เวลา ${esc(reminderStatus.clock)} น.)</h4>
+     <p>${esc(reminderReasons[reminderStatus.reason]||'กำลังตรวจสอบสถานะ')}</p>
+     <p class="muted">ห้องเช็กชื่อไม่ครบ ${Number(reminderStatus.incomplete_rooms)||0} •
+      รอประมวลผล ${Number(reminderStatus.pending_rooms)||0} •
+      ประมวลผลแล้ว ${Number(reminderStatus.attempted_rooms)||0} •
+      ส่งสำเร็จ ${Number(reminderStatus.delivered_rooms)||0} •
+      ส่งไม่สำเร็จ ${Number(reminderStatus.failed_rooms)||0} •
+      ไม่มีอุปกรณ์ ${Number(reminderStatus.no_subscription_rooms)||0}</p>
+     <p class="muted">ครูที่ปรึกษาที่สมัคร Push สำหรับห้องรอเตือน: ${Number(reminderStatus.opted_in_advisors)||0} บัญชี •
+      ข้อมูลนี้แสดงเงื่อนไขและประวัติการส่งวันนี้ ไม่ใช่หลักฐานว่า Cron ได้รันในรอบล่าสุด</p>
+    </div>`:
+   '<p class="warn" role="status">ยังอ่านสถานะเตือนอัตโนมัติไม่ได้ โปรดตรวจว่ามีการอัปเดต Backend บนโฮสติ้งแล้ว</p>';
   frame(`<section class="card stack"><div class="row between"><div><h3>ตรวจสอบการเช็กชื่อรายวัน</h3>
     <p class="muted">ห้องที่ครบหมายถึงนักเรียนที่ใช้งานอยู่ในห้องมีข้อมูลเช็กชื่อครบทุกคน</p></div>
     <button class="button secondary" id="affairsRefresh">↻ อัปเดตข้อมูล</button></div>
@@ -68,7 +95,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
    ${dailyAttendanceSummaryTable(teachers)}
 </section>
    <section class="card stack"><div><h3>ตั้งค่าเตือนอัตโนมัติ</h3>
-    <p class="muted">ตรวจทุก 5 นาทีผ่าน Cloudflare Cron • ทำงานเฉพาะวันที่ตั้งไว้และหลังเวลาที่กำหนด • ส่งให้ครูที่ปรึกษาที่สมัครรับ Push เท่านั้น (สูงสุด 1 รอบอัตโนมัติต่อห้องต่อวัน)</p></div>
+    <p class="muted">ตรวจทุก 5 นาทีผ่าน Node.js Cron ของโรงเรียน • ทำงานเฉพาะวันที่ตั้งไว้และหลังเวลาที่กำหนด • ส่งให้ครูที่ปรึกษาที่สมัครรับ Push เท่านั้น (สูงสุด 1 รอบอัตโนมัติต่อห้องต่อวัน)</p></div>
     <form id="affairsReminderSettings" class="stack">
      <label class="row"><input type="checkbox" name="auto_enabled" ${settings.auto_enabled?'checked':''}>
       <strong>เปิดระบบแจ้งเตือนอัตโนมัติ</strong></label>
@@ -79,6 +106,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
      </div>
      <button class="button" type="submit">บันทึกเวลาและวันแจ้งเตือน</button>
     </form>
+    ${autoStatus}
     <p class="muted">วันหยุดพิเศษหรือวันที่โรงเรียนไม่มีเรียน สามารถเพิ่มในส่วนกำหนดวันหยุดด้านล่าง (ระบบจะไม่ส่งเตือนอัตโนมัติในวันเหล่านั้น)</p>
     <form id="affairsHoliday" class="row">
      <div class="field"><label>วันที่ไม่มีการเรียนการสอน</label><input type="date" name="date" required></div>
