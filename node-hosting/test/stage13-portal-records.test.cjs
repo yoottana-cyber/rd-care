@@ -105,8 +105,8 @@ test('private route is now an exact GET contract; Passenger stays 501',()=>{
  assert.equal(privateRouteFor('GET','/api/portal/records'),true);
  assert.equal(privateRouteFor('POST','/api/portal/records'),false);
  const r=report();
- assert.equal(r.private_route_present,12);
- assert.equal(r.private_route_missing,29);
+ assert.equal(r.private_route_present,13);
+ assert.equal(r.private_route_missing,28);
  const res={status:0,writeHead(n){this.status=n},end(body){this.body=JSON.parse(body)}};
  requestHandler({method:'GET',url:'/api/portal/records'},res);
  assert.equal(res.status,501);
