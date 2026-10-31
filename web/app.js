@@ -12,6 +12,7 @@ import {createMyTimetable,periodChoices} from './my-timetable.js';
 import {createLateGate} from './late-gate.js';
 import {readLateGateIntent} from './late-qr-intent.js';
 import {createPeriodCenter} from './period-center.js';
+import {dateOnAttendanceEntry} from './attendance-date.js';
 import {createPwaTools} from './pwa-client.js';
 import {offerPushIntro} from './push-intro.js';
 import {registerPwaUpdates} from './pwa-updates.js';
@@ -256,7 +257,7 @@ async function boot(){
    query.get('date')<=dateToday()){
   state.roomId=Number(query.get('classroom_id'));state.date=query.get('date');
   history.replaceState(null,'',location.pathname+'?login=staff'+location.hash);
-  await showTab('attendance');return;
+  await showTab('attendance',{preserveDate:true});return;
  }
  if(requested==='notifications'||requested==='advisorCenter'||requested==='lateGate'){
   history.replaceState(null,'',location.pathname+'?login=staff'+location.hash);
@@ -377,7 +378,12 @@ function roomOptions(advisorOnly=false){
 }
 function filters({date=true,advisorOnly=false}={}){return `<div class="row"><div class="field smallbox"><label for="room">ห้องเรียน</label><select id="room">${roomOptions(advisorOnly)}</select></div>${date?`<div class="field smallbox"><label for="day">วันที่</label><input id="day" type="date" value="${state.date}" max="${dateToday()}"></div>`:''}</div>`;}
 function bindFilters(onChange){$('#room')?.addEventListener('change',e=>safeRun(async()=>{state.roomId=Number(e.target.value);state.slotId=null;await onChange()}));$('#day')?.addEventListener('change',e=>safeRun(async()=>{state.date=e.target.value;state.slotId=null;await onChange()}));}
-async function showTab(tab){scorePopup.close();if(tab!=='lateGate')lateGate.destroy();portalAdminUI?.cancel();state.tab=tab;
+async function showTab(tab,{preserveDate=false}={}){
+ const previousTab=state.tab;
+ state.date=dateOnAttendanceEntry({tab,previousTab,selectedDate:state.date,
+  today:dateToday(),preserveDate});
+ if(tab==='attendance'&&previousTab!==tab)state.slotId=null;
+ scorePopup.close();if(tab!=='lateGate')lateGate.destroy();portalAdminUI?.cancel();state.tab=tab;
  if(tab==='attendance')state.kind='daily';
  if(tab==='periodAttendance'||tab==='periodCheckin')state.kind='period';
  if(tab!=='adminStudents')unifiedImport.clear();
