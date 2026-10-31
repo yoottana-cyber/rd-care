@@ -37,6 +37,8 @@ DirectAdmin > Run JS Script > `school:push-check`
     CRON: NOT CHECKED; DO NOT START school:cron UNTIL DEVICES AND RECIPIENT RULES ARE VERIFIED.
     LIVE SQLITE UNCHANGED; SECRETS HIDDEN; NO PUSH PROVIDER CONTACTED.
 
+คำสั่ง `school:push-check` จะคืน `returncode: 0` เมื่อคู่กุญแจพร้อม และคืน `returncode: 2` เมื่อการตั้งค่า VAPID ยังไม่พร้อม (แสดงชื่อค่าที่ขาด แต่ไม่แสดงรหัสลับ)
+
 หากขึ้น `NOT READY (missing_settings)` ให้ตรวจชื่อ Environment Variables ที่ขาด
 หากขึ้น `NOT READY (invalid_subject)` ให้ตรวจ `mailto:` จริง
 หากขึ้น `NOT READY (keypair_mismatch)` หรือ `invalid_keypair` ให้ตรวจว่าคัดลอก Public/Private Key คู่เดียวกันแบบครบ ไม่มีช่องว่าง/ตัดท้าย
