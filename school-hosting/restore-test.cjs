@@ -36,13 +36,24 @@ function snapshot(db){
   name,Number(db.prepare('SELECT COUNT(*) AS n FROM '+name).get().n)
  ]));
 }
-async function run({env=process.env,log=console.log}={}){
+async function run({env=process.env,backupFile=null,log=console.log}={}){
  const source=privateDbPath(env.RD_SQLITE_FILE,WEB_ROOT);
  if(!fs.existsSync(source))throw Error('school_live_database_missing');
  const directory=backupRoot(env);
  if(path.resolve(source).startsWith(directory+path.sep))
   throw Error('school_backup_cannot_include_live_database');
- const backup=latestBackup(directory);
+ let backup=latestBackup(directory);
+ if(backupFile){
+  // Only accept a real private backup in the configured backup directory.
+  if(typeof backupFile!=='string'||path.dirname(path.resolve(backupFile))!==directory||
+   !BACKUP_FILE.test(path.basename(backupFile)))
+   throw Error('school_restore_invalid_backup_selection');
+  const file=path.resolve(backupFile);
+  const stat=fs.lstatSync(file);
+  if(!stat.isFile()||stat.isSymbolicLink()||stat.size<1024||stat.mode&0o077)
+   throw Error('school_backup_file_insecure');
+  backup={file,name:path.basename(file),mtimeMs:stat.mtimeMs,size:stat.size};
+ }
  if(fs.realpathSync(source)===fs.realpathSync(backup.file))
   throw Error('school_backup_equals_live_database');
  const destinationDir=fs.mkdtempSync(path.join(directory,'.rd-restore-check-'));
