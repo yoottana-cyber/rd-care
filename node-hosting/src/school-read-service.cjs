@@ -317,5 +317,34 @@ async function portalRecords(conn,user,studentId,from,to){
   behavior_total:-scores.behavior_remaining,...scores,
   note:'คะแนนความดีแยกจากคะแนนพฤติกรรม • ลดคะแนนพฤติกรรมได้เฉพาะเกณฑ์ปรับพฤติกรรม'};
 }
+// Stage 13 portal truancy feed, ported from worker/src/truancy-push.js.
+// This endpoint is guardian-only, as in Cloudflare. A student session sees
+// an empty list; staff tokens cannot access this portal handler.
+// All rows are limited to an ACTIVE guardian->student link, live truancy,
+// absent period mark, active event and active student. No writes.
+async function portalTruancy(conn,user,from=null,to=null){
+ if(user?.kind!=='portal')fail(403,'forbidden');
+ if(user.role==='student')return {items:[]};
+ if(user.role!=='guardian')fail(403,'forbidden');
+ const range=from===null&&to===null?null:dateRange(from,to);
+ const sql=`SELECT e.id,e.student_id,e.school_date,t.period,t.subject,s.full_name,
+   e.created_at FROM truancy_events e
+   JOIN period_truancy tr ON tr.student_id=e.student_id
+    AND tr.timetable_id=e.timetable_id AND tr.school_date=e.school_date
+   JOIN attendance_period p ON p.student_id=e.student_id
+    AND p.timetable_id=e.timetable_id
+    AND p.school_date=e.school_date AND p.status='absent'
+   JOIN timetable t ON t.id=e.timetable_id
+   JOIN students s ON s.id=e.student_id AND s.active=1
+   JOIN guardian_student_links l ON l.student_id=e.student_id
+   JOIN portal_accounts a ON a.id=l.guardian_account_id
+    AND a.active=1 AND a.role='guardian'
+   WHERE l.guardian_account_id=? AND e.active=1
+   ${range?'AND e.school_date BETWEEN ? AND ?':
+     'AND e.school_date>=DATE_SUB(UTC_DATE(),INTERVAL 30 DAY)'}
+   ORDER BY e.created_at DESC,e.id DESC LIMIT 40`;
+ const [items]=await conn.execute(sql,range?[user.id,range.from,range.to]:[user.id]);
+ return {items};
+}
 module.exports={asId,validDate,dateRange,trustedSession,assertRoom,listRooms,roster,
- dailyAttendance,savedDailyAttendance,periodAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior,portalScoreSummary,portalRecords};
+ dailyAttendance,savedDailyAttendance,periodAttendance,teacherTimetable,portalStudentId,portalChildren,portalAttendance,portalBehavior,portalScoreSummary,portalRecords,portalTruancy};
