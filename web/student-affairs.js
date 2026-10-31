@@ -80,7 +80,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
      <p class="muted">ห้องเช็กชื่อไม่ครบ ${Number(reminderStatus.incomplete_rooms)||0} •
       รอประมวลผล ${Number(reminderStatus.pending_rooms)||0} •
       ประมวลผลแล้ว ${Number(reminderStatus.attempted_rooms)||0} •
-      ส่งสำเร็จ ${Number(reminderStatus.delivered_rooms)||0} •
+      ผู้ให้บริการรับแจ้งเตือนแล้ว ${Number(reminderStatus.delivered_rooms)||0} •
       ส่งไม่สำเร็จ ${Number(reminderStatus.failed_rooms)||0} •
       ไม่มีอุปกรณ์ ${Number(reminderStatus.no_subscription_rooms)||0}</p>
      <p class="muted">ครูที่ปรึกษาที่สมัคร Push สำหรับห้องรอเตือน: ${Number(reminderStatus.opted_in_advisors)||0} บัญชี •
