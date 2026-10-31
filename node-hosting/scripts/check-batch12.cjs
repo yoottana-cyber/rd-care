@@ -80,6 +80,7 @@ async function run({env=process.env,execute=spawnSync,migration=plan,
   path.join(__dirname,'../test/d1-synthetic-fixture.test.cjs'),
   path.join(__dirname,'../test/stage13-api-parity.test.cjs'),
   path.join(__dirname,'../test/stage13-portal-records.test.cjs'),
+  path.join(__dirname,'../test/stage13-portal-truancy.test.cjs'),
   path.join(__dirname,'../test/timetable-offline-api-contract.test.cjs')
  ];
  let proc;

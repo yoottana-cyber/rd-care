@@ -160,6 +160,14 @@ async function fullCycle(conn,date){
    '&from='+date+'&to='+date,{token:pupilToken},200);
   need(Number(res.student?.id)===f.students[1]&&res.behavior?.length===0,
    'student_self_records');
+  // Internal guardian event feed: synthetic fixture has no truancy_events.
+  res=await expect(conn,'GET','/api/portal/truancy?from='+date+'&to='+date,
+   {token:guardianToken},200);
+  need(Array.isArray(res.items)&&res.items.length===0,'guardian_truancy_no_event');
+  res=await expect(conn,'GET','/api/portal/truancy',{token:pupilToken},200);
+  need(Array.isArray(res.items)&&res.items.length===0,'student_truancy_feed_empty');
+  await expect(conn,'GET','/api/portal/truancy?from='+date,
+   {token:guardianToken},400);
   await expect(conn,'GET','/api/auth/me',{token:guardianToken},401);
   await expect(conn,'POST','/api/portal/auth/logout',
    {token:guardianToken},200);
