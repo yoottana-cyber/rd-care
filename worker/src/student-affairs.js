@@ -34,6 +34,54 @@ const roomRows=async (env,date)=>{
   missing:Number(r.students)>0?Math.max(0,Number(r.students)-Number(r.checked)):0}));
 };
 const settings=async env=>(await env.DB.prepare('SELECT * FROM affairs_settings WHERE id=1').first())||{auto_enabled:0,reminder_time:'08:30',weekdays:'1,2,3,4,5'};
+export function attendanceReminderScheduleReason(setting,date,clock){
+ if(!Number(setting?.auto_enabled))return 'switch_off';
+ if(!String(setting?.weekdays||'').split(',').includes(String(weekday(date))))return 'weekday_excluded';
+ if(clock<String(setting.reminder_time||'08:30'))return 'before_time';
+ return 'ready';
+}
+async function reminderGate(env,day=bangkokToday(),clock=timeBangkok()){
+ const setting=await settings(env);
+ const reason=attendanceReminderScheduleReason(setting,day,clock);
+ if(reason!=='ready')return {reason,day,clock,setting};
+ if(!await notificationEnabled(env,'daily_reminder_advisor'))
+  return {reason:'category_disabled',day,clock,setting};
+ const holiday=await env.DB.prepare('SELECT school_date FROM affairs_non_school_days WHERE school_date=?')
+  .bind(day).first();
+ return {reason:holiday?'holiday':'ready',day,clock,setting};
+}
+async function reminderDiagnostics(env){
+ const day=bangkokToday(),clock=timeBangkok(),gate=await reminderGate(env,day,clock);
+ const all=await roomRows(env,day),needed=all.filter(room=>room.missing>0);
+ const assigned=needed.filter(room=>room.advisor_user_id||room.advisor2_user_id);
+ const {results:history=[]}=await env.DB.prepare(
+  "SELECT classroom_id,state FROM affairs_attendance_reminders WHERE school_date=? AND kind='auto'"
+ ).bind(day).all();
+ const attempted=new Set(history.map(item=>Number(item.classroom_id)));
+ const pending=assigned.filter(room=>!attempted.has(Number(room.id)));
+ const advisors=[...new Set(pending.flatMap(room=>[room.advisor_user_id,room.advisor2_user_id])
+  .map(Number).filter(x=>Number.isSafeInteger(x)&&x>0))];
+ let registered=0;
+ if(advisors.length){
+  const {results=[]}=await env.DB.prepare(`SELECT DISTINCT p.user_id FROM staff_push_subscriptions p
+   JOIN users u ON u.id=p.user_id AND u.active=1 AND u.role IN ('teacher','staff')
+   WHERE p.user_id IN (${advisors.map(()=>'?').join(',')})`).bind(...advisors).all();
+  registered=results.length;
+ }
+ const reason=gate.reason!=='ready'?gate.reason:
+  !needed.length?'no_incomplete_rooms':
+  !assigned.length?'no_assigned_advisors':
+  !pending.length?'already_attempted':
+  !registered?'no_subscriptions':'ready';
+ return {today:day,clock,reason,enabled:Number(gate.setting.auto_enabled)===1,
+  reminder_time:gate.setting.reminder_time,weekdays:gate.setting.weekdays,
+  incomplete_rooms:needed.length,assigned_rooms:assigned.length,
+  pending_rooms:pending.length,attempted_rooms:history.length,
+  delivered_rooms:history.filter(x=>x.state==='sent').length,
+  failed_rooms:history.filter(x=>x.state==='failed').length,
+  no_subscription_rooms:history.filter(x=>x.state==='no_subscription').length,
+  opted_in_advisors:registered};
+}
 async function roster(env){
  const [teachers,rooms,heads]=await Promise.all([
   env.DB.prepare("SELECT id,username,display_name,role,active FROM users WHERE role IN ('teacher','staff') AND deleted_at IS NULL ORDER BY display_name,username").all(),
@@ -128,22 +176,19 @@ async function notifyOne(env,room,date,kind,actorId=null){
 }
 export async function sendScheduledAttendanceReminders(env){
  if(!env.DB)return {state:'no_database'};
- const setting=await settings(env),day=bangkokToday();
- if(!setting.auto_enabled||!String(setting.weekdays||'').split(',').includes(String(weekday(day))))
-  return {state:'disabled_or_non_school_day'};
- if(timeBangkok()<setting.reminder_time)return {state:'not_due'};
- const skipped=await env.DB.prepare('SELECT school_date FROM affairs_non_school_days WHERE school_date=?').bind(day).first();
- if(skipped)return {state:'closed_school_day'};
- const rows=(await roomRows(env,day)).filter(x=>x.missing>0&&(x.advisor_user_id||x.advisor2_user_id));
+ const gate=await reminderGate(env);
+ if(gate.reason!=='ready')return {state:gate.reason,count:0};
+ const rows=(await roomRows(env,gate.day)).filter(x=>x.missing>0&&(x.advisor_user_id||x.advisor2_user_id));
  // Each 5-min scheduled trigger processes a bounded group; remaining rooms continue on next trigger.
  const pending=[];
  for(const room of rows){
   const prior=await env.DB.prepare(`SELECT id FROM affairs_attendance_reminders
-   WHERE classroom_id=? AND school_date=? AND kind='auto'`).bind(room.id,day).first();
+   WHERE classroom_id=? AND school_date=? AND kind='auto'`).bind(room.id,gate.day).first();
   if(!prior)pending.push(room);
   if(pending.length>=8)break;
  }
- const outcomes=await Promise.all(pending.map(room=>notifyOne(env,room,day,'auto')));
+ if(!pending.length)return {state:'nothing_pending',count:0};
+ const outcomes=await Promise.all(pending.map(room=>notifyOne(env,room,gate.day,'auto')));
  return {state:'processed',count:outcomes.length,outcomes};
 }
 export async function studentAffairsRoutes(req,env,u,path){
@@ -165,7 +210,8 @@ export async function studentAffairsRoutes(req,env,u,path){
    summary:{rooms:items.filter(x=>x.students>0).length,complete:items.filter(x=>x.complete).length,
     pending:items.filter(x=>x.students>0&&!x.complete).length}});
  }
- if(method==='GET'&&path==='/api/affairs/people')return reply(await roster(env));
+ if(method==='GET'&&path==='/api/affairs/reminder-status')return reply(await reminderDiagnostics(env));
+  if(method==='GET'&&path==='/api/affairs/people')return reply(await roster(env));
  if(method==='GET'&&path==='/api/affairs/behavior/students')return searchBehaviorStudents(req,env,u);
  if(method==='GET'&&path==='/api/affairs/behavior/monitor/summary')return schoolScoreMonitorSummary(env,u);
  if(method==='GET'&&path==='/api/affairs/behavior/monitor/history')return schoolScoreMonitorHistory(req,env,u);
