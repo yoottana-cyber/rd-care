@@ -16,7 +16,8 @@
     "school:cron": "node school-hosting/cron.cjs",
     "school:admin": "node school-hosting/setup-admin.cjs",
     "school:install": "node school-hosting/install.cjs",
-    "school:restore-test": "node school-hosting/restore-test.cjs"
+    "school:restore-test": "node school-hosting/restore-test.cjs",
+    "school:verify": "node school-hosting/verify.cjs"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"
