@@ -28,9 +28,9 @@ async function run({env=process.env,execute=spawnSync,log=console.log,warn=conso
  }
  log('[1/3] ORIGINAL WORKER, ENROLLMENT, SCHOOL PWA AND QR TESTS: OK.');
  try{
-  await backup({env,log(){}});
+  const made=await backup({env,log(){}});
   log('[2/3] FRESH PRIVATE SQLITE BACKUP: VERIFIED.');
-  await restore({env,log(){}});
+  await restore({env,backupFile:made.file,log(){}});
   log('[3/3] BACKUP RESTORED TO ISOLATED COPY: INTEGRITY, FK, SCHEMA AND COUNTS OK.');
   log('SCHOOL VERIFICATION PASS: CURRENT DATABASE UNCHANGED / NO REAL PUSH / NO IMPORT.');
   return 0;
