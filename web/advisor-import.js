@@ -118,12 +118,16 @@ export function createAdvisorImport({api,rooms,onSuccess}){
    const bad=prepared.some(r=>r.status==='error');
    if(!bad){
     const groups=existingMode==='replace'?advisorRoomBatches(currentRows,120):batches(currentRows,50);
-    let start=0;
     for(const group of groups){
      const result=await api('/api/admin/advisors/preview',{method:'POST',body:{advisors:group,existingMode}});
      if(!Array.isArray(result.items)||result.items.length!==group.length)throw Error('ผลตรวจจากเซิร์ฟเวอร์ไม่ครบ');
-     for(let i=0;i<result.items.length;i++)preview[start+i]={...result.items[i]};
-     start+=group.length;
+     // Group-by-room can reorder interleaved Excel rows. Always map results
+     // back to their original file row before displaying a proposed overwrite.
+     for(let i=0;i<result.items.length;i++){
+      const index=currentRows.indexOf(group[i]);
+      if(index<0)throw Error('ผลตรวจไม่ตรงกับแถวข้อมูลในไฟล์');
+      preview[index]={...result.items[i]};
+     }
     }
    }
    const toSave=preview.filter(r=>r.status==='ready').length;
