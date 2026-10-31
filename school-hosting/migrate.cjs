@@ -65,7 +65,20 @@ function migrate({filename,webRoot=WEB_ROOT,root=MIGRATIONS,confirm,log=console.
     throw Error('school_migration_failed_'+item.name.replace('.sql',''));
    }
   }
-  const [[count]]=[db.prepare('SELECT count(*) AS n FROM school_schema_migrations').all()];
+  // One-time 48-classroom catalog from the original D1 deployment.
+  // Do NOT seed demo students, overwrite a school catalog or change advisors.
+  const roomCount=db.prepare('SELECT COUNT(*) AS n FROM classrooms').get()?.n;
+  if(roomCount===0){
+   const seed=fs.readFileSync(path.join(ROOT,'worker','classrooms_only.sql'),'utf8');
+   db.exec('BEGIN IMMEDIATE');
+   try{
+    db.exec(seed);
+    if(Number(db.prepare('SELECT COUNT(*) AS n FROM classrooms').get()?.n)!==48)
+     throw Error('school_room_seed_incomplete');
+    db.exec('COMMIT');
+   }catch(e){try{db.exec('ROLLBACK')}catch{}throw e}
+  }
+  const count=db.prepare('SELECT count(*) AS n FROM school_schema_migrations').get();
   if(Number(count.n)!==names.length)throw Error('school_migration_count_mismatch');
   const state=db.prepare('PRAGMA integrity_check').get();
   if(state.integrity_check!=='ok')throw Error('school_database_integrity_check_failed');
