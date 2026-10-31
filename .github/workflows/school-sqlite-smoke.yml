@@ -22,5 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Run original Worker schema, auth, PWA and HTTP checks on SQLite
+      - name: Install original Worker QR dependency
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run original Worker schema, auth, PWA, scanner and HTTP checks on SQLite
         run: npm run school:test
