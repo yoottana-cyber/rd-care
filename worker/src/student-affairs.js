@@ -36,7 +36,7 @@ const roomRows=async (env,date)=>{
 const settings=async env=>(await env.DB.prepare('SELECT * FROM affairs_settings WHERE id=1').first())||{auto_enabled:0,reminder_time:'08:30',weekdays:'1,2,3,4,5'};
 async function roster(env){
  const [teachers,rooms,heads]=await Promise.all([
-  env.DB.prepare("SELECT id,display_name,active FROM users WHERE role IN ('teacher','staff') ORDER BY display_name").all(),
+  env.DB.prepare("SELECT id,username,display_name,role,active FROM users WHERE role IN ('teacher','staff') AND deleted_at IS NULL ORDER BY display_name,username").all(),
   env.DB.prepare(`SELECT c.id,c.label,c.grade,c.advisor_user_id,c.advisor2_user_id,u.display_name AS advisor_name,u2.display_name AS advisor2_name
    FROM classrooms c LEFT JOIN users u ON u.id=c.advisor_user_id
    LEFT JOIN users u2 ON u2.id=c.advisor2_user_id ORDER BY c.grade,c.room`).all(),
@@ -204,8 +204,8 @@ export async function studentAffairsRoutes(req,env,u,path){
   if(!Number.isInteger(grade)||grade<1||grade>6||!(teacher||b.teacher_user_id===null))
    fail(400,'ระดับชั้นหรือครูไม่ถูกต้อง');
   if(teacher){
-   const check=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role='teacher' AND active=1").bind(teacher).first();
-   if(!check)fail(400,'หัวหน้าระดับต้องเป็นครูที่เปิดใช้งาน');
+   const check=await env.DB.prepare("SELECT id FROM users WHERE id=? AND role IN ('teacher','staff') AND active=1 AND deleted_at IS NULL").bind(teacher).first();
+   if(!check)fail(400,'หัวหน้าระดับต้องเป็นครูหรือบุคลากรฝ่ายกิจการที่เปิดใช้งาน');
    await env.DB.prepare(`INSERT INTO affairs_grade_heads(grade,teacher_user_id,updated_by)
     VALUES(?,?,?) ON CONFLICT(grade) DO UPDATE SET teacher_user_id=excluded.teacher_user_id,
     updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP`).bind(grade,teacher,u.id).run();
