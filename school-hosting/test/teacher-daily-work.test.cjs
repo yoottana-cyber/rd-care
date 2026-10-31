@@ -76,3 +76,19 @@ test('unsaved changes guard responds to status and teaching-note edits',async()=
  period.teachingNote='อัปเดตแล้ว';
  assert.equal(attendanceHasUnsavedChanges(period,baseline),true);
 });
+
+test('homepage button wiring, browser draft warnings and PWA shell are present',()=>{
+ const app=fs.readFileSync(path.resolve(__dirname,'../../web/app.js'),'utf8');
+ const shell=fs.readFileSync(path.resolve(__dirname,'../../web/sw.js'),'utf8');
+ const html=fs.readFileSync(path.resolve(__dirname,'../../web/index.html'),'utf8');
+ assert.match(app,/\/api\/dashboard\/advisor-rooms\?date=/);
+ assert.match(app,/data-daily-room/);
+ assert.match(app,/state\.roomId=roomId/);
+ assert.match(app,/confirmAttendanceExit\(\)/);
+ assert.match(app,/addEventListener\('beforeunload'/);
+ assert.match(app,/attendanceSaving=true/);
+ assert.match(app,/state\.attendanceBaseline=takeAttendanceSnapshot\(state\)/);
+ for(const asset of ['teacher-daily-work.js','attendance-draft-guard.js','teacher-daily-work.css'])
+  assert.ok(shell.includes(asset),'PWA asset missing: '+asset);
+ assert.match(html,/teacher-daily-work\.css/);
+});
