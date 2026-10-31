@@ -83,6 +83,11 @@ test('homepage button wiring, browser draft warnings and PWA shell are present',
  const html=fs.readFileSync(path.resolve(__dirname,'../../web/index.html'),'utf8');
  assert.match(app,/\/api\/dashboard\/advisor-rooms\?date=/);
  assert.match(app,/data-daily-room/);
+ // Regression: querySelector (single element) has no forEach. A refresh used
+ // to fail after successful /auth/me, /classrooms and /dashboard responses.
+ assert.match(app,/\$\$\('\[data-quick-tab\]'\)\.forEach/);
+ assert.match(app,/\$\$\('\[data-daily-room\]'\)\.forEach/);
+ assert.doesNotMatch(app,/(?<!\$)\$\('\[data-(?:quick-tab|daily-room)\]'\)\.forEach/);
  assert.match(app,/state\.roomId=roomId/);
  assert.match(app,/confirmAttendanceExit\(\)/);
  assert.match(app,/addEventListener\('beforeunload'/);
