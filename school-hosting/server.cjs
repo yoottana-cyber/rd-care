@@ -91,6 +91,20 @@ function approvedOrigin(req,origin){
  const supplied=req.headers?.origin;
  return typeof supplied!=='string'||supplied===origin;
 }
+const MAX_API_BYTES=768*1024;
+async function boundedPostBody(req){
+ const announced=Number(req.headers?.['content-length']||0);
+ if(!Number.isFinite(announced)||announced<0||announced>MAX_API_BYTES)
+  throw Error('school_request_too_large');
+ let total=0;
+ const chunks=[];
+ for await(const chunk of req){
+  total+=chunk.length;
+  if(total>MAX_API_BYTES)throw Error('school_request_too_large');
+  chunks.push(chunk);
+ }
+ return Buffer.concat(chunks);
+}
 async function schoolHandler(req,res,{worker,db,env,config}){
  let where;
  try{where=cleanUrl(req.url,config.mount)}
@@ -117,11 +131,13 @@ async function schoolHandler(req,res,{worker,db,env,config}){
  const requestedUrl=config.origin+where.pathname+where.query;
  let request;
  try{
-  request=new Request(requestedUrl,{
-   method,headers,
-   ...(method==='POST'?{body:req,duplex:'half'}:{})
-  });
- }catch{return fail(res,400,'invalid_request')}
+  const body=method==='POST'?await boundedPostBody(req):undefined;
+  request=new Request(requestedUrl,{method,headers,
+   ...(method==='POST'?{body}:{})});
+ }catch(e){
+  return fail(res,e?.message==='school_request_too_large'?413:400,
+   e?.message==='school_request_too_large'?'request_too_large':'invalid_request');
+ }
  const jobs=[];
  const ctx={waitUntil(p){
   jobs.push(Promise.resolve(p).catch(()=>{}));
@@ -185,4 +201,4 @@ async function start(env=process.env){
  return server;
 }
 module.exports={ROOT,WEB_ROOT,TYPES,settings,cleanUrl,staticFile,
- commonHeaders,approvedOrigin,schoolHandler,verifyReady,createHandler,start};
+ commonHeaders,approvedOrigin,MAX_API_BYTES,boundedPostBody,schoolHandler,verifyReady,createHandler,start};
