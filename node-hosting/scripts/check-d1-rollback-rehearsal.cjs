@@ -22,7 +22,11 @@ function guard(env){
  need(typeof env.RD_D1_MANIFEST_FILE==='string'&&env.RD_D1_MANIFEST_FILE.length>0,
   'manifest_path_required');
  const target=path.resolve(env.RD_D1_MANIFEST_FILE);
- need(!fs.lstatSync(target).isSymbolicLink(),'manifest_symlink_forbidden');
+ const segments=target.split(path.sep).map(x=>x.toLowerCase());
+ need(!segments.some(s=>['public_html','htdocs','wwwroot','www'].includes(s)),
+  'manifest_under_web_root');
+ const stat=fs.lstatSync(target);
+ need(stat.isFile()&&!stat.isSymbolicLink(),'manifest_symlink_forbidden');
  // Private files must not accidentally be placed in a tracked Git workspace.
  for(let current=path.dirname(target);;current=path.dirname(current)){
   need(!fs.existsSync(path.join(current,'.git')),'manifest_inside_git_repo');
@@ -69,7 +73,7 @@ async function run({env=process.env,makePool=openPool,log=console.log,
   await inspect(conn); // independently verify all 63 tables are empty again
   rollbackVerified=true;
   log('D1 STAGING REHEARSAL PASS: 63 tables, '+replayed.rows+
-   ' synthetic rows compared inside transaction.');
+   ' private fixture rows compared inside transaction.');
   log('ROLLBACK VERIFIED: 63 staging tables empty, 119 FKs, zero triggers.');
   log('PUBLIC API CLOSED / NO REAL PUSH / RELEASE NO_GO.');
   return 0;
