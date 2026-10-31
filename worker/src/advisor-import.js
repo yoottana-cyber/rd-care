@@ -28,7 +28,7 @@ export function planAdvisorImport(rows,roomMap,existingUsers=[],existingMode='sk
    reason='ชื่อห้องมีอักขระเสียหาย กรุณาบันทึกเป็น CSV UTF-8';
   else if(seenUsers.has(username))
    reason='Username ซ้ำในไฟล์ (กรุณาผูกห้องเพิ่มเติมแยกครั้ง)';
-  else if(account&&(account.role!=='teacher'||!account.active||account.deleted_at))
+  else if(account&&(!['teacher','staff'].includes(account.role)||!account.active||account.deleted_at))
    reason='Username นี้ไม่ใช่บัญชีครูที่ใช้งาน';
   else if(account&&[room.advisor_user_id,room.advisor2_user_id].includes(account.id)){
    result.slot=room.advisor_user_id===account.id?1:2;
@@ -106,7 +106,7 @@ export async function advisorImportEndpoint(req,env,user,path){
   }
   if(item.mode==='update_name'||item.mode==='link_update'){
    statements.push(env.DB.prepare(
-    "UPDATE users SET display_name=? WHERE username=? AND role='teacher' AND active=1 AND deleted_at IS NULL"
+    "UPDATE users SET display_name=? WHERE username=? AND role IN ('teacher','staff') AND active=1 AND deleted_at IS NULL"
    ).bind(item.full_name,item.username));
    statements.push(env.DB.prepare(
     "INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,'advisor_bulk_name_updated','users',?)"
@@ -115,7 +115,7 @@ export async function advisorImportEndpoint(req,env,user,path){
   if(['create','link','link_update'].includes(item.mode)){
    const col=item.slot===1?'advisor_user_id':'advisor2_user_id';
    statements.push(env.DB.prepare("UPDATE classrooms SET "+col+
-    "=(SELECT id FROM users WHERE username=? AND role='teacher' AND active=1 AND deleted_at IS NULL) "+
+    "=(SELECT id FROM users WHERE username=? AND role IN ('teacher','staff') AND active=1 AND deleted_at IS NULL) "+
     "WHERE id=? AND "+col+" IS NULL").bind(item.username,room.id));
    statements.push(env.DB.prepare(
     "INSERT INTO audit_logs(actor_id,action,entity_type,entity_id) VALUES(?,'advisor_bulk_assigned','classrooms',?)"
