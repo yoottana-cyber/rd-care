@@ -76,9 +76,9 @@ export function advisorManagementMarkup(roster){
      '" data-room-coverage="'+(count===0?'missing':count===1?'partial':'complete')+'">'+
      '<th scope="row">'+esc(room.label)+'</th>'+
      '<td><label class="rd-affairs-cell-label">คนที่ 1'+
-      search(userLabels.get(primary)||'', 'teacher_user_id','ครูที่ปรึกษาคนที่ 1 ห้อง '+room.label)+'</label></td>'+
+      search(room.primaryLabel, 'teacher_user_id','ครูที่ปรึกษาคนที่ 1 ห้อง '+room.label)+'</label></td>'+
      '<td><label class="rd-affairs-cell-label">คนที่ 2 (ไม่บังคับ)'+
-      search(userLabels.get(secondary)||'', 'teacher2_user_id','ครูที่ปรึกษาคนที่ 2 ห้อง '+room.label)+'</label></td>'+
+      search(room.secondaryLabel, 'teacher2_user_id','ครูที่ปรึกษาคนที่ 2 ห้อง '+room.label)+'</label></td>'+
      '<td><span class="rd-affairs-status '+(count===0?'empty':count===1?'one':'two')+'">'+
       (count===0?'ยังไม่กำหนด':count===1?'1 คน':'2 คน')+'</span></td>'+
      '<td><button type="button" class="button secondary rd-affairs-save-room" data-save-affairs-advisor="'+Number(room.id)+'">บันทึก</button></td></tr>';
