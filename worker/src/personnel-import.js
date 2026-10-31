@@ -30,31 +30,27 @@ export function planPersonnelImport(rows,existing=[],mode='skip'){
   const role=trim(raw?.role).toLowerCase();
   const password=raw?.password;
   const old=previous.get(username);
-  let status='ready',message='';
-  if(!validUsername(username))message='Username ต้องมี 3–40 ตัวอักษรอังกฤษ ตัวเลข จุดหรือขีด';
-  else if(seen.has(username))message='Username ซ้ำภายในไฟล์';
-  else if(!cleanName(raw?.display_name))message='ชื่อ–สกุลไม่ถูกต้องหรือยาวเกิน 100 ตัว';
-  else if(!roles.has(role))message='บทบาทต้องเป็น teacher หรือ staff เท่านั้น';
-  else if(old?.deleted_at)message='บัญชีนี้เคยถูกลบ ไม่สามารถสร้างซ้ำหรือกู้คืนด้วยการนำเข้า';
-  else if(old&&old.role==='admin')message='ไม่อนุญาตให้นำเข้าทับบัญชีผู้ดูแลระบบ';
+  let status='ready',message='',problem='';
+  if(!validUsername(username))problem='Username ต้องมี 3–40 ตัวอักษรอังกฤษ ตัวเลข จุดหรือขีด';
+  else if(seen.has(username))problem='Username ซ้ำภายในไฟล์';
+  else if(!cleanName(raw?.display_name))problem='ชื่อ–สกุลไม่ถูกต้องหรือยาวเกิน 100 ตัว';
+  else if(!roles.has(role))problem='บทบาทต้องเป็น teacher หรือ staff เท่านั้น';
+  else if(old?.deleted_at)problem='บัญชีนี้เคยถูกลบ ไม่สามารถสร้างซ้ำหรือกู้คืนด้วยการนำเข้า';
+  else if(old&&old.role==='admin')problem='ไม่อนุญาตให้นำเข้าทับบัญชีผู้ดูแลระบบ';
   else if(old&&old.role!==role&&mode==='update')
-   message='บทบาทไม่ตรงกับบัญชีเดิม ต้องแก้ไขสิทธิ์แยกต่างหาก';
+   problem='บทบาทไม่ตรงกับบัญชีเดิม ต้องแก้ไขสิทธิ์แยกต่างหาก';
+  else if(!old&&!passOk(password,role))
+   problem='บัญชีใหม่ต้องมี Password '+userPasswordMinimum(role)+
+    '–128 ตัว ไม่ใช้เลขประจำตัวประชาชน';
+  if(problem){status='error';message=problem}
   else if(old&&mode==='skip'){
    status='skipped';message='มีบัญชีแล้ว ข้ามโดยไม่แก้ข้อมูลหรือรหัสผ่าน';
   }else if(old&&mode==='update'){
    status='update';message=old.active===0?
     'อัปเดตเฉพาะชื่อที่แสดง (บัญชียังคงถูกพัก รหัสผ่านและสิทธิ์เดิมไม่เปลี่ยน)':
     'อัปเดตเฉพาะชื่อที่แสดง ไม่เปลี่ยนรหัสผ่าน บทบาทหรือสิทธิ์';
-  }else if(!passOk(password,role)){
-   message='บัญชีใหม่ต้องมี Password '+userPasswordMinimum(role)+
-    '–128 ตัว ไม่ใช้เลขประจำตัวประชาชน';
-  }else{
-   status='ready';message='เพิ่มบุคลากรใหม่';
-  }
+  }else message='เพิ่มบุคลากรใหม่';
   seen.add(username);
-  if(message&&status==='ready'&&(!old||!passOk(password,role)))status='error';
-  // Validation errors always block import, even if file includes other valid rows.
-  if(message&&!['skipped','update'].includes(status))status='error';
   return {source_row,username,display_name,role,status,message};
  });
  return {ready:items.every(x=>x.status!=='error'),mode,
