@@ -18,7 +18,7 @@ export function createNotificationSettings({api,pwaTools,mount,toast,safeRun,sho
   const priority=(urgent.items||[]).filter(item=>item.school_date===day);
   const diag=diagnostics?.vapid;
   const issue=diag?.ready?'กุญแจ VAPID พร้อมใช้งาน':
-   diag?.code==='missing_settings'?'ยังขาดค่า '+(diag.missing||[]).join(', ')+' ใน Cloudflare Worker':
+   diag?.code==='missing_settings'?'ยังขาดค่า '+(diag.missing||[]).join(', ')+' บนเซิร์ฟเวอร์ RD CONNECT':
    diag?.code==='keypair_mismatch'?'VAPID Public/Private Key ไม่ใช่คู่เดียวกัน':
    diag?.code==='invalid_subject'?'รูปแบบ VAPID_SUBJECT ไม่ถูกต้อง':
    diag?.code==='invalid_keypair'?'กุญแจ VAPID มีรูปแบบไม่ถูกต้อง':
@@ -88,7 +88,7 @@ export function createNotificationSettings({api,pwaTools,mount,toast,safeRun,sho
    try{
     const response=await pwaTools.testPush();
     const errorMessages={
-     missing_settings:'Cloudflare Worker ยังตั้งค่า VAPID ไม่ครบ',
+     missing_settings:'เซิร์ฟเวอร์ RD CONNECT ยังตั้งค่า VAPID ไม่ครบ',
      invalid_subject:'VAPID_SUBJECT ไม่ถูกต้อง',
      invalid_keypair:'กุญแจ VAPID ไม่ถูกต้อง',
      keypair_mismatch:'กุญแจ VAPID_PUBLIC_KEY และ VAPID_PRIVATE_KEY ไม่ตรงกัน',

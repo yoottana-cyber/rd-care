@@ -19,7 +19,9 @@
     "school:restore-test": "node school-hosting/restore-test.cjs",
     "school:verify": "node school-hosting/verify.cjs",
     "school:load-test": "node school-hosting/concurrency-test.cjs",
-    "school:pilot-check": "node school-hosting/pilot-check.cjs"
+    "school:pilot-check": "node school-hosting/pilot-check.cjs",
+    "school:push-keygen": "node school-hosting/push-keys.cjs",
+    "school:push-check": "node school-hosting/push-check.cjs"
   },
   "dependencies": {
     "qrcode-generator": "2.0.4"
