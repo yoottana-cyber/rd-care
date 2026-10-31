@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const webCode=readFileSync(new URL('../web/affairs-people-table.js',import.meta.url),'utf8');
-const {advisorManagementMarkup,resolveTeacherId,teacherLabel,activeTeachers,filterAdvisorRoster}=
+const {advisorManagementMarkup,resolveTeacherId,teacherLabel,teacherChoiceLabel,activeTeachers,filterAdvisorRoster}=
  await import('data:text/javascript;base64,'+Buffer.from(webCode).toString('base64'));
 import {studentAffairsRoutes} from '../worker/src/student-affairs.js';
 
@@ -20,7 +20,7 @@ const rooms=Array.from({length:48},(_,i)=>({
  advisor_name:i===0?'นายสมชาย ใจดี':i===1?'นางสมใจ ใจดี':null,
  advisor2_name:i===1?'นายสมชาย ใจดี':null
 }));
-test('renders a 48-row table and six editable grade heads with name/username combobox',()=>{
+test('renders 48 rows and six heads with names-only searchable combobox',()=>{
  const {markup,teachers:choices,rooms:items}=advisorManagementMarkup({
   teachers,rooms,heads:[{grade:2,teacher_user_id:2}]
  });
@@ -32,15 +32,20 @@ test('renders a 48-row table and six editable grade heads with name/username com
  assert.match(markup,/type="search" list="rdAffairsTeacherChoices"/);
  assert.match(markup,/ฝ่ายกิจการ/);
  assert.match(markup,/นางสมใจ ใจดี/);
+ assert.doesNotMatch(markup,/@teacher001|@teacher002|@staff001|\(@/);
  assert.equal(choices.length,3);
  assert.equal(markup.includes('ครูพักบัญชี'),false);
  assert.equal(markup.includes('ผู้ดูแล'),false);
 });
-test('exact person names are disambiguated by username; freeform or inactive text is rejected',()=>{
+test('teacher names display without usernames, and only duplicate names get a neutral index',()=>{
  const active=activeTeachers(teachers);
- assert.equal(resolveTeacherId(teacherLabel(teachers[0]),active),1);
- assert.equal(resolveTeacherId(teacherLabel(teachers[4]),active),5);
- assert.equal(resolveTeacherId(teacherLabel(teachers[1]),active),2);
+ assert.equal(teacherLabel(teachers[0]),'นายสมชาย ใจดี');
+ assert.equal(teacherChoiceLabel(teachers[0],active),'นายสมชาย ใจดี • 1');
+ assert.equal(teacherChoiceLabel(teachers[4],active),'นายสมชาย ใจดี • 2');
+ assert.equal(teacherChoiceLabel(teachers[1],active),'นางสมใจ ใจดี');
+ assert.equal(resolveTeacherId(teacherChoiceLabel(teachers[0],active),active),1);
+ assert.equal(resolveTeacherId(teacherChoiceLabel(teachers[4],active),active),5);
+ assert.equal(resolveTeacherId(teacherChoiceLabel(teachers[1],active),active),2);
  assert.equal(resolveTeacherId('',active),null);
  assert.throws(()=>resolveTeacherId('นายสมชาย ใจดี',active),/เลือกชื่อครู/);
  assert.throws(()=>resolveTeacherId(teacherLabel(teachers[2]),active),/เลือกชื่อครู/);
