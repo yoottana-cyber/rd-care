@@ -31,7 +31,10 @@ def quote(name):
 
 def inspect_backup(filename):
     """Return metadata/counts only; never include data values in the report."""
-    db_path = Path(filename).expanduser().resolve()
+    supplied_path = Path(filename).expanduser()
+    if supplied_path.is_symlink():
+        raise ValueError("verified_backup_file_missing_or_invalid")
+    db_path = supplied_path.resolve()
     if not BACKUP_NAME.fullmatch(db_path.name):
         raise ValueError("verified_backup_filename_required")
     if not db_path.is_file() or db_path.is_symlink() or db_path.stat().st_size < 4096:
