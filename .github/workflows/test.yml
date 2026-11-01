@@ -84,6 +84,8 @@ jobs:
           node --check web/login-route.js
           node --check web/portal-date-range.js
           node --check 'functions/api/[[path]].js'
+      - name: Offline SQLite to MariaDB foreign key metadata audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_foreign_key_audit_test.py' -v
       - name: Offline MariaDB unique-index collisions audit (synthetic)
         run: python3 -m unittest discover -s tests -p 'mariadb_unique_index_audit_test.py' -v
       - name: Offline SQLite to MariaDB value size and constraints audit (synthetic)
