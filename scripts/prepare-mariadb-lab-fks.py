@@ -195,7 +195,7 @@ def prepare_alters(groups, tables):
         raise ValueError("fk_statement_count_incorrect")
     return (
         "-- MariaDB LAB ONLY: manual execution AFTER exact 63-table empty gate.\n"
-        "-- ALTER TABLE auto-commits: partial failures require manual review.\n"
+        "-- DDL auto-commits: partial failures require manual review.\n"
         "-- Never execute against ratsadaa_connect (staging) or live SQLite.\n"
         "-- DO NOT SET FOREIGN_KEY_CHECKS=0, DO NOT DROP tables.\n"
         +"\n".join(statement)+"\n"
