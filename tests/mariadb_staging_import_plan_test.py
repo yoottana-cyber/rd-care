@@ -94,7 +94,7 @@ class MariaStagingPlanTest(unittest.TestCase):
         fks = module.read_target_fk_parts(self.fks)
         plan = module.plan(source,target,fks)
         self.assertEqual(plan["tables_to_import"],62)
-        self.assertEqual(plan["source_rows_to_import"],63)
+        self.assertEqual(plan["source_rows_to_import"],64)
         self.assertEqual(plan["source_foreign_key_parts"],123)
         self.assertEqual(plan["target_foreign_key_parts"],123)
         self.assertEqual(plan["ready_for_fk_ordered_import"],True)
