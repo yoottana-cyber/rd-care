@@ -54,11 +54,12 @@ def redact_schema_expression(sql):
 
 def syntax_features(sql):
     """A hint list, not authoritative semantic classification."""
-    text = base.canonical(sql)
+    text = redact_schema_expression(sql).lower()
     labels = set()
     for pattern in INTERESTING:
-        compact = pattern.replace(" ", "")
-        if re.search(r"(?<![a-z_])" + re.escape(compact) + r"(?![a-z_])", text):
+        terms = pattern.split()
+        regex = r"\\b" + r"\\s+".join(map(re.escape, terms)) + r"\\b"
+        if re.search(regex, text):
             labels.add(pattern.upper().replace(" ", "_"))
     if "||" in text:
         labels.add("SQLITE_CONCAT_OPERATOR")
