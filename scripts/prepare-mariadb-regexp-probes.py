@@ -77,6 +77,19 @@ def collect_rules(sqlite_tables, target):
         clause, pattern = target_regex[0]
         if not SAFE_PATTERN.fullmatch(pattern) or len(pattern) > 128:
             raise ValueError("unsafe_regexp_pattern")
+        # Refuse any extra SQL, other predicates or metadata that do not
+        # exactly express the two expected MariaDB CHECK rule families.
+        normalized = check.canonical(clause)
+        placeholder = normalized.replace("'"+pattern+"'", "'<regex>'", 1)
+        required = (
+            col+"isnullorchar_length("+col+")="+str(config["length"])+
+            "and"+col+"regexp'<regex>'"
+            if table == "behavior_incidents" else
+            "char_length("+col+")="+str(config["length"])+
+            "and"+col+"regexp'<regex>'"
+        )
+        if placeholder != required:
+            raise ValueError("unsafe_or_unexpected_check_clause")
         # Only known semantics: nullable behavior_date, required school first time.
         # Require that the exported rule uses CHAR_LENGTH and target REGEXP,
         # to ensure probe SQL exercises the same basic predicate family.
