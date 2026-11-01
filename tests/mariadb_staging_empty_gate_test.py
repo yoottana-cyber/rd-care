@@ -81,6 +81,37 @@ class StagingEmptyTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "count_csv_delimiter_should_be_comma"):
             module.verify_csv(self.tables, self.csv)
 
+    def test_headerless_phpmyadmin_csv_is_accepted_when_full_and_valid(self):
+        with self.csv.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.writer(stream)
+            for name in self.tables:
+                writer.writerow([name, 0])
+        result = module.verify_csv(self.tables, self.csv)
+        self.assertEqual(result["tables"], 63)
+        self.assertEqual(result["non_empty"], [])
+
+    def test_lowercase_header_is_accepted(self):
+        with self.csv.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.writer(stream)
+            writer.writerow(["table_name", "row_count"])
+            for name in self.tables:
+                writer.writerow([name, 0])
+        result = module.verify_csv(self.tables, self.csv)
+        self.assertEqual(result["empty_tables"], 63)
+
+    def test_headerless_csv_must_still_have_all_tables(self):
+        with self.csv.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.writer(stream)
+            for name in self.tables[:-1]:
+                writer.writerow([name, 0])
+        with self.assertRaisesRegex(ValueError, "mariadb_count_tables_missing_or_extra"):
+            module.verify_csv(self.tables, self.csv)
+
+    def test_sql_export_is_rejected(self):
+        self.csv.write_text("-- SQL dump\\nSELECT 'foo' AS TABLE_NAME;\\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "count_csv_is_sql_not_results"):
+            module.verify_csv(self.tables, self.csv)
+
     def test_missing_table_blocked(self):
         self.write_csv()
         rows=list(csv.DictReader(self.csv.open()))
