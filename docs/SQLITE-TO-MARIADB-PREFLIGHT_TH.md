@@ -111,3 +111,32 @@ py "H:\rd-care\rd-care\scripts\compare-mariadb-schema.py" "H:\RD_CONNECT_BACKUP\
 **การที่ชื่อคอลัมน์ตรงกันยังไม่รับรองการย้ายข้อมูล** ต้องตรวจชนิดข้อมูล,
 defaults, PK/FK, unique/indexes, triggers, ความสัมพันธ์, ค่ารหัสผ่าน,
 ข้อกำหนด transactions และทดสอบนำเข้าฐานทดลองก่อนเปลี่ยนระบบจริง.
+
+## ขั้นตอน 5: ตรวจข้อมูลวันที่และเวลา ก่อนนำเข้าจริง
+
+หลังจากตารางและคอลัมน์ผ่าน read-only audit แล้ว ให้รันเครื่องมือตรวจ `TEXT → DATETIME`
+**บนคอมพิวเตอร์เท่านั้น** จาก SQLite Backup ที่ได้ `INTEGRITY: OK` ไม่ใช่ SQLite ที่เว็บกำลังใช้งาน
+
+เปิด GitHub Desktop → Fetch origin → Pull origin ก่อน แล้วรันคำสั่งต่อไปนี้ใน PowerShell:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์สำรอง SQLite ชื่อมีวันที่ใน H:\RD_CONNECT_BACKUP" }
+py "H:\rd-care\rd-care\scripts\audit-sqlite-datetime.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-columns.csv"
+```
+
+รายงานแสดงเฉพาะจำนวนแถว/รูปแบบ ไม่แสดงค่าต้นฉบับหรือข้อมูลรายคน:
+
+- `DATE_COLUMNS_SCANNED`: คาดหมาย 75 คอลัมน์ตาม Audit ล่าสุด
+- `NAIVE_SPACE`: รูปแบบ `YYYY-MM-DD HH:mm:ss` ไม่มีเครื่องหมายเขตเวลา
+- `NAIVE_ISO_T`: รูปแบบ `YYYY-MM-DDTHH:mm:ss` ไม่มีเครื่องหมายเขตเวลา
+- `UTC_Z`: ข้อมูลระบุ UTC (`Z`) ต้องมีนโยบายแปลงก่อน MariaDB DATETIME
+- `OFFSET`: มีเขตเวลา `+07:00` หรืออื่น ๆ ต้องแปลงเป็นเวลาอ้างอิงเดียวกัน
+- `FRACTIONAL`: มีทศนิยมวินาที ต้องดู `DATETIME_PRECISION` ของ MariaDB
+- `INVALID`, `BLANK`, `OUT_OF_RANGE`: ค่าที่ต้องแก้ในแผนแปลงก่อน import
+- `NULL_VIOLATION`: SQLite เป็น NULL แต่ MariaDB คอลัมน์บังคับ NOT NULL
+
+แม้ผลตรวจเป็นศูนย์ทั้งหมด ก็ยังไม่อนุญาตให้นำเข้าจริงโดยอัตโนมัติ
+ต้องทดสอบชนิด/ความยาวข้อมูล, FK/Unique, trigger และการกู้คืนบนฐานทดลองก่อน
+อย่าส่ง SQLite Backup หรือไฟล์ข้อมูลส่วนบุคคลไปยัง GitHub หรือแชต
