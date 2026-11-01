@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RD CONNECT: inspect a COPIED, VERIFIED school SQLite backup (read only).
+r"""RD CONNECT: inspect a COPIED, VERIFIED school SQLite backup (read only).
 
 No DB modifications, external connections, row exports, names, usernames,
 passwords, tokens, or student-level records. Output: schema + row counts only.
@@ -33,12 +33,14 @@ def inspect_backup(filename):
     """Return metadata/counts only; never include data values in the report."""
     supplied_path = Path(filename).expanduser()
     if supplied_path.is_symlink():
-        raise ValueError("verified_backup_file_missing_or_invalid")
+        raise ValueError("backup_symlink_not_allowed")
+    if not supplied_path.is_file():
+        raise ValueError("backup_file_not_found")
     db_path = supplied_path.resolve()
     if not BACKUP_NAME.fullmatch(db_path.name):
         raise ValueError("verified_backup_filename_required")
-    if not db_path.is_file() or db_path.is_symlink() or db_path.stat().st_size < 4096:
-        raise ValueError("verified_backup_file_missing_or_invalid")
+    if db_path.stat().st_size < 4096:
+        raise ValueError("backup_file_too_small")
     # immutable=1 prevents SQLite from creating -wal/-shm next to the downloaded
     # static backup. This MUST be a completed school:backup snapshot, NOT the
     # live rd-connect.sqlite used by Passenger.
@@ -144,6 +146,8 @@ def main():
         known = {
             "verified_backup_filename_required",
             "verified_backup_file_missing_or_invalid",
+            "backup_file_not_found", "backup_file_too_small",
+            "backup_symlink_not_allowed",
             "backup_integrity_failed", "backup_foreign_keys_failed",
             "report_must_be_outside_git_repository",
             "report_already_exists", "report_parent_directory_missing",
