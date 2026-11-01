@@ -66,6 +66,21 @@ class StagingEmptyTest(unittest.TestCase):
         self.assertEqual(result["non_empty"],[("fixture_01",11)])
         self.assertEqual(result["total_rows"],11)
 
+    def test_nonexistent_csv_has_clear_safe_reason(self):
+        with self.assertRaisesRegex(ValueError, "count_csv_missing"):
+            module.verify_csv(self.tables, self.csv)
+
+    def test_zero_byte_csv_has_clear_safe_reason(self):
+        self.csv.touch()
+        with self.assertRaisesRegex(ValueError, "count_csv_empty"):
+            module.verify_csv(self.tables, self.csv)
+
+    def test_semicolon_export_detected_safely(self):
+        self.csv.write_text("TABLE_NAME;ROW_COUNT\\nfixture_00;0\\n",
+                            encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "count_csv_delimiter_should_be_comma"):
+            module.verify_csv(self.tables, self.csv)
+
     def test_missing_table_blocked(self):
         self.write_csv()
         rows=list(csv.DictReader(self.csv.open()))
