@@ -84,6 +84,38 @@ jobs:
           node --check web/login-route.js
           node --check web/portal-date-range.js
           node --check 'functions/api/[[path]].js'
+      - name: MariaDB lab conduct and truancy transaction contract (synthetic)
+        run: node --test school-hosting/test/mariadb-conduct-parity.test.cjs
+      - name: MariaDB lab 119 FK repair preflight and SQL safety (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_lab_fk_repair_test.py' -v
+      - name: SQLite GLOB to MariaDB REGEXP read-only format probes (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_regexp_probes_test.py' -v
+      - name: SQLite MariaDB redacted CHECK difference diagnostic (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_check_difference_diagnostic_test.py' -v
+      - name: SQLite MariaDB CHECK expression text parity (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_check_parity_audit_test.py' -v
+      - name: Offline MariaDB exact staging emptiness gate (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_staging_empty_gate_test.py' -v
+      - name: Offline MariaDB generated CHECK trigger constraint audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_constraints_audit_test.py' -v
+      - name: Offline MariaDB staging FK-ordered import plan (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_staging_import_plan_test.py' -v
+      - name: Generated MariaDB unique index projection audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_generated_unique_audit_test.py' -v
+      - name: Offline SQLite to MariaDB foreign key metadata audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_foreign_key_audit_test.py' -v
+      - name: Offline MariaDB unique-index collisions audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_unique_index_audit_test.py' -v
+      - name: Offline SQLite to MariaDB value size and constraints audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_data_fit_audit_test.py' -v
+      - name: Offline SQLite timestamp conversion audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_datetime_audit_test.py' -v
+      - name: Offline MariaDB pre-import generated column and type audit (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_migration_readiness_test.py' -v
+      - name: Offline MariaDB schema comparison (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_schema_compare_test.py' -v
+      - name: Safe read-only school SQLite backup inventory (synthetic)
+        run: python3 -m unittest discover -s tests -p 'sqlite_backup_inventory_test.py' -v
       - name: Unit tests
         run: node --test tests/*.test.mjs
       - name: Test schema + sample data

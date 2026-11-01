@@ -24,7 +24,7 @@ test('daily attendance reminder schedule defaults disabled and does not deliver 
  }};
  const env={DB:db};
  const result=await sendScheduledAttendanceReminders(env);
- assert.equal(result.state,'disabled_or_non_school_day');
+ assert.equal(result.state,'switch_off');
  assert.equal(reads,1);
 });
 test('staff rules reject unsupported categories and inconsistent positive/negative points',async()=>{

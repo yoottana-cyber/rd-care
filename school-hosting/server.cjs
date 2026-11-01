@@ -30,7 +30,8 @@ function settings(env=process.env){
  if(url.protocol!=='https:'||url.username||url.password||
   url.pathname!=='/'||url.search||url.hash)throw Error('school_https_origin_required');
  const mount=env.RD_APP_MOUNT||'/web/rd-connect';
- if(!/^\/[a-z0-9/-]+$/.test(mount)||mount==='/'||mount.endsWith('/')||
+ if((mount!=='/'&&!/^\/[a-z0-9/-]+$/.test(mount))||
+  (mount!=='/'&&mount.endsWith('/'))||
   mount.includes('//')||mount.includes('/../'))throw Error('school_invalid_mount');
  const file=env.RD_SQLITE_FILE;
  if(!file)throw Error('school_db_config_missing');
@@ -109,7 +110,7 @@ async function schoolHandler(req,res,{worker,db,env,config}){
  let where;
  try{where=cleanUrl(req.url,config.mount)}
  catch{return fail(res,400,'invalid_request')}
- if(req.url.split('?')[0]===config.mount){
+ if(config.mount!=='/'&&req.url.split('?')[0]===config.mount){
   res.writeHead(308,{...commonHeaders(),
    Location:config.mount+'/'+where.query});
   return res.end();
@@ -145,7 +146,7 @@ async function schoolHandler(req,res,{worker,db,env,config}){
  try{
   const result=await worker.fetch(request,{
    ...env,DB:db,ALLOWED_ORIGINS:config.origin,
-   RD_SCHOOL_APP_URL:config.origin+config.mount+'/'
+   RD_SCHOOL_APP_URL:config.origin+(config.mount==='/'?'/':config.mount+'/')
   },ctx);
   const responseHeaders={...commonHeaders()};
   // Do not proxy unsafe CORS/cookies, and never cache authenticated data.

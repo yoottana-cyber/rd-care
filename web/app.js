@@ -1,4 +1,6 @@
 import {API_BASE_URL} from './config.js';
+import {formatThaiDate} from './thai-date.js';
+import {installThaiDatePickers} from './thai-date-picker.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
@@ -37,6 +39,7 @@ import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-
 import {initTheme,bindThemeButtons} from './theme.js';
 configureRolePwa(location.search);
 initTheme();
+installThaiDatePickers();
 // Always show the emblem; retain the bundled small crest for offline/error fallback.
 document.addEventListener('error',event=>{
  const img=event.target;
@@ -517,7 +520,7 @@ function renderDashboard(){
    <div class="rd-hero-greeting"><span class="rd-hero-avatar" aria-hidden="true">👤</span>
     <div><span class="hero-chip">✦ RD CONNECT • Smart Student Care</span>
      <h2>ยินดีต้อนรับ ${esc(state.user.display_name)}</h2>
-     <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(state.date)}</p></div></div>
+     <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(formatThaiDate(state.date))}</p></div></div>
    <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
   </div>
   ${state.user?.role!=='admin'||state.advisorToday?.items?.length?
@@ -630,7 +633,7 @@ function renderDailyOverview(){
  const focus=state.students.filter(student=>['absent','leave'].includes(dailyReferenceStatus(student.id)));
  const tiles=[['present','มา','✅'],['absent','ขาด','🔴'],['leave','ลา','🔵'],['late','สาย','🟠'],['unrecorded','ยังไม่บันทึก','⚪']];
  return `<section class="daily-class-overview" aria-label="สถานะเช็กชื่อรายวันจากครูที่ปรึกษา">
-   <div class="daily-overview-heading"><div><h3>📋 เช็กชื่อรายวันของห้อง • ${esc(state.date)}</h3>
+   <div class="daily-overview-heading"><div><h3>📋 เช็กชื่อรายวันของห้อง • ${esc(formatThaiDate(state.date))}</h3>
    <p>ข้อมูลจากครูที่ปรึกษา ใช้ดูประกอบการเช็กชื่อรายคาบเท่านั้น ไม่ปรับสถานะรายคาบอัตโนมัติ</p></div>
    <span class="daily-reference-readonly">ดูข้อมูลอย่างเดียว</span></div>
    <div class="daily-overview-stats">${tiles.map(([status,label,icon])=>
@@ -650,7 +653,7 @@ function emptyRosterHint(){
   ?`<p><strong>พบว่าห้องนี้มีนักเรียนที่ลงทะเบียนอยู่ ${count} คน แต่วันเริ่มลงทะเบียนที่เร็วที่สุดคือ ${esc(first)}</strong> ซึ่งช้ากว่าวันสอนที่เลือก กรุณาเลือกวันสอนที่ตรงกับวันที่นักเรียนเริ่มเรียน หรือตรวจข้อมูลการลงทะเบียนกับแอดมิน</p>`
   :count?`<p>ห้องนี้มีนักเรียนลงทะเบียนปัจจุบัน ${count} คน แต่ไม่พบรายชื่อที่มีผลในวันที่เลือก กรุณาตรวจประวัติย้ายเข้า/ย้ายออก และวันเริ่มลงทะเบียน</p>`
   :'<p>ยังไม่พบการลงทะเบียนนักเรียนที่ใช้งานอยู่ในห้องนี้ กรุณาตรวจหน้าแอดมินและนำเข้าข้อมูลให้เรียบร้อย</p>';
- return `<div class="empty" role="status"><strong>ไม่พบรายชื่อนักเรียนที่มีผลในวันที่ ${esc(state.date)}</strong>
+ return `<div class="empty" role="status"><strong>ไม่พบรายชื่อนักเรียนที่มีผลในวันที่ ${esc(formatThaiDate(state.date))}</strong>
   ${details}<button type="button" class="button secondary" id="refreshAttendanceRoster">🔄 โหลดรายชื่ออีกครั้ง</button></div>`;
 }
 function renderAttendance(){
@@ -783,7 +786,7 @@ function renderLate(){
    <td>${r.state==='pending'?`<button class="button secondary" type="button" data-review-self="${r.id}" data-result="verified">ยืนยัน</button>
     <button class="button ghost" type="button" data-review-self="${r.id}" data-result="rejected">ปฏิเสธ</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีคำขอจากนักเรียนในห้องนี้</div>'}
  </section>`:''}
- <div class="card"><h3>รายการมาสายวันที่ ${esc(state.date)}</h3>${state.lates.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สถานะ</th></tr></thead><tbody>${state.lates.map(l=>`<tr><td>${esc(l.full_name)}</td><td>${esc(l.arrived_at)}</td><td>${l.state==='verified'?'ยืนยันแล้ว':l.state==='rejected'?'ไม่อนุมัติ':'รอตรวจสอบ'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีรายการมาสายที่บันทึกแล้ว</div>'}</div></div>`);
+ <div class="card"><h3>รายการมาสายวันที่ ${esc(formatThaiDate(state.date))}</h3>${state.lates.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สถานะ</th></tr></thead><tbody>${state.lates.map(l=>`<tr><td>${esc(l.full_name)}</td><td>${esc(l.arrived_at)}</td><td>${l.state==='verified'?'ยืนยันแล้ว':l.state==='rejected'?'ไม่อนุมัติ':'รอตรวจสอบ'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีรายการมาสายที่บันทึกแล้ว</div>'}</div></div>`);
  bindFilters(loadLate);
  $('#lateForm').addEventListener('submit',e=>safeRun(async()=>{
   e.preventDefault();const form=e.currentTarget,f=new FormData(form),button=form.querySelector('button');
@@ -843,7 +846,7 @@ async function loadAdvisorCenter(){
  const truancy=(urgent.items||[]).filter(e=>Number(e.classroom_id)===selected);
  const focusHtml=focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
   <h3>🔔 รายละเอียดแจ้งเตือน${focus.kind==='attendance_review'?'ขาดรายคาบรอตรวจสอบ':'หนีเรียน'}</h3><strong>${esc(focus.full_name)}</strong>
-  <p>ห้อง ${esc(focus.classroom_label)} • วันที่ ${esc(focus.school_date)} • คาบ ${esc(focus.period)} • วิชา ${esc(focus.subject)}</p>
+  <p>ห้อง ${esc(focus.classroom_label)} • วันที่ ${esc(formatThaiDate(focus.school_date))} • คาบ ${esc(focus.period)} • วิชา ${esc(focus.subject)}</p>
   <p class="muted">${focus.kind==='attendance_review'?'รายการนี้รอครูที่ปรึกษาพิจารณา':'โปรดตรวจสอบข้อเท็จจริงของเหตุการณ์กับนักเรียน'}</p>
   ${focus.kind==='attendance_review'?`<div class="row">
    <button class="button secondary" data-advisor-review="${Number(focus.id)}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต / บันทึกผิด</button>
@@ -858,12 +861,12 @@ async function loadAdvisorCenter(){
  <section class="card stack"><h3>🚨 รายการหนีเรียนที่ครูบันทึก</h3>
  <p class="muted">แสดงเหตุการณ์จากครูผู้สอนที่แจ้งทันที แม้นักเรียนขาดรายวันแล้ว • ตรวจสอบข้อเท็จจริงและประสานผู้ปกครอง</p>
  ${truancy.length?truancy.map(e=>`<div class="alert-item">
-  <strong>${esc(e.full_name)}</strong><p class="muted">${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
+  <strong>${esc(e.full_name)}</strong><p class="muted">${esc(formatThaiDate(e.school_date))} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
   <span class="tag">หนีเรียน — ระบบจะส่ง Push ไปยังอุปกรณ์ที่เปิดรับและพร้อมใช้งาน</span>
  </div>`).join(''):'<p class="muted">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}</section>
  <section class="card stack"><h3>รายการรอการพิจารณา (ขาดรายคาบปกติ)</h3>
  ${items.length?items.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong>
- <p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
+ <p class="muted">${esc(formatThaiDate(a.school_date))} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
  <p class="muted">แจ้งผู้ปกครองผ่าน Push สำหรับเหตุหนีเรียนและมาสายที่บันทึกผ่าน QR โดยส่งเฉพาะอุปกรณ์ที่สมัครรับแล้ว</p></section>`);
  if(focus)$('#pushNoticeFocus')?.scrollIntoView({block:'start'});
@@ -894,7 +897,7 @@ async function loadAlerts(){
 }
 function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false,advisorOnly:true})}
  <div class="warn">นักเรียนที่ขาดรายวันแล้วจะไม่ถูกแจ้งขาดรายคาบซ้ำ • รายการขาดปกติจะไม่ส่ง Push ถึงผู้ปกครอง</div>
- ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
+ ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(formatThaiDate(a.school_date))} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-review="${a.id}" data-state="resolved">มีเหตุ/บันทึกผิด</button><button class="button" data-review="${a.id}" data-state="confirmed">ยืนยันไม่เข้าชั้นเรียน</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการรอตรวจสอบ</div>'}</div></div>`);
  bindFilters(loadAlerts);
  $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (การยืนยันขาดปกติไม่ส่ง Push ถึงผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
@@ -976,7 +979,7 @@ function renderAdminStudents(){
     <h3>ประวัติการสังกัดห้อง</h3>
     ${adminTransferState.studentId===edit.id&&adminTransferState.history.length?
       `<div class="table-wrap"><table class="table"><thead><tr><th>ห้องเรียน</th><th>เลขที่</th><th>เริ่มวันที่</th><th>สิ้นสุดก่อนวันที่</th></tr></thead>
-       <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(h.start_date)}</td><td>${esc(h.end_date||'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
+       <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(formatThaiDate(h.start_date))}</td><td>${esc(h.end_date?formatThaiDate(h.end_date):'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
    </section>`:''}
   <div id="pilotImportHolder"></div>
   <div id="unifiedImportHolder"></div>

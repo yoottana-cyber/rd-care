@@ -1,3 +1,4 @@
+import {formatThaiDate,formatThaiDateTime} from './thai-date.js';
 // Admin-only semester references; this page never changes active timetable or attendance.
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const weekdays=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
@@ -32,7 +33,7 @@ export function createTermSnapshots({api,mount,safeRun,toast,navigate}){
      <div><small>นักเรียน</small><strong>${total('students').toLocaleString('th-TH')}</strong></div>
      <div><small>ตารางสอน</small><strong>${total('lessons').toLocaleString('th-TH')}</strong></div>
      <div><small>ห้องที่มีนักเรียน</small><strong>${rooms.filter(r=>Number(r.students)>0).length}</strong></div>
-     <div><small>ข้อมูล ณ วันที่</small><strong>${esc(v.source_date)}</strong></div>
+     <div><small>ข้อมูล ณ วันที่</small><strong>${esc(formatThaiDate(v.source_date))}</strong></div>
     </div>
     ${v.preview?`<div class="rd-term-status">
      <strong>ตัวอย่างข้อมูลปัจจุบัน — ยังไม่บันทึกเป็นข้อมูลอ้างอิง</strong>
@@ -40,7 +41,7 @@ export function createTermSnapshots({api,mount,safeRun,toast,navigate}){
       สามารถบันทึกชุดข้อมูลของปี ${year} ภาคเรียน ${semester} ได้หนึ่งครั้ง โดยจะไม่เขียนทับข้อมูลเดิม</p>
      <button class="button" type="button" id="termCapture" ${busy?'disabled':''}>🔒 บันทึกชุดข้อมูลอ้างอิง</button></div>`:
      `<div class="rd-term-status"><strong>✓ บันทึกชุดข้อมูลอ้างอิงแล้ว</strong>
-      <p>ผู้บันทึก ${esc(v.record.captured_by)} · วันที่ ${esc(v.record.captured_at)}
+      <p>ผู้บันทึก ${esc(v.record.captured_by)} · วันที่ ${esc(formatThaiDateTime(v.record.captured_at))}
       · สามารถเปิดดูได้ภายหลังแม้จะเปลี่ยนห้องเรียนหรือตารางสอนปัจจุบัน</p></div>`}
    </section>
    <section class="card stack"><h3>🏫 สรุปห้องเรียน</h3>
@@ -52,7 +53,7 @@ export function createTermSnapshots({api,mount,safeRun,toast,navigate}){
      <td><button class="button secondary" type="button" data-term-room="${r.id}">ดูรายชื่อ</button></td>
     </tr>`).join('')}</tbody></table></div></section>
    ${room?`<section class="card stack"><h3>👥 นักเรียนห้อง ${esc(room.label)}</h3>
-     <p class="muted">เลขที่และห้องอ้างอิงตามข้อมูลวันที่ ${esc(v.source_date)}</p>
+     <p class="muted">เลขที่และห้องอ้างอิงตามข้อมูลวันที่ ${esc(formatThaiDate(v.source_date))}</p>
      <div class="table-wrap"><table class="table"><thead><tr><th>เลขที่</th><th>เลขประจำตัว</th><th>ชื่อ–สกุล</th></tr></thead><tbody>
       ${(v.students||[]).map(s=>`<tr><td>${esc(s.roll_no)}</td><td>${esc(s.student_no)}</td>
        <td>${esc(s.full_name)}</td></tr>`).join('')||'<tr><td colspan="3">ไม่มีรายชื่อในห้องนี้</td></tr>'}

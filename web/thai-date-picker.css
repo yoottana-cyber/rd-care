@@ -1,0 +1,52 @@
+/* Thai Buddhist Era calendar for every RD CONNECT date input. */
+.rd-thai-date-field{position:relative;display:inline-flex;width:100%;min-width:130px;vertical-align:middle}
+.rd-thai-date-field>.rd-thai-date-original{
+ position:absolute!important;width:1px!important;height:1px!important;min-width:0!important;
+ padding:0!important;margin:0!important;border:0!important;opacity:0!important;
+ overflow:hidden!important;clip-path:inset(50%)!important;pointer-events:none!important
+}
+.rd-thai-date-trigger{
+ display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;
+ min-height:42px;padding:10px 12px;border:1px solid #cbded8;border-radius:11px;
+ background:var(--rd-surface,#fff);color:var(--rd-text,#183c37);
+ font-family:inherit;font-size:14px;font-weight:650;text-align:left;cursor:pointer;
+ white-space:nowrap;line-height:1.4
+}
+.rd-thai-date-trigger:hover{border-color:#078b62}
+.rd-thai-date-trigger:focus-visible{outline:3px solid #bbebd7;outline-offset:2px}
+.rd-thai-date-trigger:disabled{opacity:.55;cursor:not-allowed}
+.rd-thai-calendar{
+ position:fixed;z-index:9999;padding:15px;border:1px solid #d5e6e0;border-radius:16px;
+ background:#fff;color:#1a3b32;box-shadow:0 16px 45px #0d322a38;
+ max-height:calc(100dvh - 16px);overflow:auto;font-family:inherit
+}
+.rd-thai-calendar button,.rd-thai-calendar select{font-family:inherit;color:inherit}
+.rd-thai-calendar-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.rd-thai-calendar-heading strong{font-size:15px}
+.rd-thai-calendar-close{border:0;background:transparent;font-size:24px;cursor:pointer;padding:2px 8px}
+.rd-thai-calendar-month{display:flex;align-items:center;gap:5px;margin-bottom:13px}
+.rd-thai-calendar-month select{min-width:0;border:1px solid #dce9e5;border-radius:8px;
+ padding:8px 4px;background:#fff;font-size:13px}
+.rd-thai-calendar-month [data-month]{flex:2}
+.rd-thai-calendar-month [data-year]{flex:1}
+.rd-thai-calendar-month button{border:1px solid #dce9e5;border-radius:8px;
+ background:#f4faf7;font-size:20px;min-width:32px;min-height:36px}
+.rd-thai-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.rd-thai-calendar-weekday{text-align:center;padding:6px 0;font-size:12px;color:#697c75}
+.rd-thai-calendar-grid button{border:0;border-radius:9px;min-height:36px;background:transparent;
+ cursor:pointer;font-size:14px}
+.rd-thai-calendar-grid button:hover:not(:disabled){background:#dbf3e8}
+.rd-thai-calendar-grid button.selected{background:#098a60;color:#fff;font-weight:750}
+.rd-thai-calendar-grid button:disabled{opacity:.3;cursor:not-allowed}
+.rd-thai-calendar button:focus-visible,.rd-thai-calendar select:focus-visible{
+ outline:2px solid #049363;outline-offset:2px
+}
+.rd-thai-calendar-footer{display:flex;align-items:center;justify-content:space-between;
+ margin-top:12px;padding-top:10px;border-top:1px solid #e8eeeb;font-size:12px;color:#71857b}
+.rd-thai-calendar-footer button{border:1px solid #d9e7df;background:#f2fbf6;
+ border-radius:8px;padding:7px 13px;font-weight:700;cursor:pointer}
+[data-theme="dark"] .rd-thai-date-trigger{background:#1e293b;border-color:#475569;color:#f8fafc}
+[data-theme="dark"] .rd-thai-calendar{background:#1e293b;border-color:#475569;color:#f8fafc}
+[data-theme="dark"] .rd-thai-calendar select,[data-theme="dark"] .rd-thai-calendar-month button,
+[data-theme="dark"] .rd-thai-calendar-footer button{background:#334155;border-color:#475569;color:#f8fafc}
+@media(max-width:560px){.rd-thai-calendar{max-height:calc(100dvh - 24px)}}

@@ -129,6 +129,13 @@ export function createBehaviorAdjustment({api,mount,safeRun,toast,rooms,getRoomI
   });
   document.querySelector('#adjustmentRule')?.addEventListener('change',()=>{
    draft();state.preview=null;
+   // A rule change must immediately update the submit button; previously the
+   // disabled state only refreshed after a pupil checkbox triggered render().
+   const button=document.querySelector('#adjustmentSubmit');
+   if(button)button.disabled=!state.picked.size||
+    !state.rules.some(rule=>String(rule.id)===String(state.ruleId));
+   // A preview for the previous rule is no longer valid.
+   document.querySelector('.score-adjust-preview')?.remove();
   });
   document.querySelectorAll('[data-adjustment-history]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{
    draft();const id=Number(button.dataset.adjustmentHistory);

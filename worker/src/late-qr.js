@@ -6,7 +6,7 @@ import {getLateCutoffTime} from './school-settings.js';
 // Existing Cloudflare-only deployments keep their historical QR destination.
 const homeUrl=env=>{
  const value=env?.RD_SCHOOL_APP_URL;
- return typeof value==='string'&&/^https:\/\/[^\s/?#]+\/[a-z0-9/-]+\/$/.test(value)
+ return typeof value==='string'&&/^https:\/\/[^\s/?#]+\/(?:[a-z0-9-]+\/)*$/.test(value)
   ?value:'https://rd-care.pages.dev/';
 };
 const textEncoder=new TextEncoder();

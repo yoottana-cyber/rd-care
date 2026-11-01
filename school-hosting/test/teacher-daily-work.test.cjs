@@ -6,7 +6,7 @@ const path=require('node:path');
 const {DatabaseSync}=require('node:sqlite');
 const {pathToFileURL}=require('node:url');
 const workerUrl=pathToFileURL(path.resolve(__dirname,'../../worker/src/worker.js')).href;
-const viewSource=fs.readFileSync(path.resolve(__dirname,'../../web/teacher-daily-work.js'),'utf8');
+const viewUrl=pathToFileURL(path.resolve(__dirname,'../../web/teacher-daily-work.js')).href;
 const guardSource=fs.readFileSync(path.resolve(__dirname,'../../web/attendance-draft-guard.js'),'utf8');
 const asModule=src=>import('data:text/javascript;base64,'+Buffer.from(src).toString('base64'));
 function fixture(){
@@ -52,11 +52,12 @@ test('student and guardian do not receive teacher dashboard',async()=>{
  }finally{sqlite.close()}
 });
 test('daily teacher UI renders real progress without student identities',async()=>{
- const {teacherDailyWorkMarkup,summarizeDailyRooms}=await asModule(viewSource);
+ const {teacherDailyWorkMarkup,summarizeDailyRooms}=await import(viewUrl);
  const items=[{id:1,label:'ม.1/1',students:35,checked:32},{id:2,label:'ม.1/2',students:30,checked:30}];
  assert.deepEqual(summarizeDailyRooms(items),{rooms:2,withStudents:2,complete:1,waiting:1,pupils:65});
  const markup=teacherDailyWorkMarkup({items},{date:'2026-10-31'});
  assert.match(markup,/เหลือ 3 คน/);
+ assert.match(markup,/31 ต.ค. 2569/);
  assert.match(markup,/32 \/ 35 คน/);
  assert.match(markup,/1 \/ 2 ห้องเช็กครบ/);
  assert.match(markup,/data-daily-room="1"/);
