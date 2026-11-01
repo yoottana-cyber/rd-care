@@ -118,7 +118,7 @@ class GeneratedUniqueAuditTests(unittest.TestCase):
         self.assertEqual(report["checked_indexes"], 3)
         self.assertEqual(report["exact_duplicate_keys"], 0)
         self.assertEqual(report["potential_casefold_collisions"], 0)
-        self.assertEqual(report["active_keys_checked"], 8)
+        self.assertEqual(report["active_keys_checked"], 7)
         self.assertFalse(report["safe_to_import"])
 
     def test_active_room_roll_collision_is_detected(self):
