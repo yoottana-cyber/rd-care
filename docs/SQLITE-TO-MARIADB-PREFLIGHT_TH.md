@@ -664,3 +664,50 @@ py "H:\rd-care\rd-care\scripts\diagnose-mariadb-check-differences.py" $backup.Fu
 สถานะ: ผ่าน exact-count empty gate (63/63 table empty ณ เวลาตรวจ) แต่
 **Import และ Cutover ยังคง NO-GO** จนกว่าจะพิสูจน์ semantics ของ CHECK
 และดำเนินการทดแทน Trigger 10 ตัวที่ MariaDB ปลายทางยังไม่มี
+
+## ขั้นตอน 16: ทดสอบ 2 กฎ SQLite GLOB → MariaDB REGEXP ด้วยข้อมูลจำลอง
+
+ผลวิเคราะห์ 1 พ.ย. 2569: CHECK 101/101, เทียบข้อความได้ตรง 86,
+เหลือ 15 รายการ / 11 ตาราง ที่ส่วนใหญ่ต่างกันเพราะ SQL syntax.
+รายการที่มีความเสี่ยงเชิงพฤติกรรมสูงสุดเป็น 2 กฎ:
+
+- `behavior_incidents.recorded_school_date`: รูปแบบ `YYYY-MM-DD`
+  จาก SQLite GLOB `[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]`
+- `school_settings.first_period_start_time`: รูปแบบเวลา `HH:MM`
+  จาก SQLite GLOB `[0-2][0-9]:[0-5][0-9]`
+
+หมายเหตุ กฎต้นทางตรวจ **รูปแบบ** ไม่ได้ยืนยันวันตามปฏิทินหรือ
+ชั่วโมงจริง เช่น `2026-99-99` และ `29:59` ผ่าน pattern ตัวต้นทางได้
+ต้องแยก date/time business validation ต่างหาก ไม่ควรเปลี่ยนนโยบายโดยไม่ทดสอบย้อนหลัง
+
+เพิ่มเครื่องมือสร้าง SQL SELECT แบบ synthetic data จาก **pattern จริงใน CSV metadata**
+โดยจำกัดรูปแบบ CHECK ที่รองรับ; ไม่คัดลอก SQL จาก CSV มาเป็นคำสั่งโดยตรง
+และไม่มี SQL เขียนฐาน, ไม่มีข้อมูลนักเรียน:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบ SQLite Backup" }
+py "H:\rd-care\rd-care\scripts\prepare-mariadb-regexp-probes.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-constraints.csv" --generate-sql "H:\RD_CONNECT_BACKUP\mariadb-regexp-probes.sql"
+```
+
+สคริปต์แจ้ง `ANCHOR_START` / `ANCHOR_END` สำหรับแต่ละ REGEXP,
+และสร้าง 22 cases ซึ่งแต่ละ case มี `SQLITE_EXPECTED` ที่คำนวณจาก SQLite GLOB
+
+จาก PowerShell คัดลอก SQL (ห้ามรันถ้าสคริปต์แจ้ง BLOCKED):
+
+```powershell
+Get-Content "H:\RD_CONNECT_BACKUP\mariadb-regexp-probes.sql" -Raw | Set-Clipboard
+```
+
+เข้า phpMyAdmin → `ratsadaa_connect` → SQL → วาง → Go
+เป็น `SELECT` จากค่าจำลองเท่านั้น ไม่มีตารางใดถูกอ่านหรือแก้ไข
+ดู `RESULT` จำนวน 22 แถว: ทุกแถวควรเป็น `PASS`; หาก `FAIL`
+ส่งเฉพาะ PROBE และ RESULT มา ไม่ต้อง Export ฐานข้อมูลจริง
+
+**แม้ทุก case เป็น PASS ก็ยังไม่ถือว่าผ่าน semantic proof ทั้งหมด**
+เพราะ MariaDB REGEXP อาจได้รับผลจาก collation/PCRE/SQL mode,
+และการทดสอบนี้เป็นตัวอย่าง ไม่ได้ครอบคลุมทุกค่าที่เป็นไปได้
+
+ต้องทดสอบ isolated MariaDB Lab เพื่อยืนยัน CHECK ใน INSERT/UPDATE
+และทำ Trigger parity 10 ตัวก่อน Import หรือ Cutover
