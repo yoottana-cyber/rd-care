@@ -53,7 +53,7 @@ def generate_sql(tables, schema):
         "FROM " + tick + schema + tick + "." + tick + table + tick
         for table in tables
     ]
-    return "-- READ ONLY: 63 exact COUNT(*) checks in MariaDB staging.\n" + (
+    return "-- READ ONLY: 63 exact row-count queries in MariaDB staging.\n" + (
         "\nUNION ALL\n".join(statements)
     ) + "\nORDER BY TABLE_NAME;\n"
 
