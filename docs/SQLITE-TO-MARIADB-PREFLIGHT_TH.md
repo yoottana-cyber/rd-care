@@ -303,3 +303,33 @@ ORDER BY s.TABLE_NAME, s.INDEX_NAME, s.SEQ_IN_INDEX;
 ```
 
 การดูนิพจน์เป็น metadata read-only; อย่า ALTER/DROP ดัชนีเพื่อให้ผ่าน
+
+## ขั้นตอน 8.1: SQLite `NO ACTION` กับ MariaDB `RESTRICT`
+
+ผลตรวจจากผู้ใช้ ณ 1 พ.ย. 2569 พบความสัมพันธ์ Foreign Key 119 รายการในทั้งสองฐาน
+แต่สคริปต์เวอร์ชันแรกแสดง `MISSING_IN_MARIADB: 119` และ
+`EXTRA_IN_MARIADB: 119` เพราะเทียบคำ `NO ACTION` กับ `RESTRICT` แบบตรงตัว
+
+ตามคู่มือ MariaDB `NO ACTION` เป็นคำพ้องของ `RESTRICT` และตรวจในลักษณะ immediate.
+ส่วน SQLite `NO ACTION` อาจต่างจาก `RESTRICT` หากมี deferred constraints
+จึงอัปเดต `scripts/audit-mariadb-foreign-keys.py` ให้จัดกลุ่มคำพ้องระหว่าง
+สองฐาน **โดยยังแสดงจำนวนความต่างของข้อความกฎดิบ** และตรวจแบบอนุรักษ์นิยม
+ว่ามีตารางประกาศ `DEFERRABLE` อยู่หรือไม่
+
+ใช้คำสั่งเดิมหลัง GitHub Desktop → Fetch origin → Pull origin:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์สำรอง SQLite" }
+py "H:\rd-care\rd-care\scripts\audit-mariadb-foreign-keys.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-foreign-keys.csv"
+```
+
+รายงานใหม่ระบุ `EXACT_ACTION_DIFFERENCES`, `NO_ACTION_RESTRICT_ALIASES`,
+`SQLITE_TABLES_WITH_DEFERRABLE_CLAUSES`, `MISSING_IN_MARIADB`,
+`EXTRA_IN_MARIADB` แยกกัน; 0 ในสองรายการหลังหมายถึงไม่มีความต่าง
+ของตาราง/คอลัมน์/กฎที่ตรวจหลังปรับความหมายชื่อกฎเท่านั้น
+
+แม้ผ่าน ยังไม่ได้พิสูจน์ว่ารัน `PRAGMA defer_foreign_keys=ON`
+ระหว่างทำงานจริงหรือไม่ จึงต้องตรวจการเชื่อมต่อ/ธุรกรรมและทดสอบ
+FK ภายในฐาน MariaDB สำรอง (ไม่ใช่ฐาน Live) ก่อน Import จริง
