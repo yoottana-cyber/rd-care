@@ -60,7 +60,7 @@ class RegexpProbesTest(unittest.TestCase):
 
     def test_rejects_unsafe_sql_from_metadata(self):
         source,target=fixture(pattern_date=DATE+"';DROP TABLE students;--")
-        with self.assertRaisesRegex(ValueError,"unsafe_regexp_pattern"):
+        with self.assertRaisesRegex(ValueError,"unsafe_or_unexpected_check_clause"):
             module.collect_rules(source,target)
 
     def test_source_sqlite_format_expected_results(self):
