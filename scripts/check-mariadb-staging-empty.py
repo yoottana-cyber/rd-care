@@ -59,13 +59,20 @@ def generate_sql(tables, schema):
 
 
 def verify_csv(tables, csv_path):
+    file = Path(csv_path).expanduser()
+    if not file.is_file():
+        raise ValueError("count_csv_missing")
+    if file.stat().st_size == 0:
+        raise ValueError("count_csv_empty")
     actual = {}
-    with Path(csv_path).open(newline="", encoding="utf-8-sig") as stream:
+    with file.open(newline="", encoding="utf-8-sig") as stream:
         reader = csv.DictReader(stream)
         if not reader.fieldnames:
             raise ValueError("invalid_count_csv_header")
         reader.fieldnames = [h.strip().strip("\ufeff") for h in reader.fieldnames]
         if not {"TABLE_NAME", "ROW_COUNT"}.issubset(reader.fieldnames):
+            if any(";" in field for field in reader.fieldnames):
+                raise ValueError("count_csv_delimiter_should_be_comma")
             raise ValueError("invalid_count_csv_header")
         for row in reader:
             if None in row:
@@ -120,13 +127,15 @@ def main():
     except (ValueError, OSError, UnicodeError, TypeError, KeyError,
             json.JSONDecodeError, csv.Error) as exc:
         known = {
+            "count_csv_missing", "count_csv_empty",
+            "count_csv_encoding_not_utf8", "count_csv_delimiter_should_be_comma",
             "invalid_inventory", "unapproved_staging_schema",
             "expected_63_tables", "invalid_count_csv_header",
             "invalid_count_csv", "mariadb_count_tables_missing_or_extra",
             "output_must_be_new_file", "output_must_be_outside_git",
             "output_must_be_outside_webroot",
         }
-        reason = str(exc)
+        reason = "count_csv_encoding_not_utf8" if isinstance(exc, UnicodeError) else str(exc)
         print("STAGING EMPTY GATE BLOCKED: " +
               (reason if reason in known else "metadata_unreadable"),
               file=sys.stderr)
