@@ -49,3 +49,42 @@
 **ห้าม** เปลี่ยน RD_SQLITE_FILE, เปลี่ยน live API, ใช้ `school:init`/`school:install`, ล้างตาราง `ratsadaa_connect`, ปิด `FOREIGN_KEY_CHECKS` เพื่อผ่านข้อผิดพลาด, หรือ Import ประวัติโดยตรงในขั้นนี้
 
 เอกสาร MariaDB: Trigger limitations Error 1442, trigger ordering `ACTION_ORDER`, trigger events/side effects; และ FK `NO ACTION` ≈ `RESTRICT` ใน immediate enforcement.
+
+## ความคืบหน้า 1 พฤศจิกายน 2569 — 22/22 REGEXP PASS และ Conduct Contract
+
+phpMyAdmin แสดง SELECT synthetic tests 22 แถว สำหรับ 2 กฎวันที่/เวลา
+ทุกแถว RESULT=PASS (SQLITE_EXPECTED ตรงกับ MARIADB_ACTUAL).
+ไม่รับรอง CHECK 101 กฎเทียบเท่าทั้งหมด และไม่ได้ทดสอบ INSERT/UPDATE.
+
+เพิ่มโมดูล pure (ไม่มี DB driver, network หรือไฟล์ และไม่ผูก live backend):
+- school-hosting/mariadb-parity/conduct-contract.cjs
+- school-hosting/test/mariadb-conduct-parity.test.cjs
+
+สัญญาพฤติกรรมที่โค้ดและ synthetic tests ตรวจ:
+- minor: เตือน 2 ครั้ง, หักตั้งแต่ครั้งที่ 3
+- moderate: เตือน 1 ครั้ง, หักตั้งแต่ครั้งที่ 2
+- serious / very_serious: หักครั้งแรก และต้องเป็นครูฝ่ายกิจการ/แอดมิน
+- good: เก็บบวกแยกจากหนี้พฤติกรรม
+- receipt ขอซ้ำ: ต้องไม่สร้าง incident/score/push ซ้ำ
+- push: warning และ deduction เป็นคนละ event, dispatch หลัง COMMIT เท่านั้น
+- truancy: ผูกกับรายคาบ, soft delete เมื่อแก้, restore ID เดิมเมื่อกลับมาหนีเรียน
+
+**โค้ดใหม่นี้เป็น contract / plan object เท่านั้น ยังไม่ใช่ MariaDB transaction adapter**
+และไม่ได้พิสูจน์การใช้จริงกับ MariaDB, race, lock หรือ rollback.
+
+ลำดับการ implement transaction บนฐาน lab ที่แยกจริง:
+1. Begin transaction, ตรวจสิทธิ์ครู/กฎ/ผู้เรียน, ล็อก students.id FOR UPDATE
+   และเรียง student IDs เมื่อหลายคนเพื่อลด deadlock
+2. ตรวจ request_id+student_id receipt ภายใต้ lock (validate rule, reason, date)
+3. นับ active incident ในคู่ student_id+affairs_rule_id แล้วคำนวณเตือน/หัก
+4. INSERT incident และ (ถ้ามีคะแนน) INSERT behavior_records พร้อม UPDATE link
+5. INSERT audit และ idempotent outbox, COMMIT แล้วค่อย dispatch push
+6. เมื่อผิดพลาด ROLLBACK ทั้งชุด, ทดสอบ retry/concurrency/timeout ใน lab เท่านั้น
+7. สำหรับ truancy ต้องบันทึก period+incident+score+audit ใน transaction เดียว
+   soft-delete และ restore ID เดิมเมื่อเปลี่ยนสถานะไปมา
+
+งานค้างต่อ: adapter MariaDB สำหรับ lab, trigger contracts อีก 7+ รายการ,
+CHECK semantic/collation, FK/lock, transaction integration tests และ importer
+ฐาน ratsadaa_connect ที่ตรวจว่าง 63/63 ตารางยังไม่ใช่ lab สำหรับเขียนทดสอบ.
+
+สถานะคงเดิม: IMPORT_AUTHORIZED=NO, CUTOVER_AUTHORIZED=NO.
