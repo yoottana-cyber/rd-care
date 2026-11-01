@@ -376,3 +376,42 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION;
 เครื่องมือนี้ไม่มีคำสั่ง INSERT/ALTER/DROP และไม่ได้แตะ DB ที่โรงเรียน
 ยังไม่รับรอง foreign key transactions, collation, check constraints, trigger
 หรือการย้ายข้อมูลจำนวนมาก; ต้องจำลอง import ใน MariaDB แยกจาก Production ต่อไป
+
+## ขั้นตอน 10: วางแผนนำเข้า MariaDB เฉพาะฐานทดสอบ (ยังไม่เขียนฐาน)
+
+หลังตรวจ FK พบ SQLite 119 / MariaDB 119, กฎ `NO ACTION` และ `RESTRICT`
+มีความหมายที่เทียบได้สำหรับ Foreign Key แบบ immediate และไม่มี
+`DEFERRABLE` ประกาศในตาราง SQLite ทั้ง 63 ตารางที่ตรวจ
+
+สร้างโปรแกรม `scripts/plan-mariadb-staging-import.py` เพื่อวางลำดับ
+ตาราง Parent → Child ก่อน Import และตัด Migration Ledger
+`school_schema_migrations`/`d1_migrations` ออก รวมถึง Generated Columns 5 ช่อง
+เครื่องมือใช้รายงานโครงสร้างเดิม **โดยไม่อ่านข้อมูลนักเรียนและไม่เปิดฐานข้อมูล**
+
+เปิด GitHub Desktop → Fetch origin → Pull origin แล้วรัน PowerShell:
+
+```powershell
+py "H:\rd-care\rd-care\scripts\plan-mariadb-staging-import.py" "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-columns-extended.csv" "H:\RD_CONNECT_BACKUP\mariadb-foreign-keys.csv"
+```
+
+ถ้าต้องการรายงาน JSON สำหรับนักพัฒนาในโฟลเดอร์ที่อยู่นอก GitHub:
+
+```powershell
+py "H:\rd-care\rd-care\scripts\plan-mariadb-staging-import.py" "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-columns-extended.csv" "H:\RD_CONNECT_BACKUP\mariadb-foreign-keys.csv" --report "H:\RD_CONNECT_BACKUP\mariadb-stage-plan.json"
+```
+
+รายงานมีเฉพาะชื่อตาราง ลำดับการนำเข้า คอลัมน์และจำนวนแถว
+ไม่บันทึกชื่อบุคคล รหัสนักเรียน รหัสผ่าน หรือค่าในข้อมูลต้นฉบับ
+จำนวนแถวที่คาดว่าจะนำเข้า: 17,435 (ไม่รวม Migration Ledger 46 แถว)
+
+ตรวจ `TABLE_DEPENDENCY_CYCLES` และ `SELF_REFERENCING_TABLES`;
+หากรายการใดไม่ใช่ 0 จะต้องออกแบบวิธีนำเข้าที่เคารพ FK ใหม่ก่อน
+และยังต้องรอผล Generated UNIQUE 3 รายการ
+
+สถานะ `IMPORT_AUTHORIZED: NO` เป็นค่าคงที่โดยตั้งใจ;
+**ไม่มีความสามารถสั่ง INSERT/ALTER/DROP** และไม่ควรเปิด
+`FOREIGN_KEY_CHECKS=0` เพื่อหลบความสัมพันธ์ที่ผิด
+
+ก่อนพัฒนาส่วนเขียนลงฐานทดลองต้องตรวจว่าใช้ **ฐานทดลองที่แยกจริง**
+จาก `ratsadaa_connect` และ DB SQLite ตัวจริง, มีสิทธิ์จำกัด
+ตรวจ CHECK/Trigger/Collation, ทดลอง rollback แล้วจึงทดสอบนำเข้าข้อมูล
