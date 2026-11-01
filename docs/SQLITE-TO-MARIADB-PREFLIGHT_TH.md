@@ -227,3 +227,79 @@ py "H:\rd-care\rd-care\scripts\audit-mariadb-unique-keys.py" $backup.FullName "H
 ผลที่ไม่พบปัญหา **ไม่ได้แปลว่านำเข้าจะสำเร็จแน่นอน**
 ยังต้องตรวจ Foreign Keys, generated expressions และ INSERT จริงในฐานทดลองแยก
 ก่อนเปิดใช้ Production; ไม่ปิด foreign_key_checks เพื่อแก้ปัญหาข้อมูลผิด
+
+## ขั้นตอน 8: ตรวจ Foreign Keys ทั้ง 62 ตารางก่อน Import
+
+ผลของ UNIQUE INDEX ล่าสุด: ตรวจได้ 93/96 index,
+ไม่มีค่าซ้ำตรงกันหรืออักษรต่างรูปแบบแต่ casefold ซ้ำ;
+เหลือ Generated Unique Index 3 รายการที่ต้องตรวจเพิ่ม
+
+Export เฉพาะ Foreign Key metadata จาก phpMyAdmin → ฐาน `ratsadaa_connect` → SQL:
+
+```sql
+SELECT
+  k.TABLE_NAME,
+  k.CONSTRAINT_NAME,
+  k.ORDINAL_POSITION,
+  k.COLUMN_NAME,
+  k.REFERENCED_TABLE_NAME,
+  k.REFERENCED_COLUMN_NAME,
+  r.UPDATE_RULE,
+  r.DELETE_RULE
+FROM information_schema.KEY_COLUMN_USAGE AS k
+JOIN information_schema.REFERENTIAL_CONSTRAINTS AS r
+  ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA
+ AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME
+ AND r.TABLE_NAME = k.TABLE_NAME
+WHERE k.TABLE_SCHEMA = 'ratsadaa_connect'
+  AND k.REFERENCED_TABLE_NAME IS NOT NULL
+ORDER BY k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION;
+```
+
+ใต้ผล SQL เลือก Export → CSV ให้มีหัวคอลัมน์และทุกแถว
+บันทึกเป็น `H:\RD_CONNECT_BACKUP\mariadb-foreign-keys.csv`
+CSV นี้เป็น metadata ของกฎฐานข้อมูล ไม่ใช่ข้อมูลส่วนตัว
+
+GitHub Desktop → Fetch origin → Pull origin แล้วรัน:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์ Backup SQLite" }
+py "H:\rd-care\rd-care\scripts\audit-mariadb-foreign-keys.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-foreign-keys.csv"
+```
+
+เครื่องมือเปรียบเทียบ foreign key รายความสัมพันธ์ โดยไม่ใช้ชื่อ constraint เป็นเงื่อนไข
+ตรวจลำดับคอลัมน์ คอลัมน์ที่อ้างอิง และ ON UPDATE/ON DELETE
+หากพบข้อแตกต่างจะแสดงเฉพาะชื่อโครงสร้างและกฎ ไม่แสดงข้อมูลของนักเรียน
+ข้อควรระวัง: source key ที่อ้าง primary key แบบ implicit จะถูกหยุดเพื่อตรวจด้วยมือ
+รายงานสำเร็จไม่แทนการทดสอบ FK insert order, collation หรือ generated index
+
+ตรวจนิพจน์และส่วนประกอบของ Generated UNIQUE INDEX อีก 3 รายการได้ด้วย SQL:
+
+```sql
+SELECT s.TABLE_NAME, s.INDEX_NAME, s.SEQ_IN_INDEX, s.COLUMN_NAME,
+       c.EXTRA, c.GENERATION_EXPRESSION
+FROM information_schema.STATISTICS AS s
+LEFT JOIN information_schema.COLUMNS AS c
+  ON c.TABLE_SCHEMA = s.TABLE_SCHEMA
+ AND c.TABLE_NAME = s.TABLE_NAME
+ AND c.COLUMN_NAME = s.COLUMN_NAME
+WHERE s.TABLE_SCHEMA = 'ratsadaa_connect'
+  AND s.NON_UNIQUE = 0
+  AND EXISTS (
+    SELECT 1
+    FROM information_schema.STATISTICS AS gs
+    JOIN information_schema.COLUMNS AS gc
+      ON gc.TABLE_SCHEMA = gs.TABLE_SCHEMA
+     AND gc.TABLE_NAME = gs.TABLE_NAME
+     AND gc.COLUMN_NAME = gs.COLUMN_NAME
+    WHERE gs.TABLE_SCHEMA = s.TABLE_SCHEMA
+      AND gs.TABLE_NAME = s.TABLE_NAME
+      AND gs.INDEX_NAME = s.INDEX_NAME
+      AND LOWER(gc.EXTRA) LIKE '%generated%'
+  )
+ORDER BY s.TABLE_NAME, s.INDEX_NAME, s.SEQ_IN_INDEX;
+```
+
+การดูนิพจน์เป็น metadata read-only; อย่า ALTER/DROP ดัชนีเพื่อให้ผ่าน
