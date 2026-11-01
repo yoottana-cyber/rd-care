@@ -155,9 +155,36 @@ def source_constraints(backup_path, allowed_tables):
     return rels
 
 
+def normalize_restrict_rule(rule):
+    """Compare immediate enforcement actions; SQLite deferred FKs need review."""
+    return "RESTRICT" if rule in ("RESTRICT", "NO ACTION") else rule
+
+
+def normalized_relation(item):
+    return (*item[:4],
+            normalize_restrict_rule(item[4]),
+            normalize_restrict_rule(item[5]))
+
+
+def deferred_fk_tables(backup_path):
+    """Conservative flag; cannot guarantee no runtime PRAGMA defer_foreign_keys."""
+    path = Path(backup_path).expanduser()
+    if not RE_BACKUP.fullmatch(path.name) or path.is_symlink() or not path.is_file():
+        raise ValueError("verified_backup_required")
+    with sqlite3.connect(path.resolve().as_uri()+"?mode=ro&immutable=1", uri=True) as db:
+        rows = db.execute(
+            "SELECT name,sql FROM sqlite_master WHERE type='table' AND sql IS NOT NULL"
+        ).fetchall()
+    # Any DEFERRABLE declaration is flagged (including NOT DEFERRABLE, conservatively).
+    return [table for table, sql in rows if re.search(r"\\bDEFERRABLE\\b", sql, re.I)]
+
+
 def analyze(source, target):
-    src = collections.Counter(source)
-    dst = collections.Counter(target)
+    exact_src = collections.Counter(source)
+    exact_dst = collections.Counter(target)
+    strict_difference_count = sum((exact_src - exact_dst).values())
+    src = collections.Counter(normalized_relation(x) for x in source)
+    dst = collections.Counter(normalized_relation(x) for x in target)
     missing = sorted((src-dst).elements())
     extra = sorted((dst-src).elements())
     def serial(item):
@@ -165,8 +192,11 @@ def analyze(source, target):
         return (table+"("+",".join(columns)+")->"+
                 parent+"("+",".join(refcols)+") "+
                 "UPDATE="+update+" DELETE="+delete)
+    compatible_alias_count = strict_difference_count - sum((src-dst).values())
     return {
         "source_fks": len(source), "target_fks": len(target),
+        "action_alias_only_differences": compatible_alias_count,
+        "strict_action_differences": strict_difference_count,
         "missing": [serial(x) for x in missing],
         "extra": [serial(x) for x in extra],
     }
@@ -185,6 +215,7 @@ def main():
         if any(ref[0] == LEDGER_MARIA for ref in dest):
             raise ValueError("unexpected_fk_on_migration_ledger")
         result = analyze(source, dest)
+        deferred_tables = deferred_fk_tables(args.backup_file)
     except (ValueError, OSError, UnicodeError, sqlite3.Error,
             csv.Error, json.JSONDecodeError, TypeError) as error:
         reasons = {
@@ -208,16 +239,23 @@ def main():
     print("SQLITE_FKS:", result["source_fks"])
     print("MARIADB_FKS:", result["target_fks"])
     print("MARIADB_FK_PART_ROWS:", part_count)
+    print("EXACT_ACTION_DIFFERENCES:", result["strict_action_differences"])
+    print("NO_ACTION_RESTRICT_ALIASES:", result["action_alias_only_differences"])
+    print("SQLITE_TABLES_WITH_DEFERRABLE_CLAUSES:", len(deferred_tables))
+    for table in deferred_tables[:20]:
+        print("  - DEFERRED_REVIEW:", table)
     print("MISSING_IN_MARIADB:", len(result["missing"]))
     for x in result["missing"][:60]:
         print(" -", x)
     print("EXTRA_IN_MARIADB:", len(result["extra"]))
     for x in result["extra"][:60]:
         print(" -", x)
-    print("NOT VERIFIED: MariaDB INSERT order, FK sign/type compatibility,")
+    print("NOTE: MariaDB NO ACTION and RESTRICT are aliases for immediate FK checks;")
+    print("SQLite DEFERRED constraints, if declared, require separate review.")
+    print("NOT VERIFIED: runtime PRAGMA defer_foreign_keys, MariaDB INSERT order, FK sign/type compatibility,")
     print("COLLATION, generated columns, CHECK constraints or trigger behavior.")
     print("NO NETWORK; NO DATA VALUES EXPORTED; NO SQLITE/MARIADB WRITES.")
-    return 2 if result["missing"] or result["extra"] else 0
+    return 2 if result["missing"] or result["extra"] or deferred_tables else 0
 
 
 if __name__=="__main__":
