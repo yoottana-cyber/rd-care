@@ -86,6 +86,8 @@ jobs:
           node --check 'functions/api/[[path]].js'
       - name: MariaDB lab conduct and truancy transaction contract (synthetic)
         run: node --test school-hosting/test/mariadb-conduct-parity.test.cjs
+      - name: MariaDB lab 119 FK repair preflight and SQL safety (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_lab_fk_repair_test.py' -v
       - name: SQLite GLOB to MariaDB REGEXP read-only format probes (synthetic)
         run: python3 -m unittest discover -s tests -p 'mariadb_regexp_probes_test.py' -v
       - name: SQLite MariaDB redacted CHECK difference diagnostic (synthetic)
