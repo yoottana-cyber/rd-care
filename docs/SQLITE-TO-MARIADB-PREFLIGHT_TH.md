@@ -469,3 +469,45 @@ py "H:\rd-care\rd-care\scripts\audit-mariadb-constraints.py" $backup.FullName "H
 ถ้า `SQLITE_TRIGGER_COUNT > MARIADB_TRIGGER_COUNT` ต้องหยุดการเปิดใช้งาน
 บน MariaDB จนกว่าจะมีการออกแบบและทดสอบ business rule ที่ขาดหายไป
 ยังไม่มีคำสั่งเขียนลง MariaDB และห้ามใช้กับ SQLite Live
+
+## ขั้นตอน 12: ยืนยันว่า MariaDB Staging ว่างทั้ง 63 ตารางด้วย COUNT(*) จริง
+
+**ห้าม** อ้าง `information_schema.TABLES.TABLE_ROWS` เพราะ InnoDB อาจให้ค่าประมาณ
+ก่อนเริ่มทดลอง import ต้องยืนยันฐาน `ratsadaa_connect` แยกจากเว็บ SQLite Live
+และทุกตารางว่างจริงด้วยการนับข้อมูลตรง ๆ ไม่ต้องส่งข้อมูลนักเรียนออกไป
+
+GitHub Desktop → Fetch origin → Pull origin และ PowerShell:
+
+```powershell
+py "H:\rd-care\rd-care\scripts\check-mariadb-staging-empty.py" "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" --generate-sql "H:\RD_CONNECT_BACKUP\mariadb-staging-counts.sql"
+```
+
+สคริปต์จะสร้างไฟล์ SELECT 63 ตารางเท่านั้นในที่เก็บ Backup นอก GitHub
+เปิดไฟล์ `mariadb-staging-counts.sql` ด้วย Notepad คัดลอก SQL ทั้งหมดไปวาง
+phpMyAdmin → ฐาน `ratsadaa_connect` → SQL แล้วกด Go
+ที่ Query results operations เลือก Export CSV comma/ชื่อคอลัมน์เป็นแถวแรก
+ส่งออกให้ได้ครบ 63 แถว บันทึกเป็น:
+
+`H:\RD_CONNECT_BACKUP\mariadb-staging-counts.csv`
+
+จากนั้นตรวจ CSV ด้วยคำสั่ง:
+
+```powershell
+py "H:\rd-care\rd-care\scripts\check-mariadb-staging-empty.py" "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" --verify-csv "H:\RD_CONNECT_BACKUP\mariadb-staging-counts.csv"
+```
+
+ผลที่คาดหมายสำหรับฐาน **ว่าง**:
+
+```text
+TABLES: 63
+EMPTY_TABLES: 63
+NON_EMPTY_TABLES: 0
+TOTAL_TARGET_ROWS: 0
+```
+
+หากพบข้อมูลอยู่ ห้ามลบ/ล้าง/เขียนทับโดยอัตโนมัติ
+ต้องแยกให้ได้ก่อนว่ารายการนั้นมาจากไหนและฐานนี้ถูกใช้งานหรือไม่
+ไม่เรียก `school:init`, `school:install`, ไม่สั่ง TRUNCATE และไม่ปิด FK checks
+
+ตัวตรวจนี้ไม่มีฟังก์ชัน Import; ต้องตรวจ Generated/CHECK/Triggers และ
+ทดสอบการเชื่อมต่อ MariaDB ผ่านบัญชีทดลองสิทธิ์จำกัดก่อนดำเนินงานต่อ
