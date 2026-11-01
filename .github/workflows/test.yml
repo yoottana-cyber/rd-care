@@ -84,6 +84,8 @@ jobs:
           node --check web/login-route.js
           node --check web/portal-date-range.js
           node --check 'functions/api/[[path]].js'
+      - name: Offline MariaDB staging FK-ordered import plan (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_staging_import_plan_test.py' -v
       - name: Generated MariaDB unique index projection audit (synthetic)
         run: python3 -m unittest discover -s tests -p 'mariadb_generated_unique_audit_test.py' -v
       - name: Offline SQLite to MariaDB foreign key metadata audit (synthetic)
