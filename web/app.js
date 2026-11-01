@@ -518,7 +518,7 @@ function renderDashboard(){
    <div class="rd-hero-greeting"><span class="rd-hero-avatar" aria-hidden="true">👤</span>
     <div><span class="hero-chip">✦ RD CONNECT • Smart Student Care</span>
      <h2>ยินดีต้อนรับ ${esc(state.user.display_name)}</h2>
-     <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(state.date)}</p></div></div>
+     <p>ภาพรวมการดูแลช่วยเหลือนักเรียน • วันที่ ${esc(formatThaiDate(state.date))}</p></div></div>
    <button class="button" type="button" id="refreshDashboard">↻ ดูข้อมูลล่าสุด</button>
   </div>
   ${state.user?.role!=='admin'||state.advisorToday?.items?.length?
@@ -631,7 +631,7 @@ function renderDailyOverview(){
  const focus=state.students.filter(student=>['absent','leave'].includes(dailyReferenceStatus(student.id)));
  const tiles=[['present','มา','✅'],['absent','ขาด','🔴'],['leave','ลา','🔵'],['late','สาย','🟠'],['unrecorded','ยังไม่บันทึก','⚪']];
  return `<section class="daily-class-overview" aria-label="สถานะเช็กชื่อรายวันจากครูที่ปรึกษา">
-   <div class="daily-overview-heading"><div><h3>📋 เช็กชื่อรายวันของห้อง • ${esc(state.date)}</h3>
+   <div class="daily-overview-heading"><div><h3>📋 เช็กชื่อรายวันของห้อง • ${esc(formatThaiDate(state.date))}</h3>
    <p>ข้อมูลจากครูที่ปรึกษา ใช้ดูประกอบการเช็กชื่อรายคาบเท่านั้น ไม่ปรับสถานะรายคาบอัตโนมัติ</p></div>
    <span class="daily-reference-readonly">ดูข้อมูลอย่างเดียว</span></div>
    <div class="daily-overview-stats">${tiles.map(([status,label,icon])=>
@@ -651,7 +651,7 @@ function emptyRosterHint(){
   ?`<p><strong>พบว่าห้องนี้มีนักเรียนที่ลงทะเบียนอยู่ ${count} คน แต่วันเริ่มลงทะเบียนที่เร็วที่สุดคือ ${esc(first)}</strong> ซึ่งช้ากว่าวันสอนที่เลือก กรุณาเลือกวันสอนที่ตรงกับวันที่นักเรียนเริ่มเรียน หรือตรวจข้อมูลการลงทะเบียนกับแอดมิน</p>`
   :count?`<p>ห้องนี้มีนักเรียนลงทะเบียนปัจจุบัน ${count} คน แต่ไม่พบรายชื่อที่มีผลในวันที่เลือก กรุณาตรวจประวัติย้ายเข้า/ย้ายออก และวันเริ่มลงทะเบียน</p>`
   :'<p>ยังไม่พบการลงทะเบียนนักเรียนที่ใช้งานอยู่ในห้องนี้ กรุณาตรวจหน้าแอดมินและนำเข้าข้อมูลให้เรียบร้อย</p>';
- return `<div class="empty" role="status"><strong>ไม่พบรายชื่อนักเรียนที่มีผลในวันที่ ${esc(state.date)}</strong>
+ return `<div class="empty" role="status"><strong>ไม่พบรายชื่อนักเรียนที่มีผลในวันที่ ${esc(formatThaiDate(state.date))}</strong>
   ${details}<button type="button" class="button secondary" id="refreshAttendanceRoster">🔄 โหลดรายชื่ออีกครั้ง</button></div>`;
 }
 function renderAttendance(){
@@ -784,7 +784,7 @@ function renderLate(){
    <td>${r.state==='pending'?`<button class="button secondary" type="button" data-review-self="${r.id}" data-result="verified">ยืนยัน</button>
     <button class="button ghost" type="button" data-review-self="${r.id}" data-result="rejected">ปฏิเสธ</button>`:'—'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีคำขอจากนักเรียนในห้องนี้</div>'}
  </section>`:''}
- <div class="card"><h3>รายการมาสายวันที่ ${esc(state.date)}</h3>${state.lates.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สถานะ</th></tr></thead><tbody>${state.lates.map(l=>`<tr><td>${esc(l.full_name)}</td><td>${esc(l.arrived_at)}</td><td>${l.state==='verified'?'ยืนยันแล้ว':l.state==='rejected'?'ไม่อนุมัติ':'รอตรวจสอบ'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีรายการมาสายที่บันทึกแล้ว</div>'}</div></div>`);
+ <div class="card"><h3>รายการมาสายวันที่ ${esc(formatThaiDate(state.date))}</h3>${state.lates.length?`<div class="table-wrap"><table class="table"><thead><tr><th>นักเรียน</th><th>เวลา</th><th>สถานะ</th></tr></thead><tbody>${state.lates.map(l=>`<tr><td>${esc(l.full_name)}</td><td>${esc(l.arrived_at)}</td><td>${l.state==='verified'?'ยืนยันแล้ว':l.state==='rejected'?'ไม่อนุมัติ':'รอตรวจสอบ'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">ยังไม่มีรายการมาสายที่บันทึกแล้ว</div>'}</div></div>`);
  bindFilters(loadLate);
  $('#lateForm').addEventListener('submit',e=>safeRun(async()=>{
   e.preventDefault();const form=e.currentTarget,f=new FormData(form),button=form.querySelector('button');
@@ -977,7 +977,7 @@ function renderAdminStudents(){
     <h3>ประวัติการสังกัดห้อง</h3>
     ${adminTransferState.studentId===edit.id&&adminTransferState.history.length?
       `<div class="table-wrap"><table class="table"><thead><tr><th>ห้องเรียน</th><th>เลขที่</th><th>เริ่มวันที่</th><th>สิ้นสุดก่อนวันที่</th></tr></thead>
-       <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(h.start_date)}</td><td>${esc(h.end_date||'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
+       <tbody>${adminTransferState.history.map(h=>`<tr><td>${esc(h.classroom_label)}</td><td>${h.roll_no}</td><td>${esc(formatThaiDate(h.start_date))}</td><td>${esc(h.end_date?formatThaiDate(h.end_date):'ปัจจุบัน')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">ยังไม่มีประวัติเก่า</p>'}
    </section>`:''}
   <div id="pilotImportHolder"></div>
   <div id="unifiedImportHolder"></div>
