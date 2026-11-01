@@ -558,3 +558,32 @@ py "H:\rd-care\rd-care\scripts\check-mariadb-staging-empty.py" "H:\RD_CONNECT_BA
 คัดลอกไป MariaDB trigger ตรง ๆ โดยไม่กระทบ Error 1442
 ต้องทำ transactional backend พร้อมตรวจ concurrency / rollback / push
 และทดสอบฐานจำลองก่อนย้ายข้อมูลจริง
+
+
+## ขั้นตอน 12.2: จัดการ error `invalid_count_csv_header` (1 พฤศจิกายน 2569)
+
+หาก Export ผลลัพธ์จาก phpMyAdmin โดยไม่ติ๊ก Include column names in first row
+จะเป็น CSV ที่ **ไม่มี header**. สคริปต์ `check-mariadb-staging-empty.py` ล่าสุด
+รองรับ CSV ทั้งแบบมี header `TABLE_NAME,ROW_COUNT` และแบบไม่มี header
+เมื่อทุกชื่อรายการตรงกับ 63 ตารางที่ตรวจ และนับจำนวนเต็มไม่ติดลบเท่านั้น.
+รองรับอักษรเล็กใน header ด้วย แต่ไม่รับไฟล์ SQL dump หรือไฟล์ข้อมูลอื่น.
+
+หลัง GitHub Desktop → Fetch origin → Pull origin รัน:
+
+```powershell
+py "H:\\rd-care\\rd-care\\scripts\\check-mariadb-staging-empty.py" "H:\\RD_CONNECT_BACKUP\\sqlite-schema-summary.json" --verify-csv "H:\\RD_CONNECT_BACKUP\\mariadb-staging-counts.csv"
+```
+
+หากยัง `invalid_count_csv_header`: ตรวจสองบรรทัดแรกเท่านั้น (มีแต่ชื่อ table/count)
+
+```powershell
+Get-Content "H:\\RD_CONNECT_BACKUP\\mariadb-staging-counts.csv" -TotalCount 2
+```
+
+ควรได้บรรทัดแรก `TABLE_NAME,ROW_COUNT` แล้วตามด้วย `affairs_...,...`
+หรือถ้าไม่มีหัวตาราง บรรทัดแรกต้องเป็นชื่อตารางที่มีอยู่จริงตาม SQL ผลลัพธ์.
+ถ้าได้ `-- MariaDB dump` / `CREATE TABLE` / `INSERT INTO` หมายถึง Export ผิดเมนู;
+ต้อง Export จาก **Query results operations** ไม่ใช่ Export ระดับ Database.
+ถ้าเป็นไฟล์จาก Excel ต้องเลือก UTF-8 CSV comma delimiter และรักษาหัวคอลัมน์เดิม.
+
+**ยังไม่ผ่าน Emptiness Gate และ Trigger parity NO-GO** จนกว่าจะได้ CSV ผล query ครบ 63 แถว.
