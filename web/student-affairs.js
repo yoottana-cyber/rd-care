@@ -1,4 +1,5 @@
 import {scoreHistoryTables} from './score-history.js';
+import {formatThaiDate,formatThaiDateTime} from './thai-date.js';
 import {advisorManagementMarkup,resolveTeacherId,filterAdvisorRoster} from './affairs-people-table.js';
 import {createCriteriaExcelImport} from './criteria-excel-import.js';
 import {dailyAttendanceSummaryTable,attendanceRoomTable} from './affairs-attendance-table.js';
@@ -6,8 +7,7 @@ import {criteriaTableMarkup,RULE_GROUPS} from './criteria-table.js';
 // RD CONNECT • Student Affairs workbench. Only the existing staff/admin role
 // opens this workspace; backend independently checks every action.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const thDate=v=>v?new Intl.DateTimeFormat('th-TH',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric'})
- .format(new Date(v+'T00:00:00Z')):'';
+const thDate=formatThaiDate;
 const bangkokToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const types={good:'คะแนนความดี',minor:'ความผิดเล็กน้อย',moderate:'ความผิดปานกลาง',
  serious:'ความผิดร้ายแรง',very_serious:'ความผิดร้ายแรงมาก',adjustment:'ปรับพฤติกรรม'};
@@ -75,7 +75,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   };
   const autoStatus=reminderStatus?
    `<div class="card" role="status" aria-live="polite">
-     <h4>สถานะเตือนอัตโนมัติวันนี้ (${esc(reminderStatus.today)} เวลา ${esc(reminderStatus.clock)} น.)</h4>
+     <h4>สถานะเตือนอัตโนมัติวันนี้ (${esc(thDate(reminderStatus.today))} เวลา ${esc(reminderStatus.clock)} น.)</h4>
      <p>${esc(reminderReasons[reminderStatus.reason]||'กำลังตรวจสอบสถานะ')}</p>
      <p class="muted">ห้องเช็กชื่อไม่ครบ ${Number(reminderStatus.incomplete_rooms)||0} •
       รอประมวลผล ${Number(reminderStatus.pending_rooms)||0} •
@@ -408,8 +408,8 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
     <p>วันที่ ${esc(thDate(c.school_date))} • รายละเอียด: ${esc(c.details)}</p>
     ${c.conditions?`<p>เงื่อนไข: ${esc(c.conditions)}</p>`:''}
     ${c.resolution?`<p>ผลติดตาม: ${esc(c.resolution)}</p>`:''}
-    <p class="muted">ผู้บันทึก ${esc(c.recorder_name)} • แจ้งผู้ปกครอง ${esc(c.guardian_informed_date||'ยังไม่บันทึก')}
-    • ผู้ปกครองรับทราบ ${esc(c.guardian_ack_date||'ยังไม่บันทึก')}</p>
+    <p class="muted">ผู้บันทึก ${esc(c.recorder_name)} • แจ้งผู้ปกครอง ${esc(c.guardian_informed_date?thDate(c.guardian_informed_date):'ยังไม่บันทึก')}
+    • ผู้ปกครองรับทราบ ${esc(c.guardian_ack_date?thDate(c.guardian_ack_date):'ยังไม่บันทึก')}</p>
    </article>`).join(''):'<p class="empty">ยังไม่มีมาตรการภาคทัณฑ์หรือทัณฑ์บน</p>'}
   </section></div>`:''}`;
  async function redrawScorePage(){
@@ -640,7 +640,7 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
   <section class="card stack rd-affairs-message-history"><h3>ประวัติข้อความที่ฉันส่ง</h3>
    ${state.messageSent.length?state.messageSent.map(x=>`<article class="rd-affairs-message-item">
     <strong>${esc(x.subject)}</strong><small>${esc(x.full_name)} • ${esc(x.student_no)} • ${esc(x.classroom_label||'')}</small>
-    <p>${esc(x.body)}</p><small>${esc(x.created_at)} •
+    <p>${esc(x.body)}</p><small>${esc(formatThaiDateTime(x.created_at))} •
     ${x.read_at?'นักเรียนอ่านแล้ว':Number(x.push_delivered)>0?'Push ตอบรับแล้ว • ยังไม่อ่าน':'บันทึกในแอปแล้ว • ยังไม่อ่าน'}</small>
    </article>`).join(''):'<p class="empty">ยังไม่มีประวัติส่งข้อความ</p>'}</section>`);
   bind('#affairsMessageSearch','submit',async e=>{
@@ -727,8 +727,8 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
        <div class="row between"><strong>${c.measure==='probation'?'ทัณฑ์บน':'ภาคทัณฑ์'}</strong><span class="tag">${esc(c.state)}</span></div>
        <p>${esc(thDate(c.school_date))} • ${esc(c.details)}</p>
        ${c.conditions?`<p class="muted">เงื่อนไข: ${esc(c.conditions)}</p>`:''}
-       <p class="muted">ผู้บันทึก: ${esc(c.recorder_name)} • แจ้งผู้ปกครอง: ${esc(c.guardian_informed_date||'ยังไม่บันทึก')}
-        • รับทราบ: ${esc(c.guardian_ack_date||'ยังไม่บันทึก')}</p>
+       <p class="muted">ผู้บันทึก: ${esc(c.recorder_name)} • แจ้งผู้ปกครอง: ${esc(c.guardian_informed_date?thDate(c.guardian_informed_date):'ยังไม่บันทึก')}
+        • รับทราบ: ${esc(c.guardian_ack_date?thDate(c.guardian_ack_date):'ยังไม่บันทึก')}</p>
        <form class="stack" data-affairs-review="${c.id}">
         <div class="row"><div class="field"><label>สถานะ</label><select name="state">
          ${[['active','ดำเนินการอยู่'],['resolved','เสร็จสิ้น'],['cancelled','ยกเลิก']].map(([v,label])=>
@@ -742,11 +742,11 @@ export function createStudentAffairs({api,mount,safeRun,toast,rooms}){
      </section>
      <section class="card stack"><h3>ประวัติคะแนนพฤติกรรมและการปรับพฤติกรรม</h3>
       ${(state.score?.items||[]).filter(e=>e.score_type!=='good').map(e=>`<div class="rd-affairs-score">
-       <strong>${formatScore(e.points)}</strong><span>${esc(e.score_type==='adjustment'?'ปรับพฤติกรรม':'ความผิด')} • ${esc(e.reason)}</span><small>${esc(e.created_at)}</small></div>`).join('')||'<p class="empty">ยังไม่มีรายการ</p>'}
+       <strong>${formatScore(e.points)}</strong><span>${esc(e.score_type==='adjustment'?'ปรับพฤติกรรม':'ความผิด')} • ${esc(e.reason)}</span><small>${esc(formatThaiDateTime(e.created_at))}</small></div>`).join('')||'<p class="empty">ยังไม่มีรายการ</p>'}
      </section>
      <section class="card stack"><h3>ประวัติคะแนนความดี (แยกต่างหาก)</h3>
       ${(state.score?.items||[]).filter(e=>e.score_type==='good').map(e=>`<div class="rd-affairs-score">
-       <strong>+${Number(e.points)}</strong><span>${esc(e.reason)}</span><small>${esc(e.created_at)}</small></div>`).join('')||'<p class="empty">ยังไม่มีรายการความดี</p>'}
+       <strong>+${Number(e.points)}</strong><span>${esc(e.reason)}</span><small>${esc(formatThaiDateTime(e.created_at))}</small></div>`).join('')||'<p class="empty">ยังไม่มีรายการความดี</p>'}
      </section>`:''}`);
   bind('#affairsStudentSearch','submit',async e=>{
    e.preventDefault();const query=String(new FormData(e.currentTarget).get('query')).trim();
