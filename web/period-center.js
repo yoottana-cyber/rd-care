@@ -1,5 +1,6 @@
 // Modern period attendance hub: interactive weekly timetable + course-based reports.
 import {periodClockRows,lessonClockLabel} from './period-clock.js';
+import {formatThaiDate,formatThaiDateTime} from './thai-date.js';
 // No sample student data; all counts and events come from authenticated RD CONNECT APIs.
 const days=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
 const shortDays=['จ.','อ.','พ.','พฤ.','ศ.','ส.','อา.'];
@@ -180,11 +181,11 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
     <button type="button" id="closePeriodDetail" class="button ghost">ปิดรายละเอียด</button></div>
     <div class="teaching-log-history"><h4>📝 บันทึกการสอนย้อนหลัง (${teachingLogs.length} รายการ)</h4>
     ${teachingLogs.length?teachingLogs.map(log=>`<article class="teaching-log-item">
-     <div><strong>${esc(log.school_date)}</strong><span class="muted">บันทึก/แก้ไขล่าสุด ${esc(log.updated_at||'')}</span></div>
+     <div><strong>${esc(formatThaiDate(log.school_date))}</strong><span class="muted">บันทึก/แก้ไขล่าสุด ${esc(log.updated_at?formatThaiDateTime(log.updated_at):'—')}</span></div>
      <p>${esc(log.note)}</p></article>`).join(''):'<p class="muted">ไม่มีบันทึกการสอนในช่วงวันที่เลือก (การบันทึกส่วนนี้ไม่บังคับ)</p>'}</div>
     <h4>รายชื่อนักเรียนที่ต้องติดตาม</h4>
     <div class="table-wrap"><table class="table"><thead><tr><th>วันที่</th><th>เลขที่</th><th>รหัสนักเรียน</th><th>ชื่อ-สกุล</th><th>สถานะ</th></tr></thead>
-     <tbody>${details.length?details.map(x=>`<tr><td>${esc(x.school_date)}</td><td>${number(x.roll_no)}</td><td>${esc(x.student_no)}</td><td>${esc(x.full_name)}</td>
+     <tbody>${details.length?details.map(x=>`<tr><td>${esc(formatThaiDate(x.school_date))}</td><td>${number(x.roll_no)}</td><td>${esc(x.student_no)}</td><td>${esc(x.full_name)}</td>
      <td><span class="period-event period-event-${esc(x.status)}">${esc(statusName[x.status]||x.status)}</span></td></tr>`).join(''):'<tr><td colspan="5" class="empty">ไม่มีรายการไม่เข้าคาบ มาสาย หรือลา ในช่วงวันที่นี้</td></tr>'}</tbody></table></div>
      ${detailLimited?'<p class="warn">รายการมีจำนวนมาก แสดงสูงสุด 500 รายการ โปรดเลือกช่วงวันที่ให้แคบลง</p>':''}</section>`:''}
    </section>`);
