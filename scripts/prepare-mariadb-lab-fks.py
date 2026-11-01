@@ -197,7 +197,7 @@ def prepare_alters(groups, tables):
         "-- MariaDB LAB ONLY: manual execution AFTER exact 63-table empty gate.\n"
         "-- DDL auto-commits: partial failures require manual review.\n"
         "-- Never execute against ratsadaa_connect (staging) or live SQLite.\n"
-        "-- DO NOT SET FOREIGN_KEY_CHECKS=0, DO NOT DROP tables.\n"
+        "-- Preserve all FK checks; no DROP or data-changing statements.\n"
         +"\n".join(statement)+"\n"
     )
 
