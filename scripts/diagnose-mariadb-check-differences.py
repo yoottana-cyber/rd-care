@@ -58,7 +58,7 @@ def syntax_features(sql):
     labels = set()
     for pattern in INTERESTING:
         terms = pattern.split()
-        regex = r"\\b" + r"\\s+".join(map(re.escape, terms)) + r"\\b"
+        regex = r"\b" + r"\s+".join(map(re.escape, terms)) + r"\b"
         if re.search(regex, text):
             labels.add(pattern.upper().replace(" ", "_"))
     if "||" in text:
