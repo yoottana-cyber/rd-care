@@ -74,3 +74,40 @@ py "H:\rd-care\rd-care\scripts\sqlite-backup-inventory.py" "H:\RD_CONNECT_BACKUP
    ทดสอบ import/reconcile/rollback และผ่านการตรวจสิทธิ์/การเชื่อมต่อ
 6. ข้อมูล SQLite อาจเปลี่ยนหลังช่วงเวลา Backup; การสลับระบบจริงต้องมี
    ช่วงหยุดการเขียนและ snapshot ล่าสุดอีกครั้ง
+
+## ขั้นตอน 4: เปรียบเทียบชื่อ 63 ตารางและคอลัมน์กับ MariaDB
+
+เมื่อตรวจ SQLite ได้ `INTEGRITY: OK | FOREIGN KEYS: OK` ให้สร้างรายงานโครงสร้างจาก Backup
+ด้วย PowerShell โดยปรับชื่อไฟล์สำรองให้ตรงกับไฟล์จริง:
+
+```powershell
+py "H:\rd-care\rd-care\scripts\sqlite-backup-inventory.py" "H:\RD_CONNECT_BACKUP\rd-connect-2026-11-01T03-22-03-873Z-8904c1cdef.sqlite" --report "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json"
+```
+
+ใน phpMyAdmin เลือก `ratsadaa_connect` → SQL แล้วรันคำสั่ง **อ่านอย่างเดียว**:
+
+```sql
+SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE, EXTRA
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = 'ratsadaa_connect'
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
+```
+
+ที่ผลลัพธ์ เลือก Query results operations → Export → CSV (ใช้ comma เป็นตัวคั่น
+และรวมบรรทัดหัวคอลัมน์ `TABLE_NAME,COLUMN_NAME,DATA_TYPE,IS_NULLABLE,EXTRA`).
+บันทึกเป็น `H:\RD_CONNECT_BACKUP\mariadb-columns.csv`.
+CSV นี้มีเฉพาะ metadata โครงสร้าง ไม่มีข้อมูลนักเรียน.
+
+เปรียบเทียบโครงสร้างแบบออฟไลน์บนเครื่องคอมพิวเตอร์:
+
+```powershell
+py "H:\rd-care\rd-care\scripts\compare-mariadb-schema.py" "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-columns.csv"
+```
+
+- `TABLE/COLUMN NAMES: MATCH` หมายถึงชื่อตาราง/คอลัมน์ตรงกัน
+- `MISMATCH` แสดงชื่อตาราง/คอลัมน์ที่ขาดหรือเกิน
+- `SCHEMA CHECK BLOCKED` หมายถึงไฟล์ metadata ไม่ครบหรือ CSV ผิดรูปแบบ
+
+**การที่ชื่อคอลัมน์ตรงกันยังไม่รับรองการย้ายข้อมูล** ต้องตรวจชนิดข้อมูล,
+defaults, PK/FK, unique/indexes, triggers, ความสัมพันธ์, ค่ารหัสผ่าน,
+ข้อกำหนด transactions และทดสอบนำเข้าฐานทดลองก่อนเปลี่ยนระบบจริง.
