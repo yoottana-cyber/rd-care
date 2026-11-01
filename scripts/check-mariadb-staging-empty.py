@@ -72,12 +72,12 @@ def verify_csv(tables, csv_path):
             raise ValueError("count_csv_empty")
         fields = [value.strip().strip("\ufeff") for value in first]
         if len(fields) != 2:
-            if len(fields) == 1 and (";" in fields[0] or "\t" in fields[0]):
-                raise ValueError("count_csv_delimiter_should_be_comma")
             if fields and fields[0].lstrip().upper().startswith(
                 ("--", "/*", "SELECT ", "CREATE ", "INSERT ", "#")
             ):
                 raise ValueError("count_csv_is_sql_not_results")
+            if len(fields) == 1 and (";" in fields[0] or "\t" in fields[0]):
+                raise ValueError("count_csv_delimiter_should_be_comma")
             raise ValueError("invalid_count_csv_header")
         header = [value.upper() for value in fields]
         if header == ["TABLE_NAME", "ROW_COUNT"]:
