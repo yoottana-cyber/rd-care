@@ -49,6 +49,15 @@ class BackupInventoryTests(unittest.TestCase):
             self.assertNotIn("SECRET-SALT-HASH", output)
             self.assertIn("full_name", output)
 
+    def test_reports_missing_or_truncated_backup(self):
+        with tempfile.TemporaryDirectory() as root:
+            missing = Path(root) / "rd-connect-2026-11-01T03-22-03-873Z-test.sqlite"
+            with self.assertRaisesRegex(ValueError, "backup_file_not_found"):
+                module.inspect_backup(str(missing))
+            missing.write_bytes(b"short")
+            with self.assertRaisesRegex(ValueError, "backup_file_too_small"):
+                module.inspect_backup(str(missing))
+
     def test_rejects_live_database_name(self):
         with tempfile.TemporaryDirectory() as root:
             source = Path(root) / "rd-connect.sqlite"
