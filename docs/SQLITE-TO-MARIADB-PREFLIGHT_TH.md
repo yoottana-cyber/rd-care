@@ -587,3 +587,43 @@ Get-Content "H:\\RD_CONNECT_BACKUP\\mariadb-staging-counts.csv" -TotalCount 2
 ถ้าเป็นไฟล์จาก Excel ต้องเลือก UTF-8 CSV comma delimiter และรักษาหัวคอลัมน์เดิม.
 
 **ยังไม่ผ่าน Emptiness Gate และ Trigger parity NO-GO** จนกว่าจะได้ CSV ผล query ครบ 63 แถว.
+
+
+## ขั้นตอน 14: ผลฐานว่างผ่าน และตรวจ CHECK รายเงื่อนไข (1 พ.ย. 2569)
+
+รับผลจาก phpMyAdmin exact COUNT ของฐาน `ratsadaa_connect` แล้ว:
+
+- `TABLES: 63`
+- `EMPTY_TABLES: 63`
+- `NON_EMPTY_TABLES: 0`
+- `TOTAL_TARGET_ROWS: 0`
+
+**นี่เป็นผลจากเวลาที่ตรวจเท่านั้น** ไม่ได้ยืนยันว่าฐานจะยังว่าง ณ เวลา Import หรือว่าฐานนี้แยกจากทุกบริการโดยสมบูรณ์ ต้องตรวจอีกครั้งก่อนมีการเขียนใด ๆ
+
+จุดค้างสำคัญ: SQLite Triggers 10 / MariaDB Triggers 0
+และ CHECK 101/101 เท่ากันเฉพาะ **จำนวน** ยังไม่ใช่ความเท่าเทียมของกฎ
+
+เพิ่ม `scripts/audit-mariadb-check-parity.py` ให้ตรวจเงื่อนไข CHECK รายตาราง
+โดยอ่าน SQLite Backup แบบ immutable, metadata CSV เดิม, ไม่เชื่อมต่อฐานใด
+และไม่พิมพ์ค่าของแถวนักเรียน:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+if (-not $backup) { throw "ไม่พบ SQLite Backup ที่ตรวจสอบแล้ว" }
+
+py "H:\rd-care\rd-care\scripts\audit-mariadb-check-parity.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-constraints.csv"
+```
+
+คำสั่งนี้มี `PER_TABLE_COUNT_MISMATCHES`,
+`EXACT_NORMALIZED_TEXT_MATCHES`, `UNMATCHED_SQLITE_CHECKS`
+และ `UNMATCHED_MARIADB_CHECKS`.
+**แม้ `EXACT_NORMALIZED_TEXT_MATCHES: 101` ก็ยังไม่พิสูจน์ semantics**
+อาจต่างกันที่ collations, numeric coercion, NULL, SQLite GLOB และ MariaDB regexp
+จึงต้องทดสอบพฤติกรรมด้วย synthetic data บนฐาน lab ที่แยกจริง
+
+ขั้นถัดไปหลังได้ผล CHECK: วางแผน transactional MariaDB backend
+รักษาพฤติกรรม Trigger ทั้ง 10 ตาม `docs/MARIADB-TRIGGER-PARITY_TH.md`,
+สร้าง lab ไม่ผูกกับเว็บจริง, ทดสอบ rollback/concurrency/idempotency.
+`IMPORT_AUTHORIZED: NO` / `CUTOVER_AUTHORIZED: NO` จนกว่าจะผ่านทั้งหมด
