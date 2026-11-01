@@ -140,3 +140,51 @@ py "H:\rd-care\rd-care\scripts\audit-sqlite-datetime.py" $backup.FullName "H:\RD
 แม้ผลตรวจเป็นศูนย์ทั้งหมด ก็ยังไม่อนุญาตให้นำเข้าจริงโดยอัตโนมัติ
 ต้องทดสอบชนิด/ความยาวข้อมูล, FK/Unique, trigger และการกู้คืนบนฐานทดลองก่อน
 อย่าส่ง SQLite Backup หรือไฟล์ข้อมูลส่วนบุคคลไปยัง GitHub หรือแชต
+
+## ขั้นตอน 6: ตรวจความยาวข้อมูลจริง ความเป็น NULL และตัวเลขเกินช่วงรับได้
+
+เมื่อรายงานวันที่เวลาผ่านแล้ว (75 คอลัมน์, INVALID=0, NULL_VIOLATION=0)
+ให้ Export **metadata** คอลัมน์ MariaDB แบบขยายอีก 1 ไฟล์
+จาก phpMyAdmin → ฐาน `ratsadaa_connect` → SQL:
+
+```sql
+SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, EXTRA,
+       CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE, DATETIME_PRECISION
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = 'ratsadaa_connect'
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
+```
+
+ใต้ผล SQL เลือก Export CSV, comma separator, มีหัวคอลัมน์ในบรรทัดแรก,
+เลือก **Dump all rows** (คาดว่า 456 แถว) แล้วบันทึก:
+
+`H:\RD_CONNECT_BACKUP\mariadb-columns-extended.csv`
+
+อัปเดต GitHub Desktop → Fetch origin → Pull origin
+
+เปิด PowerShell (ใช้ Backup สำเนาเดิมที่มีชื่อวันที่ในชื่อไฟล์):
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์สำรอง SQLite" }
+py "H:\rd-care\rd-care\scripts\audit-sqlite-mariadb-data-fit.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-columns-extended.csv"
+```
+
+ผลรายงานแสดงเฉพาะจำนวนและชื่อคอลัมน์ (ไม่แสดงค่า, ชื่อนักเรียน, username
+หรือ hash ของบัญชี):
+
+- `NOT_NULL` = ค่า NULL ที่ปลายทางไม่อนุญาต
+- `LENGTH` = ข้อความ/ข้อมูลไบนารีมีขนาดเกินคอลัมน์ปลายทาง
+- `RANGE` = ค่าจำนวนเต็มเกินช่วงของ integer ปลายทาง
+- `TYPE` = ประเภทข้อมูลใน SQLite ไม่ตรงกับชนิดของ MariaDB
+- `UNSUPPORTED_COLUMNS` = จำนวนช่องที่ยังไม่ได้รับการตรวจในสคริปต์นี้
+  (เช่น DATETIME ที่ตรวจด้วยสคริปต์ก่อนหน้า) ไม่ใช่ข้อผิดพลาดโดยตรง
+
+สคริปต์ตรวจทุกแถวของทุกตารางที่ชื่อเหมือนกันและเปรียบเทียบจำนวนแถวกับ
+รายงาน SQLite เดิม; ตัด `school_schema_migrations` ออกจากรายการข้อมูล
+และข้าม Generated Columns 5 ช่องของ MariaDB
+
+**ยังไม่สั่งนำเข้าข้อมูลจริง** หลังผ่านขั้นนี้ต้องตรวจ Unique/Foreign Key,
+Collation, CHECK, Generated Expressions และการจำลอง INSERT ใน MariaDB
+บนฐานทดลองที่ไม่กระทบ Production ก่อนเปลี่ยนระบบ
