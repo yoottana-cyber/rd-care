@@ -333,3 +333,46 @@ py "H:\rd-care\rd-care\scripts\audit-mariadb-foreign-keys.py" $backup.FullName "
 แม้ผ่าน ยังไม่ได้พิสูจน์ว่ารัน `PRAGMA defer_foreign_keys=ON`
 ระหว่างทำงานจริงหรือไม่ จึงต้องตรวจการเชื่อมต่อ/ธุรกรรมและทดสอบ
 FK ภายในฐาน MariaDB สำรอง (ไม่ใช่ฐาน Live) ก่อน Import จริง
+
+## ขั้นตอน 9: ตรวจ Generated UNIQUE Index 3 รายการจาก SQLite Backup
+
+ผล FK ล่าสุด: SQLite 119 / MariaDB 119; NO ACTION/RESTRICT aliases 119;
+SQLite DEFERRABLE declarations = 0; missing / extra relationships = 0.
+
+หลัง GitHub Desktop → Fetch origin → Pull origin ให้ใช้ไฟล์เดิมทั้งหมด
+โดยไม่ต้อง Export จาก phpMyAdmin ใหม่:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์สำรอง SQLite" }
+py "H:\rd-care\rd-care\scripts\audit-mariadb-generated-unique.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-columns-extended.csv" "H:\RD_CONNECT_BACKUP\mariadb-indexes.csv"
+```
+
+เครื่องมือนี้ตรวจคีย์อ้างอิงจาก SQLite ตามกฎที่คาดหมายสำหรับ 3 ดัชนี
+
+- `students(live_classroom_id,live_roll_no)`: ตรวจ `(classroom_id,roll_no)`
+  เฉพาะแถวที่ `deleted_at IS NULL`
+- `student_enrollments(current_student_id)`: ตรวจ `student_id`
+  เฉพาะแถวที่ `end_date IS NULL`
+- `student_enrollments(current_classroom_id,current_roll_no)`:
+  ตรวจ `(classroom_id,roll_no)` เฉพาะแถวที่ `end_date IS NULL`
+
+รายงานจะแสดงจำนวนดัชนีที่ตรงตามกฎ/ดัชนีที่ไม่รู้จัก และจำนวนคีย์
+ที่ซ้ำกัน; **ไม่แสดง student_id, roll_no, ชื่อหรือข้อมูลรายคน**
+
+สิ่งสำคัญ: นี่คือการตรวจ **ค่าที่คาดว่าคอลัมน์ Generated จะสร้าง**
+ไม่ใช่การพิสูจน์ว่า `GENERATION_EXPRESSION` จริงใน MariaDB ตรงกัน
+ทุกประการ ต้องตรวจ SQL metadata เพิ่มก่อนตัดสินใจ Import:
+
+```sql
+SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, EXTRA, GENERATION_EXPRESSION
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = 'ratsadaa_connect'
+  AND LOWER(EXTRA) LIKE '%generated%'
+ORDER BY TABLE_NAME, ORDINAL_POSITION;
+```
+
+เครื่องมือนี้ไม่มีคำสั่ง INSERT/ALTER/DROP และไม่ได้แตะ DB ที่โรงเรียน
+ยังไม่รับรอง foreign key transactions, collation, check constraints, trigger
+หรือการย้ายข้อมูลจำนวนมาก; ต้องจำลอง import ใน MariaDB แยกจาก Production ต่อไป
