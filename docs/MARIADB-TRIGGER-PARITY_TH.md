@@ -88,3 +88,48 @@ CHECK semantic/collation, FK/lock, transaction integration tests และ impor
 ฐาน ratsadaa_connect ที่ตรวจว่าง 63/63 ตารางยังไม่ใช่ lab สำหรับเขียนทดสอบ.
 
 สถานะคงเดิม: IMPORT_AUTHORIZED=NO, CUTOVER_AUTHORIZED=NO.
+
+## ขั้น Lab-only Transaction Prototype — 1 พฤศจิกายน 2569
+
+เพิ่มโมดูลไม่ผูกเข้ากับ app.js / school-hosting/server.cjs:
+
+- school-hosting/mariadb-parity/lab-transaction.cjs
+- school-hosting/mariadb-parity/manual-conduct-transaction.cjs
+- school-hosting/test/mariadb-lab-transaction.test.cjs
+- school-hosting/test/mariadb-manual-conduct-transaction.test.cjs
+
+ข้อจำกัดความปลอดภัย:
+
+- รับ connection แบบ mysql2/promise จากผู้เรียกเท่านั้น; โค้ดไม่สร้าง pool,
+  ไม่อ่านรหัสผ่านจาก Environment, ไม่เปิด network และไม่มี route ให้เว็บจริง
+- ต้องยืนยันชื่อฐานผ่าน SELECT DATABASE() ตรงกับ ratsadaa_connect_lab เท่านั้น
+  ปฏิเสธ ratsadaa_connect (staging เดิม) และชื่ออื่นทั้งหมด
+- ก่อน BEGIN และขณะ Transaction ตรวจ FOREIGN_KEY_CHECKS=1 กับ UNIQUE_CHECKS=1
+  ไม่มีการปิด constraint checks, ไม่มี TRUNCATE, ไม่มี Import/ALTER/DROP
+- ต้องระบุ confirmation เฉพาะ Lab และใช้ connection เดียวกันจน COMMIT/ROLLBACK
+- ตรวจ actor ใน users + student_affairs_assignments, ตรวจ room/advisor/advisor2
+  หรือ timetable active ภายใน transaction, ล็อก students.id FOR UPDATE
+- อ่านกฎคะแนนที่เปิดใช้และไม่ถูก archive, ปฏิเสธ managed truancy rule
+- นับ incident ภายใต้ student lock, คำนวณเตือน/หักจาก conduct-contract
+- ตรวจ request_id+student_id ก่อน INSERT, ป้องกัน replay ที่มี reason/rule/actor ต่าง
+- INSERT behavior_incidents; หาก points_applied !=0 จึง INSERT behavior_records
+  โดยเลือก created_at ของ incident เดิม, UPDATE incident.behavior_record_id
+- INSERT audit_log และ event ลง behavior_score_push_events ใน Transaction เดียว
+  โดยไม่ dispatch Push ระหว่าง Transaction หรือโดยโมดูลนี้
+- ถ้า SQL ผิดพลาด ROLLBACK; ถ้า COMMIT ไม่แน่ชัด ห้าม retry อัตโนมัติ
+- ถ้ามี Trigger ที่เกี่ยวกับ behavior อยู่ใน MariaDB Lab ให้หยุด
+  เพื่อไม่เสี่ยงสร้างคะแนน/แจ้งเตือนซ้ำ
+
+**ทดสอบโดย mock connection เท่านั้น:** warning, deduction, audit/outbox
+ภายในการ commit เดียว, duplicate request ไม่สร้างข้อมูลซ้ำ,
+unauthorized, failed statement rollback, wrong schema blocked, FK/UNIQUE off
+blocked, commit uncertainty. ยังไม่ได้ทดสอบจริงกับ MariaDB engine
+
+ยังไม่รองรับ record date ที่ผู้ใช้เลือก, bulk conduct, undo/restore
+จริงบน DB, period truancy write path, outbox dispatcher หรือ reconnect retry.
+โมดูลจะปฏิเสธ selected history date แทนการนำเข้าด้วยวันผิด
+
+**ยังไม่ใช่ Production Adapter และไม่อนุญาต Import/Cutover.**
+ต้องสร้างฐาน Lab แยกพร้อม synthetic schema และ MariaDB connection
+ที่ได้รับอนุมัติก่อนถึงจะเปิด real DB integration test ได้
+และต้องเก็บฐาน ratsadaa_connect ที่ยังว่างไว้โดยไม่เขียนทับ
