@@ -61,7 +61,7 @@ test('runs on single verified lab connection, commits once after work',async()=>
  assert.deepEqual(steps(c),['begin','commit']);
  const queries=c.log.filter(x=>x[0]==='query');
  assert.equal(queries.filter(x=>x[1].startsWith('SELECT DATABASE()')).length,3);
- assert.equal(queries[3][1],'INSERT INTO lab_fake VALUES (?)');
+ assert.equal(queries[2][1],'INSERT INTO lab_fake VALUES (?)');
 });
 test('rolls back a partial write and never commits it',async()=>{
  const c=makeConnection({failQuery:true});
