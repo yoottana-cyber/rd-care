@@ -1,4 +1,5 @@
 import {API_BASE_URL} from './config.js';
+import {formatThaiDate} from './thai-date.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
@@ -843,7 +844,7 @@ async function loadAdvisorCenter(){
  const truancy=(urgent.items||[]).filter(e=>Number(e.classroom_id)===selected);
  const focusHtml=focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
   <h3>🔔 รายละเอียดแจ้งเตือน${focus.kind==='attendance_review'?'ขาดรายคาบรอตรวจสอบ':'หนีเรียน'}</h3><strong>${esc(focus.full_name)}</strong>
-  <p>ห้อง ${esc(focus.classroom_label)} • วันที่ ${esc(focus.school_date)} • คาบ ${esc(focus.period)} • วิชา ${esc(focus.subject)}</p>
+  <p>ห้อง ${esc(focus.classroom_label)} • วันที่ ${esc(formatThaiDate(focus.school_date))} • คาบ ${esc(focus.period)} • วิชา ${esc(focus.subject)}</p>
   <p class="muted">${focus.kind==='attendance_review'?'รายการนี้รอครูที่ปรึกษาพิจารณา':'โปรดตรวจสอบข้อเท็จจริงของเหตุการณ์กับนักเรียน'}</p>
   ${focus.kind==='attendance_review'?`<div class="row">
    <button class="button secondary" data-advisor-review="${Number(focus.id)}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต / บันทึกผิด</button>
@@ -858,12 +859,12 @@ async function loadAdvisorCenter(){
  <section class="card stack"><h3>🚨 รายการหนีเรียนที่ครูบันทึก</h3>
  <p class="muted">แสดงเหตุการณ์จากครูผู้สอนที่แจ้งทันที แม้นักเรียนขาดรายวันแล้ว • ตรวจสอบข้อเท็จจริงและประสานผู้ปกครอง</p>
  ${truancy.length?truancy.map(e=>`<div class="alert-item">
-  <strong>${esc(e.full_name)}</strong><p class="muted">${esc(e.school_date)} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
+  <strong>${esc(e.full_name)}</strong><p class="muted">${esc(formatThaiDate(e.school_date))} • คาบ ${esc(e.period)} • ${esc(e.subject)}</p>
   <span class="tag">หนีเรียน — ระบบจะส่ง Push ไปยังอุปกรณ์ที่เปิดรับและพร้อมใช้งาน</span>
  </div>`).join(''):'<p class="muted">ไม่มีรายการหนีเรียนที่กำลังใช้งานใน 30 วันที่ผ่านมา</p>'}</section>
  <section class="card stack"><h3>รายการรอการพิจารณา (ขาดรายคาบปกติ)</h3>
  ${items.length?items.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong>
- <p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
+ <p class="muted">${esc(formatThaiDate(a.school_date))} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-advisor-review="${a.id}" data-state="resolved" type="button">มีเหตุได้รับอนุญาต/บันทึกผิด</button><button class="button" data-advisor-review="${a.id}" data-state="confirmed" type="button">ยืนยันไม่เข้าคาบ</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการที่รอการตรวจสอบ</div>'}</section>
  <p class="muted">แจ้งผู้ปกครองผ่าน Push สำหรับเหตุหนีเรียนและมาสายที่บันทึกผ่าน QR โดยส่งเฉพาะอุปกรณ์ที่สมัครรับแล้ว</p></section>`);
  if(focus)$('#pushNoticeFocus')?.scrollIntoView({block:'start'});
@@ -894,7 +895,7 @@ async function loadAlerts(){
 }
 function renderAlerts(){mount(`<div class="stack"><div><h2>ศูนย์ตรวจสอบการขาดเรียน</h2><p class="muted">ครูที่ปรึกษายืนยันก่อนสรุปว่าไม่มีเหตุที่ได้รับอนุญาต</p></div><div class="card stack">${filters({date:false,advisorOnly:true})}
  <div class="warn">นักเรียนที่ขาดรายวันแล้วจะไม่ถูกแจ้งขาดรายคาบซ้ำ • รายการขาดปกติจะไม่ส่ง Push ถึงผู้ปกครอง</div>
- ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(a.school_date)} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
+ ${state.alerts.length?state.alerts.map(a=>`<div class="alert-item"><div class="row between"><div><strong>${esc(a.full_name)}</strong><p class="muted">${esc(formatThaiDate(a.school_date))} • คาบ ${a.period} • ${esc(a.subject)}</p></div><span class="tag">รอตรวจสอบ</span></div>
  <div class="row"><button class="button secondary" data-review="${a.id}" data-state="resolved">มีเหตุ/บันทึกผิด</button><button class="button" data-review="${a.id}" data-state="confirmed">ยืนยันไม่เข้าชั้นเรียน</button></div></div>`).join(''):'<div class="empty">ไม่มีรายการรอตรวจสอบ</div>'}</div></div>`);
  bindFilters(loadAlerts);
  $$('[data-review]').forEach(button=>button.addEventListener('click',()=>safeRun(async()=>{if(!confirm(button.dataset.state==='confirmed'?'ยืนยันการไม่เข้าชั้นเรียน? (การยืนยันขาดปกติไม่ส่ง Push ถึงผู้ปกครอง)':'ยืนยันว่ามีเหตุได้รับอนุญาตหรือบันทึกผิด?'))return;await api(`/api/alerts/${button.dataset.review}/review`,{method:'POST',body:{state:button.dataset.state}});toast('บันทึกผลการตรวจสอบแล้ว');await loadAlerts()})));
