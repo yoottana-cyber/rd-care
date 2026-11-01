@@ -1,3 +1,4 @@
+import {formatThaiDate} from './thai-date.js';
 // RD CONNECT teacher dashboard: assigned homerooms and daily progress.
 // Presentation only. All room-scoping and counts are authorized by the API.
 const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -35,7 +36,7 @@ export function teacherDailyWorkMarkup(result,{date='',unavailable=false}={}){
  }).join('');
  return '<section class="card rd-teacher-today" aria-label="งานเช็กชื่อของครู">'+
   '<div class="rd-teacher-today-heading"><div><h3>📋 งานเช็กชื่อของฉัน</h3>'+
-  '<p class="muted">เฉพาะห้องที่ได้รับมอบหมายเป็นครูที่ปรึกษา • วันที่ '+esc(date)+
+  '<p class="muted">เฉพาะห้องที่ได้รับมอบหมายเป็นครูที่ปรึกษา • วันที่ '+esc(formatThaiDate(date))+
   ' • ข้อมูลที่บันทึกบนเซิร์ฟเวอร์</p></div>'+
   '<span class="rd-teacher-today-counter" role="status">'+stats.complete+' / '+stats.withStudents+
   ' ห้องเช็กครบ</span></div>'+
