@@ -1,4 +1,5 @@
 import {API_BASE_URL} from './config.js';
+import {formatThaiDate} from './thai-date.js';
 import {bindThemeButtons} from './theme.js';
 import {readAuthSession,saveAuthSession,clearAuthSession,setLastLoginArea,shouldRenewAuthSession,extendAuthSession,isPersonalMobileDevice} from './auth-session.js';
 import {createGuardianPush,createPortalPush} from './guardian-push.js';
@@ -77,12 +78,7 @@ export function createPortalUi({root,onStaffLogin,onLegacyLateReport,onInstallAp
    if(status)status.textContent='QR Code นี้ไม่ใช่ QR ลงชื่อมาสายของโรงเรียน กรุณาสแกนแผ่นที่จุดครูเวร';
   }
  });
- const portalDate=value=>{
-  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return String(value||'');
-  const d=new Date(value+'T00:00:00Z');
-  return Number.isNaN(d.getTime())?value:new Intl.DateTimeFormat('th-TH',{
-   timeZone:'UTC',day:'numeric',month:'short',year:'numeric'}).format(d);
- };
+ const portalDate=value=>formatThaiDate(value);
  const statusTone=value=>['present','verified'].includes(value)?'positive':
   ['late','pending'].includes(value)?'attention':['absent','truancy'].includes(value)?'critical':'neutral';
  const statusLabel=value=>thaiStatus[value]||({verified:'ยืนยันแล้ว',pending:'รอตรวจสอบ',rejected:'ไม่อนุมัติ'}[value])||value||'—';
