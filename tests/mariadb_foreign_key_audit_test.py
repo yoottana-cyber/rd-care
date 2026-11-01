@@ -101,6 +101,40 @@ class ForeignKeyAuditTests(unittest.TestCase):
         self.assertIn("DELETE=RESTRICT",report["missing"][0])
         self.assertIn("DELETE=CASCADE",report["extra"][0])
 
+    def test_mariadb_restrict_is_alias_of_sqlite_no_action_for_immediate_fk(self):
+        self.fkrows[1]["UPDATE_RULE"] = "RESTRICT"
+        self.write_csv()
+        src = module.source_constraints(
+            self.backup, module.validate_manifest(self.inventory))
+        dest, *unused = module.target_constraints(self.fkcsv)
+        report = module.analyze(src, dest)
+        self.assertEqual(report["missing"], [])
+        self.assertEqual(report["extra"], [])
+        self.assertEqual(report["strict_action_differences"], 1)
+        self.assertEqual(report["action_alias_only_differences"], 1)
+
+    def test_deferred_fk_declaration_is_flagged_for_manual_review(self):
+        with sqlite3.connect(self.backup) as db:
+            db.execute("DROP TABLE fixture_03")
+            db.execute(
+                "CREATE TABLE fixture_03 (id INTEGER PRIMARY KEY, "
+                "parent_id INTEGER REFERENCES fixture_00(id) "
+                "DEFERRABLE INITIALLY DEFERRED)"
+            )
+        self.assertEqual(module.deferred_fk_tables(self.backup), ["fixture_03"])
+
+    def test_restrict_semantics_does_not_hide_real_cascade_difference(self):
+        self.fkrows[1]["UPDATE_RULE"] = "RESTRICT"
+        self.fkrows[1]["DELETE_RULE"] = "RESTRICT"
+        self.write_csv()
+        src = module.source_constraints(
+            self.backup, module.validate_manifest(self.inventory))
+        dest, *unused = module.target_constraints(self.fkcsv)
+        report = module.analyze(src, dest)
+        self.assertEqual(len(report["missing"]), 1)
+        self.assertEqual(len(report["extra"]), 1)
+        self.assertIn("DELETE=CASCADE", report["missing"][0])
+
     def test_rejects_csv_without_referenced_columns(self):
         self.fkrows[0]["REFERENCED_COLUMN_NAME"]=""
         self.write_csv()
