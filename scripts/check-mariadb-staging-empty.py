@@ -66,19 +66,34 @@ def verify_csv(tables, csv_path):
         raise ValueError("count_csv_empty")
     actual = {}
     with file.open(newline="", encoding="utf-8-sig") as stream:
-        reader = csv.DictReader(stream)
-        if not reader.fieldnames:
-            raise ValueError("invalid_count_csv_header")
-        reader.fieldnames = [h.strip().strip("\ufeff") for h in reader.fieldnames]
-        if not {"TABLE_NAME", "ROW_COUNT"}.issubset(reader.fieldnames):
-            if any(";" in field for field in reader.fieldnames):
+        reader = csv.reader(stream)
+        first = next(reader, None)
+        if first is None:
+            raise ValueError("count_csv_empty")
+        fields = [value.strip().strip("\ufeff") for value in first]
+        if len(fields) != 2:
+            if len(fields) == 1 and (";" in fields[0] or "\t" in fields[0]):
                 raise ValueError("count_csv_delimiter_should_be_comma")
+            if fields and fields[0].lstrip().upper().startswith(
+                ("--", "/*", "SELECT ", "CREATE ", "INSERT ", "#")
+            ):
+                raise ValueError("count_csv_is_sql_not_results")
             raise ValueError("invalid_count_csv_header")
-        for row in reader:
-            if None in row:
+        header = [value.upper() for value in fields]
+        if header == ["TABLE_NAME", "ROW_COUNT"]:
+            rows = reader
+        elif fields[0] in tables and fields[1].isdecimal():
+            # phpMyAdmin may export query results without a header row.
+            # Recognize only a known table and a nonnegative count.
+            import itertools
+            rows = itertools.chain([first], reader)
+        else:
+            raise ValueError("invalid_count_csv_header")
+        for row in rows:
+            if len(row) != 2:
                 raise ValueError("invalid_count_csv")
-            table = (row["TABLE_NAME"] or "").strip()
-            count = (row["ROW_COUNT"] or "").strip()
+            table = row[0].strip()
+            count = row[1].strip()
             if (not IDENT.fullmatch(table) or table in actual or
                     not count.isdecimal()):
                 raise ValueError("invalid_count_csv")
@@ -129,6 +144,7 @@ def main():
         known = {
             "count_csv_missing", "count_csv_empty",
             "count_csv_encoding_not_utf8", "count_csv_delimiter_should_be_comma",
+            "count_csv_is_sql_not_results",
             "invalid_inventory", "unapproved_staging_schema",
             "expected_63_tables", "invalid_count_csv_header",
             "invalid_count_csv", "mariadb_count_tables_missing_or_extra",
