@@ -511,3 +511,50 @@ TOTAL_TARGET_ROWS: 0
 
 ตัวตรวจนี้ไม่มีฟังก์ชัน Import; ต้องตรวจ Generated/CHECK/Triggers และ
 ทดสอบการเชื่อมต่อ MariaDB ผ่านบัญชีทดลองสิทธิ์จำกัดก่อนดำเนินงานต่อ
+
+## ขั้นตอน 12.1: แก้ STAGING EMPTY GATE BLOCKED: metadata_unreadable
+
+จากการตรวจ 1 พฤศจิกายน 2569: ไฟล์ `mariadb-staging-counts.sql`
+สร้างสำเร็จแล้ว แต่ผลตรวจ `--verify-csv` ยังไม่ผ่าน
+ซึ่งไม่ใช่ข้อยืนยันว่าฐานมีข้อมูล สคริปต์เวอร์ชันใหม่แยกความผิดพลาดได้
+
+ขั้นแรกให้ตรวจว่ามี CSV ผลการรัน SELECT อยู่จริงหรือไม่:
+
+```powershell
+Test-Path "H:\RD_CONNECT_BACKUP\mariadb-staging-counts.csv"
+Get-Item "H:\RD_CONNECT_BACKUP\mariadb-staging-counts.csv" -ErrorAction SilentlyContinue | Select-Object Name,Length
+```
+
+ถ้าขึ้น False: ไฟล์ SQL ไม่ได้เป็น CSV ผลลัพธ์โดยอัตโนมัติ
+ให้เปิด `H:\RD_CONNECT_BACKUP\mariadb-staging-counts.sql` ด้วย Notepad
+คัดลอก SQL ทั้งหมด รันที่ phpMyAdmin → `ratsadaa_connect` → SQL → Go;
+จากหน้า **ผลการค้นหา** เลือก Query results operations → Export → CSV
+ตั้ง comma (ไม่ใช่ semicolon), Include column names in first row
+และ Dump all rows ให้ได้ 63 แถว; บันทึกชื่อ CSV ที่ระบุข้างต้น
+
+ถ้าขึ้น True: ตรวจว่าไม่เป็นไฟล์ 0 bytes และหัวคอลัมน์ต้องเป็น
+`TABLE_NAME,ROW_COUNT` ไม่ใช่ SQL source, HTML, spreadsheet,
+หรือข้อมูลที่ Export จากแท็บฐานข้อมูลแทน query results
+
+หลัง Fetch/Pull อัปเดตสคริปต์แล้วรัน:
+
+```powershell
+py "H:\rd-care\rd-care\scripts\check-mariadb-staging-empty.py" "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" --verify-csv "H:\RD_CONNECT_BACKUP\mariadb-staging-counts.csv"
+```
+
+สคริปต์จะแยก `count_csv_missing`, `count_csv_empty`,
+`count_csv_delimiter_should_be_comma`, `invalid_count_csv_header`,
+`mariadb_count_tables_missing_or_extra`, `count_csv_encoding_not_utf8`
+โดยไม่แสดงข้อมูลส่วนบุคคล
+
+## ขั้นตอน 13: Trigger parity blocker
+
+ข้อมูลล่าสุด: `GENERATED_MATCHED: 5`, CHECK count 101/101, SQLite triggers 10
+แต่ MariaDB triggers 0; **ยัง NO-GO** แม้ฐานว่างและ import plan ถูกต้อง
+อ่านรายละเอียดหน้าที่ Trigger ทั้ง 10 และแนวทางรักษาผลลัพธ์ใน
+`docs/MARIADB-TRIGGER-PARITY_TH.md`
+
+โดยเฉพาะ `behavior_incident_apply` เขียนกลับตารางต้นเหตุ; ไม่สามารถ
+คัดลอกไป MariaDB trigger ตรง ๆ โดยไม่กระทบ Error 1442
+ต้องทำ transactional backend พร้อมตรวจ concurrency / rollback / push
+และทดสอบฐานจำลองก่อนย้ายข้อมูลจริง
