@@ -99,7 +99,7 @@ export function createPeriodCenter({api,mount,safeRun,openLesson,openEditor,toas
        <span class="period-column-time">${esc(range)}</span>
       </th>`;
      }).join('')}</tr></thead>
-     <tbody>${cells.map(row=>`<tr><th scope="row" class="period-day period-day-${row.day_of_week}">${esc(row.dayShort)}<small>${esc(row.date.slice(8))}/${esc(row.date.slice(5,7))}</small></th>
+     <tbody>${cells.map(row=>`<tr><th scope="row" class="period-day period-day-${row.day_of_week}">${esc(row.dayShort)}<small>${esc(formatThaiDate(row.date))</small></th>
       ${row.cells.map(cell=>cell.lesson?(()=>{
        const l=cell.lesson;
        const status=statusFor(l.id,row.date),hasSaved=Number(status?.recorded||0)>0,hasAbsent=Number(status?.absent||0)>0;
