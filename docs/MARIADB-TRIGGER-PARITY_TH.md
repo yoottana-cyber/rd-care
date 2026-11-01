@@ -133,3 +133,48 @@ blocked, commit uncertainty. ยังไม่ได้ทดสอบจริ
 ต้องสร้างฐาน Lab แยกพร้อม synthetic schema และ MariaDB connection
 ที่ได้รับอนุมัติก่อนถึงจะเปิด real DB integration test ได้
 และต้องเก็บฐาน ratsadaa_connect ที่ยังว่างไว้โดยไม่เขียนทับ
+
+## MariaDB Lab — FK 0 จาก 119 (1 พ.ย. 2569)
+
+ข้อมูล phpMyAdmin: `ratsadaa_connect_lab` มี 63 ตาราง, students=0,
+Generated Columns=5, Triggers=0, Foreign Keys=0. Lab ยังไม่พร้อม
+สำหรับ Transaction tests / Import จนกว่าจะซ่อม Foreign Keys.
+
+เตรียมเครื่องมือ `scripts/prepare-mariadb-lab-fks.py` ที่อ่าน
+SQLite verified backup และ `mariadb-foreign-keys.csv` ของต้นทาง
+(ผ่าน 119 FK, 123 FK parts) ไม่เชื่อมต่อหรือเขียนฐานจริง.
+
+### A. สร้าง SQL อ่านจำนวนแถวทั้งหมดของ Lab
+
+GitHub Desktop Fetch origin → Pull origin แล้วรัน:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -Filter "rd-connect-*.sqlite" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบ SQLite backup" }
+py "H:\rd-care\rd-care\scripts\prepare-mariadb-lab-fks.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-foreign-keys.csv" --preflight-sql "H:\RD_CONNECT_BACKUP\mariadb-lab-fk-preflight.sql"
+```
+
+คัดลอก SQL เข้า phpMyAdmin ฐาน `ratsadaa_connect_lab` → SQL → Go
+Export *Query results operations* เป็น CSV ที่มี 3 หัวคอลัมน์
+`KIND,NAME,N` บันทึกไว้เป็น
+`H:\RD_CONNECT_BACKUP\mariadb-lab-fk-preflight.csv`.
+
+ผล CSV ต้องมี 67 แถว: TABLE_ROWS 63 ตารางต้อง 0 ทุกตาราง,
+TABLE_COUNT=63, FK_COUNT=0, GENERATED_COUNT=5, TRIGGER_COUNT=0.
+
+### B. สร้าง DDL ซ่อม FK (ยังไม่ execute)
+
+```powershell
+py "H:\rd-care\rd-care\scripts\prepare-mariadb-lab-fks.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-foreign-keys.csv" --prepare-alters "H:\RD_CONNECT_BACKUP\mariadb-lab-add-fks.sql" --lab-counts-csv "H:\RD_CONNECT_BACKUP\mariadb-lab-fk-preflight.csv"
+```
+
+สคริปต์จะสร้าง 119 `ALTER TABLE` ที่เจาะจงฐาน
+`ratsadaa_connect_lab` เท่านั้น เมื่อข้อมูล metadata แสดงว่าฐานว่าง
+ครบและ schema สำคัญมีจำนวนตรงตามที่คาด. ไม่เขียนฐานเอง.
+
+**ห้ามรัน DDL ซ่อมจนกว่าจะตรวจความสอดคล้องของชนิดคอลัมน์และ
+indexes ใน Lab และได้รับผลตรวจ preflight ล่าสุด**
+MariaDB ALTER TABLE เป็น DDL ที่อาจ commit รายคำสั่ง หากผิดพลาด
+ต้องตรวจสถานะ partial repair; ห้ามสั่งรันซ้ำทันทีหรือปิด FK checks.
+
+ฐาน `ratsadaa_connect` และ SQLite Live ไม่ถูกแตะในขั้นตอนนี้.
