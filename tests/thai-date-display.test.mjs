@@ -42,5 +42,5 @@ test('date views use the shared formatter, and the PWA caches it for offline ope
  assert.match(file('student-affairs.js'),/formatThaiDateTime\(x\.created_at\)/);
  const sw=file('sw.js');
  assert.match(sw,/\.\/thai-date\.js/);
- assert.match(sw,/rd-care-shell-v130/);
+ assert.match(sw,/rd-care-shell-v131/);
 });
