@@ -67,7 +67,7 @@ def collect_rules(sqlite_tables, target):
             raise ValueError("unexpected_sqlite_glob_constraint")
         target_regex = []
         for clause in dest_by_table.get(table, []):
-            if re.search(r"\b"+re.escape(col)+r"\s+REGEXP\b", clause, re.I):
+            if re.search(r"`?"+re.escape(col)+r"`?\s+REGEXP\b", clause, re.I):
                 match = REGEXP_EXTRACT.search(clause)
                 if not match:
                     raise ValueError("unexpected_regexp_clause")
