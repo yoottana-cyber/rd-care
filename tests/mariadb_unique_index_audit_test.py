@@ -90,6 +90,37 @@ class IndexAuditTests(unittest.TestCase):
         self.assertNotIn("Alice",str(result["issues"]))
         self.assertNotIn("same",str(result["issues"]))
 
+    def test_accepts_phpmyadmin_null_marker_for_sub_part(self):
+        self.assertEqual(audit.sql_nullable_metadata("NULL"), "")
+        self.assertEqual(audit.sql_nullable_metadata("\\N"), "")
+        self.assertEqual(audit.sql_nullable_metadata(""), "")
+        self.assertEqual(audit.sql_nullable_metadata(" 20 "), "20")
+        rows = list(csv.DictReader(self.indexes.open(newline="")))
+        rows[0]["SUB_PART"] = "NULL"
+        rows[0]["COLUMN_NAME"] = "username"
+        for row in rows[1:]:
+            row["SUB_PART"] = "NULL"
+        with self.indexes.open("w", newline="") as stream:
+            writer=csv.DictWriter(stream,fieldnames=[
+                "TABLE_NAME","INDEX_NAME","NON_UNIQUE","SEQ_IN_INDEX",
+                "COLUMN_NAME","SUB_PART","INDEX_TYPE"])
+            writer.writeheader()
+            writer.writerows(rows)
+        src, cols, indexes = audit.read_metadata(
+            self.schema, self.columns, self.indexes
+        )
+        report = audit.inspect_unique(self.backup, src, cols, indexes)
+        self.assertEqual(report["unique_skipped_prefix"], 0)
+        self.assertEqual(report["unique_checked"], 2)
+
+    def test_safe_reason_does_not_reveal_csv_values(self):
+        self.assertEqual(audit.safe_reason(ValueError("invalid_mariadb_index")),
+                         "invalid_mariadb_index")
+        self.assertEqual(
+            audit.safe_reason(ValueError("student_private_value")),
+            "cannot_read_metadata_or_backup"
+        )
+
     def test_ignores_nulls_in_unique_index(self):
         src, cols, indexes=audit.read_metadata(self.schema,self.columns,self.indexes)
         indexes={k:v for k,v in indexes.items() if k[0]=="fixture_02"}
