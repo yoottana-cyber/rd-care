@@ -56,7 +56,7 @@ class LabFkRepairTests(unittest.TestCase):
 
     def test_read_only_preflight_sql_targets_lab_and_all_tables(self):
         sql=mod.preflight_sql(self.tables)
-        self.assertEqual(sql.count(" AS N"),63)
+        self.assertEqual(sql.count("COUNT(*) AS N FROM"),63)
         self.assertIn(TICK+"ratsadaa_connect_lab"+TICK+"."+TICK+"fixture_00"+TICK,sql)
         self.assertIn("FK_COUNT",sql)
         self.assertIn("GENERATED_COUNT",sql)
