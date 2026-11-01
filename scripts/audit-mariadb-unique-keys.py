@@ -37,6 +37,29 @@ def load_csv(filename, required):
             raise ValueError("metadata_header_incomplete")
         return list(reader)
 
+ 
+def sql_nullable_metadata(value):
+    """phpMyAdmin may serialize a SQL NULL as NULL, \\N, or empty."""
+    text = (value or "").strip()
+    return "" if text.upper() in ("NULL", "\\N") else text
+
+
+def safe_reason(exception):
+    """Show only fixed failure codes, never raw input values or student records."""
+    allowed = {
+        "invalid_identifier", "missing_metadata_header",
+        "metadata_header_incomplete", "invalid_sqlite_inventory",
+        "invalid_mariadb_columns", "duplicate_mariadb_column",
+        "target_tables_mismatch", "invalid_mariadb_index",
+        "index_table_unknown", "index_column_unknown",
+        "mariadb_index_inventory_empty", "verified_backup_required",
+        "backup_integrity_failed", "backup_foreign_keys_failed",
+        "index_part_order_invalid", "index_source_columns_missing",
+        "schema_backup_counts_mismatch",
+    }
+    msg = str(exception)
+    return msg if msg in allowed else "cannot_read_metadata_or_backup"
+
 
 def read_metadata(schema_file, columns_file, indexes_file):
     with Path(schema_file).open(encoding="utf-8-sig") as stream:
@@ -85,7 +108,7 @@ def read_metadata(schema_file, columns_file, indexes_file):
     for row in load_csv(indexes_file, IDX_FIELDS):
         table = (row["TABLE_NAME"] or "").strip()
         idx = (row["INDEX_NAME"] or "").strip()
-        col = (row["COLUMN_NAME"] or "").strip()
+        col = sql_nullable_metadata(row["COLUMN_NAME"])
         if not IDENT.fullmatch(table) or not idx or not IDENT.fullmatch(idx):
             raise ValueError("invalid_mariadb_index")
         if table not in cols:
@@ -100,7 +123,7 @@ def read_metadata(schema_file, columns_file, indexes_file):
         key = indexes.setdefault(idxkey, {"unique": non_unique == "0", "parts": {}})
         if key["unique"] != (non_unique == "0") or int(seq) in key["parts"]:
             raise ValueError("invalid_mariadb_index")
-        sub = (row["SUB_PART"] or "").strip()
+        sub = sql_nullable_metadata(row["SUB_PART"])
         if sub and (not sub.isdecimal() or int(sub)<1):
             raise ValueError("invalid_mariadb_index")
         key["parts"][int(seq)] = {
@@ -208,8 +231,8 @@ def main():
             args.sqlite_schema_json,args.mariadb_columns_extended_csv,
             args.mariadb_indexes_csv)
         r=inspect_unique(args.backup_file,source,cols,indexes)
-    except (ValueError,OSError,UnicodeError,sqlite3.Error,csv.Error,json.JSONDecodeError,TypeError):
-        print("UNIQUE INDEX AUDIT BLOCKED: metadata/backup invalid or incomplete.",
+    except (ValueError,OSError,UnicodeError,sqlite3.Error,csv.Error,json.JSONDecodeError,TypeError) as exc:
+        print("UNIQUE INDEX AUDIT BLOCKED: "+safe_reason(exc),
               file=sys.stderr)
         return 1
     print("RD CONNECT MARIADB UNIQUE INDEX AUDIT: READ ONLY")
