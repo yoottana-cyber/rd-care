@@ -188,3 +188,42 @@ py "H:\rd-care\rd-care\scripts\audit-sqlite-mariadb-data-fit.py" $backup.FullNam
 **ยังไม่สั่งนำเข้าข้อมูลจริง** หลังผ่านขั้นนี้ต้องตรวจ Unique/Foreign Key,
 Collation, CHECK, Generated Expressions และการจำลอง INSERT ใน MariaDB
 บนฐานทดลองที่ไม่กระทบ Production ก่อนเปลี่ยนระบบ
+
+## ขั้นตอน 7: ตรวจ MariaDB UNIQUE INDEX ชนกับข้อมูล SQLite หรือไม่
+
+Export **เฉพาะ metadata ดัชนี** จาก phpMyAdmin → `ratsadaa_connect` → SQL:
+
+```sql
+SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX,
+       COLUMN_NAME, SUB_PART, INDEX_TYPE
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = 'ratsadaa_connect'
+ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX;
+```
+
+ใต้ผล SQL เลือก **Export → CSV**, delimiter เป็น comma,
+เปิดชื่อคอลัมน์บรรทัดแรก, Dump all rows แล้วบันทึกชื่อ
+`H:\RD_CONNECT_BACKUP\mariadb-indexes.csv`.
+ไฟล์นี้ไม่มีข้อมูลนักเรียนหรือรหัสผ่าน
+
+GitHub Desktop → Fetch origin → Pull origin แล้วใช้ PowerShell:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์ Backup SQLite" }
+py "H:\rd-care\rd-care\scripts\audit-mariadb-unique-keys.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-columns-extended.csv" "H:\RD_CONNECT_BACKUP\mariadb-indexes.csv"
+```
+
+- `UNIQUE_CHECKED`: จำนวน Unique Index ที่ตรวจจากข้อมูล SQLite จริง
+- `EXACT_DUPLICATE_GROUPS`: กลุ่มรายการที่ซ้ำตรงกัน
+- `POTENTIAL_CASEFOLD_COLLISIONS`: รูปแบบอักษรต่างกัน แต่ casefold เหมือนกัน
+- `UNIQUE_SKIPPED_GENERATED`: ดัชนีที่ประกอบด้วย Generated Columns
+  ต้องตรวจอีกครั้งด้วย MySQL/MariaDB จริงในฐานทดลองแยก
+- `UNIQUE_SKIPPED_PREFIX`: ดัชนี prefix ต้องตรวจความยาวและ prefix เพิ่ม
+
+**ข้อจำกัด:** วิธี Python ไม่จำลองกฎ Collation ของ MariaDB ได้ครบ
+โดยเฉพาะการเปรียบเทียบอักษรไทย, accent, accent folding และการ normalize;
+ผลที่ไม่พบปัญหา **ไม่ได้แปลว่านำเข้าจะสำเร็จแน่นอน**
+ยังต้องตรวจ Foreign Keys, generated expressions และ INSERT จริงในฐานทดลองแยก
+ก่อนเปิดใช้ Production; ไม่ปิด foreign_key_checks เพื่อแก้ปัญหาข้อมูลผิด
