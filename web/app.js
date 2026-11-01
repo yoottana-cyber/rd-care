@@ -1,5 +1,6 @@
 import {API_BASE_URL} from './config.js';
 import {formatThaiDate} from './thai-date.js';
+import {installThaiDatePickers} from './thai-date-picker.js';
 import {runSafely} from './run-safely.js';
 import {createRequestCache} from './request-cache.js';
 import {createUnifiedImport} from './unified-import.js';
@@ -38,6 +39,7 @@ import {renderSidebarNavigation,pageLocation,searchNavItems} from './navigation-
 import {initTheme,bindThemeButtons} from './theme.js';
 configureRolePwa(location.search);
 initTheme();
+installThaiDatePickers();
 // Always show the emblem; retain the bundled small crest for offline/error fallback.
 document.addEventListener('error',event=>{
  const img=event.target;
