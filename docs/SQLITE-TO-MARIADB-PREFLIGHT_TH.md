@@ -627,3 +627,40 @@ py "H:\rd-care\rd-care\scripts\audit-mariadb-check-parity.py" $backup.FullName "
 รักษาพฤติกรรม Trigger ทั้ง 10 ตาม `docs/MARIADB-TRIGGER-PARITY_TH.md`,
 สร้าง lab ไม่ผูกกับเว็บจริง, ทดสอบ rollback/concurrency/idempotency.
 `IMPORT_AUTHORIZED: NO` / `CUTOVER_AUTHORIZED: NO` จนกว่าจะผ่านทั้งหมด
+
+## ขั้นตอน 15: ตรวจ 15 CHECK expression mismatches ที่พบใน 11 ตาราง
+
+ผล Audit 1 พ.ย. 2569:
+- SQLITE_CHECKS=101, MARIADB_CHECKS=101
+- EXACT_NORMALIZED_TEXT_MATCHES=86
+- PER_TABLE_COUNT_MISMATCHES=0
+- UNMATCHED_SQLITE_CHECKS=15, UNMATCHED_MARIADB_CHECKS=15
+- ตารางที่ต้องตรวจ: affairs_behavior_rules, affairs_settings, behavior_incidents,
+  behavior_records, notification_outbox, period_teaching_logs, portal_accounts,
+  school_settings, student_direct_messages, student_enrollments, student_transfer_plans.
+
+ไม่มีหลักฐานว่า 15 กฎนี้ผิดทั้งหมด; บางกฎอาจแปลง SQLite SQL syntax เป็น MariaDB
+syntax แล้วมีพฤติกรรมเหมือนกัน. อย่างไรก็ตาม SQL text ยังไม่ตรง ต้องทดสอบ
+semantic และ domain rules ด้วย synthetic input บน MariaDB Lab ที่ไม่ผูกกับเว็บ
+
+เพิ่มสคริปต์ diagnostics แบบอ่านอย่างเดียว แสดงชื่อ CHECK ฝั่ง MariaDB
+และข้อความเปรียบเทียบ SQL จาก schema ทั้งสองฝั่งโดย **ซ่อน quoted string literals**
+ทำให้ไม่จำเป็นต้องส่ง SQLite DB หรือ CSV metadata ทั้งไฟล์เข้าแชต:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์ Backup SQLite" }
+py "H:\rd-care\rd-care\scripts\diagnose-mariadb-check-differences.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-constraints.csv"
+```
+
+ผลลัพธ์จับคู่ CHECK ที่เหลือในแต่ละตารางจากความคล้ายของ syntax **เพื่อการวินิจฉัยเท่านั้น**
+ไม่ถือว่าเป็นกฎเดียวกัน, ไม่ถือว่าผ่านการพิสูจน์ และ return code 2 หากยังมี mismatch
+(เป็นผลที่คาดหมายสำหรับ 15 ข้อ ไม่ใช่ crash)
+
+กรุณาส่งผลลัพธ์ Diagnostic เฉพาะข้อความกลับมา ไม่ต้องส่ง DB Backup หรือรหัสผ่าน
+ผู้พัฒนาจะใช้วิเคราะห์ข้อที่เป็นการแปลง syntax และข้อที่ต้องแก้/ทดสอบจริง
+
+สถานะ: ผ่าน exact-count empty gate (63/63 table empty ณ เวลาตรวจ) แต่
+**Import และ Cutover ยังคง NO-GO** จนกว่าจะพิสูจน์ semantics ของ CHECK
+และดำเนินการทดแทน Trigger 10 ตัวที่ MariaDB ปลายทางยังไม่มี
