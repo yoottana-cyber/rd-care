@@ -176,7 +176,7 @@ def deferred_fk_tables(backup_path):
             "SELECT name,sql FROM sqlite_master WHERE type='table' AND sql IS NOT NULL"
         ).fetchall()
     # Any DEFERRABLE declaration is flagged (including NOT DEFERRABLE, conservatively).
-    return [table for table, sql in rows if re.search(r"\\bDEFERRABLE\\b", sql, re.I)]
+    return [table for table, sql in rows if re.search(r"\bDEFERRABLE\b", sql, re.I)]
 
 
 def analyze(source, target):
