@@ -84,6 +84,8 @@ jobs:
           node --check web/login-route.js
           node --check web/portal-date-range.js
           node --check 'functions/api/[[path]].js'
+      - name: Offline MariaDB exact staging emptiness gate (synthetic)
+        run: python3 -m unittest discover -s tests -p 'mariadb_staging_empty_gate_test.py' -v
       - name: Offline MariaDB generated CHECK trigger constraint audit (synthetic)
         run: python3 -m unittest discover -s tests -p 'mariadb_constraints_audit_test.py' -v
       - name: Offline MariaDB staging FK-ordered import plan (synthetic)
