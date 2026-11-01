@@ -1,3 +1,4 @@
+import {formatThaiDate} from './thai-date.js';
 // Permanent printed late-arrival QR for the school duty station.
 // No rotating secret: the QR is a public link; authenticated student and duty
 // teacher review are required before attendance is verified.
@@ -18,11 +19,11 @@ export function createLateGate({api,mount,toast,safeRun}){
   mount(`<div class="stack late-qr-page">
    <header class="row between"><div><h2>📷 QR ลงชื่อมาสาย (ถาวร)</h2>
     <p class="muted">QR แผ่นเดียวพิมพ์ติดไว้ได้ทุกวัน • หลัง ${esc(state.qr?.cutoff_time||'08:00')} น. นักเรียนลงชื่อแล้วระบบอนุมัติและบันทึกเช็กชื่อรายวันเป็น สาย โดยอัตโนมัติ</p></div>
-    <span class="tag">วันที่ ${esc(state.date||'-')}</span></header>
+    <span class="tag">วันที่ ${esc(formatThaiDate(state.date))}</span></header>
    ${state.focus?`<section class="card stack" id="pushNoticeFocus" tabindex="-1">
     <h3>🔔 รายละเอียดแจ้งเตือนมาสาย</h3>
     <strong>${esc(state.focus.full_name)}</strong>
-    <p>ห้อง ${esc(state.focus.classroom_label)} • วันที่ ${esc(state.focus.school_date)}
+    <p>ห้อง ${esc(state.focus.classroom_label)} • วันที่ ${esc(formatThaiDate(state.focus.school_date))}
       • เวลา ${esc(state.focus.arrived_at)} น.</p>
     ${state.focus.reason?`<p>สาเหตุ: ${esc(state.focus.reason)}</p>`:''}
     ${state.queue.some(item=>Number(item.auto_id)===Number(state.focus.id)&&item.can_delete)?
