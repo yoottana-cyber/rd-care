@@ -415,3 +415,57 @@ py "H:\rd-care\rd-care\scripts\plan-mariadb-staging-import.py" "H:\RD_CONNECT_BA
 ก่อนพัฒนาส่วนเขียนลงฐานทดลองต้องตรวจว่าใช้ **ฐานทดลองที่แยกจริง**
 จาก `ratsadaa_connect` และ DB SQLite ตัวจริง, มีสิทธิ์จำกัด
 ตรวจ CHECK/Trigger/Collation, ทดลอง rollback แล้วจึงทดสอบนำเข้าข้อมูล
+
+## ขั้นตอน 11: ยืนยันสูตร MariaDB Generated และเปรียบเทียบ CHECK/Triggers แบบอ่านอย่างเดียว
+
+หลังขั้นตอน Generated UNIQUE และลำดับนำเข้าผ่าน:
+`EXPECTED_INDEXES=3, MATCHED_INDEXES=3, EXACT_DUPLICATE_KEYS=0`,
+`TABLES_TO_IMPORT=62, SOURCE_ROWS_TO_IMPORT=17435, TABLE_DEPENDENCY_CYCLES=0`
+
+ใน phpMyAdmin ของฐาน `ratsadaa_connect` ใช้คำสั่ง SELECT ต่อไปนี้:
+
+```sql
+SELECT 'GENERATED' AS ITEM_TYPE, TABLE_NAME, COLUMN_NAME AS ITEM_NAME,
+       GENERATION_EXPRESSION AS ITEM_VALUE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = 'ratsadaa_connect'
+  AND LOWER(EXTRA) LIKE '%generated%'
+UNION ALL
+SELECT 'CHECK' AS ITEM_TYPE, TABLE_NAME, CONSTRAINT_NAME, CHECK_CLAUSE
+FROM information_schema.CHECK_CONSTRAINTS
+WHERE CONSTRAINT_SCHEMA = 'ratsadaa_connect'
+UNION ALL
+SELECT 'TRIGGER' AS ITEM_TYPE, EVENT_OBJECT_TABLE AS TABLE_NAME,
+       TRIGGER_NAME AS ITEM_NAME,
+       CONCAT(ACTION_TIMING, ' ', EVENT_MANIPULATION) AS ITEM_VALUE
+FROM information_schema.TRIGGERS
+WHERE TRIGGER_SCHEMA = 'ratsadaa_connect'
+ORDER BY ITEM_TYPE, TABLE_NAME, ITEM_NAME;
+```
+
+Export เฉพาะผล SQL เป็น CSV แบบ comma, เปิด header row, dump all rows
+และบันทึก `H:\RD_CONNECT_BACKUP\mariadb-constraints.csv`
+รายงานนี้เป็น metadata เท่านั้น ไม่ใช่ข้อมูลบุคคลหรือข้อมูลบัญชี
+
+GitHub Desktop → Fetch origin → Pull origin แล้ว PowerShell:
+
+```powershell
+$backup = Get-ChildItem "H:\RD_CONNECT_BACKUP" -File -Filter "rd-connect-*.sqlite" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $backup) { throw "ไม่พบไฟล์สำรอง SQLite" }
+py "H:\rd-care\rd-care\scripts\audit-mariadb-constraints.py" $backup.FullName "H:\RD_CONNECT_BACKUP\sqlite-schema-summary.json" "H:\RD_CONNECT_BACKUP\mariadb-constraints.csv"
+```
+
+โปรแกรมตรวจ MariaDB Generation Expressions ให้ตรงกับกฎที่คาดหมาย
+5 คอลัมน์ (เช่น `deleted_at IS NULL`, `end_date IS NULL`)
+และรายงานจำนวน CHECK/Trigger ใน SQLite และ MariaDB
+
+ข้อจำกัด: เปรียบเทียบรูปแบบ CASE WHEN ที่รู้จักเท่านั้น
+หาก MariaDB ใช้รูปแบบนิพจน์อื่นที่สมมูลกัน จะไม่รายงานว่า MATCH
+ก่อนตรวจด้วยผู้พัฒนา; CHECK count เป็นการนับ SQL syntax
+ไม่ใช่การพิสูจน์ว่าความหมายเหมือนกัน และชื่อ Trigger ต่างกัน
+ไม่ได้แปลว่าทำงานผิดเสมอ ต้องตรวจ body และทดสอบธุรกรรม
+
+ถ้า `SQLITE_TRIGGER_COUNT > MARIADB_TRIGGER_COUNT` ต้องหยุดการเปิดใช้งาน
+บน MariaDB จนกว่าจะมีการออกแบบและทดสอบ business rule ที่ขาดหายไป
+ยังไม่มีคำสั่งเขียนลง MariaDB และห้ามใช้กับ SQLite Live
